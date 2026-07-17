@@ -41,26 +41,48 @@ pnpm dlx supabase@latest migration list
 
 ## 카카오 회원가입·로그인 설정
 
-일반 회원은 Supabase Auth의 Kakao OAuth로 가입과 로그인을 한 번에 처리합니다.
+일반 회원은 카카오 OIDC와 Supabase Auth를 연결해 가입과 로그인을 한 번에 처리합니다.
+인가 요청에는 `scope`를 직접 넣지 않고 Kakao Developers에 실제로 설정된 동의항목만
+사용하므로, 심사 전 미승인 항목을 요청해 발생하는 KOE205를 방지합니다.
 
 1. Kakao Developers에서 앱의 웹 플랫폼 도메인에 `https://www.ninety-nine-vintage.store`를 등록합니다.
-2. 카카오 로그인을 활성화하고 필요한 동의 항목을 설정합니다.
-3. 카카오 로그인 Redirect URI에 아래 Supabase 콜백을 정확히 등록합니다.
+2. 카카오 로그인과 OpenID Connect를 활성화합니다.
+3. 카카오 로그인 Redirect URI에 아래 서버 콜백을 정확히 등록합니다.
 
    ```text
-   https://bkwesxsznqupoqnwzzmn.supabase.co/auth/v1/callback
+   https://www.ninety-nine-vintage.store/api/auth/kakao/oidc
    ```
 
-4. Supabase Dashboard의 Authentication > Providers > Kakao에 카카오 REST API 키와 Client Secret을 설정합니다.
-5. Supabase Authentication > URL Configuration을 다음과 같이 설정합니다.
+4. Vercel 서버 환경에 `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET`,
+   `KAKAO_OIDC_REDIRECT_URI`와 `SUPABASE_SECRET_KEY`를 설정합니다. Client Secret과
+   Supabase secret key에는 `NEXT_PUBLIC_` 접두사를 붙이지 않습니다.
+5. 개인정보 동의항목 권한 심사 전에는 현재 설정된 닉네임만 사용합니다. 사업자 정보가
+   등록된 비즈 앱에서 심사 승인을 받은 뒤 Kakao Developers > 카카오 로그인 >
+   동의항목에서 이름(`name`), 성별(`gender`), 출생연도(`birthyear`)를 필수 동의로
+   저장합니다. 이메일(`account_email`)과 카카오계정 전화번호(`phone_number`)는
+   설정하거나 요청하지 않습니다.
+6. 심사 자료에는 다음 공개 URL을 사용합니다.
 
    ```text
-   Site URL: https://www.ninety-nine-vintage.store
-   Redirect URL: https://www.ninety-nine-vintage.store/auth/callback
-   Local Redirect URL: http://localhost:3000/auth/callback
+   회원가입 URL: https://www.ninety-nine-vintage.store/signup
+   개인정보처리방침 URL: https://www.ninety-nine-vintage.store/privacy
    ```
 
-애플리케이션은 로그인 완료 후 `/auth/callback`에서 세션을 확인하고 메인 화면으로 이동합니다. Vercel Preview에서 OAuth를 시험하려면 사용할 Preview 도메인의 `/auth/callback`도 Supabase Redirect URLs에 별도로 허용해야 합니다.
+서버는 카카오 액세스 토큰으로 OIDC UserInfo를 한 번 조회해 이름·성별·출생연도를
+민감정보 테이블에 저장한 뒤 토큰을 폐기합니다. 카카오 앱별 회원번호(`sub`)에는
+UNIQUE 제약을 적용해 같은 카카오 계정의 중복 가입을 차단합니다. 이메일이나 전화번호는
+변경될 수 있으므로 회원 고유키로 사용하지 않습니다.
+
+심사 승인 및 동의항목 저장을 모두 확인한 뒤 아래 SQL을 한 번 실행하면, 이름·성별·
+출생연도 세 값이 확인되지 않은 세션은 회원 기능을 사용할 수 없습니다. 승인 전에는
+반드시 `false`를 유지해야 KOE205 없이 기존 닉네임 로그인으로 심사 자료를 준비할 수
+있습니다.
+
+```sql
+update public.kakao_profile_requirements
+set enforce_verified_profile = true, updated_at = now()
+where singleton;
+```
 
 ## 관리자와 운영자 계정
 

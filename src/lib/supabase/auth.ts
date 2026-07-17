@@ -55,20 +55,10 @@ export async function signInWithKakao(): Promise<void> {
     throw new AuthenticationError("카카오 로그인은 브라우저에서 시작해 주세요.");
   }
 
-  const redirectTo = new URL("/auth/callback", window.location.origin).toString();
-  const { error } = await getSupabaseBrowserClient().auth.signInWithOAuth({
-    provider: "kakao",
-    options: {
-      redirectTo,
-    },
-  });
-
-  if (error) {
-    throw new AuthenticationError(
-      "카카오 로그인을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.",
-      { cause: error },
-    );
-  }
+  // Supabase's standard Kakao OAuth provider may request email and profile-image
+  // scopes. This server-owned OIDC flow omits scope entirely, so Kakao applies
+  // only the consent items that are actually configured in the app console.
+  window.location.assign("/api/auth/kakao/start");
 }
 
 /**

@@ -1,7 +1,8 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- Supabase Storage/Kakao 이미지 URL을 표시합니다. */
-import { useId, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import type { Role } from "@/src/types/auction";
 import { Button, Modal } from "@/src/components/common";
 import { useMemberAccount } from "@/src/hooks/useMemberAccount";
@@ -10,7 +11,12 @@ import type {
   SaveShippingAddressInput,
   WonProductShippingStatus,
 } from "@/src/lib/supabase/memberAccount";
+import {
+  fetchMyKakaoProfile,
+  type KakaoMemberProfile,
+} from "@/src/lib/supabase/kakaoProfile";
 import { formatKRW } from "@/src/utils/formatters";
+import { deleteMyAccount } from "@/src/lib/supabase/account";
 
 interface AccountPageProps {
   userId?: string;
@@ -42,6 +48,169 @@ const shippingStatusLabel: Record<WonProductShippingStatus, string> = {
   requested: "택배 접수 완료",
   shipped: "발송 완료",
 };
+
+const genderLabel = {
+  female: "여성",
+  male: "남성",
+} as const;
+
+function DeleteAccountModal({
+  open,
+  onClose,
+  onDeleted,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [confirmation, setConfirmation] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleDelete = async (event: FormEvent) => {
+    event.preventDefault();
+    if (confirmation !== "탈퇴") return;
+    setIsDeleting(true);
+    setError("");
+    try {
+      await deleteMyAccount();
+      onDeleted();
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "회원 탈퇴를 완료하지 못했습니다.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="회원 탈퇴"
+      description="회원 프로필과 서비스 이용 정보를 삭제합니다. 되돌릴 수 없습니다."
+      size="sm"
+    >
+      <form onSubmit={handleDelete} className="space-y-4">
+        <p className="rounded-2xl border border-[#edc2b8] bg-[#fff0ea] px-4 py-3 text-sm font-bold leading-6 text-[#974a3e]">
+          관계 법령상 보관 의무가 있는 거래 기록을 제외한 회원 정보는 탈퇴 처리와 함께
+          삭제됩니다. 계속하려면 아래에 <strong>탈퇴</strong>를 입력하세요.
+        </p>
+        <label className="block text-sm font-black text-[#4c4039]">
+          확인 문구
+          <input
+            value={confirmation}
+            onChange={(event) => setConfirmation(event.target.value)}
+            placeholder="탈퇴"
+            className="mt-2 h-12 w-full rounded-2xl border-2 border-[#ddcbbb] bg-white px-4 font-bold outline-none focus:border-[#d77b67]"
+            disabled={isDeleting}
+          />
+        </label>
+        {error ? <p role="alert" className="text-sm font-bold text-[#a84c3f]">{error}</p> : null}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={isDeleting}>
+            취소
+          </Button>
+          <Button type="submit" disabled={confirmation !== "탈퇴"} isLoading={isDeleting}>
+            {isDeleting ? "탈퇴 처리 중..." : "회원 탈퇴"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function VerifiedKakaoProfilePanel({ userId }: { userId: string }) {
+  const [profile, setProfile] = useState<KakaoMemberProfile | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
+
+  useEffect(() => {
+    let active = true;
+    void fetchMyKakaoProfile(userId)
+      .then((nextProfile) => {
+        if (!active) return;
+        setProfile(nextProfile);
+        setStatus("ready");
+      })
+      .catch(() => {
+        if (active) setStatus("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  return (
+    <section className="mt-6 rounded-[2rem] border border-[#eadbcd] bg-[#fffaf4] px-6 py-7 shadow-sm sm:px-9">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black tracking-[0.16em] text-[#a85e50]">
+            KAKAO VERIFIED PROFILE
+          </p>
+          <h3 className="mt-2 text-xl font-black text-[#443830]">
+            카카오 회원 정보
+          </h3>
+          <p className="mt-2 break-keep text-sm font-bold leading-6 text-[#7c6b60]">
+            회원 식별·고객 지원과 연령·성별 기반 서비스 운영에 사용되는 본인 정보입니다.
+          </p>
+        </div>
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-black ${
+            profile?.profileComplete
+              ? "bg-[#e2f2e8] text-[#3d6b50]"
+              : "bg-[#fff0d9] text-[#8a6731]"
+          }`}
+        >
+          {profile?.profileComplete ? "필수 정보 확인 완료" : "정보 확인 대기"}
+        </span>
+      </div>
+
+      {status === "loading" ? (
+        <p className="mt-5 text-sm font-bold text-[#7b6a5f]" role="status">
+          카카오 회원 정보를 확인하고 있어요.
+        </p>
+      ) : status === "error" ? (
+        <p className="mt-5 text-sm font-bold text-[#a45145]" role="alert">
+          회원 정보를 불러오지 못했습니다. 잠시 후 다시 로그인해 주세요.
+        </p>
+      ) : (
+        <dl className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-[#eadfd4] bg-white px-4 py-3">
+            <dt className="text-xs font-black text-[#8c796c]">이름</dt>
+            <dd className="mt-1 font-black text-[#4a3e36]">
+              {profile?.fullName || "심사 승인 후 제공"}
+            </dd>
+          </div>
+          <div className="rounded-2xl border border-[#eadfd4] bg-white px-4 py-3">
+            <dt className="text-xs font-black text-[#8c796c]">성별</dt>
+            <dd className="mt-1 font-black text-[#4a3e36]">
+              {profile?.gender ? genderLabel[profile.gender] : "심사 승인 후 제공"}
+            </dd>
+          </div>
+          <div className="rounded-2xl border border-[#eadfd4] bg-white px-4 py-3">
+            <dt className="text-xs font-black text-[#8c796c]">출생연도</dt>
+            <dd className="mt-1 font-black text-[#4a3e36]">
+              {profile?.birthYear ? `${profile.birthYear}년` : "심사 승인 후 제공"}
+            </dd>
+          </div>
+        </dl>
+      )}
+
+      <p className="mt-4 text-xs font-bold leading-5 text-[#89786d]">
+        이메일과 카카오계정 전화번호는 요청하거나 저장하지 않습니다. 자세한 내용은{" "}
+        <Link href="/privacy" className="underline underline-offset-2">
+          개인정보처리방침
+        </Link>
+        에서 확인할 수 있습니다.
+      </p>
+    </section>
+  );
+}
 
 const closedAtFormatter = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
@@ -645,6 +814,7 @@ export function AccountPage({
   onSignIn,
   onSignOut,
 }: AccountPageProps) {
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   if (!userId) {
     return (
       <main className="mx-auto w-full max-w-3xl px-4 pb-28 pt-8 sm:px-6 lg:pb-12">
@@ -711,14 +881,30 @@ export function AccountPage({
           </div>
         </dl>
 
-        <div className="flex justify-end px-6 py-5 sm:px-9">
+        <div className="flex flex-wrap justify-end gap-2 px-6 py-5 sm:px-9">
+          {role === "user" ? (
+            <Button variant="ghost" onClick={() => setDeleteModalOpen(true)}>
+              회원 탈퇴
+            </Button>
+          ) : null}
           <Button variant="ghost" onClick={() => void onSignOut()}>
             로그아웃
           </Button>
         </div>
       </section>
 
-      {role === "user" ? <MemberAccountPanel key={userId} userId={userId} /> : null}
+      {role === "user" ? (
+        <>
+          <VerifiedKakaoProfilePanel key={`kakao-${userId}`} userId={userId} />
+          <MemberAccountPanel key={userId} userId={userId} />
+        </>
+      ) : null}
+
+      <DeleteAccountModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onDeleted={() => window.location.replace("/")}
+      />
     </main>
   );
 }

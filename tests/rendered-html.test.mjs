@@ -118,19 +118,28 @@ test("keeps native build dependencies approved in both pnpm config locations", a
   }
 });
 
-test("uses Kakao membership and two configurable server-provisioned operators", async () => {
-  const [auth, authSession, modal, callback, provision, environmentExample, auctionApp] = await Promise.all([
+test("uses console-approved Kakao OIDC consent and two configurable server-provisioned operators", async () => {
+  const [auth, authSession, modal, callback, oidcHelper, oidcStart, oidcCallback, oidcSession, oidcProfile, kakaoMigration, requirementMigration, privacy, signup, provision, environmentExample, auctionApp] = await Promise.all([
     source("src/lib/supabase/auth.ts"),
     source("src/hooks/useAuthSession.ts"),
     source("src/components/auth/AuthModal.tsx"),
     source("app/auth/callback/page.tsx"),
+    source("src/lib/kakao/oidc.ts"),
+    source("app/api/auth/kakao/start/route.ts"),
+    source("app/api/auth/kakao/oidc/route.ts"),
+    source("app/api/auth/kakao/session/route.ts"),
+    source("app/api/auth/kakao/profile/route.ts"),
+    source("supabase/migrations/20260718020000_add_verified_kakao_profiles.sql"),
+    source("supabase/migrations/20260718023000_gate_required_kakao_profiles.sql"),
+    source("app/privacy/page.tsx"),
+    source("app/signup/page.tsx"),
     source("scripts/provision-operators.mjs"),
     source(".env.example"),
     source("src/components/AuctionApp.tsx"),
   ]);
 
-  assert.match(auth, /provider:\s*"kakao"/);
-  assert.match(auth, /\/auth\/callback/);
+  assert.match(auth, /window\.location\.assign\("\/api\/auth\/kakao\/start"\)/);
+  assert.doesNotMatch(auth, /signInWithOAuth/);
   assert.match(auth, /"unauthorized"/);
   assert.match(auth, /providers\.includes\("kakao"\)/);
   assert.match(auth, /hasKakaoProvider && hasMemberCompatibleRole/);
@@ -147,6 +156,49 @@ test("uses Kakao membership and two configurable server-provisioned operators", 
   assert.match(modal, /운영자는 발급받은 아이디/);
   assert.doesNotMatch(modal, /operator01~03/);
   assert.match(callback, /exchangeCodeForSession/);
+  assert.match(callback, /signInWithIdToken/);
+  assert.match(callback, /provider:\s*"kakao"/);
+  assert.match(callback, /\/api\/auth\/kakao\/session/);
+  assert.match(callback, /\/api\/auth\/kakao\/profile/);
+  assert.doesNotMatch(oidcHelper, /searchParams\.set\("scope"/);
+  assert.match(oidcHelper, /omit `scope`/);
+  assert.match(oidcHelper, /hashTokenSha256/);
+  assert.match(oidcHelper, /HttpOnly/);
+  assert.match(oidcHelper, /SameSite=Lax/);
+  assert.match(oidcHelper, /timingSafeStringEqual/);
+  assert.match(oidcStart, /KAKAO_STATE_COOKIE/);
+  assert.match(oidcStart, /KAKAO_NONCE_COOKIE/);
+  assert.match(oidcStart, /hashTokenSha256\(rawNonce\)/);
+  assert.match(oidcCallback, /client_secret:\s*configuration\.clientSecret/);
+  assert.match(oidcCallback, /AbortSignal\.timeout/);
+  assert.match(oidcSession, /hasTrustedRequestOrigin/);
+  assert.match(oidcSession, /clearHttpOnlyCookie/);
+  assert.match(oidcProfile, /KAKAO_USERINFO_ENDPOINT/);
+  assert.match(oidcProfile, /userHasKakaoSubject/);
+  assert.match(oidcProfile, /identity\.provider !== "kakao"/);
+  assert.doesNotMatch(oidcProfile, /user\.user_metadata/);
+  assert.match(oidcProfile, /\.from\("kakao_member_profiles"\)/);
+  assert.match(oidcProfile, /fullName && gender && birthYear/);
+  assert.match(oidcProfile, /enforce_verified_profile/);
+  assert.match(oidcProfile, /required_profile_incomplete/);
+  assert.doesNotMatch(oidcProfile, /userInfo\.(?:email|phone_number)/);
+  assert.match(kakaoMigration, /kakao_subject text not null unique/);
+  assert.match(kakaoMigration, /full_name text/);
+  assert.match(kakaoMigration, /gender text/);
+  assert.match(kakaoMigration, /birth_year smallint/);
+  assert.doesNotMatch(kakaoMigration, /create policy "Staff read verified Kakao profiles"/);
+  assert.doesNotMatch(kakaoMigration, /account_email|phone_number/);
+  assert.match(requirementMigration, /enforce_verified_profile boolean not null default false/);
+  assert.match(requirementMigration, /public\.has_required_kakao_profile\(\)/);
+  assert.match(requirementMigration, /and kakao_profiles\.profile_complete/);
+  assert.match(requirementMigration, /and public\.has_required_kakao_profile\(\)/);
+  assert.match(privacy, /개인정보처리방침/);
+  assert.match(privacy, /이름/);
+  assert.match(privacy, /성별/);
+  assert.match(privacy, /출생연도/);
+  assert.match(signup, /이메일과 카카오계정 전화번호는 동의 요청하지 않습니다/);
+  assert.match(callback, /kakaoSessionCreated = true/);
+  assert.match(callback, /if \(kakaoSessionCreated\)/);
   assert.match(provision, /email_confirm:\s*true/);
   assert.match(provision, /SUPABASE_SECRET_KEY/);
   assert.match(provision, /password\.length < 12/);
@@ -160,6 +212,9 @@ test("uses Kakao membership and two configurable server-provisioned operators", 
   assert.match(environmentExample, /OPERATOR01_ID=/);
   assert.match(environmentExample, /OPERATOR02_ID=/);
   assert.doesNotMatch(environmentExample, /OPERATOR03_(?:ID|PASSWORD)/);
+  assert.match(environmentExample, /KAKAO_REST_API_KEY=/);
+  assert.match(environmentExample, /KAKAO_CLIENT_SECRET=/);
+  assert.doesNotMatch(environmentExample, /NEXT_PUBLIC_KAKAO_CLIENT_SECRET/);
   assert.doesNotMatch(provision, /sb_secret_|service_role\s*=\s*["'][A-Za-z0-9]/);
   assert.doesNotMatch(auctionApp, /RoleToggle|MOCK_BIDDER|chatThreadState/);
 });
@@ -363,6 +418,23 @@ test("uses real member delivery data with a default-closed address panel", async
   assert.match(migration, /create or replace function public\.request_product_shipping/);
   assert.match(migration, /shipping_credit_count = shipping_credit_count - 1/);
   assert.doesNotMatch(migration, /assign_product_winner_on_close/);
+});
+
+test("allows verified Kakao members to delete accounts without losing required shipping history", async () => {
+  const [accountRoute, accountRepository, retentionMigration, policy] = await Promise.all([
+    source("app/api/account/delete/route.ts"),
+    source("src/lib/supabase/account.ts"),
+    source("supabase/migrations/20260718022000_allow_account_deletion_with_shipping_history.sql"),
+    source("app/privacy/page.tsx"),
+  ]);
+  assert.match(accountRoute, /verifier\.auth\.getUser\(accessToken\)/);
+  assert.match(accountRoute, /identity\.provider === "kakao"/);
+  assert.match(accountRoute, /admin\.auth\.admin\.deleteUser/);
+  assert.match(accountRepository, /Authorization: `Bearer \$\{data\.session\.access_token\}`/);
+  assert.match(retentionMigration, /alter column member_id drop not null/);
+  assert.match(retentionMigration, /on delete set null/);
+  assert.match(retentionMigration, /member_deleted_at/);
+  assert.match(policy, /관계 법령/);
 });
 
 test("provides a collapsible Supabase operator center with constrained product management", async () => {

@@ -22,13 +22,8 @@ export default function AuthCallbackPage() {
       if (active && !hasRedirected) setError(message);
     };
 
-    const {
-      data: { subscription },
-    } = client.auth.onAuthStateChange((_event, session) => {
-      if (session) finish();
-    });
-
     const completeLogin = async () => {
+      let kakaoSessionCreated = false;
       const query = new URLSearchParams(window.location.search);
       const providerError =
         query.get("error_description") || query.get("error") || null;
@@ -39,6 +34,51 @@ export default function AuthCallbackPage() {
       }
 
       try {
+        if (query.get("kakao_oidc") === "1") {
+          const tokenResponse = await fetch("/api/auth/kakao/session", {
+            method: "POST",
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+            cache: "no-store",
+          });
+          const tokenPayload = (await tokenResponse.json()) as {
+            idToken?: unknown;
+            nonce?: unknown;
+          };
+          if (
+            !tokenResponse.ok ||
+            typeof tokenPayload.idToken !== "string" ||
+            typeof tokenPayload.nonce !== "string"
+          ) {
+            throw new Error("Kakao OIDC handoff expired.");
+          }
+
+          const { data, error: idTokenError } =
+            await client.auth.signInWithIdToken({
+              provider: "kakao",
+              token: tokenPayload.idToken,
+              nonce: tokenPayload.nonce,
+            });
+          if (idTokenError) throw idTokenError;
+          if (data.session) {
+            kakaoSessionCreated = true;
+            const profileResponse = await fetch("/api/auth/kakao/profile", {
+              method: "POST",
+              headers: {
+                Accept: "application/json",
+                Authorization: `Bearer ${data.session.access_token}`,
+              },
+              credentials: "same-origin",
+              cache: "no-store",
+            });
+            if (!profileResponse.ok) {
+              throw new Error("Kakao profile synchronization failed.");
+            }
+            finish();
+            return;
+          }
+        }
+
         const { data: current, error: sessionError } =
           await client.auth.getSession();
         if (sessionError) throw sessionError;
@@ -62,6 +102,9 @@ export default function AuthCallbackPage() {
 
         fail("로그인 정보를 확인하지 못했어요. 처음부터 다시 시도해 주세요.");
       } catch {
+        if (kakaoSessionCreated) {
+          await client.auth.signOut();
+        }
         fail("로그인을 마무리하지 못했어요. 잠시 후 다시 시도해 주세요.");
       }
     };
@@ -70,7 +113,6 @@ export default function AuthCallbackPage() {
 
     return () => {
       active = false;
-      subscription.unsubscribe();
     };
   }, []);
 

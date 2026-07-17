@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { AdminAccessGate } from "@/src/components/admin/AdminAccessGate";
 import { AdminPage } from "@/src/components/admin";
 import BulkAuctionImportModal from "@/src/components/admin/BulkAuctionImportModal";
@@ -336,6 +337,18 @@ export function AuctionApp() {
       <div key={activePage} className="animate-fade-in-up relative">
         {renderPage()}
       </div>
+
+      <footer className="relative mx-auto w-full max-w-7xl px-4 pb-28 pt-3 text-center text-xs font-bold text-[var(--text-muted)] sm:px-6 lg:px-8 lg:pb-8">
+        <p>나인티나인 빈티지 · 다미네 구제</p>
+        <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2">
+          <Link href="/signup" className="underline underline-offset-2">
+            카카오 회원가입 안내
+          </Link>
+          <Link href="/privacy" className="underline underline-offset-2">
+            개인정보처리방침
+          </Link>
+        </div>
+      </footer>
 
       <NewAuctionModal
         open={newAuctionOpen && (role === "admin" || role === "operator")}

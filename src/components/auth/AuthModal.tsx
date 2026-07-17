@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import type { User } from "@supabase/supabase-js";
 import { Button, Modal } from "@/src/components/common";
 import {
@@ -149,6 +150,10 @@ export default function AuthModal({
               카카오 계정으로 로그인하면 회원가입이 함께 완료됩니다. 비밀번호를
               따로 만들 필요가 없어요.
             </p>
+            <div className="mx-auto mt-4 max-w-sm rounded-2xl border border-[#ead8b4] bg-[#fff7df] px-4 py-3 text-left text-sm font-bold leading-6 text-[#725c36]">
+              <p><strong>필수 동의:</strong> 이름, 성별, 출생연도</p>
+              <p>이메일과 카카오계정 전화번호는 요청하지 않습니다.</p>
+            </div>
 
             <button
               type="button"
@@ -173,6 +178,17 @@ export default function AuthModal({
               )}
               {isSubmitting ? "카카오로 이동 중..." : "카카오로 로그인"}
             </button>
+            <p className="mt-4 text-xs font-bold leading-5 text-[#86746a]">
+              로그인 전에{" "}
+              <Link href="/signup" className="underline underline-offset-2" onClick={onClose}>
+                회원가입 안내
+              </Link>
+              와{" "}
+              <Link href="/privacy" className="underline underline-offset-2" onClick={onClose}>
+                개인정보처리방침
+              </Link>
+              을 확인해 주세요.
+            </p>
           </section>
         ) : (
           <form role="tabpanel" onSubmit={handleStaffLogin} className="space-y-4 pt-6">

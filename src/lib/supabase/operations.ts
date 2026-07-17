@@ -14,8 +14,13 @@ type MemberDirectoryRow =
 export interface StaffMemberDirectoryEntry {
   id: string;
   displayName: string | null;
+  legalName: string | null;
   email: string | null;
   phone: string | null;
+  gender: "female" | "male" | null;
+  birthYear: number | null;
+  kakaoProfileComplete: boolean;
+  kakaoSyncedAt: string | null;
   accountStatus: MemberAccountStatus;
   shippingCreditCount: number;
   addressCount: number;
@@ -38,8 +43,13 @@ function mapMemberDirectoryRow(
   return {
     id: row.id,
     displayName: row.display_name,
+    legalName: row.legal_name,
     email: row.email,
     phone: row.phone,
+    gender: row.gender,
+    birthYear: row.birth_year,
+    kakaoProfileComplete: row.kakao_profile_complete,
+    kakaoSyncedAt: row.kakao_synced_at,
     accountStatus: row.account_status,
     shippingCreditCount: row.shipping_credit_count,
     addressCount: row.address_count,

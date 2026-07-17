@@ -126,6 +126,71 @@ export type Database = {
           },
         ];
       };
+      kakao_member_profiles: {
+        Row: {
+          member_id: string;
+          kakao_subject: string;
+          full_name: string | null;
+          gender: "female" | "male" | null;
+          birth_year: number | null;
+          profile_complete: boolean;
+          consent_items: string[];
+          last_synced_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          member_id: string;
+          kakao_subject: string;
+          full_name?: string | null;
+          gender?: "female" | "male" | null;
+          birth_year?: number | null;
+          profile_complete?: boolean;
+          consent_items?: string[];
+          last_synced_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          member_id?: string;
+          kakao_subject?: string;
+          full_name?: string | null;
+          gender?: "female" | "male" | null;
+          birth_year?: number | null;
+          profile_complete?: boolean;
+          consent_items?: string[];
+          last_synced_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "kakao_member_profiles_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      kakao_profile_requirements: {
+        Row: {
+          singleton: boolean;
+          enforce_verified_profile: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          singleton?: boolean;
+          enforce_verified_profile?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          singleton?: boolean;
+          enforce_verified_profile?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       products: {
         Row: {
           id: string;
@@ -307,7 +372,8 @@ export type Database = {
       shipping_requests: {
         Row: {
           id: string;
-          member_id: string;
+          member_id: string | null;
+          member_deleted_at: string | null;
           address_id: string | null;
           address_snapshot: Json;
           status: ShippingRequestStatus;
@@ -320,7 +386,8 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          member_id: string;
+          member_id?: string | null;
+          member_deleted_at?: string | null;
           address_id?: string | null;
           address_snapshot: Json;
           status?: ShippingRequestStatus;
@@ -333,7 +400,8 @@ export type Database = {
         };
         Update: {
           id?: string;
-          member_id?: string;
+          member_id?: string | null;
+          member_deleted_at?: string | null;
           address_id?: string | null;
           address_snapshot?: Json;
           status?: ShippingRequestStatus;
@@ -544,8 +612,13 @@ export type Database = {
         Returns: {
           id: string;
           display_name: string;
+          legal_name: string | null;
           email: string | null;
           phone: string | null;
+          gender: "female" | "male" | null;
+          birth_year: number | null;
+          kakao_profile_complete: boolean;
+          kakao_synced_at: string | null;
           account_status: MemberAccountStatus;
           shipping_credit_count: number;
           address_count: number;
@@ -556,6 +629,10 @@ export type Database = {
         }[];
       };
       is_admin: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      has_required_kakao_profile: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
       };

@@ -41,6 +41,7 @@ export interface AdminPageProps {
 
 type LoadStatus = "idle" | "loading" | "success" | "error";
 type MemberStatusFilter = "all" | MemberAccountStatus;
+type MemberGenderFilter = "all" | "female" | "male" | "unknown";
 type ProductStatusFilter = "all" | ManagedProduct["status"];
 
 const MEMBER_PAGE_SIZE = 12;
@@ -142,6 +143,8 @@ export function AdminPage({
   const [memberQuery, setMemberQuery] = useState("");
   const [memberStatusFilter, setMemberStatusFilter] =
     useState<MemberStatusFilter>("all");
+  const [memberGenderFilter, setMemberGenderFilter] =
+    useState<MemberGenderFilter>("all");
   const [memberPage, setMemberPage] = useState(1);
   const [mutatingMemberId, setMutatingMemberId] = useState<string | null>(
     null,
@@ -218,15 +221,25 @@ export function AdminPage({
       ) {
         return false;
       }
+      if (
+        memberGenderFilter !== "all" &&
+        (memberGenderFilter === "unknown"
+          ? member.gender !== null
+          : member.gender !== memberGenderFilter)
+      ) {
+        return false;
+      }
       if (!query) return true;
       return [
         member.displayName,
+        member.legalName,
         member.email,
         member.phone,
+        member.birthYear?.toString(),
         member.id,
       ].some((value) => value?.toLocaleLowerCase("ko-KR").includes(query));
     });
-  }, [memberQuery, memberStatusFilter, members]);
+  }, [memberGenderFilter, memberQuery, memberStatusFilter, members]);
 
   const memberTotalPages = Math.max(
     1,
@@ -504,7 +517,7 @@ export function AdminPage({
             </p>
           ) : null}
 
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_190px]">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_170px_170px]">
             <label className="text-sm font-black text-[#594a40]">
               회원 검색
               <input
@@ -514,7 +527,7 @@ export function AdminPage({
                   setMemberQuery(event.target.value);
                   setMemberPage(1);
                 }}
-                placeholder="이름, 이메일, 전화번호 또는 회원 ID"
+                placeholder="닉네임, 이름, 출생연도, 연락처 또는 회원 ID"
                 className="mt-2 w-full rounded-2xl border border-[#decdbf] bg-white px-4 py-3 text-sm font-semibold text-[#463a34] outline-none transition focus:border-[#ec7866] focus:ring-4 focus:ring-[#ec7866]/10"
               />
             </label>
@@ -533,6 +546,24 @@ export function AdminPage({
                 <option value="all">전체 상태</option>
                 <option value="active">활성</option>
                 <option value="suspended">이용 정지</option>
+              </select>
+            </label>
+            <label className="text-sm font-black text-[#594a40]">
+              성별 기준
+              <select
+                value={memberGenderFilter}
+                onChange={(event) => {
+                  setMemberGenderFilter(
+                    event.target.value as MemberGenderFilter,
+                  );
+                  setMemberPage(1);
+                }}
+                className="mt-2 w-full rounded-2xl border border-[#decdbf] bg-white px-4 py-3 text-sm font-semibold text-[#463a34] outline-none transition focus:border-[#ec7866] focus:ring-4 focus:ring-[#ec7866]/10"
+              >
+                <option value="all">전체 성별</option>
+                <option value="female">여성</option>
+                <option value="male">남성</option>
+                <option value="unknown">확인 대기</option>
               </select>
             </label>
           </div>
@@ -589,12 +620,15 @@ export function AdminPage({
                               상담 {member.supportStatus === "open" ? "진행" : "종료"}
                             </span>
                           ) : null}
+                          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${member.kakaoProfileComplete ? "border-[#c7dbca] bg-[#edf7ef] text-[#467052]" : "border-[#ead5ae] bg-[#fff8e6] text-[#876a37]"}`}>
+                            {member.kakaoProfileComplete ? "카카오 정보 확인" : "카카오 정보 대기"}
+                          </span>
                         </div>
                         <p className="mt-1 truncate text-sm font-semibold text-[#77685d]">
-                          {member.email || "이메일 없음"}
+                          실명 {member.legalName || "확인 대기"} · 성별 {member.gender === "female" ? "여성" : member.gender === "male" ? "남성" : "확인 대기"} · 출생연도 {member.birthYear ? `${member.birthYear}년` : "확인 대기"}
                         </p>
                         <p className="mt-1 truncate text-xs font-semibold text-[#9a8a7e]">
-                          {member.phone || "전화번호 없음"} · ID {member.id}
+                          배송 연락처 {member.phone || "미등록"} · ID {member.id}
                         </p>
                       </div>
                     </div>

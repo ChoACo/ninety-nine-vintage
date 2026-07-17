@@ -1015,7 +1015,6 @@ export const adminCustomerChats: AdminCustomerChatThread[] = [
     id: "admin-chat-kim-naeun",
     userId: currentUser.id,
     customerName: currentUser.name,
-    online: true,
     lastMessage: "두 벌을 함께 보내 주세요.",
     lastMessageAt: mockDateTime(0, "10:22:00"),
     messages: [
@@ -1037,7 +1036,6 @@ export const adminCustomerChats: AdminCustomerChatThread[] = [
     id: "admin-chat-park-soyeon",
     userId: "user-park-soyeon",
     customerName: "박소연",
-    online: true,
     lastMessage: "입금 확인 부탁드립니다.",
     lastMessageAt: mockDateTime(0, "11:32:00"),
     messages: [
@@ -1053,7 +1051,6 @@ export const adminCustomerChats: AdminCustomerChatThread[] = [
     id: "admin-chat-lee-junho",
     userId: "user-lee-junho",
     customerName: "이준호",
-    online: false,
     lastMessage: "한진택배로 발송되었습니다.",
     lastMessageAt: mockDateTime(1, "16:50:00"),
     messages: [
@@ -1076,7 +1073,6 @@ export const chatThreads: ChatThread[] = [
     lastMessage: "트렌치코트는 여성 66~77 사이즈에 잘 맞아요.",
     lastMessageAt: "2026-07-16T18:12:00+09:00",
     unread: 2,
-    online: true,
     messages: [
       {
         id: "host-message-1",
@@ -1112,7 +1108,6 @@ export const chatThreads: ChatThread[] = [
     lastMessage: "내일 오후 출고 후 송장 번호를 보내드릴게요.",
     lastMessageAt: "2026-07-16T16:45:00+09:00",
     unread: 0,
-    online: true,
     messages: [
       {
         id: "delivery-message-1",
@@ -1142,7 +1137,6 @@ export const chatThreads: ChatThread[] = [
     lastMessage: "새 상품은 매일 오전 9시에 공개됩니다.",
     lastMessageAt: "2026-07-14T09:05:00+09:00",
     unread: 1,
-    online: false,
     messages: [
       {
         id: "guide-message-1",

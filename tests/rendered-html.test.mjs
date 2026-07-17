@@ -51,7 +51,7 @@ test("server-renders the Dami vintage auction feed", async () => {
   assert.doesNotMatch(html, /버버리 체크 안감 트렌치코트 여성 66~77/);
   assert.doesNotMatch(html, /울 100% 카멜 핸드메이드 코트/);
   assert.match(html, /내 실시간 경매 현황/);
-  assert.match(html, /현재 접속 중인 회원/);
+  assert.match(html, /현재 접속 중인 사용자/);
   assert.match(html, /관리자 직통/);
   assert.doesNotMatch(html, /경매 진행 중|개별 남은 시간/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
@@ -78,6 +78,7 @@ test("keeps the auction UI modular while Supabase owns the product source", asyn
     "src/hooks/useAuctionPolicyClock.ts",
     "src/hooks/useFulfillmentFlow.ts",
     "src/hooks/usePaymentDeadlineCountdown.ts",
+    "src/hooks/useOnlineMembers.ts",
     "src/utils/bidding.ts",
     "src/utils/bidStatus.ts",
     "src/utils/auctionBidPolicy.ts",
@@ -176,6 +177,7 @@ test("keeps bidding transparent, cutoff-aware, and mistake-proof", async () => {
     bidStatus,
     liveSidebar,
     onlineSidebar,
+    onlineMembersHook,
     floatingChat,
     chatPage,
     auctionBidPolicy,
@@ -194,6 +196,7 @@ test("keeps bidding transparent, cutoff-aware, and mistake-proof", async () => {
     readFile(new URL("../src/utils/bidStatus.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/components/live/LiveBidSidebar.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/live/OnlineMembersSidebar.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/hooks/useOnlineMembers.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/components/chat/FloatingAdminChat.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/chat/ChatPage.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/utils/auctionBidPolicy.ts", import.meta.url), "utf8"),
@@ -274,15 +277,25 @@ test("keeps bidding transparent, cutoff-aware, and mistake-proof", async () => {
   assert.match(liveSidebar, /내가 입찰 중인 상품/);
   assert.match(liveSidebar, /<BidConfirmModal/);
   assert.match(liveSidebar, /getQuickBidAmount\(confirmPost\)/);
-  assert.match(onlineSidebar, /김\*수/);
-  assert.match(onlineSidebar, /현재 접속 중인 회원/);
+  assert.doesNotMatch(onlineSidebar, /김\*수|DEFAULT_ONLINE_MEMBERS|Mock 데이터/);
+  assert.match(onlineSidebar, /현재 접속 중인 사용자/);
+  assert.match(onlineSidebar, /Supabase 실시간 연결 기준/);
   assert.match(onlineSidebar, /sticky top-24/);
+  assert.match(onlineMembersHook, /site-online-members-v1/);
+  assert.match(onlineMembersHook, /createSupabasePresenceClient\(\)/);
+  assert.match(onlineMembersHook, /presence:\s*\{[\s\S]*key:\s*visitorId/);
+  assert.match(onlineMembersHook, /\.on\("presence", \{ event: "sync" \}/);
+  assert.match(onlineMembersHook, /channel\.presenceState\(\)/);
+  assert.match(onlineMembersHook, /\.track\(\{\}\)/);
+  assert.match(onlineMembersHook, /VISITOR_ID_TTL_MS/);
+  assert.match(onlineMembersHook, /MAX_VISIBLE_ONLINE_MEMBERS/);
+  assert.match(onlineMembersHook, /channel\.untrack\(\)/);
+  assert.match(onlineMembersHook, /client\.removeChannel\(channel\)/);
   assert.match(floatingChat, /fixed bottom-/);
   assert.match(floatingChat, /scale-95 opacity-0/);
-  assert.match(floatingChat, /🟢 온라인/);
+  assert.doesNotMatch(floatingChat, /thread\?\.online|🟢 온라인|⚪ 오프라인/);
   assert.match(floatingChat, /thread\.messages/);
-  assert.match(chatPage, /🟢 온라인/);
-  assert.match(chatPage, /⚪ 오프라인/);
+  assert.doesNotMatch(chatPage, /thread\.online|🟢 온라인|⚪ 오프라인/);
   assert.match(auctionBidPolicy, /NEW_BID_CUTOFF_SECONDS\s*=\s*20 \* 60 \* 60 \+ 56 \* 60/);
   assert.match(auctionBidPolicy, /AUCTION_CLOSE_SECONDS\s*=\s*21 \* 60 \* 60/);
   assert.match(auctionBidPolicy, /if \(userHasBidHistory\)/);
@@ -295,6 +308,7 @@ test("keeps bidding transparent, cutoff-aware, and mistake-proof", async () => {
   assert.match(auctionApp, /max-w-\[1800px\]/);
   assert.match(auctionApp, /xl:grid-cols-\[170px_minmax\(0,1fr\)_235px\]/);
   assert.match(auctionApp, /<OnlineMembersSidebar/);
+  assert.match(auctionApp, /useOnlineMembers\(\)/);
   assert.match(auctionApp, /<LiveBidSidebar/);
   assert.match(auctionApp, /<FloatingAdminChat/);
   assert.match(auctionApp, /useSupabaseProducts\(\)/);
@@ -617,6 +631,8 @@ test("persists auction products and images through Supabase", async () => {
   assert.match(supabaseClient, /createClient<Database>/);
   assert.match(supabaseClient, /NEXT_PUBLIC_SUPABASE_URL/);
   assert.match(supabaseClient, /NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
+  assert.match(supabaseClient, /export function createSupabasePresenceClient/);
+  assert.match(supabaseClient, /persistSession: false/);
   assert.doesNotMatch(supabaseClient, /SERVICE_ROLE|service_role/);
   assert.match(productRepository, /product-images/);
   assert.match(productRepository, /Date\.now\(\).*crypto\.randomUUID\(\)/);
@@ -784,11 +800,15 @@ test("keeps the double-click index.html synchronized with the updated business r
   assert.match(standalone, /function OnlineMembersSidebar/);
   assert.match(standalone, /function LiveBidSidebar/);
   assert.match(standalone, /function FloatingAdminChat/);
-  assert.match(standalone, /현재 접속 중인 회원/);
+  assert.match(standalone, /현재 접속 중인 사용자/);
+  assert.match(standalone, /site-online-members-v1/);
+  assert.match(standalone, /\.on\("presence", \{ event: "sync" \}/);
+  assert.match(standalone, /channel\.presenceState\(\)/);
+  assert.match(standalone, /channel\.track\(\{\}\)/);
+  assert.doesNotMatch(standalone, /김\*수|const ONLINE_MEMBERS\s*=|Mock 접속 상태/);
   assert.match(standalone, /🔥 재입찰 필요 상품/);
   assert.match(standalone, /🟢 내가 입찰 중인 상품/);
-  assert.match(standalone, /🟢 온라인/);
-  assert.match(standalone, /⚪ 오프라인/);
+  assert.doesNotMatch(standalone, /thread\?*\.online|🟢 온라인|⚪ 오프라인/);
   assert.match(standalone, /max-w-\[1800px\]/);
   assert.match(standalone, /xl:grid-cols-\[170px_minmax\(0,1fr\)_235px\]/);
 

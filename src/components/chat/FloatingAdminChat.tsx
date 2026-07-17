@@ -76,12 +76,8 @@ export function FloatingAdminChat({ thread, onSendMessage }: FloatingAdminChatPr
             <h2 className="truncate text-[17px] font-black text-[#493f39]">
               {thread?.name ?? "다미네 구제 관리자"}
             </h2>
-            <p
-              className={`mt-0.5 text-base font-bold ${
-                thread?.online ? "text-[#3f8068]" : "text-[#81766f]"
-              }`}
-            >
-              {thread?.online ? "🟢 온라인" : "⚪ 오프라인"}
+            <p className="mt-0.5 text-base font-bold text-[#81766f]">
+              문의를 남기면 확인 후 답변드려요
             </p>
           </div>
 

@@ -177,7 +177,6 @@ export interface AdminCustomerChatThread {
   id: string;
   userId: string;
   customerName: string;
-  online: boolean;
   lastMessage: string;
   lastMessageAt: ISODateString;
   messages: readonly AdminCustomerChatMessage[];
@@ -242,6 +241,5 @@ export interface ChatThread {
   lastMessage: string;
   lastMessageAt: ISODateString;
   unread: number;
-  online: boolean;
   messages: ChatMessage[];
 }

@@ -97,14 +97,8 @@ export function AdminCsChatModal({
               <p className="text-xl font-black text-[#493d35]">{buyer.name}</p>
               <p className="font-bold text-[#76685f]">낙찰 고객 CS 채팅</p>
             </div>
-            <span
-              className={`rounded-full px-3 py-1.5 font-black ${
-                thread?.online
-                  ? "bg-[#e0f4e9] text-[#3e765e]"
-                  : "bg-[#eeeae5] text-[#706a63]"
-              }`}
-            >
-              {thread?.online ? "🟢 온라인" : "⚪ 오프라인"}
+            <span className="rounded-full bg-[#eeeae5] px-3 py-1.5 font-black text-[#706a63]">
+              고객 대화
             </span>
           </header>
 

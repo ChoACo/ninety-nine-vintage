@@ -74,9 +74,6 @@ export function ChatPage({ threads, onSendMessage }: ChatPageProps) {
                     aria-hidden="true"
                   >
                     {thread.initials}
-                    {thread.online && (
-                      <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-[3px] border-white bg-[#77b89b]" />
-                    )}
                   </span>
 
                   <span className="min-w-0 flex-1">
@@ -89,12 +86,8 @@ export function ChatPage({ threads, onSendMessage }: ChatPageProps) {
                         {formatKoreanTime(thread.lastMessageAt)}
                       </time>
                     </span>
-                    <span
-                      className={`mt-0.5 block text-base font-bold ${
-                        thread.online ? "text-[#3f8068]" : "text-[#81766f]"
-                      }`}
-                    >
-                      {thread.online ? "🟢 온라인" : "⚪ 오프라인"}
+                    <span className="mt-0.5 block text-base font-bold text-[#81766f]">
+                      공식 상담 채널
                     </span>
                     <span className="mt-1 flex items-center justify-between gap-2">
                       <span className="truncate text-base text-[#756960]">{thread.lastMessage}</span>
@@ -122,12 +115,8 @@ export function ChatPage({ threads, onSendMessage }: ChatPageProps) {
             </span>
             <div>
               <h3 className="text-[17px] font-bold text-[#4a403a]">{selectedThread.name}</h3>
-              <p
-                className={`mt-0.5 text-base font-bold ${
-                  selectedThread.online ? "text-[#3f8068]" : "text-[#81766f]"
-                }`}
-              >
-                {selectedThread.online ? "🟢 온라인" : "⚪ 오프라인"}
+              <p className="mt-0.5 text-base font-bold text-[#81766f]">
+                메시지를 남기면 확인 후 답변드려요
               </p>
             </div>
           </header>

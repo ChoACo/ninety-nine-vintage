@@ -154,7 +154,6 @@ export function AdminPage({
             id: `admin-chat-${payload.userId}`,
             userId: payload.userId,
             customerName: payload.customerName,
-            online: false,
             lastMessage: payload.text,
             lastMessageAt: sentAt,
             messages: [message],

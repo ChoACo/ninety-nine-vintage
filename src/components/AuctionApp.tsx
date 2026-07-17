@@ -56,6 +56,7 @@ import {
   signOutSupabaseAdmin,
 } from "@/src/lib/supabase/adminAuth";
 import { useFulfillmentFlow } from "@/src/hooks/useFulfillmentFlow";
+import { useOnlineMembers } from "@/src/hooks/useOnlineMembers";
 import { useSupabaseProducts } from "@/src/hooks/useSupabaseProducts";
 
 const PROFILE_STORAGE_KEY = "damine-vintage-profile";
@@ -67,6 +68,12 @@ const MOCK_BIDDER_IDENTITY = currentUser.name;
 export function AuctionApp() {
   const [role, setRole] = useState<Role>("user");
   const [activePage, setActivePage] = useState<NavigationTarget>("feed");
+  const {
+    members: onlineMembers,
+    hasMore: hasMoreOnlineMembers,
+    status: onlineMembersStatus,
+    error: onlineMembersError,
+  } = useOnlineMembers();
   const {
     posts,
     setPosts,
@@ -443,7 +450,6 @@ export function AuctionApp() {
             id: `admin-chat-${payload.userId}`,
             userId: payload.userId,
             customerName: payload.customerName,
-            online: false,
             lastMessage: text,
             lastMessageAt: sentAt,
             messages: [
@@ -610,7 +616,13 @@ export function AuctionApp() {
     return (
       <main className="mx-auto w-full max-w-[1800px] px-3 pb-28 pt-6 sm:px-4 sm:pt-8 lg:px-5 lg:pb-12">
         <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_235px] xl:grid-cols-[170px_minmax(0,1fr)_235px] xl:gap-4">
-          <OnlineMembersSidebar className="hidden xl:block" />
+          <OnlineMembersSidebar
+            members={onlineMembers}
+            hasMore={hasMoreOnlineMembers}
+            status={onlineMembersStatus}
+            error={onlineMembersError}
+            className="hidden xl:block"
+          />
 
           <div className="min-w-0">
             <AuctionClock />

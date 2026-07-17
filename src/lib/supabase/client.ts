@@ -37,3 +37,19 @@ export function getSupabaseBrowserClient(): SupabaseClient<Database> {
 
   return browserClient;
 }
+
+/**
+ * Presence uses an isolated public client so a rapid React remount cannot
+ * reuse a channel that the shared application client is still closing.
+ */
+export function createSupabasePresenceClient(): SupabaseClient<Database> {
+  const { url, publishableKey } = getSupabaseConfiguration();
+
+  return createClient<Database>(url, publishableKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}

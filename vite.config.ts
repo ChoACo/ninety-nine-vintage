@@ -40,6 +40,20 @@ export default defineConfig(async () => {
   process.env.WRANGLER_LOG_PATH ??= ".wrangler/logs";
   process.env.MINIFLARE_REGISTRY_PATH ??= ".wrangler/registry";
 
+  // vinext needs a platform adapter to emit Vercel's SSR function and routes.
+  // Keep the native Cloudflare/Sites build for every other environment.
+  const isVercelBuild =
+    process.env.VERCEL === "1" || process.env.NITRO_PRESET === "vercel";
+
+  if (isVercelBuild) {
+    const { nitro } = await import("nitro/vite");
+    const { default: tailwindcss } = await import("@tailwindcss/vite");
+
+    return {
+      plugins: [vinext(), tailwindcss(), nitro()],
+    };
+  }
+
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 

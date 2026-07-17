@@ -51,7 +51,10 @@ import {
 import { formatKRW } from "@/src/utils/formatters";
 import { createProduct } from "@/src/lib/supabase/products";
 import { getSupabaseBrowserClient } from "@/src/lib/supabase/client";
-import { isSupabaseAdmin } from "@/src/lib/supabase/adminAuth";
+import {
+  isSupabaseAdmin,
+  signOutSupabaseAdmin,
+} from "@/src/lib/supabase/adminAuth";
 import { useFulfillmentFlow } from "@/src/hooks/useFulfillmentFlow";
 import { useSupabaseProducts } from "@/src/hooks/useSupabaseProducts";
 
@@ -80,6 +83,7 @@ export function AuctionApp() {
   const [newAuctionOpen, setNewAuctionOpen] = useState(false);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [isAdminSigningOut, setIsAdminSigningOut] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
   useEffect(() => {
@@ -543,6 +547,27 @@ export function AuctionApp() {
     showToast("Supabase 관리자 인증을 완료했어요.");
   };
 
+  const handleAdminSignOut = async () => {
+    setIsAdminSigningOut(true);
+
+    try {
+      await signOutSupabaseAdmin();
+      setIsAdminAuthenticated(false);
+      setRole("user");
+      setActivePage("feed");
+      setNewAuctionOpen(false);
+      showToast("관리자 로그아웃을 완료했어요.");
+    } catch (signOutError) {
+      showToast(
+        signOutError instanceof Error
+          ? signOutError.message
+          : "관리자 로그아웃을 완료하지 못했어요.",
+      );
+    } finally {
+      setIsAdminSigningOut(false);
+    }
+  };
+
   const renderPage = () => {
     if (activePage === "chat") {
       return (
@@ -640,6 +665,9 @@ export function AuctionApp() {
           role={role}
           onRoleChange={handleRoleChange}
           onCreateAuction={() => setNewAuctionOpen(true)}
+          isAdminAuthenticated={isAdminAuthenticated}
+          isAdminSigningOut={isAdminSigningOut}
+          onAdminSignOut={handleAdminSignOut}
         />
         <Navigation
           activePage={activePage}

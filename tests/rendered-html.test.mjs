@@ -660,6 +660,53 @@ test("persists auction products and images through Supabase", async () => {
   await assert.rejects(access(new URL("../src/utils/imageFiles.ts", import.meta.url)));
 });
 
+test("aligns the admin session lifecycle and Storage image policy", async () => {
+  const [
+    modal,
+    productRepository,
+    imagePolicy,
+    adminAuth,
+    auctionApp,
+    siteHeader,
+    databaseTypes,
+    migration,
+  ] = await Promise.all([
+    readFile(new URL("../src/components/feed/NewAuctionModal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/supabase/products.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/supabase/productImagePolicy.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/supabase/adminAuth.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/AuctionApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/common/SiteHeader.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/supabase/database.types.ts", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/migrations/20260717000000_create_products.sql", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(modal, /isSupportedProductImageMimeType\(file\.type\)/);
+  assert.match(modal, /PRODUCT_IMAGE_FORMAT_LABEL/);
+  assert.match(productRepository, /isSupportedProductImageMimeType\(file\.type\)/);
+
+  for (const mimeType of [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "image/avif",
+    "image/heic",
+    "image/heif",
+  ]) {
+    assert.match(imagePolicy, new RegExp(`"${mimeType}"`));
+    assert.match(migration, new RegExp(`'${mimeType}'`));
+  }
+
+  assert.match(adminAuth, /export async function signOutSupabaseAdmin/);
+  assert.match(adminAuth, /\.auth\.signOut\(\)/);
+  assert.match(auctionApp, /handleAdminSignOut/);
+  assert.match(auctionApp, /await signOutSupabaseAdmin\(\)/);
+  assert.match(siteHeader, /관리자 로그아웃/);
+  assert.match(siteHeader, /관리자 인증됨/);
+  assert.match(databaseTypes, /is_admin:[\s\S]*Returns: boolean/);
+});
+
 test("keeps the double-click index.html synchronized with the updated business rules", async () => {
   const standalone = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const postCardSource = standalone.slice(

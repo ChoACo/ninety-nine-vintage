@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated output from vinext, Vercel and Cloudflare tooling.
+    ".vercel/**",
+    ".vinext/**",
+    ".wrangler/**",
+    "dist/**",
   ]),
 ]);
 

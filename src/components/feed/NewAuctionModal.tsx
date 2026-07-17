@@ -13,6 +13,10 @@ import Button from "@/src/components/common/Button";
 import Modal from "@/src/components/common/Modal";
 import type { AuctionStatus, ISODateString } from "@/src/types/auction";
 import {
+  isSupportedProductImageMimeType,
+  PRODUCT_IMAGE_FORMAT_LABEL,
+} from "@/src/lib/supabase/productImagePolicy";
+import {
   formatKRW,
   getRelativeKoreanDateTime,
 } from "@/src/utils/formatters";
@@ -109,11 +113,11 @@ export default function NewAuctionModal({
     const input = event.currentTarget;
     const files = Array.from(input.files ?? []);
     const imageFiles = files.filter((file) =>
-      file.type.startsWith("image/"),
+      isSupportedProductImageMimeType(file.type),
     );
 
     if (imageFiles.length !== files.length) {
-      setError("이미지 파일만 선택할 수 있어요.");
+      setError(`${PRODUCT_IMAGE_FORMAT_LABEL} 사진만 선택할 수 있어요.`);
     } else {
       setError("");
     }
@@ -288,7 +292,7 @@ export default function NewAuctionModal({
               className="mt-2 text-xs font-medium leading-5 text-[#8a786c]"
             >
               여러 장을 한 번에 선택할 수 있어요. 첫 번째 사진이 대표
-              사진으로 표시됩니다.
+              사진으로 표시됩니다. 지원 형식: {PRODUCT_IMAGE_FORMAT_LABEL}.
             </p>
           </div>
 

@@ -38,3 +38,14 @@ export async function signInSupabaseAdmin(
 
   return data.user;
 }
+
+export async function signOutSupabaseAdmin(): Promise<void> {
+  const { error } = await getSupabaseBrowserClient().auth.signOut();
+
+  if (error) {
+    throw new AdminAuthenticationError(
+      "관리자 로그아웃을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.",
+      { cause: error },
+    );
+  }
+}

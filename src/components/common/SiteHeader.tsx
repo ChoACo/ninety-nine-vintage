@@ -8,12 +8,18 @@ export interface SiteHeaderProps {
   role: Role;
   onRoleChange: (role: Role) => void;
   onCreateAuction?: () => void;
+  isAdminAuthenticated?: boolean;
+  isAdminSigningOut?: boolean;
+  onAdminSignOut?: () => void | Promise<void>;
 }
 
 export default function SiteHeader({
   role,
   onRoleChange,
   onCreateAuction,
+  isAdminAuthenticated = false,
+  isAdminSigningOut = false,
+  onAdminSignOut,
 }: SiteHeaderProps) {
   return (
     <header className="rounded-[2rem] border border-white/80 bg-[#fffaf3]/90 p-4 shadow-[0_14px_40px_rgba(101,75,54,0.1)] backdrop-blur sm:p-5">
@@ -36,10 +42,27 @@ export default function SiteHeader({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <span className="rounded-full bg-[#e7f2f5] px-3 py-1.5 text-sm font-bold text-[#467481]">
-            Supabase 관리자 인증
+          <span
+            aria-live="polite"
+            className={`rounded-full px-3 py-1.5 text-sm font-bold ${
+              isAdminAuthenticated
+                ? "bg-[#e5f4eb] text-[#35684f]"
+                : "bg-[#f4ece4] text-[#806c60]"
+            }`}
+          >
+            {isAdminAuthenticated ? "관리자 인증됨" : "관리자 로그인 필요"}
           </span>
           <RoleToggle role={role} onToggle={onRoleChange} compact />
+          {isAdminAuthenticated && onAdminSignOut ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              isLoading={isAdminSigningOut}
+              onClick={() => void onAdminSignOut()}
+            >
+              {isAdminSigningOut ? "로그아웃 중..." : "관리자 로그아웃"}
+            </Button>
+          ) : null}
           {role === "admin" && onCreateAuction ? (
             <Button onClick={onCreateAuction} size="sm" className="ml-auto sm:ml-0">
               <span aria-hidden="true">+</span> 경매글 작성

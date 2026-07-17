@@ -8,6 +8,10 @@ import { getNextAuctionDeadline } from "@/src/utils/formatters";
 import { isSupabaseAdmin } from "./adminAuth";
 import { getSupabaseBrowserClient } from "./client";
 import type { Database, Json } from "./database.types";
+import {
+  isSupportedProductImageMimeType,
+  PRODUCT_IMAGE_FORMAT_LABEL,
+} from "./productImagePolicy";
 
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -105,8 +109,10 @@ function getImageExtension(file: File): string {
 }
 
 function assertUploadableImage(file: File) {
-  if (!file.type.startsWith("image/")) {
-    throw new ProductRepositoryError("이미지 파일만 업로드할 수 있어요.");
+  if (!isSupportedProductImageMimeType(file.type)) {
+    throw new ProductRepositoryError(
+      `${PRODUCT_IMAGE_FORMAT_LABEL} 사진만 업로드할 수 있어요.`,
+    );
   }
   if (file.size <= 0 || file.size > MAX_IMAGE_BYTES) {
     throw new ProductRepositoryError(

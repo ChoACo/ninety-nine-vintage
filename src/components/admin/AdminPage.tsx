@@ -1,187 +1,897 @@
 "use client";
 
-import { useMemo, useState } from "react";
+/* eslint-disable @next/next/no-img-element -- Supabase Storage 원격 상품 이미지를 표시합니다. */
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
-import type {
-  AdminSaleRecord,
-  AdminShipmentBatch,
-  ShipmentRegistrationPayload,
-} from "@/src/types/auction";
+import Button from "@/src/components/common/Button";
+import Modal from "@/src/components/common/Modal";
+import {
+  deleteManagedProduct,
+  fetchManagedProducts,
+  type ManagedProduct,
+  updateManagedProduct,
+} from "@/src/lib/supabase/products";
+import {
+  adjustMemberShippingCredits,
+  getStaffMemberDirectory,
+  setMemberAccountStatus,
+  type MemberAccountStatus,
+  type StaffMemberDirectoryEntry,
+} from "@/src/lib/supabase/operations";
 import { formatKRW } from "@/src/utils/formatters";
 
-import { AdminShipmentBoard } from "./AdminShipmentBoard";
-import { buildRecentSevenClosingDays, buildShipmentBatchesFromSales } from "./adminUtils";
-import { PickingPreviewModal } from "./PickingPreviewModal";
-import { RecentClosingList } from "./RecentClosingList";
-import { ShipmentRegistrationModal } from "./ShipmentRegistrationModal";
+import { CollapsibleSection } from "./CollapsibleSection";
+import {
+  ProductEditModal,
+  type ProductEditValues,
+} from "./ProductEditModal";
 
 export interface AdminPageProps {
-  sales: readonly AdminSaleRecord[];
-  shipments?: readonly AdminShipmentBatch[];
-  onRegisterShipment?: (
-    payload: ShipmentRegistrationPayload,
-  ) => void | Promise<void>;
+  role: "admin" | "operator";
+  onCreateProduct: () => void;
+  onOpenBulkImport: () => void;
+  onProductsChanged: () => void | Promise<void>;
   onNotify?: (message: string) => void;
 }
 
+type LoadStatus = "idle" | "loading" | "success" | "error";
+type MemberStatusFilter = "all" | MemberAccountStatus;
+type ProductStatusFilter = "all" | ManagedProduct["status"];
+
+const MEMBER_PAGE_SIZE = 12;
+const PRODUCT_PAGE_SIZE = 10;
+
+const productStatusLabel: Record<ManagedProduct["status"], string> = {
+  pending: "공개 대기",
+  active: "진행 중",
+  closed: "마감",
+};
+
+const productStatusClasses: Record<ManagedProduct["status"], string> = {
+  pending: "border-[#ead5a9] bg-[#fff7df] text-[#82673a]",
+  active: "border-[#b9d9c8] bg-[#e5f4eb] text-[#35684f]",
+  closed: "border-[#d8d0c9] bg-[#eee9e4] text-[#71675f]",
+};
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "기록 없음";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "확인 필요";
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function MemberInitial({ member }: { member: StaffMemberDirectoryEntry }) {
+  const label = member.displayName?.trim() || member.email?.trim() || "회원";
+  return (
+    <span
+      aria-hidden="true"
+      className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#d8c9bc] bg-[#f4e9df] text-sm font-black text-[#765e50]"
+    >
+      {label.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
+function Pagination({
+  currentPage,
+  totalPages,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+
+  return (
+    <nav
+      aria-label="목록 페이지 이동"
+      className="mt-5 flex items-center justify-center gap-3"
+    >
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={currentPage <= 1}
+        onClick={() => onPageChange(currentPage - 1)}
+      >
+        이전
+      </Button>
+      <span className="min-w-20 text-center text-sm font-black text-[#6f5d51]">
+        {currentPage} / {totalPages}
+      </span>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={currentPage >= totalPages}
+        onClick={() => onPageChange(currentPage + 1)}
+      >
+        다음
+      </Button>
+    </nav>
+  );
+}
+
 export function AdminPage({
-  sales,
-  shipments,
-  onRegisterShipment,
+  role,
+  onCreateProduct,
+  onOpenBulkImport,
+  onProductsChanged,
   onNotify,
 }: AdminPageProps) {
-  const [fallbackShipments, setFallbackShipments] = useState<
-    AdminShipmentBatch[]
-  >(() => buildShipmentBatchesFromSales(sales));
-  const [previewBatch, setPreviewBatch] =
-    useState<AdminShipmentBatch | null>(null);
-  const [registrationBatch, setRegistrationBatch] =
-    useState<AdminShipmentBatch | null>(null);
-
-  const shipmentBatches = shipments ?? fallbackShipments;
-
-  const salesWithLiveShippingStatus = useMemo(() => {
-    const shippedAuctionIds = new Set(
-      shipmentBatches
-        .filter((batch) => batch.status === "shipped")
-        .flatMap((batch) => batch.items.map((item) => item.auctionId)),
-    );
-    const packingAuctionIds = new Set(
-      shipmentBatches
-        .filter((batch) => batch.status === "packing")
-        .flatMap((batch) => batch.items.map((item) => item.auctionId)),
-    );
-
-    return sales.map((sale) => {
-      if (shippedAuctionIds.has(sale.auctionId)) {
-        return {
-          ...sale,
-          stage: "shipped" as const,
-          shippingStatus: "shipped" as const,
-        };
-      }
-      if (packingAuctionIds.has(sale.auctionId)) {
-        return {
-          ...sale,
-          stage: "shipping-requested" as const,
-          shippingStatus: "ready" as const,
-        };
-      }
-      return sale;
-    });
-  }, [sales, shipmentBatches]);
-
-  const recentDays = useMemo(
-    () => buildRecentSevenClosingDays(salesWithLiveShippingStatus),
-    [salesWithLiveShippingStatus],
+  const [members, setMembers] = useState<StaffMemberDirectoryEntry[]>([]);
+  const [memberLoadStatus, setMemberLoadStatus] =
+    useState<LoadStatus>("idle");
+  const [memberError, setMemberError] = useState("");
+  const [memberQuery, setMemberQuery] = useState("");
+  const [memberStatusFilter, setMemberStatusFilter] =
+    useState<MemberStatusFilter>("all");
+  const [memberPage, setMemberPage] = useState(1);
+  const [mutatingMemberId, setMutatingMemberId] = useState<string | null>(
+    null,
   );
-  const totalSales = salesWithLiveShippingStatus.reduce(
-    (sum, sale) => sum + sale.winningBid,
-    0,
-  );
-  const pendingPayments = salesWithLiveShippingStatus.filter(
-    (sale) => sale.paymentStatus === "pending",
-  ).length;
-  const packingCount = shipmentBatches.filter(
-    (batch) => batch.status === "packing",
-  ).length;
 
+  const [products, setProducts] = useState<ManagedProduct[]>([]);
+  const [productLoadStatus, setProductLoadStatus] =
+    useState<LoadStatus>("idle");
+  const [productError, setProductError] = useState("");
+  const [productQuery, setProductQuery] = useState("");
+  const [productStatusFilter, setProductStatusFilter] =
+    useState<ProductStatusFilter>("all");
+  const [productPage, setProductPage] = useState(1);
+  const [editingProduct, setEditingProduct] =
+    useState<ManagedProduct | null>(null);
+  const [deletingProduct, setDeletingProduct] =
+    useState<ManagedProduct | null>(null);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
-  const handleRegisterShipment = async (
-    payload: ShipmentRegistrationPayload,
-  ) => {
-    if (onRegisterShipment) {
-      await onRegisterShipment(payload);
-    } else {
-      setFallbackShipments((current) =>
-        current.map((batch) =>
-          batch.id === payload.batchId
-            ? {
-                ...batch,
-                status: "shipped",
-                courier: payload.courier,
-                trackingNumber: payload.trackingNumber,
-                shippedAt: payload.shippedAt,
-              }
-            : batch,
+  const isAdmin = role === "admin";
+
+  const loadMembers = useCallback(async () => {
+    setMemberLoadStatus("loading");
+    setMemberError("");
+    try {
+      const directory = await getStaffMemberDirectory();
+      setMembers(directory);
+      setMemberLoadStatus("success");
+    } catch (error) {
+      setMemberLoadStatus("error");
+      setMemberError(
+        getErrorMessage(
+          error,
+          "회원 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
         ),
       );
     }
+  }, []);
 
-    onNotify?.("송장이 등록되어 배송 중 / 발송 완료 영역으로 이동했습니다.");
+  const loadProducts = useCallback(async () => {
+    setProductLoadStatus("loading");
+    setProductError("");
+    try {
+      const managedProducts = await fetchManagedProducts();
+      setProducts(managedProducts);
+      setProductLoadStatus("success");
+    } catch (error) {
+      setProductLoadStatus("error");
+      setProductError(
+        getErrorMessage(
+          error,
+          "상품 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+        ),
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    const loadTimer = window.setTimeout(() => {
+      void loadMembers();
+      void loadProducts();
+    }, 0);
+
+    return () => window.clearTimeout(loadTimer);
+  }, [loadMembers, loadProducts]);
+
+  const filteredMembers = useMemo(() => {
+    const query = memberQuery.trim().toLocaleLowerCase("ko-KR");
+    return members.filter((member) => {
+      if (
+        memberStatusFilter !== "all" &&
+        member.accountStatus !== memberStatusFilter
+      ) {
+        return false;
+      }
+      if (!query) return true;
+      return [
+        member.displayName,
+        member.email,
+        member.phone,
+        member.id,
+      ].some((value) => value?.toLocaleLowerCase("ko-KR").includes(query));
+    });
+  }, [memberQuery, memberStatusFilter, members]);
+
+  const memberTotalPages = Math.max(
+    1,
+    Math.ceil(filteredMembers.length / MEMBER_PAGE_SIZE),
+  );
+  const safeMemberPage = Math.min(memberPage, memberTotalPages);
+  const pagedMembers = filteredMembers.slice(
+    (safeMemberPage - 1) * MEMBER_PAGE_SIZE,
+    safeMemberPage * MEMBER_PAGE_SIZE,
+  );
+
+  const filteredProducts = useMemo(() => {
+    const query = productQuery.trim().toLocaleLowerCase("ko-KR");
+    return products.filter((product) => {
+      if (
+        productStatusFilter !== "all" &&
+        product.status !== productStatusFilter
+      ) {
+        return false;
+      }
+      if (!query) return true;
+      return [product.title, product.description, product.id].some((value) =>
+        value.toLocaleLowerCase("ko-KR").includes(query),
+      );
+    });
+  }, [productQuery, productStatusFilter, products]);
+
+  const productTotalPages = Math.max(
+    1,
+    Math.ceil(filteredProducts.length / PRODUCT_PAGE_SIZE),
+  );
+  const safeProductPage = Math.min(productPage, productTotalPages);
+  const pagedProducts = filteredProducts.slice(
+    (safeProductPage - 1) * PRODUCT_PAGE_SIZE,
+    safeProductPage * PRODUCT_PAGE_SIZE,
+  );
+
+  const activeMemberCount = members.filter(
+    (member) => member.accountStatus === "active",
+  ).length;
+  const suspendedMemberCount = members.length - activeMemberCount;
+  const activeProductCount = products.filter(
+    (product) => product.status === "active",
+  ).length;
+  const pendingProductCount = products.filter(
+    (product) => product.status === "pending",
+  ).length;
+
+  const handleMemberStatusChange = async (
+    member: StaffMemberDirectoryEntry,
+    status: MemberAccountStatus,
+  ) => {
+    if (!isAdmin || member.accountStatus === status) return;
+    setMutatingMemberId(member.id);
+    setMemberError("");
+    try {
+      const updatedStatus = await setMemberAccountStatus(member.id, status);
+      setMembers((current) =>
+        current.map((entry) =>
+          entry.id === member.id
+            ? { ...entry, accountStatus: updatedStatus }
+            : entry,
+        ),
+      );
+      onNotify?.(
+        status === "active"
+          ? "회원 계정을 다시 활성화했습니다."
+          : "회원 계정을 이용 정지했습니다.",
+      );
+    } catch (error) {
+      setMemberError(
+        getErrorMessage(error, "회원 상태를 변경하지 못했습니다."),
+      );
+    } finally {
+      setMutatingMemberId(null);
+    }
+  };
+
+  const handleShippingCreditChange = async (
+    member: StaffMemberDirectoryEntry,
+    delta: number,
+  ) => {
+    if (!isAdmin || (delta < 0 && member.shippingCreditCount <= 0)) return;
+    setMutatingMemberId(member.id);
+    setMemberError("");
+    try {
+      const updatedCreditCount = await adjustMemberShippingCredits(
+        member.id,
+        delta,
+      );
+      setMembers((current) =>
+        current.map((entry) =>
+          entry.id === member.id
+            ? {
+                ...entry,
+                shippingCreditCount: updatedCreditCount,
+              }
+            : entry,
+        ),
+      );
+      onNotify?.(
+        `배송 이용권을 ${delta > 0 ? "1개 추가" : "1개 차감"}했습니다.`,
+      );
+    } catch (error) {
+      setMemberError(
+        getErrorMessage(error, "배송 이용권을 변경하지 못했습니다."),
+      );
+    } finally {
+      setMutatingMemberId(null);
+    }
+  };
+
+  const handleProductSave = async (
+    productId: string,
+    values: ProductEditValues,
+  ) => {
+    const currentProduct = products.find((product) => product.id === productId);
+    if (!currentProduct) {
+      throw new Error("수정할 상품을 찾지 못했습니다. 목록을 새로고침해 주세요.");
+    }
+
+    const updatedProduct = await updateManagedProduct(productId, {
+      title: values.title,
+      description: values.description,
+      startingPrice: values.startingPrice,
+      bidIncrement: currentProduct.bidIncrement,
+      status: values.status,
+      publishAt: values.publishAt,
+      expectedUpdatedAt: currentProduct.updatedAt,
+    });
+
+    setProducts((current) =>
+      current.map((product) =>
+        product.id === productId ? updatedProduct : product,
+      ),
+    );
+    onNotify?.("상품 정보를 수정했습니다.");
+
+    try {
+      await onProductsChanged();
+    } catch {
+      setProductError(
+        "상품은 수정되었지만 공개 피드를 바로 갱신하지 못했습니다. 목록 새로고침을 눌러 주세요.",
+      );
+    }
+  };
+
+  const handleProductDelete = async () => {
+    if (!deletingProduct) return;
+    setIsDeletingProduct(true);
+    setDeleteError("");
+    try {
+      await deleteManagedProduct(
+        deletingProduct.id,
+        deletingProduct.updatedAt,
+      );
+      setProducts((current) =>
+        current.filter((product) => product.id !== deletingProduct.id),
+      );
+      setEditingProduct((current) =>
+        current?.id === deletingProduct.id ? null : current,
+      );
+      setDeletingProduct(null);
+      onNotify?.("상품을 삭제했습니다.");
+      try {
+        await onProductsChanged();
+      } catch {
+        setProductError(
+          "상품은 삭제되었지만 공개 피드를 바로 갱신하지 못했습니다. 목록 새로고침을 눌러 주세요.",
+        );
+      }
+    } catch (error) {
+      setDeleteError(
+        getErrorMessage(error, "상품을 삭제하지 못했습니다."),
+      );
+    } finally {
+      setIsDeletingProduct(false);
+    }
   };
 
   return (
     <main className="mx-auto w-full max-w-[1500px] px-4 pb-28 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pb-12">
       <header className="mb-7 flex flex-col gap-5 sm:mb-9 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-[17px] font-black tracking-[0.15em] text-[#688493]">
-            ADMIN LOGISTICS
+          <p className="text-sm font-black tracking-[0.16em] text-[#688493]">
+            OPERATIONS CENTER
           </p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-[#493b31] sm:text-4xl">
-            다미네 구제 관리자 페이지
+            운영자 페이지
           </h1>
           <p className="mt-3 max-w-3xl text-[17px] font-bold leading-8 text-[#796b60]">
-            합배송 피킹부터 송장 등록과 최근 7일 낙찰 현황을 한 화면에서 처리합니다. 고객 상담은 상담 대화함에서 관리합니다.
+            회원과 경매 상품을 실제 서버 데이터로 조회하고, 필요한 업무만 펼쳐서 처리합니다.
           </p>
         </div>
-        <span className="w-fit rounded-full border-2 border-[#e5d5c4] bg-[#fffaf3] px-4 py-2 text-[17px] font-black text-[#8a7060] shadow-sm">
-          관리자 전용
+        <span className="w-fit rounded-full border-2 border-[#d6e2e5] bg-[#edf7f9] px-4 py-2 text-sm font-black text-[#4e737c] shadow-sm">
+          운영 센터 · {isAdmin ? "최고 관리자" : "운영자"}
         </span>
       </header>
 
-      <section
-        aria-label="관리자 운영 현황 요약"
-        className="mb-8 grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4"
+      <div className="space-y-4">
+        <CollapsibleSection
+          eyebrow="OVERVIEW"
+          title="운영 현황"
+          summary="회원과 상품의 현재 상태를 서버 기준으로 빠르게 확인합니다."
+          defaultOpen
+        >
+          <div
+            aria-label="운영 현황 요약"
+            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          >
+            <article className="rounded-[1.4rem] border border-[#dfd3c7] bg-white p-5">
+              <p className="text-sm font-black text-[#8c7b6e]">전체 회원</p>
+              <p className="mt-2 text-3xl font-black text-[#493b31]">
+                {memberLoadStatus === "success" ? members.length : "—"}
+                <span className="ml-1 text-sm">명</span>
+              </p>
+              <p className="mt-2 text-xs font-bold text-[#8c7b6e]">
+                {memberLoadStatus === "success"
+                  ? `활성 ${activeMemberCount} · 정지 ${suspendedMemberCount}`
+                  : "회원 데이터를 확인 중"}
+              </p>
+            </article>
+            <article className="rounded-[1.4rem] border border-[#cbdde5] bg-[#edf7fa] p-5">
+              <p className="text-sm font-black text-[#66808e]">진행 중 경매</p>
+              <p className="mt-2 text-3xl font-black text-[#3e5b69]">
+                {productLoadStatus === "success" ? activeProductCount : "—"}
+                <span className="ml-1 text-sm">개</span>
+              </p>
+              <p className="mt-2 text-xs font-bold text-[#66808e]">
+                공개 피드에 노출 중인 상품
+              </p>
+            </article>
+            <article className="rounded-[1.4rem] border border-[#ead5a9] bg-[#fff7df] p-5">
+              <p className="text-sm font-black text-[#82673a]">공개 대기</p>
+              <p className="mt-2 text-3xl font-black text-[#73572d]">
+                {productLoadStatus === "success" ? pendingProductCount : "—"}
+                <span className="ml-1 text-sm">개</span>
+              </p>
+              <p className="mt-2 text-xs font-bold text-[#82673a]">
+                예약 공개를 기다리는 상품
+              </p>
+            </article>
+            <article className="rounded-[1.4rem] border border-[#e7c9be] bg-[#fff0ea] p-5">
+              <p className="text-sm font-black text-[#966154]">운영 권한</p>
+              <p className="mt-2 text-xl font-black text-[#7c473c]">
+                {isAdmin ? "전체 관리" : "운영 업무"}
+              </p>
+              <p className="mt-2 text-xs font-bold leading-5 text-[#966154]">
+                {isAdmin
+                  ? "회원 상태와 배송 이용권 변경 가능"
+                  : "회원 정보는 읽기 전용으로 제공"}
+              </p>
+            </article>
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          eyebrow="MEMBERS"
+          title="회원 관리"
+          summary="전체 회원의 계정 상태, 배송 이용권, 상담·입찰 현황을 확인합니다."
+          actions={
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => void loadMembers()}
+              isLoading={memberLoadStatus === "loading"}
+            >
+              목록 새로고침
+            </Button>
+          }
+        >
+          {!isAdmin ? (
+            <p className="mb-4 rounded-2xl border border-[#d5e1e4] bg-[#edf7f9] px-4 py-3 text-sm font-bold leading-6 text-[#4f7179]">
+              운영자 계정은 회원 정보를 조회할 수 있습니다. 계정 정지와 배송 이용권 변경은 최고 관리자만 처리할 수 있습니다.
+            </p>
+          ) : null}
+
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_190px]">
+            <label className="text-sm font-black text-[#594a40]">
+              회원 검색
+              <input
+                type="search"
+                value={memberQuery}
+                onChange={(event) => {
+                  setMemberQuery(event.target.value);
+                  setMemberPage(1);
+                }}
+                placeholder="이름, 이메일, 전화번호 또는 회원 ID"
+                className="mt-2 w-full rounded-2xl border border-[#decdbf] bg-white px-4 py-3 text-sm font-semibold text-[#463a34] outline-none transition focus:border-[#ec7866] focus:ring-4 focus:ring-[#ec7866]/10"
+              />
+            </label>
+            <label className="text-sm font-black text-[#594a40]">
+              계정 상태
+              <select
+                value={memberStatusFilter}
+                onChange={(event) => {
+                  setMemberStatusFilter(
+                    event.target.value as MemberStatusFilter,
+                  );
+                  setMemberPage(1);
+                }}
+                className="mt-2 w-full rounded-2xl border border-[#decdbf] bg-white px-4 py-3 text-sm font-semibold text-[#463a34] outline-none transition focus:border-[#ec7866] focus:ring-4 focus:ring-[#ec7866]/10"
+              >
+                <option value="all">전체 상태</option>
+                <option value="active">활성</option>
+                <option value="suspended">이용 정지</option>
+              </select>
+            </label>
+          </div>
+
+          {memberError ? (
+            <div
+              role="alert"
+              className="mt-4 flex flex-col gap-3 rounded-2xl border border-[#efc8bb] bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#a84c3f] sm:flex-row sm:items-center sm:justify-between"
+            >
+              <span>{memberError}</span>
+              <Button size="sm" variant="ghost" onClick={() => void loadMembers()}>
+                다시 시도
+              </Button>
+            </div>
+          ) : null}
+
+          {memberLoadStatus === "loading" && members.length === 0 ? (
+            <p className="mt-5 rounded-2xl border border-[#e5d9ce] bg-white px-4 py-8 text-center text-sm font-bold text-[#7b6c61]">
+              회원 목록을 불러오는 중입니다...
+            </p>
+          ) : pagedMembers.length === 0 ? (
+            <p className="mt-5 rounded-2xl border border-dashed border-[#ddcfc2] bg-white/70 px-4 py-8 text-center text-sm font-bold text-[#7b6c61]">
+              조건에 맞는 회원이 없습니다.
+            </p>
+          ) : (
+            <ul className="mt-5 grid gap-3 xl:grid-cols-2">
+              {pagedMembers.map((member) => {
+                const isMutating = mutatingMemberId === member.id;
+                return (
+                  <li
+                    key={member.id}
+                    className="rounded-[1.4rem] border border-[#e4d8cd] bg-white p-4 shadow-[0_8px_22px_rgba(89,65,49,0.05)] sm:p-5"
+                  >
+                    <div className="flex items-start gap-3">
+                      <MemberInitial member={member} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="truncate text-base font-black text-[#493b31]">
+                            {member.displayName || "이름 미설정"}
+                          </h3>
+                          <span
+                            className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${
+                              member.accountStatus === "active"
+                                ? "border-[#b9d9c8] bg-[#e5f4eb] text-[#35684f]"
+                                : "border-[#e7bdb4] bg-[#fff0ea] text-[#9d493d]"
+                            }`}
+                          >
+                            {member.accountStatus === "active"
+                              ? "활성"
+                              : "이용 정지"}
+                          </span>
+                          {member.supportStatus ? (
+                            <span className="rounded-full border border-[#cbdde5] bg-[#edf7fa] px-2.5 py-1 text-[11px] font-black text-[#4f717b]">
+                              상담 {member.supportStatus === "open" ? "진행" : "종료"}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 truncate text-sm font-semibold text-[#77685d]">
+                          {member.email || "이메일 없음"}
+                        </p>
+                        <p className="mt-1 truncate text-xs font-semibold text-[#9a8a7e]">
+                          {member.phone || "전화번호 없음"} · ID {member.id}
+                        </p>
+                      </div>
+                    </div>
+
+                    <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <div className="rounded-xl bg-[#faf5ef] px-3 py-2">
+                        <dt className="text-[11px] font-black text-[#8b7a6d]">배송 이용권</dt>
+                        <dd className="mt-1 text-sm font-black text-[#4e4037]">{member.shippingCreditCount}개</dd>
+                      </div>
+                      <div className="rounded-xl bg-[#faf5ef] px-3 py-2">
+                        <dt className="text-[11px] font-black text-[#8b7a6d]">배송지</dt>
+                        <dd className="mt-1 text-sm font-black text-[#4e4037]">{member.addressCount}곳</dd>
+                      </div>
+                      <div className="rounded-xl bg-[#faf5ef] px-3 py-2">
+                        <dt className="text-[11px] font-black text-[#8b7a6d]">입찰</dt>
+                        <dd className="mt-1 text-sm font-black text-[#4e4037]">{member.bidCount}회</dd>
+                      </div>
+                      <div className="rounded-xl bg-[#faf5ef] px-3 py-2">
+                        <dt className="text-[11px] font-black text-[#8b7a6d]">최근 로그인</dt>
+                        <dd className="mt-1 truncate text-[11px] font-black text-[#4e4037]" title={formatDateTime(member.lastSignInAt)}>
+                          {formatDateTime(member.lastSignInAt)}
+                        </dd>
+                      </div>
+                    </dl>
+
+                    {isAdmin ? (
+                      <div className="mt-4 flex flex-col gap-3 border-t border-[#eee4db] pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-[#77675c]">배송 이용권</span>
+                          <button
+                            type="button"
+                            aria-label={`${member.displayName || "회원"} 배송 이용권 1개 차감`}
+                            disabled={isMutating || member.shippingCreditCount <= 0}
+                            onClick={() => void handleShippingCreditChange(member, -1)}
+                            className="grid h-10 w-10 place-items-center rounded-xl border border-[#ddcfc3] bg-white text-lg font-black text-[#775f50] transition hover:bg-[#fff5eb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#dc7563] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            −
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`${member.displayName || "회원"} 배송 이용권 1개 추가`}
+                            disabled={isMutating}
+                            onClick={() => void handleShippingCreditChange(member, 1)}
+                            className="grid h-10 w-10 place-items-center rounded-xl border border-[#c9dce1] bg-[#edf7fa] text-lg font-black text-[#496c76] transition hover:bg-[#deeff4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#588691] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={member.accountStatus === "active" ? "danger" : "secondary"}
+                          isLoading={isMutating}
+                          onClick={() =>
+                            void handleMemberStatusChange(
+                              member,
+                              member.accountStatus === "active"
+                                ? "suspended"
+                                : "active",
+                            )
+                          }
+                        >
+                          {member.accountStatus === "active" ? "계정 이용 정지" : "계정 활성화"}
+                        </Button>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <Pagination
+            currentPage={safeMemberPage}
+            totalPages={memberTotalPages}
+            onPageChange={setMemberPage}
+          />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          eyebrow="PRODUCTS"
+          title="상품 관리"
+          summary="예약·진행·마감 상품을 검색하고 공개 정보를 수정하거나 삭제합니다."
+          actions={
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => void loadProducts()}
+              isLoading={productLoadStatus === "loading"}
+            >
+              목록 새로고침
+            </Button>
+          }
+        >
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_190px]">
+            <label className="text-sm font-black text-[#594a40]">
+              상품 검색
+              <input
+                type="search"
+                value={productQuery}
+                onChange={(event) => {
+                  setProductQuery(event.target.value);
+                  setProductPage(1);
+                }}
+                placeholder="상품명, 설명 또는 상품 ID"
+                className="mt-2 w-full rounded-2xl border border-[#decdbf] bg-white px-4 py-3 text-sm font-semibold text-[#463a34] outline-none transition focus:border-[#ec7866] focus:ring-4 focus:ring-[#ec7866]/10"
+              />
+            </label>
+            <label className="text-sm font-black text-[#594a40]">
+              공개 상태
+              <select
+                value={productStatusFilter}
+                onChange={(event) => {
+                  setProductStatusFilter(
+                    event.target.value as ProductStatusFilter,
+                  );
+                  setProductPage(1);
+                }}
+                className="mt-2 w-full rounded-2xl border border-[#decdbf] bg-white px-4 py-3 text-sm font-semibold text-[#463a34] outline-none transition focus:border-[#ec7866] focus:ring-4 focus:ring-[#ec7866]/10"
+              >
+                <option value="all">전체 상태</option>
+                <option value="pending">공개 대기</option>
+                <option value="active">진행 중</option>
+                <option value="closed">마감</option>
+              </select>
+            </label>
+          </div>
+
+          {productError ? (
+            <div
+              role="alert"
+              className="mt-4 flex flex-col gap-3 rounded-2xl border border-[#efc8bb] bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#a84c3f] sm:flex-row sm:items-center sm:justify-between"
+            >
+              <span>{productError}</span>
+              <Button size="sm" variant="ghost" onClick={() => void loadProducts()}>
+                다시 시도
+              </Button>
+            </div>
+          ) : null}
+
+          {productLoadStatus === "loading" && products.length === 0 ? (
+            <p className="mt-5 rounded-2xl border border-[#e5d9ce] bg-white px-4 py-8 text-center text-sm font-bold text-[#7b6c61]">
+              상품 목록을 불러오는 중입니다...
+            </p>
+          ) : pagedProducts.length === 0 ? (
+            <p className="mt-5 rounded-2xl border border-dashed border-[#ddcfc2] bg-white/70 px-4 py-8 text-center text-sm font-bold text-[#7b6c61]">
+              조건에 맞는 상품이 없습니다.
+            </p>
+          ) : (
+            <ul className="mt-5 space-y-3">
+              {pagedProducts.map((product) => (
+                <li
+                  key={product.id}
+                  className="flex flex-col gap-4 rounded-[1.4rem] border border-[#e4d8cd] bg-white p-4 shadow-[0_8px_22px_rgba(89,65,49,0.05)] sm:flex-row sm:items-center"
+                >
+                  {product.imageUrls[0] ? (
+                    <img
+                      src={product.imageUrls[0]}
+                      alt=""
+                      className="h-28 w-full rounded-2xl border border-[#e8ddd3] object-cover sm:h-24 sm:w-24 sm:shrink-0"
+                    />
+                  ) : (
+                    <div className="grid h-28 w-full place-items-center rounded-2xl border border-dashed border-[#ddcfc2] bg-[#faf5ef] text-xs font-black text-[#97877b] sm:h-24 sm:w-24 sm:shrink-0">
+                      사진 없음
+                    </div>
+                  )}
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${productStatusClasses[product.status]}`}>
+                        {productStatusLabel[product.status]}
+                      </span>
+                      {product.bidLockedAt ? (
+                        <span className="rounded-full border border-[#e7bdb4] bg-[#fff0ea] px-2.5 py-1 text-[11px] font-black text-[#9d493d]">
+                          첫 입찰 확정
+                        </span>
+                      ) : null}
+                    </div>
+                    <h3 className="mt-2 truncate text-lg font-black text-[#493b31]">
+                      {product.title}
+                    </h3>
+                    <p className="mt-1 line-clamp-2 text-sm font-semibold leading-6 text-[#7d6d62]">
+                      {product.description}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-[#8b7a6d]">
+                      <span>현재가 {formatKRW(product.currentPrice)}</span>
+                      <span>입찰 {product.participantCount}명</span>
+                      <span>공개 {formatDateTime(product.publish_at)}</span>
+                      <span>수정 {formatDateTime(product.updatedAt)}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 gap-2 sm:flex-col">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="flex-1"
+                      onClick={() => setEditingProduct(product)}
+                    >
+                      수정
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      className="flex-1"
+                      onClick={() => {
+                        setDeleteError("");
+                        setDeletingProduct(product);
+                      }}
+                    >
+                      삭제
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <Pagination
+            currentPage={safeProductPage}
+            totalPages={productTotalPages}
+            onPageChange={setProductPage}
+          />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          eyebrow="REGISTRATION"
+          title="상품 등록"
+          summary="한 건을 직접 등록하거나 여러 상품을 일괄 등록합니다."
+        >
+          <div className="grid gap-4 lg:grid-cols-2">
+            <article className="rounded-[1.4rem] border-2 border-[#b9d5db] bg-[#edf7fa] p-5 shadow-sm sm:p-6">
+              <p className="text-xs font-black tracking-[0.14em] text-[#577984]">BULK IMPORT</p>
+              <h3 className="mt-2 text-xl font-black text-[#385b65]">상품 일괄 등록 · 기본</h3>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#617b83]">
+                정해진 양식을 내려받는 단계 없이 Excel의 상품·이미지명 열을 자동으로 찾아 사진 폴더와 연결하고, 등록 전 오류를 검토합니다.
+              </p>
+              <Button className="mt-5" onClick={onOpenBulkImport}>
+                일괄 등록 열기
+              </Button>
+            </article>
+            <article className="rounded-[1.4rem] border border-[#efd2c8] bg-[#fff2ec] p-5 sm:p-6">
+              <p className="text-xs font-black tracking-[0.14em] text-[#a56051]">SINGLE PRODUCT</p>
+              <h3 className="mt-2 text-xl font-black text-[#5c4037]">새 경매글 작성</h3>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#83685e]">
+                예외 상품은 설명과 사진을 확인하며 한 건씩 등록하고 공개 시각을 선택합니다.
+              </p>
+              <Button className="mt-5" variant="secondary" onClick={onCreateProduct}>
+                상품 1건 등록
+              </Button>
+            </article>
+          </div>
+        </CollapsibleSection>
+      </div>
+
+      <ProductEditModal
+        product={editingProduct}
+        open={Boolean(editingProduct)}
+        onClose={() => setEditingProduct(null)}
+        onSave={handleProductSave}
+      />
+
+      <Modal
+        open={Boolean(deletingProduct)}
+        onClose={isDeletingProduct ? () => undefined : () => setDeletingProduct(null)}
+        closeOnBackdrop={!isDeletingProduct}
+        title="경매 상품 삭제"
+        description="삭제한 상품은 피드와 운영 센터에서 사라집니다."
+        size="sm"
       >
-        <article className="rounded-[1.5rem] border-2 border-[#eadfce] bg-[#fffaf3] p-5">
-          <p className="text-[17px] font-black text-[#8c7b6e]">최근 낙찰</p>
-          <p className="mt-2 text-3xl font-black text-[#493b31]">
-            {salesWithLiveShippingStatus.length}
-            <span className="ml-1 text-[17px]">벌</span>
+        <div className="space-y-4 p-5 sm:p-6">
+          <p className="text-sm font-bold leading-6 text-[#66564c]">
+            <strong className="text-[#493b31]">{deletingProduct?.title}</strong>
+            을(를) 정말 삭제할까요? 입찰 기록이 있는 상품은 서버 정책에 따라 삭제가 거부될 수 있습니다.
           </p>
-        </article>
-        <article className="rounded-[1.5rem] border-2 border-[#cbdde5] bg-[#e4f0f5] p-5">
-          <p className="text-[17px] font-black text-[#66808e]">총 낙찰 금액</p>
-          <p className="mt-2 text-2xl font-black text-[#3e5b69]">
-            {formatKRW(totalSales)}
-          </p>
-        </article>
-        <article className="rounded-[1.5rem] border-2 border-[#efd2c8] bg-[#fbe4dc] p-5">
-          <p className="text-[17px] font-black text-[#9f6659]">입금 확인 필요</p>
-          <p className="mt-2 text-3xl font-black text-[#b96351]">
-            {pendingPayments}
-            <span className="ml-1 text-[17px]">건</span>
-          </p>
-        </article>
-        <article className="rounded-[1.5rem] border-2 border-[#b9d9c8] bg-[#e5f4eb] p-5">
-          <p className="text-[17px] font-black text-[#557866]">포장 대기</p>
-          <p className="mt-2 text-3xl font-black text-[#35684f]">
-            {packingCount}
-            <span className="ml-1 text-[17px]">건</span>
-          </p>
-        </article>
-      </section>
-
-      <AdminShipmentBoard
-        batches={shipmentBatches}
-        onOpenPreview={setPreviewBatch}
-        onOpenRegistration={setRegistrationBatch}
-      />
-
-      <div className="my-10 h-px bg-[#dfd2c4]" />
-
-      <RecentClosingList days={recentDays} />
-
-      <PickingPreviewModal
-        batch={previewBatch}
-        onClose={() => setPreviewBatch(null)}
-      />
-      <ShipmentRegistrationModal
-        batch={registrationBatch}
-        onRegister={handleRegisterShipment}
-        onClose={() => setRegistrationBatch(null)}
-      />
+          {deleteError ? (
+            <p role="alert" className="rounded-2xl bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#b14c3f]">
+              {deleteError}
+            </p>
+          ) : null}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="ghost"
+              onClick={() => setDeletingProduct(null)}
+              disabled={isDeletingProduct}
+            >
+              취소
+            </Button>
+            <Button
+              variant="danger"
+              isLoading={isDeletingProduct}
+              onClick={() => void handleProductDelete()}
+            >
+              {isDeletingProduct ? "삭제 중..." : "상품 삭제"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </main>
   );
 }

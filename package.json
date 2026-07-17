@@ -17,7 +17,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
-    "test": "vinext build && node --test tests/rendered-html.test.mjs",
+    "test": "vinext build && node --test tests/batch-auction.test.mjs tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "operators:provision": "node scripts/provision-operators.mjs"
@@ -25,6 +25,7 @@
   "dependencies": {
     "@supabase/supabase-js": "2.110.6",
     "drizzle-orm": "0.45.2",
+    "exceljs": "4.4.0",
     "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6"

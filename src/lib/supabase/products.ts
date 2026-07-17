@@ -1,14 +1,16 @@
 import type { NewAuctionDraft } from "@/src/components/feed";
+import type { BatchAuctionProgressReporter } from "@/src/lib/import/batchAuction";
 import type {
   AuctionPost,
   AuctionStatus,
   BidHistoryRecord,
 } from "@/src/types/auction";
 import { getNextAuctionDeadline } from "@/src/utils/formatters";
-import { isSupabaseAdmin } from "./adminAuth";
+import { getUserRole, isStaffRole } from "./auth";
 import { getSupabaseBrowserClient } from "./client";
 import type { Database, Json } from "./database.types";
 import {
+  hasSupportedProductImageSignature,
   isSupportedProductImageMimeType,
   PRODUCT_IMAGE_FORMAT_LABEL,
 } from "./productImagePolicy";
@@ -100,6 +102,17 @@ export function mapProductRowToAuctionPost(row: ProductRow): AuctionPost {
   };
 }
 
+export interface ManagedProduct extends AuctionPost {
+  updatedAt: string;
+}
+
+function mapProductRowToManagedProduct(row: ProductRow): ManagedProduct {
+  return {
+    ...mapProductRowToAuctionPost(row),
+    updatedAt: row.updated_at,
+  };
+}
+
 function getImageExtension(file: File): string {
   const fileExtension = file.name
     .split(".")
@@ -134,7 +147,8 @@ async function removeUploadedImages(paths: readonly string[]) {
       .storage.from(PRODUCT_IMAGES_BUCKET)
       .remove([...paths]);
   } catch {
-    // 원래 업로드/INSERT 오류를 유지합니다. 고아 파일은 운영 로그에서 정리합니다.
+    // Preserve the original upload/database error. Orphan cleanup can be
+    // retried from Storage without risking a second database write.
   }
 }
 
@@ -146,6 +160,7 @@ export interface UploadedProductImages {
 export async function uploadProductImages(
   files: readonly File[],
   productId: string,
+  onUploaded?: (completed: number, total: number) => void,
 ): Promise<UploadedProductImages> {
   if (files.length === 0) {
     throw new ProductRepositoryError("상품 사진을 하나 이상 선택해 주세요.");
@@ -158,6 +173,11 @@ export async function uploadProductImages(
   try {
     for (const file of files) {
       assertUploadableImage(file);
+      if (!(await hasSupportedProductImageSignature(file))) {
+        throw new ProductRepositoryError(
+          "사진 파일의 실제 형식과 확장자 또는 MIME 정보가 일치하지 않아요.",
+        );
+      }
       const extension = getImageExtension(file);
       const path = `products/${productId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
       const { data, error } = await client.storage
@@ -170,7 +190,7 @@ export async function uploadProductImages(
 
       if (error) {
         throw new ProductRepositoryError(
-          "사진 업로드에 실패했어요. Storage 버킷과 관리자 권한을 확인해 주세요.",
+          "사진 업로드에 실패했어요. Storage 버킷과 운영자 권한을 확인해 주세요.",
           { cause: error },
         );
       }
@@ -180,6 +200,7 @@ export async function uploadProductImages(
         .from(PRODUCT_IMAGES_BUCKET)
         .getPublicUrl(data.path);
       imageUrls.push(publicUrlData.publicUrl);
+      onUploaded?.(imageUrls.length, files.length);
     }
 
     return { imageUrls, paths };
@@ -194,31 +215,90 @@ export interface CreatedProduct {
   imageUrls: string[];
 }
 
-export async function createProduct(
-  draft: NewAuctionDraft,
-): Promise<CreatedProduct> {
+async function requireStaffSession() {
   const client = getSupabaseBrowserClient();
   const {
     data: { user },
     error: userError,
   } = await client.auth.getUser();
 
-  if (userError || !isSupabaseAdmin(user)) {
+  if (userError || !user || !isStaffRole(getUserRole(user))) {
     throw new ProductRepositoryError(
-      "Supabase 관리자 로그인 후 상품을 등록해 주세요.",
+      "Supabase 관리자 또는 운영자 로그인 후 상품을 관리해 주세요.",
       userError ? { cause: userError } : undefined,
     );
   }
 
-  const id = crypto.randomUUID();
+  const { data: hasStaffAccess, error: staffError } = await client.rpc(
+    "is_staff",
+  );
+  if (staffError || !hasStaffAccess) {
+    throw new ProductRepositoryError(
+      "등록된 운영 권한을 확인하지 못했어요. 다시 로그인해 주세요.",
+      staffError ? { cause: staffError } : undefined,
+    );
+  }
+
+  return client;
+}
+
+interface PreparedProductDraft {
+  id: string;
+  draft: NewAuctionDraft;
+  publishAt: Date;
+}
+
+function prepareProductDraft(draft: NewAuctionDraft): PreparedProductDraft {
+  const title = draft.title.trim();
+  const description = draft.description.trim();
   const publishAt = new Date(draft.publish_at);
 
+  if (!title || title.length > 160) {
+    throw new ProductRepositoryError("상품명은 160자 이내로 입력해 주세요.");
+  }
+  if (!description || description.length > 10_000) {
+    throw new ProductRepositoryError("상품 설명은 10,000자 이내로 입력해 주세요.");
+  }
+  if (
+    !Number.isSafeInteger(draft.startingPrice) ||
+    draft.startingPrice < 1 ||
+    draft.startingPrice > 1_000_000_000
+  ) {
+    throw new ProductRepositoryError(
+      "시작가는 1원 이상 10억원 이하의 정수여야 해요.",
+    );
+  }
+  if (
+    !Number.isSafeInteger(draft.bidIncrement) ||
+    draft.bidIncrement < 1 ||
+    draft.bidIncrement > 100_000_000
+  ) {
+    throw new ProductRepositoryError("입찰 단위를 확인해 주세요.");
+  }
+  if (draft.status !== "pending" && draft.status !== "active") {
+    throw new ProductRepositoryError("등록할 상품 상태를 확인해 주세요.");
+  }
   if (Number.isNaN(publishAt.getTime())) {
     throw new ProductRepositoryError("상품 공개 시간이 올바르지 않습니다.");
   }
+  if (draft.imageFiles.length === 0) {
+    throw new ProductRepositoryError("상품 사진을 하나 이상 선택해 주세요.");
+  }
+  draft.imageFiles.forEach(assertUploadableImage);
 
-  const uploaded = await uploadProductImages(draft.imageFiles, id);
-  const row: ProductInsert = {
+  return {
+    id: crypto.randomUUID(),
+    draft: { ...draft, title, description },
+    publishAt,
+  };
+}
+
+function createProductInsert(
+  prepared: PreparedProductDraft,
+  imageUrls: string[],
+): ProductInsert {
+  const { draft, id, publishAt } = prepared;
+  return {
     id,
     title: draft.title,
     description: draft.description,
@@ -230,21 +310,188 @@ export async function createProduct(
     starting_price: draft.startingPrice,
     current_price: draft.startingPrice,
     bid_increment: draft.bidIncrement,
-    image_urls: uploaded.imageUrls,
+    image_urls: imageUrls,
     bid_history: [],
   };
+}
+
+export async function createProduct(
+  draft: NewAuctionDraft,
+): Promise<CreatedProduct> {
+  const client = await requireStaffSession();
+  const prepared = prepareProductDraft(draft);
+  const uploaded = await uploadProductImages(
+    prepared.draft.imageFiles,
+    prepared.id,
+  );
+  const row = createProductInsert(prepared, uploaded.imageUrls);
 
   const { error } = await client.from("products").insert(row);
-
   if (error) {
     await removeUploadedImages(uploaded.paths);
     throw new ProductRepositoryError(
-      "상품 저장에 실패했어요. products 테이블과 관리자 권한을 확인해 주세요.",
+      "상품 저장에 실패했어요. products 테이블과 운영자 권한을 확인해 주세요.",
       { cause: error },
     );
   }
 
-  return { id, imageUrls: uploaded.imageUrls };
+  return { id: prepared.id, imageUrls: uploaded.imageUrls };
+}
+
+export async function createProductsBatch(
+  drafts: readonly NewAuctionDraft[],
+  onProgress?: BatchAuctionProgressReporter,
+): Promise<CreatedProduct[]> {
+  if (drafts.length === 0) {
+    throw new ProductRepositoryError("일괄 등록할 상품이 없습니다.");
+  }
+  if (drafts.length > 200) {
+    throw new ProductRepositoryError(
+      "한 번에 최대 200개 상품까지 등록할 수 있어요.",
+    );
+  }
+
+  const preparedDrafts = drafts.map(prepareProductDraft);
+  const totalImages = preparedDrafts.reduce(
+    (total, prepared) => total + prepared.draft.imageFiles.length,
+    0,
+  );
+  const client = await requireStaffSession();
+  const uploadedPaths: string[] = [];
+  const createdProducts: CreatedProduct[] = [];
+  const rows: ProductInsert[] = [];
+  let completedImages = 0;
+
+  try {
+    onProgress?.(0, totalImages, "uploading");
+    for (const prepared of preparedDrafts) {
+      const uploaded = await uploadProductImages(
+        prepared.draft.imageFiles,
+        prepared.id,
+        (completedForProduct) => {
+          onProgress?.(
+            completedImages + completedForProduct,
+            totalImages,
+            "uploading",
+          );
+        },
+      );
+      completedImages += prepared.draft.imageFiles.length;
+      uploadedPaths.push(...uploaded.paths);
+      rows.push(createProductInsert(prepared, uploaded.imageUrls));
+      createdProducts.push({
+        id: prepared.id,
+        imageUrls: uploaded.imageUrls,
+      });
+    }
+
+    onProgress?.(totalImages, totalImages, "saving");
+    const { error } = await client.from("products").insert(rows);
+    if (error) {
+      throw new ProductRepositoryError(
+        "일괄 상품 저장에 실패했어요. 입력값과 운영자 권한을 확인해 주세요.",
+        { cause: error },
+      );
+    }
+
+    return createdProducts;
+  } catch (error) {
+    await removeUploadedImages(uploadedPaths);
+    throw error;
+  }
+}
+
+export async function fetchManagedProducts(): Promise<ManagedProduct[]> {
+  const client = await requireStaffSession();
+  const { data, error } = await client
+    .from("products")
+    .select(PRODUCT_COLUMNS)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new ProductRepositoryError("운영 상품 목록을 불러오지 못했어요.", {
+      cause: error,
+    });
+  }
+
+  return ((data ?? []) as unknown as ProductRow[]).map(
+    mapProductRowToManagedProduct,
+  );
+}
+
+export interface ManagedProductUpdate {
+  title: string;
+  description: string;
+  startingPrice: number;
+  bidIncrement: number;
+  status: AuctionStatus;
+  publishAt: string;
+  expectedUpdatedAt: string;
+}
+
+export async function updateManagedProduct(
+  productId: string,
+  input: ManagedProductUpdate,
+): Promise<ManagedProduct> {
+  const client = await requireStaffSession();
+  const { data, error } = await client
+    .rpc("update_managed_product", {
+      p_product_id: productId,
+      p_title: input.title,
+      p_description: input.description,
+      p_starting_price: input.startingPrice,
+      p_bid_increment: input.bidIncrement,
+      p_status: input.status,
+      p_publish_at: input.publishAt,
+      p_expected_updated_at: input.expectedUpdatedAt,
+    })
+    .single();
+
+  if (error || !data) {
+    throw new ProductRepositoryError(
+      error?.message || "상품을 수정하지 못했어요.",
+      error ? { cause: error } : undefined,
+    );
+  }
+
+  return mapProductRowToManagedProduct(data as unknown as ProductRow);
+}
+
+function getStoragePathFromPublicUrl(publicUrl: string): string | null {
+  try {
+    const pathname = new URL(publicUrl).pathname;
+    const marker = `/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/`;
+    const markerIndex = pathname.indexOf(marker);
+    if (markerIndex < 0) return null;
+    const path = decodeURIComponent(pathname.slice(markerIndex + marker.length));
+    return path.startsWith("products/") ? path : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteManagedProduct(
+  productId: string,
+  expectedUpdatedAt: string,
+): Promise<void> {
+  const client = await requireStaffSession();
+  const { data, error } = await client.rpc("delete_managed_product", {
+    p_product_id: productId,
+    p_expected_updated_at: expectedUpdatedAt,
+  });
+
+  if (error) {
+    throw new ProductRepositoryError(error.message, { cause: error });
+  }
+
+  const paths = (data ?? []).flatMap((url) => {
+    const path = getStoragePathFromPublicUrl(url);
+    return path ? [path] : [];
+  });
+  // The database deletion is authoritative. Storage cleanup is best-effort so
+  // a transient object API failure cannot make the UI retry an already-deleted
+  // product and report a misleading failure.
+  await removeUploadedImages(paths);
 }
 
 export async function fetchPublishedProducts(

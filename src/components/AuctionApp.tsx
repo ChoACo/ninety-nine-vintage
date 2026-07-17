@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AdminAccessGate } from "@/src/components/admin/AdminAccessGate";
 import { AdminPage } from "@/src/components/admin";
+import BulkAuctionImportModal from "@/src/components/admin/BulkAuctionImportModal";
 import { AuthModal } from "@/src/components/auth";
 import { ChatPage } from "@/src/components/chat/ChatPage";
 import { FloatingAdminChat } from "@/src/components/chat/FloatingAdminChat";
@@ -23,14 +24,17 @@ import { AccountPage } from "@/src/components/profile";
 import { useAuthSession } from "@/src/hooks/useAuthSession";
 import { useOnlineMembers } from "@/src/hooks/useOnlineMembers";
 import { useSupabaseProducts } from "@/src/hooks/useSupabaseProducts";
-import type { AppRole } from "@/src/lib/supabase/auth";
+import { isStaffRole, type AppRole } from "@/src/lib/supabase/auth";
 import { placeBid } from "@/src/lib/supabase/bids";
 import {
   getOrCreateMemberSupportConversation,
   reopenMemberSupportConversation,
   sendSupportMessage,
 } from "@/src/lib/supabase/supportChat";
-import { createProduct } from "@/src/lib/supabase/products";
+import {
+  createProduct,
+  createProductsBatch,
+} from "@/src/lib/supabase/products";
 import type { Role } from "@/src/types/auction";
 import { formatKRW } from "@/src/utils/formatters";
 
@@ -45,6 +49,8 @@ export function AuctionApp() {
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("member");
   const [newAuctionOpen, setNewAuctionOpen] = useState(false);
+  const [bulkAuctionOpen, setBulkAuctionOpen] = useState(false);
+  const [operationsRevision, setOperationsRevision] = useState(0);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
@@ -142,13 +148,14 @@ export function AuctionApp() {
   };
 
   const handleCreateAuction = async (draft: NewAuctionDraft) => {
-    if (auth.role !== "admin") {
+    if (!isStaffRole(auth.role)) {
       openAuthentication("staff");
-      throw new Error("관리자 계정으로 로그인해 주세요.");
+      throw new Error("관리자 또는 운영자 계정으로 로그인해 주세요.");
     }
 
     await createProduct(draft);
     await refreshProducts();
+    setOperationsRevision((current) => current + 1);
     if (draft.status === "active") setActivePage("feed");
     showToast(
       draft.status === "pending"
@@ -157,12 +164,28 @@ export function AuctionApp() {
     );
   };
 
+  const handleCreateAuctionsBatch = async (
+    drafts: NewAuctionDraft[],
+    onProgress: Parameters<typeof createProductsBatch>[1],
+  ) => {
+    if (!isStaffRole(auth.role)) {
+      openAuthentication("staff");
+      throw new Error("관리자 또는 운영자 계정으로 로그인해 주세요.");
+    }
+
+    await createProductsBatch(drafts, onProgress);
+    await refreshProducts();
+    setOperationsRevision((current) => current + 1);
+    showToast(`${drafts.length.toLocaleString("ko-KR")}개 경매글을 일괄 등록했습니다.`);
+  };
+
   const handleSignOut = async () => {
     setIsSigningOut(true);
     try {
       await auth.signOut();
       setActivePage("feed");
       setNewAuctionOpen(false);
+      setBulkAuctionOpen(false);
       showToast("로그아웃했습니다.");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "로그아웃하지 못했습니다.");
@@ -170,8 +193,6 @@ export function AuctionApp() {
       setIsSigningOut(false);
     }
   };
-
-  const emptyAdminSales = useMemo(() => [], []);
 
   const renderPage = () => {
     if (activePage === "chat") {
@@ -203,10 +224,17 @@ export function AuctionApp() {
     }
 
     if (activePage === "admin") {
-      return role === "admin" ? (
-        <AdminPage sales={emptyAdminSales} shipments={[]} onNotify={showToast} />
+      return role === "admin" || role === "operator" ? (
+        <AdminPage
+          key={operationsRevision}
+          role={role}
+          onCreateProduct={() => setNewAuctionOpen(true)}
+          onOpenBulkImport={() => setBulkAuctionOpen(true)}
+          onProductsChanged={refreshProducts}
+          onNotify={showToast}
+        />
       ) : (
-        <AdminAccessGate onSwitchToAdmin={() => openAuthentication("staff")} />
+        <AdminAccessGate onSwitchToStaff={() => openAuthentication("staff")} />
       );
     }
 
@@ -294,7 +322,6 @@ export function AuctionApp() {
           isAuthenticated={Boolean(auth.user)}
           displayName={displayName}
           onOpenAuth={() => openAuthentication("member")}
-          onCreateAuction={role === "admin" ? () => setNewAuctionOpen(true) : undefined}
           isSigningOut={isSigningOut}
           onSignOut={auth.user ? handleSignOut : undefined}
         />
@@ -311,9 +338,15 @@ export function AuctionApp() {
       </div>
 
       <NewAuctionModal
-        open={newAuctionOpen && role === "admin"}
+        open={newAuctionOpen && (role === "admin" || role === "operator")}
         onClose={() => setNewAuctionOpen(false)}
         onSubmit={handleCreateAuction}
+      />
+
+      <BulkAuctionImportModal
+        open={bulkAuctionOpen && (role === "admin" || role === "operator")}
+        onClose={() => setBulkAuctionOpen(false)}
+        onSubmit={handleCreateAuctionsBatch}
       />
 
       <AuthModal

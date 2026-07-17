@@ -148,10 +148,9 @@ export function useAuthSession(): AuthSessionState {
     const hasAuthorizedSession = async (user: User): Promise<boolean> => {
       const role = getUserRole(user);
       if (role === "unauthorized") return false;
-      if (!isStaffRole(role)) return true;
-
-      const { data, error: staffAccessError } = await client.rpc("is_staff");
-      return !staffAccessError && data === true;
+      const accessFunction = isStaffRole(role) ? "is_staff" : "is_member";
+      const { data, error: accessError } = await client.rpc(accessFunction);
+      return !accessError && data === true;
     };
 
     const rejectSession = async () => {
@@ -206,7 +205,7 @@ export function useAuthSession(): AuthSessionState {
         return;
       }
 
-      if (nextSession?.user && isStaffRole(getUserRole(nextSession.user))) {
+      if (nextSession?.user) {
         setSession(null);
         setProfile(null);
         setIsLoading(true);

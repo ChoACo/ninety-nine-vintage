@@ -227,7 +227,7 @@ export default function NewAuctionModal({
               updateField("description", event.target.value)
             }
             placeholder={
-              "첫 줄: 버버리 트렌치코트 · 여성 66~77\n둘째 줄부터: 실측, 사용감·오염·수선 여부를 자세히 적어 주세요."
+              "첫 줄: 상품명 · 표기 사이즈\n둘째 줄부터: 실측, 사용감·오염·수선 여부를 자세히 적어 주세요."
             }
             rows={5}
             className={`${inputClasses} resize-y`}

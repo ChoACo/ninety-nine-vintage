@@ -15,12 +15,12 @@ const navigationItems: Array<{
   value: NavigationTarget;
   label: string;
   icon: string;
-  adminOnly?: boolean;
+  staffOnly?: boolean;
 }> = [
   { value: "feed", label: "경매 피드", icon: "⌂" },
   { value: "chat", label: "채팅", icon: "○" },
   { value: "profile", label: "내 정보", icon: "☺" },
-  { value: "admin", label: "관리자", icon: "⚙", adminOnly: true },
+  { value: "admin", label: "운영 센터", icon: "⚙", staffOnly: true },
 ];
 
 export default function Navigation({
@@ -37,7 +37,8 @@ export default function Navigation({
       <div className="grid grid-cols-4 gap-1">
         {navigationItems.map((item) => {
           const selected = activePage === item.value;
-          const isLocked = item.adminOnly && role !== "admin";
+          const isLocked =
+            item.staffOnly && role !== "admin" && role !== "operator";
           const visibleLabel =
             item.value === "chat" && (role === "operator" || role === "admin")
               ? "상담 대화함"
@@ -50,7 +51,7 @@ export default function Navigation({
               aria-current={selected ? "page" : undefined}
               aria-label={
                 isLocked
-                  ? `${visibleLabel}, 관리자 계정에서 이용 가능`
+                  ? `${visibleLabel}, 관리자 또는 운영자 계정에서 이용 가능`
                   : visibleLabel
               }
               onClick={() => onNavigate(item.value)}

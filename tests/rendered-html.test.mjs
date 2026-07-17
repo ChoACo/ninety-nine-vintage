@@ -99,7 +99,8 @@ test("uses Kakao membership and server-only operator provisioning", async () => 
   assert.match(auth, /client\.rpc\([\s\S]*"is_staff"/);
   assert.match(authSession, /getUserRole\(nextSession\.user\) === "unauthorized"/);
   assert.match(authSession, /hasAuthorizedSession/);
-  assert.match(authSession, /client\.rpc\("is_staff"\)/);
+  assert.match(authSession, /isStaffRole\(role\) \? "is_staff" : "is_member"/);
+  assert.match(authSession, /client\.rpc\(accessFunction\)/);
   assert.match(authSession, /client\.auth\.signOut\(\)/);
   assert.match(auth, /operator01/);
   assert.match(auth, /operator02/);
@@ -275,4 +276,86 @@ test("removes the old visible mock data and standalone demo", async () => {
   await assert.rejects(access(new URL("demo.html", rootUrl)));
   await assert.rejects(access(new URL("src/components/common/RoleToggle.tsx", rootUrl)));
   await assert.rejects(access(new URL("src/hooks/useMockLiveBids.ts", rootUrl)));
+});
+
+test("uses real member delivery data with a default-closed address panel", async () => {
+  const [accountPage, accountRepository, accountHook, migration] = await Promise.all([
+    source("src/components/profile/AccountPage.tsx"),
+    source("src/lib/supabase/memberAccount.ts"),
+    source("src/hooks/useMemberAccount.ts"),
+    source("supabase/migrations/20260718000000_add_member_operations_and_staff_products.sql"),
+  ]);
+
+  assert.match(accountPage, /\[isAddressOpen, setIsAddressOpen\] = useState\(false\)/);
+  assert.match(accountPage, /aria-expanded=\{isAddressOpen\}/);
+  assert.match(accountPage, /선택 상품 택배 접수하기/);
+  assert.ok(
+    accountPage.indexOf("선택 상품 택배 접수하기") <
+      accountPage.indexOf("택배 가능 횟수"),
+  );
+  assert.doesNotMatch(accountPage, /localStorage|data:image\//);
+  assert.match(accountRepository, /\.from\("member_accounts"\)/);
+  assert.match(accountRepository, /\.from\("shipping_addresses"\)/);
+  assert.match(accountRepository, /"get_my_won_products"/);
+  assert.match(accountRepository, /"request_product_shipping"/);
+  assert.match(accountHook, /Promise\.all\(/);
+  assert.match(migration, /create table if not exists public\.member_accounts/);
+  assert.match(migration, /create table if not exists public\.shipping_addresses/);
+  assert.match(migration, /create or replace function public\.request_product_shipping/);
+  assert.match(migration, /shipping_credit_count = shipping_credit_count - 1/);
+  assert.doesNotMatch(migration, /assign_product_winner_on_close/);
+});
+
+test("provides a collapsible Supabase operator center with constrained product management", async () => {
+  const [auctionApp, navigation, adminPage, products, operations, migration] = await Promise.all([
+    source("src/components/AuctionApp.tsx"),
+    source("src/components/common/Navigation.tsx"),
+    source("src/components/admin/AdminPage.tsx"),
+    source("src/lib/supabase/products.ts"),
+    source("src/lib/supabase/operations.ts"),
+    source("supabase/migrations/20260718000000_add_member_operations_and_staff_products.sql"),
+  ]);
+
+  assert.match(navigation, /label: "운영 센터"/);
+  assert.match(navigation, /role !== "admin" && role !== "operator"/);
+  assert.match(auctionApp, /role === "admin" \|\| role === "operator"/);
+  assert.match(auctionApp, /onOpenBulkImport=\{\(\) => setBulkAuctionOpen\(true\)\}/);
+  assert.doesNotMatch(auctionApp, /emptyAdminSales|shipments=\{\[\]\}/);
+  assert.ok((adminPage.match(/<CollapsibleSection/g) ?? []).length >= 4);
+  assert.match(adminPage, /getStaffMemberDirectory/);
+  assert.match(adminPage, /updateManagedProduct/);
+  assert.match(adminPage, /deleteManagedProduct/);
+  assert.match(operations, /"get_staff_member_directory"/);
+  assert.match(products, /fetchManagedProducts/);
+  assert.match(products, /\.rpc\("update_managed_product"/);
+  assert.match(products, /\.rpc\("delete_managed_product"/);
+  assert.match(migration, /create policy "Staff insert products"/);
+  assert.match(migration, /revoke update, delete on public\.products from authenticated/);
+  assert.match(migration, /create or replace function public\.update_managed_product/);
+  assert.match(migration, /for update;/);
+  assert.match(migration, /p_expected_updated_at/);
+});
+
+test("matches Excel image names in order and batches real Storage and database writes", async () => {
+  const [parser, modal, products] = await Promise.all([
+    source("src/lib/import/batchAuction.ts"),
+    source("src/components/admin/BulkAuctionImportModal.tsx"),
+    source("src/lib/supabase/products.ts"),
+  ]);
+
+  assert.match(parser, /await import\("exceljs"\)/);
+  assert.match(parser, /strategy: "relative-path"/);
+  assert.match(parser, /strategy: "basename"/);
+  assert.match(parser, /strategy: "unique-stem"/);
+  assert.match(parser, /code: "ambiguous_image"/);
+  assert.match(parser, /code: "image_reused_across_products"/);
+  assert.match(parser, /imageFiles: row\.imageMatches\.map\(\(match\) => match\.file\)/);
+  assert.match(modal, /webkitdirectory/);
+  assert.match(modal, /type="file"[\s\S]*multiple/);
+  assert.doesNotMatch(modal, /download|양식 내려받기|템플릿 다운로드/);
+  assert.match(products, /createProductsBatch/);
+  assert.match(products, /await uploadProductImages/);
+  assert.match(products, /client\.from\("products"\)\.insert\(rows\)/);
+  assert.match(products, /await removeUploadedImages\(uploadedPaths\)/);
+  assert.match(products, /hasSupportedProductImageSignature/);
 });

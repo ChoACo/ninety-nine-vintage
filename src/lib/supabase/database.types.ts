@@ -8,6 +8,8 @@ export type Json =
 
 export type ProductStatus = "pending" | "active" | "closed";
 export type SupportConversationStatus = "open" | "closed";
+export type MemberAccountStatus = "active" | "suspended";
+export type ShippingRequestStatus = "requested" | "shipped";
 
 export type Database = {
   public: {
@@ -89,6 +91,41 @@ export type Database = {
           },
         ];
       };
+      member_accounts: {
+        Row: {
+          member_id: string;
+          phone: string | null;
+          shipping_credit_count: number;
+          account_status: MemberAccountStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          member_id: string;
+          phone?: string | null;
+          shipping_credit_count?: number;
+          account_status?: MemberAccountStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          member_id?: string;
+          phone?: string | null;
+          shipping_credit_count?: number;
+          account_status?: MemberAccountStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_accounts_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       products: {
         Row: {
           id: string;
@@ -109,6 +146,8 @@ export type Database = {
           bid_locked_at: string | null;
           final_bid_id: string | null;
           final_bid_amount: number | null;
+          created_by: string | null;
+          updated_by: string | null;
         };
         Insert: {
           id?: string;
@@ -129,6 +168,8 @@ export type Database = {
           bid_locked_at?: string | null;
           final_bid_id?: string | null;
           final_bid_amount?: number | null;
+          created_by?: string | null;
+          updated_by?: string | null;
         };
         Update: {
           id?: string;
@@ -149,6 +190,8 @@ export type Database = {
           bid_locked_at?: string | null;
           final_bid_id?: string | null;
           final_bid_amount?: number | null;
+          created_by?: string | null;
+          updated_by?: string | null;
         };
         Relationships: [
           {
@@ -183,6 +226,140 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [];
+      };
+      shipping_addresses: {
+        Row: {
+          id: string;
+          member_id: string;
+          label: string;
+          recipient_name: string;
+          phone: string;
+          address: string;
+          is_default: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          member_id: string;
+          label: string;
+          recipient_name: string;
+          phone: string;
+          address: string;
+          is_default?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          member_id?: string;
+          label?: string;
+          recipient_name?: string;
+          phone?: string;
+          address?: string;
+          is_default?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "shipping_addresses_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      shipping_request_items: {
+        Row: {
+          request_id: string;
+          product_id: string;
+          created_at: string;
+        };
+        Insert: {
+          request_id: string;
+          product_id: string;
+          created_at?: string;
+        };
+        Update: {
+          request_id?: string;
+          product_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "shipping_request_items_request_id_fkey";
+            columns: ["request_id"];
+            isOneToOne: false;
+            referencedRelation: "shipping_requests";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "shipping_request_items_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: true;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      shipping_requests: {
+        Row: {
+          id: string;
+          member_id: string;
+          address_id: string | null;
+          address_snapshot: Json;
+          status: ShippingRequestStatus;
+          courier: string | null;
+          tracking_number: string | null;
+          requested_at: string;
+          shipped_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          member_id: string;
+          address_id?: string | null;
+          address_snapshot: Json;
+          status?: ShippingRequestStatus;
+          courier?: string | null;
+          tracking_number?: string | null;
+          requested_at?: string;
+          shipped_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          member_id?: string;
+          address_id?: string | null;
+          address_snapshot?: Json;
+          status?: ShippingRequestStatus;
+          courier?: string | null;
+          tracking_number?: string | null;
+          requested_at?: string;
+          shipped_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "shipping_requests_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "shipping_requests_address_id_fkey";
+            columns: ["address_id"];
+            isOneToOne: false;
+            referencedRelation: "shipping_addresses";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       support_conversations: {
         Row: {
@@ -338,6 +515,46 @@ export type Database = {
           updated_at: string;
         }[];
       };
+      adjust_member_shipping_credits: {
+        Args: { p_member_id: string; p_delta: number };
+        Returns: number;
+      };
+      delete_managed_product: {
+        Args: { p_product_id: string; p_expected_updated_at: string };
+        Returns: string[];
+      };
+      delete_my_shipping_address: {
+        Args: { p_address_id: string };
+        Returns: undefined;
+      };
+      get_my_won_products: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          product_id: string;
+          title: string;
+          image_urls: string[];
+          closed_at: string;
+          final_bid_amount: number;
+          shipping_status: "ready" | "requested" | "shipped";
+          shipment_request_id: string | null;
+        }[];
+      };
+      get_staff_member_directory: {
+        Args: { p_limit?: number; p_offset?: number };
+        Returns: {
+          id: string;
+          display_name: string;
+          email: string | null;
+          phone: string | null;
+          account_status: MemberAccountStatus;
+          shipping_credit_count: number;
+          address_count: number;
+          bid_count: number;
+          support_status: SupportConversationStatus | null;
+          created_at: string;
+          last_sign_in_at: string | null;
+        }[];
+      };
       is_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
@@ -390,6 +607,38 @@ export type Database = {
           created_at: string;
           updated_at: string;
         }[];
+      };
+      request_product_shipping: {
+        Args: { p_product_ids: string[]; p_address_id: string };
+        Returns: string;
+      };
+      set_member_account_status: {
+        Args: { p_member_id: string; p_status: MemberAccountStatus };
+        Returns: MemberAccountStatus;
+      };
+      update_managed_product: {
+        Args: {
+          p_product_id: string;
+          p_title: string;
+          p_description: string;
+          p_starting_price: number;
+          p_bid_increment: number;
+          p_status: ProductStatus;
+          p_publish_at: string;
+          p_expected_updated_at: string;
+        };
+        Returns: Database["public"]["Tables"]["products"]["Row"][];
+      };
+      upsert_my_shipping_address: {
+        Args: {
+          p_id: string | null;
+          p_label: string;
+          p_recipient_name: string;
+          p_phone: string;
+          p_address: string;
+          p_is_default?: boolean;
+        };
+        Returns: Database["public"]["Tables"]["shipping_addresses"]["Row"][];
       };
     };
     Enums: { [_ in never]: never };

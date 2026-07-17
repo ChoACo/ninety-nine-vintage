@@ -8,7 +8,6 @@ export interface SiteHeaderProps {
   isAuthenticated: boolean;
   displayName?: string;
   onOpenAuth: () => void;
-  onCreateAuction?: () => void;
   isSigningOut?: boolean;
   onSignOut?: () => void | Promise<void>;
 }
@@ -24,7 +23,6 @@ export default function SiteHeader({
   isAuthenticated,
   displayName,
   onOpenAuth,
-  onCreateAuction,
   isSigningOut = false,
   onSignOut,
 }: SiteHeaderProps) {
@@ -58,12 +56,6 @@ export default function SiteHeader({
               카카오로 시작하기
             </Button>
           )}
-
-          {role === "admin" && onCreateAuction ? (
-            <Button onClick={onCreateAuction} size="sm">
-              <span aria-hidden="true">+</span> 경매글 작성
-            </Button>
-          ) : null}
 
           {isAuthenticated && onSignOut ? (
             <Button

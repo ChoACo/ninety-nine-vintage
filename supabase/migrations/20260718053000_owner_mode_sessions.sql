@@ -1,7 +1,9 @@
 -- Short-lived, server-managed sessions for the private owner console.
 -- The browser receives only a random opaque token. Its SHA-256 digest and the
--- digest of the verified Supabase access token are stored here, so neither a
--- database read nor the cookie alone is sufficient to unlock owner mode.
+-- digest of the most recently verified Supabase access token are stored here.
+-- The server re-verifies the Kakao owner bearer on every request and safely
+-- rebinds this digest when Supabase rotates that bearer during navigation, so
+-- neither the cookie nor an access token alone can unlock owner mode.
 
 create table if not exists public.owner_mode_sessions (
   id uuid primary key default gen_random_uuid(),

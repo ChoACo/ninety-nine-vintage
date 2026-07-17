@@ -173,7 +173,6 @@ export async function validateOwnerModeSession(
     .select("expires_at")
     .eq("owner_id", context.userId)
     .eq("token_hash", tokenHash)
-    .eq("access_token_hash", accessTokenHash)
     .gt("expires_at", now)
     .maybeSingle();
   if (error) throw new OwnerModeRequestError(500, "session_check_failed");
@@ -183,7 +182,12 @@ export async function validateOwnerModeSession(
 
   const { error: touchError } = await context.admin
     .from("owner_mode_sessions")
-    .update({ last_verified_at: now })
+    // Supabase may rotate a valid access token during a full-page navigation.
+    // The request has already re-verified the Kakao owner identity, so rebind
+    // the opaque cookie session to the current token instead of rejecting a
+    // legitimate refresh. A cookie and a valid owner bearer are still both
+    // required for every request.
+    .update({ last_verified_at: now, access_token_hash: accessTokenHash })
     .eq("owner_id", context.userId)
     .eq("token_hash", tokenHash);
   if (touchError) throw new OwnerModeRequestError(500, "session_check_failed");

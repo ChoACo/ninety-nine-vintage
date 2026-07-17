@@ -22,8 +22,8 @@ export function AdminAccessGate({ onSwitchToStaff }: AdminAccessGateProps) {
             운영 스태프 인증이 필요해요
           </h2>
           <p className="mx-auto mt-4 max-w-lg break-keep text-[17px] font-bold leading-8 text-[#7d6d63]">
-            관리자 또는 등록된 운영자 계정으로 로그인하면 회원 현황과 경매 상품을
-            실제 서버 데이터로 안전하게 관리할 수 있어요.
+            등록된 운영 스태프 계정으로 로그인하면 역할에 허용된 회원·상품·배송
+            업무를 실제 서버 데이터로 안전하게 처리할 수 있어요.
           </p>
           <Button size="lg" className="mt-7" onClick={onSwitchToStaff}>
             운영 스태프 로그인

@@ -6,7 +6,11 @@ import type {
   BidHistoryRecord,
 } from "@/src/types/auction";
 import { getNextAuctionDeadline } from "@/src/utils/formatters";
-import { getUserRole, isStaffRole } from "./auth";
+import {
+  canManageProducts,
+  getUserRole,
+  mapAccessRoleToAppRole,
+} from "./auth";
 import { getSupabaseBrowserClient } from "./client";
 import type { Database, Json } from "./database.types";
 import {
@@ -215,6 +219,13 @@ export interface CreatedProduct {
   imageUrls: string[];
 }
 
+interface ProductAccessRpcClient {
+  rpc(functionName: "current_access_role" | "can_manage_products"): PromiseLike<{
+    data: unknown;
+    error: { message: string } | null;
+  }>;
+}
+
 async function requireStaffSession() {
   const client = getSupabaseBrowserClient();
   const {
@@ -222,20 +233,31 @@ async function requireStaffSession() {
     error: userError,
   } = await client.auth.getUser();
 
-  if (userError || !user || !isStaffRole(getUserRole(user))) {
+  if (userError || !user || getUserRole(user) === "unauthorized") {
     throw new ProductRepositoryError(
-      "Supabase 관리자 또는 운영자 로그인 후 상품을 관리해 주세요.",
+      "등록된 운영자 또는 직원 계정으로 로그인 후 상품을 관리해 주세요.",
       userError ? { cause: userError } : undefined,
     );
   }
 
-  const { data: hasStaffAccess, error: staffError } = await client.rpc(
-    "is_staff",
+  const accessClient = client as unknown as ProductAccessRpcClient;
+  const { data: accessRole, error: roleError } = await accessClient.rpc(
+    "current_access_role",
   );
-  if (staffError || !hasStaffAccess) {
+  const resolvedRole = mapAccessRoleToAppRole(accessRole);
+  if (roleError || !canManageProducts(resolvedRole)) {
     throw new ProductRepositoryError(
-      "등록된 운영 권한을 확인하지 못했어요. 다시 로그인해 주세요.",
-      staffError ? { cause: staffError } : undefined,
+      "이 카카오 계정에는 상품 업무 권한이 없습니다.",
+      roleError ? { cause: roleError } : undefined,
+    );
+  }
+
+  const { data: hasProductAccess, error: productAccessError } =
+    await accessClient.rpc("can_manage_products");
+  if (productAccessError || hasProductAccess !== true) {
+    throw new ProductRepositoryError(
+      "등록된 상품 업무 권한을 확인하지 못했어요. 다시 로그인해 주세요.",
+      productAccessError ? { cause: productAccessError } : undefined,
     );
   }
 

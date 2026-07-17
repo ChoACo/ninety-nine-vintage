@@ -1,7 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { useMemberSupportChat } from "@/src/hooks/useSupportChat";
+import {
+  useEmployeeSupportChat,
+  useMemberSupportThreads,
+} from "@/src/hooks/useSupportChat";
 import {
   MAX_SUPPORT_MESSAGE_LENGTH,
   isSupportStaffRole,
@@ -36,11 +39,34 @@ export function ChatPage({ userId, role, onRequestSignIn }: ChatPageProps) {
     return <StaffChatInbox key={userId} staffId={userId} role={role} />;
   }
 
+  if (role === "employee") {
+    return <EmployeeChat key={userId} userId={userId} />;
+  }
+
   return <MemberChat key={userId} userId={userId} />;
 }
 
 function MemberChat({ userId }: { userId: string }) {
-  const chat = useMemberSupportChat(userId);
+  const chat = useMemberSupportThreads(userId);
+  return <ParticipantChat userId={userId} chat={chat} internal={false} />;
+}
+
+function EmployeeChat({ userId }: { userId: string }) {
+  const chat = useEmployeeSupportChat(userId);
+  return <ParticipantChat userId={userId} chat={chat} internal />;
+}
+
+function ParticipantChat({
+  userId,
+  chat,
+  internal,
+}: {
+  userId: string;
+  chat:
+    | ReturnType<typeof useMemberSupportThreads>
+    | ReturnType<typeof useEmployeeSupportChat>;
+  internal: boolean;
+}) {
   const [draft, setDraft] = useState("");
   const messagesRef = useRef<HTMLDivElement>(null);
 
@@ -68,7 +94,16 @@ function MemberChat({ userId }: { userId: string }) {
   };
 
   if (chat.isLoading) {
-    return <ChatAccessState title="운영팀 대화를 불러오는 중이에요…" description="회원님의 비공개 상담함을 준비하고 있습니다." />;
+    return (
+      <ChatAccessState
+        title="운영팀 대화를 불러오는 중이에요…"
+        description={
+          internal
+            ? "지정 운영자와의 내부 대화를 준비하고 있습니다."
+            : "회원님의 비공개 상담함을 준비하고 있습니다."
+        }
+      />
+    );
   }
 
   if (!chat.conversation && chat.error) {
@@ -93,8 +128,14 @@ function MemberChat({ userId }: { userId: string }) {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-black tracking-[0.16em] text-[#bd6f5e]">PRIVATE SUPPORT</p>
-            <h2 className="mt-0.5 text-xl font-black text-[#493f38]">다미네 운영팀</h2>
-            <p className="mt-0.5 text-sm font-bold text-[#81746b]">이 대화는 회원님과 운영팀만 볼 수 있어요.</p>
+            <h2 className="mt-0.5 text-xl font-black text-[#493f38]">
+              {internal ? "담당 운영자 내부 대화" : "다미네 운영팀"}
+            </h2>
+            <p className="mt-0.5 text-sm font-bold text-[#81746b]">
+              {internal
+                ? "이 대화는 직원 본인과 지정 운영자만 볼 수 있어요."
+                : "이 대화는 회원님과 담당 운영자만 볼 수 있어요."}
+            </p>
           </div>
           <span className={`rounded-full px-3 py-1.5 text-xs font-black ${isClosed ? "bg-[#ece7e2] text-[#81766e]" : "bg-[#e4f1e8] text-[#4a7758]"}`}>
             {isClosed ? "상담 종료" : chat.conversation ? "상담 중" : "새 문의"}
@@ -120,11 +161,51 @@ function MemberChat({ userId }: { userId: string }) {
           </div>
         )}
 
+        {!internal && "conversations" in chat && chat.conversations.length > 0 ? (
+          <nav
+            aria-label="내 상담 대화"
+            className="flex gap-2 overflow-x-auto border-b border-[#eee4da] bg-white/70 px-5 py-3 md:px-8"
+          >
+            {chat.conversations.map((conversation) => (
+              <button
+                key={conversation.id}
+                type="button"
+                onClick={() => chat.selectConversation(conversation.id)}
+                className={`relative shrink-0 rounded-full px-4 py-2 text-sm font-black ${
+                  conversation.id === chat.selectedConversationId
+                    ? "bg-[#df806f] text-white"
+                    : "border border-[#dfd2c7] bg-white text-[#74675f]"
+                }`}
+              >
+                {conversation.conversationType === "product"
+                  ? `상품 · ${conversation.subject ?? "문의"}`
+                  : "일반 상담"}
+                {conversation.isUnread ? (
+                  <span
+                    className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#b94f40]"
+                    aria-label="안 읽은 메시지"
+                  />
+                ) : null}
+              </button>
+            ))}
+          </nav>
+        ) : null}
+
         <div ref={messagesRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-7 md:px-8" aria-live="polite">
-          {chat.messages.length === 0 ? (
+          {"isMessagesLoading" in chat && chat.isMessagesLoading ? (
+            <p className="py-8 text-center text-sm font-bold text-[#81766f]">
+              대화 내용을 불러오는 중…
+            </p>
+          ) : chat.messages.length === 0 ? (
             <div className="mx-auto mt-12 max-w-md rounded-3xl border border-dashed border-[#ddcfc3] bg-white/70 p-7 text-center">
-              <p className="text-lg font-black text-[#564a42]">운영팀에 궁금한 점을 남겨주세요</p>
-              <p className="mt-2 break-keep text-sm font-bold leading-6 text-[#82746a]">주문, 입찰, 배송과 관련된 문의에 순서대로 답변드려요.</p>
+              <p className="text-lg font-black text-[#564a42]">
+                {internal ? "담당 운영자에게 내부 메시지를 남겨주세요" : "운영팀에 궁금한 점을 남겨주세요"}
+              </p>
+              <p className="mt-2 break-keep text-sm font-bold leading-6 text-[#82746a]">
+                {internal
+                  ? "이 내용은 일반 회원 화면에 표시되지 않습니다."
+                  : "주문, 입찰, 배송과 관련된 문의에 순서대로 답변드려요."}
+              </p>
             </div>
           ) : (
             chat.messages.map((message) => {
@@ -133,7 +214,11 @@ function MemberChat({ userId }: { userId: string }) {
               return (
                 <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                   <div className={`flex max-w-[82%] flex-col ${isMine ? "items-end" : "items-start"}`}>
-                    {!isMine && <span className="mb-1 px-1 text-xs font-bold text-[#8e8076]">운영팀</span>}
+                    {!isMine && (
+                      <span className="mb-1 px-1 text-xs font-bold text-[#8e8076]">
+                        {internal ? "담당 운영자" : "운영팀"}
+                      </span>
+                    )}
                     <p className={`whitespace-pre-wrap break-words rounded-[1.35rem] px-4 py-3 text-[17px] leading-7 shadow-sm ${
                       isMine
                         ? "rounded-br-md bg-[#e18472] text-white"

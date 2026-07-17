@@ -52,6 +52,64 @@ test("keeps the OAuth callback on the vinext SSR router", async () => {
   assert.doesNotMatch(html, /404: NOT_FOUND|Code: NOT_FOUND/);
 });
 
+test("publishes PG review business, terms, privacy, refund, and price information", async () => {
+  const [footer, termsSource, refundSource, privacySource, productCard] = await Promise.all([
+    source("src/components/common/BusinessFooter.tsx"),
+    source("app/terms/page.tsx"),
+    source("app/refund/page.tsx"),
+    source("app/privacy/page.tsx"),
+    source("src/components/feed/PostCard.tsx"),
+  ]);
+  const [homeResponse, termsResponse, privacyResponse, refundResponse] = await Promise.all([
+    render("/"),
+    render("/terms"),
+    render("/privacy"),
+    render("/refund"),
+  ]);
+
+  for (const response of [homeResponse, termsResponse, privacyResponse, refundResponse]) {
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  }
+
+  const [home, terms, privacy, refund] = await Promise.all([
+    homeResponse.text(),
+    termsResponse.text(),
+    privacyResponse.text(),
+    refundResponse.text(),
+  ]);
+
+  for (const html of [home, terms, privacy, refund]) {
+    assert.match(html, /나인 티나인 빈티지/);
+    assert.match(html, /875-07-03297/);
+    assert.match(html, /이영준/);
+    assert.match(html, /0507-1494-3519/);
+    assert.match(html, /ninety-nine@kakao\.com/);
+    assert.match(html, /\/terms/);
+    assert.match(html, /\/privacy/);
+    assert.match(html, /\/refund/);
+  }
+
+  assert.match(footer, /부산광역시 수영구 수미로50번길 37-1/);
+  assert.match(footer, /통신판매업 신고 면제 사유/);
+  assert.match(footer, /간이과세자/);
+  assert.doesNotMatch(footer, /1973|생년월일|개업 연월일|발급 사유/);
+  assert.match(terms, /서비스 이용약관/);
+  assert.match(termsSource, /최고 유효 입찰가가 낙찰가/);
+  assert.match(termsSource, /중고품, 단일 재고 또는 경매 상품이라는 이유만으로/);
+  assert.match(privacy, /개인정보처리방침/);
+  assert.match(privacySource, /개인정보 보호 담당/);
+  assert.match(refund, /취소·반품·환불 및 청약철회 정책/);
+  assert.match(refundSource, /7일 이내/);
+  assert.match(refundSource, /3개월 이내/);
+  assert.match(refundSource, /30일/);
+  assert.match(refundSource, /3영업일 이내/);
+  assert.match(refundSource, /반환 비용은 회사가 부담/);
+  assert.match(productCard, /시작 가격/);
+  assert.match(productCard, /현재 입찰가/);
+  assert.match(productCard, /formatKRW\(displayedPrice\)/);
+});
+
 test("server-renders a persistent light and dark theme selector", async () => {
   const [layout, globalStyles, toggle, toggleStyles, header, commonExports] = await Promise.all([
     source("app/layout.tsx"),
@@ -118,8 +176,8 @@ test("keeps native build dependencies approved in both pnpm config locations", a
   }
 });
 
-test("uses console-approved Kakao OIDC consent and two configurable server-provisioned operators", async () => {
-  const [auth, authSession, modal, callback, oidcHelper, oidcStart, oidcCallback, oidcSession, oidcProfile, kakaoMigration, requirementMigration, privacy, signup, provision, environmentExample, auctionApp] = await Promise.all([
+test("uses console-approved Kakao OIDC consent as the only interactive login", async () => {
+  const [auth, authSession, modal, callback, oidcHelper, oidcStart, oidcCallback, oidcSession, oidcProfile, kakaoMigration, requirementMigration, privacy, signup, environmentExample, packageSource, auctionApp] = await Promise.all([
     source("src/lib/supabase/auth.ts"),
     source("src/hooks/useAuthSession.ts"),
     source("src/components/auth/AuthModal.tsx"),
@@ -133,28 +191,26 @@ test("uses console-approved Kakao OIDC consent and two configurable server-provi
     source("supabase/migrations/20260718023000_gate_required_kakao_profiles.sql"),
     source("app/privacy/page.tsx"),
     source("app/signup/page.tsx"),
-    source("scripts/provision-operators.mjs"),
     source(".env.example"),
+    source("package.json"),
     source("src/components/AuctionApp.tsx"),
   ]);
 
   assert.match(auth, /window\.location\.assign\("\/api\/auth\/kakao\/start"\)/);
+  assert.doesNotMatch(auth, /signInWithPassword|signInStaff|signInOwner/);
   assert.doesNotMatch(auth, /signInWithOAuth/);
   assert.match(auth, /"unauthorized"/);
   assert.match(auth, /providers\.includes\("kakao"\)/);
-  assert.match(auth, /hasKakaoProvider && hasMemberCompatibleRole/);
-  assert.doesNotMatch(auth, /:\s*"member";\s*\n\}/);
-  assert.match(auth, /client\.rpc\([\s\S]*"is_staff"/);
-  assert.match(authSession, /getUserRole\(nextSession\.user\) === "unauthorized"/);
-  assert.match(authSession, /hasAuthorizedSession/);
-  assert.match(authSession, /isStaffRole\(role\) \? "is_staff" : "is_member"/);
-  assert.match(authSession, /client\.rpc\(accessFunction\)/);
+  assert.match(auth, /if \(!hasKakaoProvider\) return "unauthorized"/);
+  assert.match(auth, /if \(!hasMemberCompatibleRole\) return "unauthorized"/);
+  assert.match(authSession, /"current_access_role"/);
+  assert.match(authSession, /mapAccessRoleToAppRole\(accessRole\)/);
+  assert.match(authSession, /nextRole === "employee"[\s\S]*"can_manage_products"/);
+  assert.match(authSession, /if \(nextRole !== "admin"\)[\s\S]*touch_my_last_seen/);
   assert.match(authSession, /client\.auth\.signOut\(\)/);
-  assert.match(auth, /OPERATOR_ID_PATTERN/);
-  assert.doesNotMatch(auth, /["']operator0[123]["']/i);
   assert.match(modal, /카카오로 로그인/);
-  assert.match(modal, /운영자는 발급받은 아이디/);
-  assert.doesNotMatch(modal, /operator01~03/);
+  assert.match(modal, /회원과 운영 스태프는 모두 카카오 계정으로 로그인/);
+  assert.doesNotMatch(modal, /type="(?:email|password)"|아이디로 로그인|signInWithPassword/);
   assert.match(callback, /exchangeCodeForSession/);
   assert.match(callback, /signInWithIdToken/);
   assert.match(callback, /provider:\s*"kakao"/);
@@ -199,36 +255,27 @@ test("uses console-approved Kakao OIDC consent and two configurable server-provi
   assert.match(signup, /이메일과 카카오계정 전화번호는 동의 요청하지 않습니다/);
   assert.match(callback, /kakaoSessionCreated = true/);
   assert.match(callback, /if \(kakaoSessionCreated\)/);
-  assert.match(provision, /email_confirm:\s*true/);
-  assert.match(provision, /SUPABASE_SECRET_KEY/);
-  assert.match(provision, /password\.length < 12/);
-  assert.match(provision, /idEnvironmentName:\s*"OPERATOR01_ID"/);
-  assert.match(provision, /idEnvironmentName:\s*"OPERATOR02_ID"/);
-  assert.match(provision, /removeUnexpectedOperatorSlots/);
-  assert.match(provision, /user\.app_metadata\?\.role === "operator"/);
-  assert.match(provision, /countRetiredOperatorUsers/);
-  assert.doesNotMatch(provision, /OPERATOR03_(?:ID|PASSWORD)/);
-  assert.doesNotMatch(provision, /auth\.admin\.deleteUser/);
-  assert.match(environmentExample, /OPERATOR01_ID=/);
-  assert.match(environmentExample, /OPERATOR02_ID=/);
-  assert.doesNotMatch(environmentExample, /OPERATOR03_(?:ID|PASSWORD)/);
+  assert.doesNotMatch(environmentExample, /OPERATOR\d+_(?:ID|PASSWORD)=/);
   assert.match(environmentExample, /KAKAO_REST_API_KEY=/);
   assert.match(environmentExample, /KAKAO_CLIENT_SECRET=/);
   assert.doesNotMatch(environmentExample, /NEXT_PUBLIC_KAKAO_CLIENT_SECRET/);
-  assert.doesNotMatch(provision, /sb_secret_|service_role\s*=\s*["'][A-Za-z0-9]/);
+  assert.doesNotMatch(packageSource, /operators:provision|provision-operators/);
+  await assert.rejects(access(new URL("scripts/provision-operators.mjs", rootUrl)));
   assert.doesNotMatch(auctionApp, /RoleToggle|MOCK_BIDDER|chatThreadState/);
 });
 
 test("enforces private member-to-staff chat in SQL and UI", async () => {
-  const [migration, hardening, kakaoOnly, repository, chatPage, floatingChat, staffInbox, hook] = await Promise.all([
+  const [migration, hardening, kakaoOnly, routing, repository, chatPage, floatingChat, staffInbox, hook, auctionApp] = await Promise.all([
     source("supabase/migrations/20260717210000_add_accounts_support_and_bids.sql"),
     source("supabase/migrations/20260717220000_harden_auth_chat_bids.sql"),
     source("supabase/migrations/20260717230000_require_kakao_for_members.sql"),
+    source("supabase/migrations/20260718031000_route_support_by_operator.sql"),
     source("src/lib/supabase/supportChat.ts"),
     source("src/components/chat/ChatPage.tsx"),
     source("src/components/chat/FloatingAdminChat.tsx"),
     source("src/components/chat/StaffChatInbox.tsx"),
     source("src/hooks/useSupportChat.ts"),
+    source("src/components/AuctionApp.tsx"),
   ]);
 
   assert.match(migration, /create table if not exists public\.support_conversations/);
@@ -247,38 +294,33 @@ test("enforces private member-to-staff chat in SQL and UI", async () => {
   assert.match(hardening, /revoke update \(last_read_at\)/);
   assert.match(repository, /MAX_SUPPORT_MESSAGE_LENGTH = 2_000/);
   assert.match(repository, /fetchMemberSupportConversation/);
+  assert.match(repository, /getOrCreateProductInquiryConversation/);
+  assert.match(repository, /getOrCreateEmployeeSupportConversation/);
+  assert.match(repository, /fetchStaffSupportInbox\([\s\S]*inboxOperatorId/);
   assert.match(chatPage, /<MemberChat key=\{userId\} userId=\{userId\}/);
-  assert.match(chatPage, /<StaffChatInbox key=\{userId\} staffId=\{userId\}/);
+  assert.match(chatPage, /<EmployeeChat key=\{userId\} userId=\{userId\}/);
+  assert.match(chatPage, /<StaffChatInbox key=\{userId\} staffId=\{userId\} role=\{role\}/);
   assert.match(floatingChat, /isOpen \? \(/);
   assert.match(floatingChat, /<MemberFloatingChat\s+key=\{userId\}/);
   assert.match(floatingChat, /새 문의 시작/);
   assert.doesNotMatch(floatingChat, /disabled=\{!chat\.conversation/);
-  assert.match(hook, /selectedConversationIdRef\.current === conversationId/);
-  assert.match(hook, /conversation \?\? \(await getOrCreateMemberSupportConversation\(\)\)/);
-  assert.match(hook, /messagesRequestIdRef\.current \+= 1;[\s\S]*selectedConversationIdRef\.current = conversationId/);
-  assert.match(hook, /if \(!conversationId \|\| !selectedConversation\?\.isUnread\) return/);
+  assert.match(hook, /participantType === "employee"[\s\S]*getOrCreateEmployeeSupportConversation/);
+  assert.match(hook, /export function useEmployeeSupportChat/);
+  assert.match(hook, /fetchMemberSupportThreads/);
+  assert.match(hook, /selectedConversationIdRef/);
   assert.match(staffInbox, /회원명 또는 메시지 검색/);
-  assert.match(staffInbox, /내가 담당하기/);
-});
-
-test("keeps the administrator intact and reconciles exactly two configured operator slots", async () => {
-  const [migration, hardening, configurableIds, provision] = await Promise.all([
-    source("supabase/migrations/20260717210000_add_accounts_support_and_bids.sql"),
-    source("supabase/migrations/20260717220000_harden_auth_chat_bids.sql"),
-    source("supabase/migrations/20260718010000_allow_configured_operator_ids.sql"),
-    source("scripts/provision-operators.mjs"),
-  ]);
-
-  assert.match(migration, /app_metadata\.role = 'admin' account remains an administrator/);
-  assert.doesNotMatch(migration, /update\s+auth\.users/i);
-  assert.match(migration, /in \('admin', 'operator'\)/);
-  assert.match(configurableIds, /drop constraint if exists operator_accounts_reserved_username_check/);
-  assert.match(configurableIds, /delete from public\.operator_accounts/);
-  assert.match(provision, /operatorDefinitions = \[[\s\S]*OPERATOR01_ID[\s\S]*OPERATOR02_ID/);
-  assert.match(provision, /configuredIds\.has\(slot\.username\)/);
-  assert.doesNotMatch(provision, /OPERATOR03_(?:ID|PASSWORD)/);
-  assert.match(hardening, /users\.raw_app_meta_data ->> 'operator_id' = new\.username/);
-  assert.match(hardening, /operators\.auth_user_id = auth\.uid\(\)/);
+  assert.match(staffInbox, /role === "admin"/);
+  assert.match(staffInbox, /읽기 전용/);
+  assert.match(staffInbox, /fetchSupportOperators/);
+  assert.match(routing, /check \(conversation_type in \('general', 'product', 'internal'\)\)/);
+  assert.match(routing, /create or replace function public\.get_or_create_product_inquiry_conversation/);
+  assert.match(routing, /products\.inquiry_operator_id,[\s\S]*into v_operator_id, v_subject/);
+  assert.match(routing, /create or replace function public\.get_or_create_employee_support_conversation/);
+  assert.match(routing, /public\.support_employee_operator\(v_user_id\)/);
+  assert.match(routing, /conversations\.assigned_staff_id = auth\.uid\(\)/);
+  assert.match(routing, /public\.is_owner\(\)/);
+  assert.match(routing, /public\.can_send_support_message\(conversation_id\)/);
+  assert.match(auctionApp, /getOrCreateProductInquiryConversation\(postId\)/);
 });
 
 test("uses a row-locked server RPC as the only bid write path", async () => {
@@ -429,6 +471,9 @@ test("allows verified Kakao members to delete accounts without losing required s
   ]);
   assert.match(accountRoute, /verifier\.auth\.getUser\(accessToken\)/);
   assert.match(accountRoute, /identity\.provider === "kakao"/);
+  assert.match(accountRoute, /account_access_roles/);
+  assert.match(accountRoute, /accessRole\?\.role_code === "owner"/);
+  assert.match(accountRoute, /protected_account/);
   assert.match(accountRoute, /admin\.auth\.admin\.deleteUser/);
   assert.match(accountRepository, /Authorization: `Bearer \$\{data\.session\.access_token\}`/);
   assert.match(retentionMigration, /alter column member_id drop not null/);
@@ -438,25 +483,45 @@ test("allows verified Kakao members to delete accounts without losing required s
 });
 
 test("provides a collapsible Supabase operator center with constrained product management", async () => {
-  const [auctionApp, navigation, adminPage, products, operations, migration] = await Promise.all([
+  const [auctionApp, navigation, siteHeader, adminPage, revenuePanel, shippingPanel, products, operations, migration, accessMigration] = await Promise.all([
     source("src/components/AuctionApp.tsx"),
     source("src/components/common/Navigation.tsx"),
+    source("src/components/common/SiteHeader.tsx"),
     source("src/components/admin/AdminPage.tsx"),
+    source("src/components/admin/RevenuePanel.tsx"),
+    source("src/components/admin/ShippingWorkPanel.tsx"),
     source("src/lib/supabase/products.ts"),
     source("src/lib/supabase/operations.ts"),
     source("supabase/migrations/20260718000000_add_member_operations_and_staff_products.sql"),
+    source("supabase/migrations/20260718030000_add_role_levels_revenue_enforcement.sql"),
   ]);
 
   assert.match(navigation, /label: "운영 센터"/);
-  assert.match(navigation, /role !== "admin" && role !== "operator"/);
-  assert.match(auctionApp, /role === "admin" \|\| role === "operator"/);
+  assert.match(navigation, /canAccessOperationsWorkspace\(role\)/);
+  assert.match(navigation, /role === "employee"/);
+  assert.match(auctionApp, /canAccessOperationsCenter\(auth\.role\)/);
+  assert.match(auctionApp, /ownerMode === "admin" \? "admin" : "operator"/);
+  assert.match(siteHeader, /isOwnerRole\(role\) && onOwnerModeChange/);
+  assert.match(siteHeader, /운영자 모드/);
+  assert.match(siteHeader, /관리자 모드/);
   assert.match(auctionApp, /onOpenBulkImport=\{\(\) => setBulkAuctionOpen\(true\)\}/);
   assert.doesNotMatch(auctionApp, /emptyAdminSales|shipments=\{\[\]\}/);
-  assert.ok((adminPage.match(/<CollapsibleSection/g) ?? []).length >= 4);
+  assert.ok((adminPage.match(/<CollapsibleSection/g) ?? []).length >= 6);
   assert.match(adminPage, /getStaffMemberDirectory/);
+  assert.match(adminPage, /setMemberAccessRole/);
+  assert.match(adminPage, /addMemberWarning/);
+  assert.match(adminPage, /deleteManagedMember/);
+  assert.match(adminPage, /<RevenuePanel/);
+  assert.match(adminPage, /<ShippingWorkPanel/);
+  assert.match(revenuePanel, /getDailyRevenue/);
+  assert.match(revenuePanel, /upsertDailyRevenue/);
+  assert.match(shippingPanel, /getPendingShippingWork/);
+  assert.match(shippingPanel, /markShippingRequestShipped/);
   assert.match(adminPage, /updateManagedProduct/);
   assert.match(adminPage, /deleteManagedProduct/);
   assert.match(operations, /"get_staff_member_directory"/);
+  assert.match(operations, /"set_member_access_role"/);
+  assert.match(operations, /"upsert_daily_revenue"/);
   assert.match(products, /fetchManagedProducts/);
   assert.match(products, /\.rpc\("update_managed_product"/);
   assert.match(products, /\.rpc\("delete_managed_product"/);
@@ -465,6 +530,56 @@ test("provides a collapsible Supabase operator center with constrained product m
   assert.match(migration, /create or replace function public\.update_managed_product/);
   assert.match(migration, /for update;/);
   assert.match(migration, /p_expected_updated_at/);
+  assert.match(accessMigration, /create table if not exists public\.daily_revenue/);
+  assert.match(accessMigration, /revenue_date date primary key/);
+  assert.doesNotMatch(accessMigration, /auction_settlements/);
+});
+
+test("keeps the hidden Kakao owner private and enforces role, warning, and revenue rules", async () => {
+  const [migration, routing, revenueFix, onlineDirectory, operatorPromotion, auth, presence, siteHeader, config] = await Promise.all([
+    source("supabase/migrations/20260718030000_add_role_levels_revenue_enforcement.sql"),
+    source("supabase/migrations/20260718031000_route_support_by_operator.sql"),
+    source("supabase/migrations/20260718032000_fix_monthly_revenue_lint.sql"),
+    source("supabase/migrations/20260718033000_secure_online_member_heartbeat.sql"),
+    source("supabase/migrations/20260718034000_promote_initial_kakao_operator.sql"),
+    source("src/lib/supabase/auth.ts"),
+    source("src/hooks/useOnlineMembers.ts"),
+    source("src/components/common/SiteHeader.tsx"),
+    source("supabase/config.toml"),
+  ]);
+
+  assert.match(migration, /30be08c2-6259-42c6-af26-4ded6362de12/g);
+  assert.match(migration, /identities\.provider = 'kakao'/);
+  assert.match(migration, /users\.raw_app_meta_data ->> 'role' = 'admin'[\s\S]*delete from auth\.users/);
+  assert.match(migration, /lower\(users\.email::text\) = 'cocoaline082@gmail\.com'/);
+  assert.match(migration, /create trigger auth_users_protect_owner_delete/);
+  assert.match(migration, /role_code in \('owner', 'operator', 'employee', 'band_member', 'member'\)/);
+  assert.match(migration, /v_requested_role not in \('operator', 'employee', 'band_member', 'member'\)/);
+  assert.match(migration, /mod\(v_warning_count, 3\) = 0/);
+  assert.match(migration, /make_interval\(days => v_sanction_round\)/);
+  assert.match(migration, /create table if not exists public\.cancelled_auction_bids/);
+  assert.match(migration, /v_category = 'late_payment'[\s\S]*is_payment_deadline_exempt/);
+  assert.match(migration, /delete from public\.auction_bids/);
+  assert.doesNotMatch(migration, /create or replace function public\.place_bid/);
+  assert.match(auth, /admin: \{ label: "운영자", grade: null \}/);
+  assert.doesNotMatch(siteHeader, /0등급|최고 관리자/);
+  assert.match(presence, /shouldTrackPresence\(role\)/);
+  assert.match(presence, /"touch_my_last_seen"/);
+  assert.match(presence, /"get_online_member_directory"/);
+  assert.doesNotMatch(presence, /\.track\(|presenceState|client\.channel/);
+  assert.match(routing, /roles\.role_code = 'operator'[\s\S]*has_kakao_identity/);
+  assert.match(routing, /public\.is_owner\(\)/);
+  assert.match(revenueFix, /with monthly as/);
+  assert.match(revenueFix, /group by 1/);
+  assert.match(revenueFix, /alter function public\.get_staff_member_directory\(integer, integer\) volatile/);
+  assert.match(onlineDirectory, /auth_user_has_kakao_identity\(auth\.uid\(\)\)/);
+  assert.match(onlineDirectory, /statement_timestamp\(\) - interval '75 seconds'/);
+  assert.match(onlineDirectory, /roles\.role_code in \('operator', 'band_member', 'member'\)/);
+  assert.match(onlineDirectory, /grant execute on function public\.get_online_member_directory\(integer\) to authenticated/);
+  assert.match(operatorPromotion, /4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee/);
+  assert.match(operatorPromotion, /set_member_access_role\(v_operator_id, 'operator'\)/);
+  assert.match(operatorPromotion, /products\.inquiry_operator_id is null/);
+  assert.match(config, /\[auth\.email\][\s\S]*enable_signup = false/);
 });
 
 test("matches Excel image names in order and batches real Storage and database writes", async () => {

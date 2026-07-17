@@ -3,7 +3,9 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useStaffSupportInbox } from "@/src/hooks/useSupportChat";
 import {
+  fetchSupportOperators,
   MAX_SUPPORT_MESSAGE_LENGTH,
+  type SupportOperator,
   type SupportStaffRole,
 } from "@/src/lib/supabase/supportChat";
 import { formatKoreanTime } from "@/src/utils/formatters";
@@ -23,11 +25,47 @@ const filters: Array<{ value: InboxFilter; label: string }> = [
 ];
 
 export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
-  const chat = useStaffSupportInbox(staffId);
+  const isAuditMode = role === "admin";
+  const [operators, setOperators] = useState<SupportOperator[]>([]);
+  const [selectedOperatorId, setSelectedOperatorId] = useState<string | null>(
+    role === "operator" ? staffId : null,
+  );
+  const [operatorError, setOperatorError] = useState<string | null>(null);
+  const inboxOperatorId = role === "operator" ? staffId : selectedOperatorId;
+  const chat = useStaffSupportInbox(staffId, inboxOperatorId);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [draft, setDraft] = useState("");
   const messagesRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isAuditMode) return;
+
+    let active = true;
+    void fetchSupportOperators()
+      .then((items) => {
+        if (!active) return;
+        setOperators(items);
+        setSelectedOperatorId((current) =>
+          current && items.some((item) => item.id === current)
+            ? current
+            : items[0]?.id ?? null,
+        );
+        setOperatorError(null);
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        setOperatorError(
+          loadError instanceof Error
+            ? loadError.message
+            : "운영자 목록을 불러오지 못했어요.",
+        );
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isAuditMode, staffId]);
 
   const visibleConversations = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
@@ -66,7 +104,7 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
   const handleSend = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const text = draft.trim();
-    if (!text || chat.isSending) return;
+    if (!text || chat.isSending || isAuditMode) return;
 
     try {
       await chat.sendMessage(text);
@@ -86,12 +124,43 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
         <aside className="border-b border-[#eadfd5] bg-[#fff8f0] lg:border-b-0 lg:border-r">
           <div className="border-b border-[#eadfd5] p-5">
             <p className="text-xs font-black tracking-[0.16em] text-[#b96d5d]">
-              {role === "admin" ? "ADMIN SUPPORT" : "OPERATOR SUPPORT"}
+              {isAuditMode ? "OPERATOR INBOX REVIEW" : "OPERATOR SUPPORT"}
             </p>
-            <h2 className="mt-1 text-2xl font-black text-[#473d36]">고객 상담함</h2>
+            <h2 className="mt-1 text-2xl font-black text-[#473d36]">
+              {isAuditMode ? "운영자별 상담함" : "내 상담함"}
+            </h2>
             <p className="mt-1 text-sm font-bold text-[#85766c]">
-              회원별 비공개 문의를 한곳에서 관리합니다.
+              {isAuditMode
+                ? "운영자를 선택해 배정된 대화를 읽기 전용으로 확인합니다."
+                : "내게 배정된 회원 문의와 내부 대화만 표시됩니다."}
             </p>
+
+            {isAuditMode ? (
+              <div className="mt-4" aria-label="확인할 운영자 상담함">
+                <p className="mb-2 text-sm font-black text-[#6f6057]">운영자 선택</p>
+                <div className="flex flex-wrap gap-2">
+                  {operators.map((operator) => (
+                    <button
+                      key={operator.id}
+                      type="button"
+                      onClick={() => setSelectedOperatorId(operator.id)}
+                      className={`rounded-full px-3 py-2 text-sm font-black ${
+                        selectedOperatorId === operator.id
+                          ? "bg-[#6f7f72] text-white"
+                          : "border border-[#ddcfc3] bg-white text-[#6f6057]"
+                      }`}
+                    >
+                      {operator.displayName}
+                    </button>
+                  ))}
+                </div>
+                {operatorError ? (
+                  <p className="mt-2 text-sm font-bold text-[#a85143]" role="alert">
+                    {operatorError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
 
             <label htmlFor="support-search" className="sr-only">
               회원 또는 메시지 검색
@@ -132,7 +201,7 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
               visibleConversations.map((conversation) => {
                 const memberName =
                   conversation.member?.displayName ??
-                  `회원 ${conversation.memberId.slice(0, 6)}`;
+                  `${conversation.conversationType === "internal" ? "직원" : "회원"} ${conversation.memberId.slice(0, 6)}`;
                 const selected = conversation.id === chat.selectedConversationId;
 
                 return (
@@ -162,16 +231,21 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
                     <span className="mt-1 block truncate text-sm font-medium text-[#75685f]">
                       {conversation.lastMessagePreview ?? "아직 메시지가 없습니다."}
                     </span>
+                    <span className="mt-1 block truncate text-xs font-bold text-[#9a756b]">
+                      {conversation.conversationType === "product"
+                        ? `상품 문의 · ${conversation.subject ?? "상품"}`
+                        : conversation.conversationType === "internal"
+                          ? "직원 내부 대화"
+                          : "일반 상담"}
+                    </span>
                     <span className="mt-2 flex items-center justify-between text-xs font-bold">
                       <span className={conversation.status === "open" ? "text-[#438262]" : "text-[#91857d]"}>
                         {conversation.status === "open" ? "상담 중" : "상담 종료"}
                       </span>
                       <span className="text-[#9a756b]">
-                        {conversation.assignedStaffId
-                          ? conversation.assignedStaffId === staffId
-                            ? "내 담당"
-                            : conversation.assignedStaff?.displayName ?? "담당자 배정"
-                          : "미배정"}
+                        {conversation.assignedStaffId === staffId
+                          ? "내 담당"
+                          : conversation.assignedStaff?.displayName ?? "담당 운영자"}
                       </span>
                     </span>
                   </button>
@@ -189,35 +263,35 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-lg font-black text-[#493f38]">
                   {chat.selectedConversation.member?.displayName ??
-                    `회원 ${chat.selectedConversation.memberId.slice(0, 6)}`}
+                    `${chat.selectedConversation.conversationType === "internal" ? "직원" : "회원"} ${chat.selectedConversation.memberId.slice(0, 6)}`}
                 </h3>
                 <p className="text-sm font-bold text-[#887a70]">
-                  회원과 운영팀만 볼 수 있는 비공개 상담
+                  {chat.selectedConversation.conversationType === "internal"
+                    ? "직원과 지정 운영자만 볼 수 있는 내부 대화"
+                    : chat.selectedConversation.conversationType === "product"
+                      ? `상품 문의 · ${chat.selectedConversation.subject ?? "상품"}`
+                      : "회원과 담당 운영자만 볼 수 있는 비공개 상담"}
                 </p>
               </div>
-              {!chat.selectedConversation.assignedStaffId && (
+              {!isAuditMode ? (
                 <button
                   type="button"
-                  onClick={() => void chat.changeConversation({ assignedStaffId: staffId })}
+                  onClick={() =>
+                    void chat.changeConversation({
+                      status:
+                        chat.selectedConversation?.status === "open" ? "closed" : "open",
+                    })
+                  }
                   disabled={chat.isUpdating}
-                  className="rounded-xl border border-[#d9c9ba] bg-white px-3 py-2 text-sm font-black text-[#6d5d52] disabled:opacity-50"
+                  className="rounded-xl bg-[#6f7f72] px-3 py-2 text-sm font-black text-white disabled:opacity-50"
                 >
-                  내가 담당하기
+                  {chat.selectedConversation.status === "open" ? "대화 종료" : "다시 열기"}
                 </button>
+              ) : (
+                <span className="rounded-full bg-[#eee8e2] px-3 py-1.5 text-xs font-black text-[#75685f]">
+                  읽기 전용
+                </span>
               )}
-              <button
-                type="button"
-                onClick={() =>
-                  void chat.changeConversation({
-                    status:
-                      chat.selectedConversation?.status === "open" ? "closed" : "open",
-                  })
-                }
-                disabled={chat.isUpdating}
-                className="rounded-xl bg-[#6f7f72] px-3 py-2 text-sm font-black text-white disabled:opacity-50"
-              >
-                {chat.selectedConversation.status === "open" ? "상담 종료" : "다시 열기"}
-              </button>
             </header>
 
             {chat.error && (
@@ -242,7 +316,13 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
                     <div key={message.id} className={`flex ${isStaffMessage ? "justify-end" : "justify-start"}`}>
                       <div className={`flex max-w-[82%] flex-col ${isStaffMessage ? "items-end" : "items-start"}`}>
                         <span className="mb-1 px-1 text-xs font-bold text-[#8f8178]">
-                          {isMine ? "나" : isStaffMessage ? "다른 운영자" : "회원"}
+                          {isMine
+                            ? "나"
+                            : isStaffMessage
+                              ? "담당 운영자"
+                              : chat.selectedConversation?.conversationType === "internal"
+                                ? "직원"
+                                : "회원"}
                         </span>
                         <p className={`whitespace-pre-wrap break-words rounded-[1.25rem] px-4 py-3 text-[16px] leading-7 shadow-sm ${
                           isStaffMessage
@@ -261,6 +341,11 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
               )}
             </div>
 
+            {isAuditMode ? (
+              <div className="border-t border-[#eadfd5] bg-[#f4efe9] p-4 text-center text-sm font-bold text-[#75685f]">
+                감사 화면에서는 대화를 읽을 수만 있으며 메시지를 보낼 수 없습니다.
+              </div>
+            ) : (
             <form onSubmit={handleSend} className="border-t border-[#eadfd5] bg-white/85 p-4">
               <textarea
                 value={draft}
@@ -282,6 +367,7 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
                 </button>
               </div>
             </form>
+            )}
           </div>
         )}
       </div>

@@ -43,8 +43,12 @@ export default function ProductInquiryModal({
       await onSubmit(trimmedMessage);
       setMessage("");
       onClose();
-    } catch {
-      setError("문의 전송에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "문의 전송에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      );
     } finally {
       setIsSending(false);
     }
@@ -55,7 +59,7 @@ export default function ProductInquiryModal({
       open={open}
       onClose={closeModal}
       title="상품 문의하기"
-      description={`‘${productLabel}’에 대해 궁금한 내용을 관리자에게 바로 남겨 주세요.`}
+      description={`‘${productLabel}’의 담당 운영자에게 비공개 문의를 남겨 주세요.`}
       size="sm"
       closeOnBackdrop={!isSending}
     >
@@ -91,7 +95,7 @@ export default function ProductInquiryModal({
         </div>
 
         <p className="rounded-2xl bg-[#edf7f9] px-4 py-3 text-[15px] font-bold leading-6 text-[#4c7079]">
-          보내기를 눌러도 현재 상품 화면은 그대로 유지됩니다.
+          문의는 담당 운영자에게만 전달되며, 답변은 상담 페이지의 상품 대화에서 확인할 수 있습니다.
         </p>
 
         <div className="grid grid-cols-2 gap-3">

@@ -17,15 +17,22 @@ import {
   updateManagedProduct,
 } from "@/src/lib/supabase/products";
 import {
+  addMemberWarning,
   adjustMemberShippingCredits,
+  deleteManagedMember,
   getStaffMemberDirectory,
+  setMemberAccessRole,
   setMemberAccountStatus,
+  updateManagedMember,
+  type ManagedAccessRole,
   type MemberAccountStatus,
   type StaffMemberDirectoryEntry,
 } from "@/src/lib/supabase/operations";
 import { formatKRW } from "@/src/utils/formatters";
 
 import { CollapsibleSection } from "./CollapsibleSection";
+import { RevenuePanel } from "./RevenuePanel";
+import { ShippingWorkPanel } from "./ShippingWorkPanel";
 import {
   ProductEditModal,
   type ProductEditValues,
@@ -57,6 +64,13 @@ const productStatusClasses: Record<ManagedProduct["status"], string> = {
   pending: "border-[#ead5a9] bg-[#fff7df] text-[#82673a]",
   active: "border-[#b9d9c8] bg-[#e5f4eb] text-[#35684f]",
   closed: "border-[#d8d0c9] bg-[#eee9e4] text-[#71675f]",
+};
+
+const memberRoleLabel: Record<ManagedAccessRole, string> = {
+  operator: "운영자",
+  employee: "직원",
+  band_member: "밴드 기존 회원",
+  member: "일반 회원",
 };
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -149,6 +163,19 @@ export function AdminPage({
   const [mutatingMemberId, setMutatingMemberId] = useState<string | null>(
     null,
   );
+  const [editingMember, setEditingMember] =
+    useState<StaffMemberDirectoryEntry | null>(null);
+  const [editDisplayName, setEditDisplayName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [warningMember, setWarningMember] =
+    useState<StaffMemberDirectoryEntry | null>(null);
+  const [warningCategory, setWarningCategory] = useState<
+    "general" | "late_payment"
+  >("general");
+  const [warningReason, setWarningReason] = useState("");
+  const [deletingMember, setDeletingMember] =
+    useState<StaffMemberDirectoryEntry | null>(null);
+  const [memberActionError, setMemberActionError] = useState("");
 
   const [products, setProducts] = useState<ManagedProduct[]>([]);
   const [productLoadStatus, setProductLoadStatus] =
@@ -165,7 +192,7 @@ export function AdminPage({
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
-  const isAdmin = role === "admin";
+  const isOwnerMode = role === "admin";
 
   const loadMembers = useCallback(async () => {
     setMemberLoadStatus("loading");
@@ -212,9 +239,17 @@ export function AdminPage({
     return () => window.clearTimeout(loadTimer);
   }, [loadMembers, loadProducts]);
 
+  const directoryMembers = useMemo(
+    () =>
+      isOwnerMode
+        ? members
+        : members.filter((member) => member.accessRole !== "operator"),
+    [isOwnerMode, members],
+  );
+
   const filteredMembers = useMemo(() => {
     const query = memberQuery.trim().toLocaleLowerCase("ko-KR");
-    return members.filter((member) => {
+    return directoryMembers.filter((member) => {
       if (
         memberStatusFilter !== "all" &&
         member.accountStatus !== memberStatusFilter
@@ -239,7 +274,7 @@ export function AdminPage({
         member.id,
       ].some((value) => value?.toLocaleLowerCase("ko-KR").includes(query));
     });
-  }, [memberGenderFilter, memberQuery, memberStatusFilter, members]);
+  }, [directoryMembers, memberGenderFilter, memberQuery, memberStatusFilter]);
 
   const memberTotalPages = Math.max(
     1,
@@ -277,10 +312,10 @@ export function AdminPage({
     safeProductPage * PRODUCT_PAGE_SIZE,
   );
 
-  const activeMemberCount = members.filter(
+  const activeMemberCount = directoryMembers.filter(
     (member) => member.accountStatus === "active",
   ).length;
-  const suspendedMemberCount = members.length - activeMemberCount;
+  const suspendedMemberCount = directoryMembers.length - activeMemberCount;
   const activeProductCount = products.filter(
     (product) => product.status === "active",
   ).length;
@@ -292,7 +327,7 @@ export function AdminPage({
     member: StaffMemberDirectoryEntry,
     status: MemberAccountStatus,
   ) => {
-    if (!isAdmin || member.accountStatus === status) return;
+    if (member.accountStatus === status) return;
     setMutatingMemberId(member.id);
     setMemberError("");
     try {
@@ -322,7 +357,7 @@ export function AdminPage({
     member: StaffMemberDirectoryEntry,
     delta: number,
   ) => {
-    if (!isAdmin || (delta < 0 && member.shippingCreditCount <= 0)) return;
+    if (delta < 0 && member.shippingCreditCount <= 0) return;
     setMutatingMemberId(member.id);
     setMemberError("");
     try {
@@ -347,6 +382,120 @@ export function AdminPage({
       setMemberError(
         getErrorMessage(error, "배송 이용권을 변경하지 못했습니다."),
       );
+    } finally {
+      setMutatingMemberId(null);
+    }
+  };
+
+  const handleMemberRoleChange = async (
+    member: StaffMemberDirectoryEntry,
+    nextRole: ManagedAccessRole,
+  ) => {
+    if (member.accessRole === nextRole) return;
+    if (nextRole === "operator" && !isOwnerMode) return;
+    setMutatingMemberId(member.id);
+    setMemberError("");
+    try {
+      await setMemberAccessRole(member.id, nextRole);
+      if (nextRole === "operator" && isOwnerMode) {
+        setMembers((current) =>
+          current.map((entry) =>
+            entry.id === member.id ? { ...entry, accessRole: nextRole } : entry,
+          ),
+        );
+      } else {
+        setMembers((current) =>
+          current.map((entry) =>
+            entry.id === member.id ? { ...entry, accessRole: nextRole } : entry,
+          ),
+        );
+      }
+      onNotify?.(`회원 권한을 ${memberRoleLabel[nextRole]}로 변경했습니다.`);
+    } catch (error) {
+      setMemberError(getErrorMessage(error, "회원 권한을 변경하지 못했습니다."));
+    } finally {
+      setMutatingMemberId(null);
+    }
+  };
+
+  const openMemberEdit = (member: StaffMemberDirectoryEntry) => {
+    setEditingMember(member);
+    setEditDisplayName(member.displayName ?? "");
+    setEditPhone(member.phone ?? "");
+    setMemberActionError("");
+  };
+
+  const saveMemberEdit = async () => {
+    if (!editingMember) return;
+    setMutatingMemberId(editingMember.id);
+    setMemberActionError("");
+    try {
+      await updateManagedMember(editingMember.id, editDisplayName, editPhone);
+      setMembers((current) =>
+        current.map((entry) =>
+          entry.id === editingMember.id
+            ? { ...entry, displayName: editDisplayName.trim(), phone: editPhone.trim() || null }
+            : entry,
+        ),
+      );
+      setEditingMember(null);
+      onNotify?.("회원 정보를 수정했습니다.");
+    } catch (error) {
+      setMemberActionError(getErrorMessage(error, "회원 정보를 수정하지 못했습니다."));
+    } finally {
+      setMutatingMemberId(null);
+    }
+  };
+
+  const submitWarning = async () => {
+    if (!warningMember) return;
+    setMutatingMemberId(warningMember.id);
+    setMemberActionError("");
+    try {
+      const result = await addMemberWarning(
+        warningMember.id,
+        warningCategory,
+        warningReason,
+      );
+      setMembers((current) =>
+        current.map((entry) =>
+          entry.id === warningMember.id
+            ? {
+                ...entry,
+                warningCount: result.warningCount,
+                sanctionCount: result.sanctionCount,
+                bidBlockedUntil: result.bidBlockedUntil,
+              }
+            : entry,
+        ),
+      );
+      setWarningMember(null);
+      setWarningReason("");
+      onNotify?.(
+        result.cancelledBidCount > 0
+          ? `경고와 제재를 적용하고 진행 중 입찰 ${result.cancelledBidCount}건을 취소했습니다.`
+          : warningCategory === "late_payment" && warningMember.paymentDeadlineExempt
+            ? "밴드 기존 회원의 결제 지연 면제를 유지했습니다."
+            : "회원 경고를 등록했습니다.",
+      );
+    } catch (error) {
+      setMemberActionError(getErrorMessage(error, "경고를 등록하지 못했습니다."));
+    } finally {
+      setMutatingMemberId(null);
+    }
+  };
+
+  const confirmMemberDelete = async () => {
+    if (!deletingMember) return;
+    setMutatingMemberId(deletingMember.id);
+    setMemberActionError("");
+    try {
+      await deleteManagedMember(deletingMember.id);
+      setMembers((current) => current.filter((entry) => entry.id !== deletingMember.id));
+      setDeletingMember(null);
+      onNotify?.("회원 계정을 삭제했습니다.");
+    } catch (error) {
+      setMemberActionError(getErrorMessage(error, "회원 계정을 삭제하지 못했습니다."));
     } finally {
       setMutatingMemberId(null);
     }
@@ -435,7 +584,7 @@ export function AdminPage({
           </p>
         </div>
         <span className="w-fit rounded-full border-2 border-[#d6e2e5] bg-[#edf7f9] px-4 py-2 text-sm font-black text-[#4e737c] shadow-sm">
-          운영 센터 · {isAdmin ? "최고 관리자" : "운영자"}
+          운영 센터 · {isOwnerMode ? "관리자 모드" : "운영자"}
         </span>
       </header>
 
@@ -453,7 +602,7 @@ export function AdminPage({
             <article className="rounded-[1.4rem] border border-[#dfd3c7] bg-white p-5">
               <p className="text-sm font-black text-[#8c7b6e]">전체 회원</p>
               <p className="mt-2 text-3xl font-black text-[#493b31]">
-                {memberLoadStatus === "success" ? members.length : "—"}
+                {memberLoadStatus === "success" ? directoryMembers.length : "—"}
                 <span className="ml-1 text-sm">명</span>
               </p>
               <p className="mt-2 text-xs font-bold text-[#8c7b6e]">
@@ -485,15 +634,31 @@ export function AdminPage({
             <article className="rounded-[1.4rem] border border-[#e7c9be] bg-[#fff0ea] p-5">
               <p className="text-sm font-black text-[#966154]">운영 권한</p>
               <p className="mt-2 text-xl font-black text-[#7c473c]">
-                {isAdmin ? "전체 관리" : "운영 업무"}
+                회원·상품 관리
               </p>
               <p className="mt-2 text-xs font-bold leading-5 text-[#966154]">
-                {isAdmin
-                  ? "회원 상태와 배송 이용권 변경 가능"
-                  : "회원 정보는 읽기 전용으로 제공"}
+                {isOwnerMode
+                  ? "운영자 지정까지 가능한 전용 모드"
+                  : "회원 상태·등급·배송 이용권 관리"}
               </p>
             </article>
           </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          eyebrow="REVENUE"
+          title="매출 현황"
+          summary="실제 입금이 확인된 하루 매출만 저장하고 일·주·월·연 단위로 합산합니다."
+        >
+          <RevenuePanel />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          eyebrow="SHIPPING"
+          title="배송 대기 업무"
+          summary="회원이 접수한 상품의 배송지와 운송장 처리 상태를 확인합니다."
+        >
+          <ShippingWorkPanel />
         </CollapsibleSection>
 
         <CollapsibleSection
@@ -511,11 +676,11 @@ export function AdminPage({
             </Button>
           }
         >
-          {!isAdmin ? (
-            <p className="mb-4 rounded-2xl border border-[#d5e1e4] bg-[#edf7f9] px-4 py-3 text-sm font-bold leading-6 text-[#4f7179]">
-              운영자 계정은 회원 정보를 조회할 수 있습니다. 계정 정지와 배송 이용권 변경은 최고 관리자만 처리할 수 있습니다.
-            </p>
-          ) : null}
+          <p className="mb-4 rounded-2xl border border-[#d5e1e4] bg-[#edf7f9] px-4 py-3 text-sm font-bold leading-6 text-[#4f7179]">
+            {isOwnerMode
+              ? "회원 정보·상태·등급을 관리하고 필요할 때 운영자 권한을 지정할 수 있습니다."
+              : "회원 정보·상태·등급과 배송 이용권을 이 화면에서 관리할 수 있습니다."}
+          </p>
 
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_170px_170px]">
             <label className="text-sm font-black text-[#594a40]">
@@ -615,6 +780,9 @@ export function AdminPage({
                               ? "활성"
                               : "이용 정지"}
                           </span>
+                          <span className="rounded-full border border-[#d6d2e8] bg-[#f3f1fb] px-2.5 py-1 text-[11px] font-black text-[#635d82]">
+                            {memberRoleLabel[member.accessRole]}
+                          </span>
                           {member.supportStatus ? (
                             <span className="rounded-full border border-[#cbdde5] bg-[#edf7fa] px-2.5 py-1 text-[11px] font-black text-[#4f717b]">
                               상담 {member.supportStatus === "open" ? "진행" : "종료"}
@@ -633,7 +801,7 @@ export function AdminPage({
                       </div>
                     </div>
 
-                    <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
                       <div className="rounded-xl bg-[#faf5ef] px-3 py-2">
                         <dt className="text-[11px] font-black text-[#8b7a6d]">배송 이용권</dt>
                         <dd className="mt-1 text-sm font-black text-[#4e4037]">{member.shippingCreditCount}개</dd>
@@ -647,53 +815,83 @@ export function AdminPage({
                         <dd className="mt-1 text-sm font-black text-[#4e4037]">{member.bidCount}회</dd>
                       </div>
                       <div className="rounded-xl bg-[#faf5ef] px-3 py-2">
-                        <dt className="text-[11px] font-black text-[#8b7a6d]">최근 로그인</dt>
-                        <dd className="mt-1 truncate text-[11px] font-black text-[#4e4037]" title={formatDateTime(member.lastSignInAt)}>
-                          {formatDateTime(member.lastSignInAt)}
+                        <dt className="text-[11px] font-black text-[#8b7a6d]">최근 접속</dt>
+                        <dd className="mt-1 truncate text-[11px] font-black text-[#4e4037]" title={formatDateTime(member.lastSeenAt)}>
+                          {formatDateTime(member.lastSeenAt)}
+                        </dd>
+                      </div>
+                      <div className="rounded-xl bg-[#faf5ef] px-3 py-2">
+                        <dt className="text-[11px] font-black text-[#8b7a6d]">경고 / 제재</dt>
+                        <dd className="mt-1 text-sm font-black text-[#4e4037]">{member.warningCount} / {member.sanctionCount}</dd>
+                      </div>
+                      <div className="rounded-xl bg-[#faf5ef] px-3 py-2">
+                        <dt className="text-[11px] font-black text-[#8b7a6d]">입찰 제한</dt>
+                        <dd className="mt-1 truncate text-[11px] font-black text-[#4e4037]" title={formatDateTime(member.bidBlockedUntil)}>
+                          {member.bidBlockedUntil ? formatDateTime(member.bidBlockedUntil) : "없음"}
                         </dd>
                       </div>
                     </dl>
 
-                    {isAdmin ? (
-                      <div className="mt-4 flex flex-col gap-3 border-t border-[#eee4db] pt-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-[#77675c]">배송 이용권</span>
-                          <button
-                            type="button"
-                            aria-label={`${member.displayName || "회원"} 배송 이용권 1개 차감`}
-                            disabled={isMutating || member.shippingCreditCount <= 0}
-                            onClick={() => void handleShippingCreditChange(member, -1)}
-                            className="grid h-10 w-10 place-items-center rounded-xl border border-[#ddcfc3] bg-white text-lg font-black text-[#775f50] transition hover:bg-[#fff5eb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#dc7563] disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            −
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={`${member.displayName || "회원"} 배송 이용권 1개 추가`}
+                    <div className="mt-4 space-y-3 border-t border-[#eee4db] pt-4">
+                      <div className="grid gap-2 sm:grid-cols-[170px_auto_1fr] sm:items-center">
+                        <label className="text-xs font-black text-[#77675c]">
+                          회원 권한
+                          <select
+                            aria-label={`${member.displayName || "회원"} 권한`}
+                            value={member.accessRole}
                             disabled={isMutating}
-                            onClick={() => void handleShippingCreditChange(member, 1)}
-                            className="grid h-10 w-10 place-items-center rounded-xl border border-[#c9dce1] bg-[#edf7fa] text-lg font-black text-[#496c76] transition hover:bg-[#deeff4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#588691] disabled:cursor-not-allowed disabled:opacity-40"
+                            onChange={(event) =>
+                              void handleMemberRoleChange(
+                                member,
+                                event.target.value as ManagedAccessRole,
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-[#ddcfc3] bg-white px-3 py-2 text-sm font-bold"
                           >
-                            +
-                          </button>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant={member.accountStatus === "active" ? "danger" : "secondary"}
-                          isLoading={isMutating}
-                          onClick={() =>
-                            void handleMemberStatusChange(
-                              member,
-                              member.accountStatus === "active"
-                                ? "suspended"
-                                : "active",
-                            )
-                          }
-                        >
-                          {member.accountStatus === "active" ? "계정 이용 정지" : "계정 활성화"}
-                        </Button>
+                            {isOwnerMode ? <option value="operator">운영자</option> : null}
+                            <option value="employee">직원</option>
+                            <option value="band_member">밴드 기존 회원</option>
+                            <option value="member">일반 회원</option>
+                          </select>
+                        </label>
+                        {member.accessRole !== "operator" ? (
+                          <div className="flex items-center gap-2 sm:pt-5">
+                            <span className="text-xs font-black text-[#77675c]">배송 이용권</span>
+                            <button
+                              type="button"
+                              aria-label={`${member.displayName || "회원"} 배송 이용권 1개 차감`}
+                              disabled={isMutating || member.shippingCreditCount <= 0}
+                              onClick={() => void handleShippingCreditChange(member, -1)}
+                              className="grid h-10 w-10 place-items-center rounded-xl border border-[#ddcfc3] bg-white text-lg font-black text-[#775f50] disabled:opacity-40"
+                            >−</button>
+                            <button
+                              type="button"
+                              aria-label={`${member.displayName || "회원"} 배송 이용권 1개 추가`}
+                              disabled={isMutating}
+                              onClick={() => void handleShippingCreditChange(member, 1)}
+                              className="grid h-10 w-10 place-items-center rounded-xl border border-[#c9dce1] bg-[#edf7fa] text-lg font-black text-[#496c76] disabled:opacity-40"
+                            >+</button>
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
+                      {member.accessRole !== "operator" ? (
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="secondary" disabled={isMutating} onClick={() => openMemberEdit(member)}>정보 수정</Button>
+                          <Button
+                            size="sm"
+                            variant={member.accountStatus === "active" ? "danger" : "secondary"}
+                            isLoading={isMutating}
+                            onClick={() => void handleMemberStatusChange(member, member.accountStatus === "active" ? "suspended" : "active")}
+                          >
+                            {member.accountStatus === "active" ? "이용 정지" : "계정 활성화"}
+                          </Button>
+                          {member.accessRole === "member" || member.accessRole === "band_member" ? (
+                            <Button size="sm" variant="ghost" disabled={isMutating} onClick={() => { setWarningMember(member); setWarningCategory("general"); setWarningReason(""); setMemberActionError(""); }}>경고 등록</Button>
+                          ) : null}
+                          <Button size="sm" variant="ghost" disabled={isMutating} onClick={() => { setDeletingMember(member); setMemberActionError(""); }}>회원 삭제</Button>
+                        </div>
+                      ) : null}
+                    </div>
                   </li>
                 );
               })}
@@ -882,6 +1080,80 @@ export function AdminPage({
           </div>
         </CollapsibleSection>
       </div>
+
+      <Modal
+        open={Boolean(editingMember)}
+        onClose={mutatingMemberId ? () => undefined : () => setEditingMember(null)}
+        closeOnBackdrop={!mutatingMemberId}
+        title="회원 정보 수정"
+        description="회원에게 표시되는 이름과 배송 연락처를 수정합니다."
+        size="sm"
+      >
+        <div className="space-y-4 p-5 sm:p-6">
+          <label className="block text-sm font-black text-[#594a40]">
+            표시 이름
+            <input value={editDisplayName} onChange={(event) => setEditDisplayName(event.target.value)} maxLength={80} className="mt-2 w-full rounded-xl border border-[#decdbf] bg-white px-4 py-3 font-semibold" />
+          </label>
+          <label className="block text-sm font-black text-[#594a40]">
+            연락처
+            <input value={editPhone} onChange={(event) => setEditPhone(event.target.value)} maxLength={30} className="mt-2 w-full rounded-xl border border-[#decdbf] bg-white px-4 py-3 font-semibold" placeholder="미등록 가능" />
+          </label>
+          {memberActionError ? <p role="alert" className="rounded-xl bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#a84c3f]">{memberActionError}</p> : null}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" disabled={Boolean(mutatingMemberId)} onClick={() => setEditingMember(null)}>취소</Button>
+            <Button isLoading={mutatingMemberId === editingMember?.id} onClick={() => void saveMemberEdit()}>저장</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(warningMember)}
+        onClose={mutatingMemberId ? () => undefined : () => setWarningMember(null)}
+        closeOnBackdrop={!mutatingMemberId}
+        title="회원 경고 등록"
+        description="경고 3회마다 입찰 제재가 적용되고 해당 회원의 진행 중 입찰이 취소됩니다."
+        size="sm"
+      >
+        <div className="space-y-4 p-5 sm:p-6">
+          <label className="block text-sm font-black text-[#594a40]">
+            경고 종류
+            <select value={warningCategory} onChange={(event) => setWarningCategory(event.target.value as "general" | "late_payment")} className="mt-2 w-full rounded-xl border border-[#decdbf] bg-white px-4 py-3 font-semibold">
+              <option value="general">일반 운영 경고</option>
+              <option value="late_payment">결제 지연 경고</option>
+            </select>
+          </label>
+          {warningMember?.paymentDeadlineExempt && warningCategory === "late_payment" ? (
+            <p className="rounded-xl bg-[#edf7fa] px-4 py-3 text-sm font-bold leading-6 text-[#4f7179]">밴드 기존 회원은 결제 기한과 결제 지연 경고·제재가 면제되어 기록되지 않습니다.</p>
+          ) : null}
+          <label className="block text-sm font-black text-[#594a40]">
+            사유
+            <textarea value={warningReason} onChange={(event) => setWarningReason(event.target.value)} maxLength={500} rows={4} className="mt-2 w-full resize-none rounded-xl border border-[#decdbf] bg-white px-4 py-3 font-semibold" placeholder="경고 사유를 구체적으로 입력해 주세요." />
+          </label>
+          {memberActionError ? <p role="alert" className="rounded-xl bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#a84c3f]">{memberActionError}</p> : null}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" disabled={Boolean(mutatingMemberId)} onClick={() => setWarningMember(null)}>취소</Button>
+            <Button variant="danger" disabled={!warningReason.trim()} isLoading={mutatingMemberId === warningMember?.id} onClick={() => void submitWarning()}>경고 등록</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(deletingMember)}
+        onClose={mutatingMemberId ? () => undefined : () => setDeletingMember(null)}
+        closeOnBackdrop={!mutatingMemberId}
+        title="회원 계정 삭제"
+        description="삭제 후에는 로그인과 회원 정보 복구가 어렵습니다."
+        size="sm"
+      >
+        <div className="space-y-4 p-5 sm:p-6">
+          <p className="text-sm font-bold leading-6 text-[#66564c]"><strong>{deletingMember?.displayName || "선택한 회원"}</strong> 계정을 삭제할까요? 배송 기록은 개인정보를 제거한 업무 기록으로만 보존됩니다.</p>
+          {memberActionError ? <p role="alert" className="rounded-xl bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#a84c3f]">{memberActionError}</p> : null}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" disabled={Boolean(mutatingMemberId)} onClick={() => setDeletingMember(null)}>취소</Button>
+            <Button variant="danger" isLoading={mutatingMemberId === deletingMember?.id} onClick={() => void confirmMemberDelete()}>회원 삭제</Button>
+          </div>
+        </div>
+      </Modal>
 
       <ProductEditModal
         product={editingProduct}

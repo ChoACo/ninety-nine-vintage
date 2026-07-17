@@ -60,7 +60,7 @@ export default function BidHistoryModal({
             <span>읽기 전용 입찰 기록</span>
           </p>
           <p className="mt-1 break-keep text-sm font-semibold leading-6 text-[#58777e]">
-            관리자 화면에서도 이 기록을 수정하는 기능은 제공되지 않습니다.
+            운영 센터에서도 이 기록을 수정하는 기능은 제공되지 않습니다.
           </p>
         </div>
 

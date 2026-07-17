@@ -60,6 +60,10 @@ export default function SignupGuidePage() {
           <Link href="/privacy" className="underline underline-offset-2">
             개인정보처리방침
           </Link>
+          과{" "}
+          <Link href="/terms" className="underline underline-offset-2">
+            이용약관
+          </Link>
           을 확인한 것으로 처리됩니다.
         </p>
         <div className="mt-5 text-center">

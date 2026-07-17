@@ -7,9 +7,10 @@ import { getSupabaseBrowserClient } from "./client";
 
 export const MAX_SUPPORT_MESSAGE_LENGTH = 2_000;
 
-export type SupportViewerRole = "member" | "operator" | "admin";
+export type SupportViewerRole = "member" | "employee" | "operator" | "admin";
 export type SupportStaffRole = Extract<SupportViewerRole, "operator" | "admin">;
 export type SupportConversationStatus = "open" | "closed";
+export type SupportConversationType = "general" | "product" | "internal";
 
 export interface SupportProfile {
   id: string;
@@ -23,6 +24,9 @@ export interface SupportConversation {
   id: string;
   memberId: string;
   assignedStaffId: string | null;
+  conversationType: SupportConversationType;
+  productId: string | null;
+  subject: string | null;
   status: SupportConversationStatus;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
@@ -50,6 +54,15 @@ export interface SupportInboxConversation extends SupportConversation {
   member: SupportProfile | null;
   assignedStaff: SupportProfile | null;
   isUnread: boolean;
+}
+
+export interface SupportMemberConversation extends SupportConversation {
+  isUnread: boolean;
+}
+
+export interface SupportOperator {
+  id: string;
+  displayName: string;
 }
 
 export interface SupportChatSubscriptionHandlers {
@@ -83,6 +96,9 @@ interface ConversationRow {
   id: string;
   member_id: string;
   assigned_staff_id: string | null;
+  conversation_type: SupportConversationType;
+  product_id: string | null;
+  subject: string | null;
   status: SupportConversationStatus;
   last_message_at: string | null;
   last_message_preview: string | null;
@@ -106,6 +122,11 @@ interface ReadRow {
   last_read_at: string;
 }
 
+interface OperatorRow {
+  operator_id: string;
+  display_name: string;
+}
+
 export type SupportChatDatabase = {
   public: {
     Tables: {
@@ -127,6 +148,9 @@ export type SupportChatDatabase = {
           id?: string;
           member_id: string;
           assigned_staff_id?: string | null;
+          conversation_type?: SupportConversationType;
+          product_id?: string | null;
+          subject?: string | null;
           status?: SupportConversationStatus;
           last_message_at?: string | null;
           last_message_preview?: string | null;
@@ -135,7 +159,6 @@ export type SupportChatDatabase = {
           updated_at?: string;
         };
         Update: {
-          assigned_staff_id?: string | null;
           status?: SupportConversationStatus;
           updated_at?: string;
         };
@@ -171,6 +194,14 @@ export type SupportChatDatabase = {
         Args: Record<PropertyKey, never>;
         Returns: ConversationRow[];
       };
+      get_or_create_product_inquiry_conversation: {
+        Args: { p_product_id: string };
+        Returns: ConversationRow[];
+      };
+      get_or_create_employee_support_conversation: {
+        Args: Record<PropertyKey, never>;
+        Returns: ConversationRow[];
+      };
       mark_support_conversation_read: {
         Args: { p_conversation_id: string };
         Returns: ReadRow[];
@@ -178,6 +209,14 @@ export type SupportChatDatabase = {
       reopen_my_support_conversation: {
         Args: Record<PropertyKey, never>;
         Returns: ConversationRow[];
+      };
+      reopen_support_conversation: {
+        Args: { p_conversation_id: string };
+        Returns: ConversationRow[];
+      };
+      list_support_operators: {
+        Args: Record<PropertyKey, never>;
+        Returns: OperatorRow[];
       };
     };
     Enums: { [_ in never]: never };
@@ -207,6 +246,9 @@ function toConversation(row: ConversationRow): SupportConversation {
     id: row.id,
     memberId: row.member_id,
     assignedStaffId: row.assigned_staff_id,
+    conversationType: row.conversation_type,
+    productId: row.product_id,
+    subject: row.subject,
     status: row.status,
     lastMessageAt: row.last_message_at,
     lastMessagePreview: row.last_message_preview,
@@ -298,6 +340,41 @@ export async function getOrCreateMemberSupportConversation(): Promise<SupportCon
   return toConversation(row);
 }
 
+export async function getOrCreateProductInquiryConversation(
+  productId: string,
+): Promise<SupportConversation> {
+  const { data, error } = await getSupportClient().rpc(
+    "get_or_create_product_inquiry_conversation",
+    { p_product_id: productId },
+  );
+  throwQueryError(error, "상품 문의 대화를 준비하지 못했어요. 잠시 후 다시 시도해 주세요.");
+
+  const row = data?.[0];
+  if (!row) {
+    throw new SupportChatError("상품 문의 대화를 찾지 못했어요.", {
+      code: "conversation_not_found",
+    });
+  }
+
+  return toConversation(row);
+}
+
+export async function getOrCreateEmployeeSupportConversation(): Promise<SupportConversation> {
+  const { data, error } = await getSupportClient().rpc(
+    "get_or_create_employee_support_conversation",
+  );
+  throwQueryError(error, "내부 운영 대화를 준비하지 못했어요. 잠시 후 다시 시도해 주세요.");
+
+  const row = data?.[0];
+  if (!row) {
+    throw new SupportChatError("내부 운영 대화를 찾지 못했어요.", {
+      code: "conversation_not_found",
+    });
+  }
+
+  return toConversation(row);
+}
+
 export async function fetchMemberSupportConversation(
   userId: string,
 ): Promise<SupportConversation | null> {
@@ -305,8 +382,23 @@ export async function fetchMemberSupportConversation(
     .from("support_conversations")
     .select("*")
     .eq("member_id", userId)
+    .eq("conversation_type", "general")
     .maybeSingle();
   throwQueryError(error, "상담 대화를 불러오지 못했어요.");
+
+  return data ? toConversation(data) : null;
+}
+
+export async function fetchEmployeeSupportConversation(
+  userId: string,
+): Promise<SupportConversation | null> {
+  const { data, error } = await getSupportClient()
+    .from("support_conversations")
+    .select("*")
+    .eq("member_id", userId)
+    .eq("conversation_type", "internal")
+    .maybeSingle();
+  throwQueryError(error, "내부 운영 대화를 불러오지 못했어요.");
 
   return data ? toConversation(data) : null;
 }
@@ -320,6 +412,25 @@ export async function reopenMemberSupportConversation(): Promise<SupportConversa
   const row = data?.[0];
   if (!row) {
     throw new SupportChatError("다시 열 상담을 찾지 못했어요.", {
+      code: "conversation_not_found",
+    });
+  }
+
+  return toConversation(row);
+}
+
+export async function reopenSupportConversation(
+  conversationId: string,
+): Promise<SupportConversation> {
+  const { data, error } = await getSupportClient().rpc(
+    "reopen_support_conversation",
+    { p_conversation_id: conversationId },
+  );
+  throwQueryError(error, "대화를 다시 열지 못했어요. 잠시 후 다시 시도해 주세요.");
+
+  const row = data?.[0];
+  if (!row) {
+    throw new SupportChatError("다시 열 대화를 찾지 못했어요.", {
       code: "conversation_not_found",
     });
   }
@@ -382,6 +493,41 @@ export async function fetchSupportReadReceipts(
   );
 }
 
+export async function fetchMemberSupportThreads(
+  userId: string,
+): Promise<SupportMemberConversation[]> {
+  const client = getSupportClient();
+  const [conversationResult, readResult] = await Promise.all([
+    client
+      .from("support_conversations")
+      .select("*")
+      .eq("member_id", userId)
+      .in("conversation_type", ["general", "product"])
+      .order("last_message_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false }),
+    client.from("support_reads").select("*").eq("user_id", userId),
+  ]);
+
+  throwQueryError(conversationResult.error, "상담 대화 목록을 불러오지 못했어요.");
+  throwQueryError(readResult.error, "상담 읽음 상태를 불러오지 못했어요.");
+
+  const reads = new Map(
+    (readResult.data ?? []).map((row) => [row.conversation_id, toReadReceipt(row)]),
+  );
+
+  return (conversationResult.data ?? []).map((row) => {
+    const conversation = toConversation(row);
+    return {
+      ...conversation,
+      isUnread: isConversationUnread(
+        conversation,
+        userId,
+        reads.get(conversation.id),
+      ),
+    };
+  });
+}
+
 export function isConversationUnread(
   conversation: SupportConversation,
   viewerId: string,
@@ -396,14 +542,17 @@ export function isConversationUnread(
 
 export async function fetchStaffSupportInbox(
   staffId: string,
+  inboxOperatorId: string,
 ): Promise<SupportInboxConversation[]> {
   const client = getSupportClient();
+  const conversationQuery = client
+    .from("support_conversations")
+    .select("*")
+    .eq("assigned_staff_id", inboxOperatorId)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
   const [conversationResult, readResult] = await Promise.all([
-    client
-      .from("support_conversations")
-      .select("*")
-      .order("last_message_at", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false }),
+    conversationQuery,
     client.from("support_reads").select("*").eq("user_id", staffId),
   ]);
 
@@ -432,6 +581,16 @@ export async function fetchStaffSupportInbox(
       staffId,
       reads.get(conversation.id),
     ),
+  }));
+}
+
+export async function fetchSupportOperators(): Promise<SupportOperator[]> {
+  const { data, error } = await getSupportClient().rpc("list_support_operators");
+  throwQueryError(error, "운영자 상담함 목록을 불러오지 못했어요.");
+
+  return (data ?? []).map((row: OperatorRow) => ({
+    id: row.operator_id,
+    displayName: row.display_name,
   }));
 }
 
@@ -476,18 +635,13 @@ export async function markSupportConversationRead(
 export async function updateSupportConversation(
   conversationId: string,
   updates: {
-    assignedStaffId?: string | null;
     status?: SupportConversationStatus;
   },
 ): Promise<SupportConversation> {
   const payload: {
-    assigned_staff_id?: string | null;
     status?: SupportConversationStatus;
   } = {};
 
-  if ("assignedStaffId" in updates) {
-    payload.assigned_staff_id = updates.assignedStaffId;
-  }
   if (updates.status) payload.status = updates.status;
 
   const { data, error } = await getSupportClient()
@@ -598,8 +752,53 @@ export function subscribeToMemberSupportChat(
   };
 }
 
+export function subscribeToMemberSupportThreads(
+  memberId: string,
+  handlers: SupportChatSubscriptionHandlers,
+): () => void {
+  const client = getSupportClient();
+  const channel = client
+    .channel(makeChannelName(`support-member-threads-${memberId}`))
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "support_conversations",
+        filter: `member_id=eq.${memberId}`,
+      },
+      handlers.onConversationChange ?? (() => undefined),
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "support_messages" },
+      (payload) =>
+        handlers.onMessageChange?.(
+          messageFromPayload(
+            payload as RealtimePostgresChangesPayload<MessageRow>,
+          ),
+        ),
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "support_reads",
+        filter: `user_id=eq.${memberId}`,
+      },
+      handlers.onReadChange ?? (() => undefined),
+    );
+
+  attachSubscriptionStatusHandler(channel, handlers);
+  return () => {
+    void client.removeChannel(channel);
+  };
+}
+
 export function subscribeToStaffSupportInbox(
   staffId: string,
+  inboxOperatorId: string,
   handlers: SupportChatSubscriptionHandlers,
 ): () => void {
   const client = getSupportClient();
@@ -607,7 +806,12 @@ export function subscribeToStaffSupportInbox(
     .channel(makeChannelName(`support-staff-${staffId}`))
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "support_conversations" },
+      {
+        event: "*",
+        schema: "public",
+        table: "support_conversations",
+        filter: `assigned_staff_id=eq.${inboxOperatorId}`,
+      },
       handlers.onConversationChange ?? (() => undefined),
     )
     .on(

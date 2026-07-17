@@ -57,6 +57,14 @@ const policySections = [
                 <td className="px-4 py-3">배송 신청 시 필수</td>
                 <td className="px-4 py-3">낙찰 상품 배송과 배송 문의 처리</td>
               </tr>
+              <tr>
+                <td className="px-4 py-3 font-bold">서비스 이용 시 자동 생성</td>
+                <td className="px-4 py-3">닉네임, 최근 접속 시각</td>
+                <td className="px-4 py-3">서비스 이용 시</td>
+                <td className="px-4 py-3">
+                  로그인 회원에게 현재 접속 중인 회원 닉네임 표시, 부정 이용 방지
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -73,7 +81,9 @@ const policySections = [
       <p>
         회원 정보는 회원 탈퇴 시까지 보유하고 지체 없이 삭제합니다. 다만 전자상거래
         등 관계 법령에서 일정 기간 보관을 요구하는 거래·분쟁 기록은 해당 법정 기간
-        동안 분리 보관한 뒤 삭제합니다.
+        동안 분리 보관한 뒤 삭제합니다. 온라인 표시는 서버가 확인한 최근 접속 시각이
+        75초 이내인 경우에만 로그인 회원에게 제공하며, 최고관리자와 직원 계정은
+        표시하지 않습니다.
       </p>
     ),
   },
@@ -121,7 +131,7 @@ const policySections = [
     title: "7. 안전성 확보 조치",
     content: (
       <p>
-        접근 권한 최소화, 관리자·운영자 권한 분리, 데이터베이스 행 단위 접근정책,
+        접근 권한 최소화, 운영 업무별 권한 분리, 데이터베이스 행 단위 접근정책,
         암호화 통신, 비밀키 서버 보관, 접속 기록 점검을 적용합니다. 카카오 액세스
         토큰은 회원 정보 동기화 직후 폐기하고 데이터베이스에 저장하지 않습니다.
       </p>
@@ -130,11 +140,18 @@ const policySections = [
   {
     title: "8. 개인정보 보호책임 및 문의",
     content: (
-      <p>
-        개인정보 보호 담당: 나인티나인 빈티지 운영팀. 개인정보 관련 문의,
-        열람·정정·삭제 요청은 서비스의 <strong>운영팀 문의</strong>를 통해 접수할 수
-        있습니다.
-      </p>
+      <div className="space-y-2">
+        <p>개인정보 보호 담당: 나인 티나인 빈티지 운영팀</p>
+        <p>
+          전화: <a href="tel:0507-1494-3519" className="font-black underline underline-offset-2">0507-1494-3519</a>
+          {" · "}
+          이메일: <a href="mailto:ninety-nine@kakao.com" className="font-black underline underline-offset-2">ninety-nine@kakao.com</a>
+        </p>
+        <p>
+          개인정보 관련 문의와 열람·정정·삭제 요청은 위 연락처 또는 서비스의
+          <strong> 운영팀 문의</strong>를 통해 접수할 수 있습니다.
+        </p>
+      </div>
     ),
   },
 ];
@@ -166,8 +183,21 @@ export default function PrivacyPolicyPage() {
           ))}
         </div>
         <div className="mt-8 border-t border-[var(--border)] pt-6 text-sm font-bold leading-6 text-[var(--text-muted)]">
-          <p>공고일자: 2026년 7월 17일 · 시행일자: 2026년 7월 17일</p>
+          <p>개인정보처리자: 나인 티나인 빈티지 · 대표자 이영준</p>
+          <p className="mt-1">공고일자: 2026년 7월 17일 · 시행일자: 2026년 7월 17일</p>
           <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/terms"
+              className="rounded-xl border border-[var(--border)] px-4 py-2 text-[var(--text-strong)]"
+            >
+              이용약관
+            </Link>
+            <Link
+              href="/refund"
+              className="rounded-xl border border-[var(--border)] px-4 py-2 text-[var(--text-strong)]"
+            >
+              취소·환불 정책
+            </Link>
             <Link
               href="/signup"
               className="rounded-xl bg-[var(--accent-surface)] px-4 py-2 text-[var(--accent-text)]"

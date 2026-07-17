@@ -1,5 +1,6 @@
 import { hasTrustedRequestOrigin } from "@/src/lib/kakao/oidc";
 import { createSupabaseServerClients } from "@/src/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 function response(body: Record<string, unknown>, status: number): Response {
   return Response.json(body, {
@@ -33,6 +34,22 @@ export async function POST(request: Request) {
     );
     if (error || !data.user || !isKakaoMember) {
       return response({ error: "unauthorized" }, 401);
+    }
+
+    // The service owner is a Kakao account too, so provider validation alone is
+    // not enough. Keep the hidden owner account out of every self-service
+    // deletion path; the database also enforces this with a delete trigger.
+    const roleClient = admin as unknown as SupabaseClient;
+    const { data: accessRole, error: accessRoleError } = await roleClient
+      .from("account_access_roles")
+      .select("role_code")
+      .eq("user_id", data.user.id)
+      .maybeSingle();
+    if (accessRoleError) {
+      return response({ error: "role_check_failed" }, 500);
+    }
+    if (accessRole?.role_code === "owner") {
+      return response({ error: "protected_account" }, 403);
     }
 
     const { error: deleteError } = await admin.auth.admin.deleteUser(

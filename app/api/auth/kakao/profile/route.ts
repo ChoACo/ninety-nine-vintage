@@ -1,4 +1,4 @@
-import type { User } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 import {
   clearHttpOnlyCookie,
@@ -121,9 +121,11 @@ export async function POST(request: Request) {
     const profileComplete = Boolean(fullName && gender && birthYear);
     const syncedAt = new Date().toISOString();
 
+    const roleClient = admin as unknown as SupabaseClient;
     const [
       { error: profileError },
       { data: requirements, error: requirementError },
+      { error: accessRoleError },
     ] = await Promise.all([
       admin.from("kakao_member_profiles").upsert(
         {
@@ -143,6 +145,14 @@ export async function POST(request: Request) {
           .select("enforce_verified_profile")
           .eq("singleton", true)
           .maybeSingle(),
+      roleClient.from("account_access_roles").upsert(
+        {
+          user_id: userData.user.id,
+          role_code: "member",
+          reports_to_operator_id: null,
+        },
+        { onConflict: "user_id", ignoreDuplicates: true },
+      ),
     ]);
 
     if (profileError) {
@@ -154,7 +164,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (requirementError) {
+    if (requirementError || accessRoleError) {
       return jsonResponse(request.url, { error: "profile_sync" }, 500);
     }
 

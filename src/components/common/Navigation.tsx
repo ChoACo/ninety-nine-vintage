@@ -1,13 +1,18 @@
 "use client";
 
-import type { Role } from "@/src/types/auction";
+import {
+  canAccessOperationsCenter,
+  canAccessOperationsWorkspace,
+  isMemberRole,
+  type AppRole,
+} from "@/src/lib/supabase/auth";
 
 export type NavigationTarget = "feed" | "chat" | "profile" | "admin";
 
 export interface NavigationProps {
   activePage: NavigationTarget;
   onNavigate: (page: NavigationTarget) => void;
-  role: Role;
+  role: AppRole;
   className?: string;
 }
 
@@ -37,10 +42,19 @@ export default function Navigation({
       <div className="grid grid-cols-4 gap-1">
         {navigationItems.map((item) => {
           const selected = activePage === item.value;
+          const isOperationsWorkspace = canAccessOperationsWorkspace(role);
+          const isChatAllowed =
+            role === "unauthorized" ||
+            isMemberRole(role) ||
+            role === "employee" ||
+            canAccessOperationsCenter(role);
           const isLocked =
-            item.staffOnly && role !== "admin" && role !== "operator";
+            (item.staffOnly && !isOperationsWorkspace) ||
+            (item.value === "chat" && !isChatAllowed);
           const visibleLabel =
-            item.value === "chat" && (role === "operator" || role === "admin")
+            item.value === "admin" && role === "employee"
+              ? "업무 도구"
+              : item.value === "chat" && canAccessOperationsCenter(role)
               ? "상담 대화함"
               : item.label;
 
@@ -51,10 +65,12 @@ export default function Navigation({
               aria-current={selected ? "page" : undefined}
               aria-label={
                 isLocked
-                  ? `${visibleLabel}, 관리자 또는 운영자 계정에서 이용 가능`
+                  ? `${visibleLabel}, 허용된 운영 역할에서 이용 가능`
                   : visibleLabel
               }
-              onClick={() => onNavigate(item.value)}
+              onClick={() => {
+                if (!isLocked) onNavigate(item.value);
+              }}
               className={`group relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-1.5 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#eb7765] sm:flex-row sm:gap-2 sm:text-base ${
                 selected
                   ? "bg-[var(--accent-surface)] text-[var(--accent-text)] shadow-sm"

@@ -40,7 +40,7 @@ type Feedback = { type: "success" | "error"; message: string } | null;
 const roleLabel: Record<Role, string> = {
   user: "일반 회원",
   operator: "운영자",
-  admin: "관리자",
+  admin: "운영자",
 };
 
 const shippingStatusLabel: Record<WonProductShippingStatus, string> = {

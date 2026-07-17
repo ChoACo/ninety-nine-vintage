@@ -1,5 +1,18 @@
-/** 서버가 발급한 JWT app_metadata에서만 파생하는 애플리케이션 역할입니다. */
+/** 서버 역할 RPC 결과를 기존 화면 컴포넌트에 전달할 때 사용하는 호환 역할입니다. */
 export type Role = "user" | "operator" | "admin";
+
+/** 공개 화면에 표시할 수 있는 등급입니다. 내부 소유자 등급은 포함하지 않습니다. */
+export type PublicRoleGrade = 1 | 2 | 2.5 | 3;
+
+/**
+ * 권한 정책에서 사용하는 공개 역할 이름입니다. 기존 `admin` 값은 서버 내부의
+ * 소유자 식별자로만 유지하고 공개 역할에 포함하지 않습니다.
+ */
+export type PublicRoleName =
+  | "operator"
+  | "employee"
+  | "band_member"
+  | "member";
 
 export type AuctionStatus = "pending" | "active" | "closed";
 
@@ -40,7 +53,7 @@ export interface UserProfile {
  * 공개 입찰 기록 한 건입니다.
  *
  * 실제 서비스에서는 서버가 생성한 append-only 원장만 반환해야 하며,
- * 클라이언트나 관리자 UI에서 기존 기록을 수정할 수 없어야 합니다.
+ * 클라이언트나 운영 UI에서 기존 기록을 수정할 수 없어야 합니다.
  */
 export interface BidHistoryRecord {
   readonly id: string;
@@ -98,9 +111,9 @@ export interface WonAuction {
   courier?: "한진택배";
   trackingNumber?: string;
   shippedAt?: ISODateString;
-  /** 관리자 피킹 화면에서 사용하는 낙찰 당시 상품 설명 스냅샷 */
+  /** 운영 피킹 화면에서 사용하는 낙찰 당시 상품 설명 스냅샷 */
   description?: string;
-  /** 관리자 피킹 화면에서 사용하는 원본 사진 스냅샷 */
+  /** 운영 피킹 화면에서 사용하는 원본 사진 스냅샷 */
   imageUrls?: readonly string[];
 }
 
@@ -144,7 +157,7 @@ export interface ShipmentBatchItem {
 
 export type ShipmentBatchStatus = "packing" | "shipped";
 
-/** 관리자 물류 화면과 구매자 배송 현황이 공유하는 합배송 요청 스냅샷입니다. */
+/** 운영 물류 화면과 구매자 배송 현황이 공유하는 합배송 요청 스냅샷입니다. */
 export interface AdminShipmentBatch {
   id: string;
   buyer: BuyerInfo;

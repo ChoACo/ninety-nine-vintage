@@ -1,32 +1,39 @@
 "use client";
 
-import type { Role } from "@/src/types/auction";
+import {
+  getPublicRoleLabel,
+  isOwnerRole,
+  type AppRole,
+} from "@/src/lib/supabase/auth";
 import Button from "./Button";
 import ThemeToggle from "./ThemeToggle";
 
+export type OwnerMode = "operator" | "admin";
+
 export interface SiteHeaderProps {
-  role: Role;
+  role: AppRole;
   isAuthenticated: boolean;
   displayName?: string;
   onOpenAuth: () => void;
+  ownerMode?: OwnerMode;
+  onOwnerModeChange?: (mode: OwnerMode) => void;
   isSigningOut?: boolean;
   onSignOut?: () => void | Promise<void>;
 }
-
-const ROLE_LABEL: Record<Role, string> = {
-  user: "일반 회원",
-  operator: "운영자",
-  admin: "관리자",
-};
 
 export default function SiteHeader({
   role,
   isAuthenticated,
   displayName,
   onOpenAuth,
+  ownerMode = "operator",
+  onOwnerModeChange,
   isSigningOut = false,
   onSignOut,
 }: SiteHeaderProps) {
+  const roleLabel = getPublicRoleLabel(role);
+  const safeDisplayName = isOwnerRole(role) ? "" : displayName?.trim();
+
   return (
     <header className="theme-surface-glass rounded-[2rem] border p-4 backdrop-blur sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -50,9 +57,43 @@ export default function SiteHeader({
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           <ThemeToggle />
 
+          {isAuthenticated && isOwnerRole(role) && onOwnerModeChange ? (
+            <div
+              role="group"
+              aria-label="비공개 운영 권한 모드"
+              className="flex rounded-full border border-[var(--border)] bg-[var(--surface-muted)] p-1"
+            >
+              <button
+                type="button"
+                aria-pressed={ownerMode === "operator"}
+                onClick={() => onOwnerModeChange("operator")}
+                className={`min-h-9 rounded-full px-3 text-xs font-black transition ${
+                  ownerMode === "operator"
+                    ? "bg-[var(--surface)] text-[var(--accent-text)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-strong)]"
+                }`}
+              >
+                운영자 모드
+              </button>
+              <button
+                type="button"
+                aria-pressed={ownerMode === "admin"}
+                onClick={() => onOwnerModeChange("admin")}
+                className={`min-h-9 rounded-full px-3 text-xs font-black transition ${
+                  ownerMode === "admin"
+                    ? "bg-[var(--surface)] text-[var(--accent-text)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-strong)]"
+                }`}
+              >
+                관리자 모드
+              </button>
+            </div>
+          ) : null}
+
           {isAuthenticated ? (
             <span className="rounded-full bg-[var(--success-surface)] px-3 py-1.5 text-sm font-bold text-[var(--success-text)]">
-              {displayName || ROLE_LABEL[role]} · {ROLE_LABEL[role]}
+              {safeDisplayName ? `${safeDisplayName} · ` : ""}
+              {roleLabel}
             </span>
           ) : (
             <Button size="sm" onClick={onOpenAuth}>

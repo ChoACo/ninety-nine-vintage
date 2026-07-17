@@ -607,6 +607,13 @@ export type Database = {
           shipment_request_id: string | null;
         }[];
       };
+      get_online_member_directory: {
+        Args: { p_limit?: number };
+        Returns: {
+          id: string;
+          display_name: string;
+        }[];
+      };
       get_staff_member_directory: {
         Args: { p_limit?: number; p_offset?: number };
         Returns: {
@@ -692,6 +699,10 @@ export type Database = {
       set_member_account_status: {
         Args: { p_member_id: string; p_status: MemberAccountStatus };
         Returns: MemberAccountStatus;
+      };
+      touch_my_last_seen: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
       };
       update_managed_product: {
         Args: {

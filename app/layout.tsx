@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { BusinessFooter } from "@/src/components/common";
 import "./globals.css";
 
 const themeInitializationScript = `
@@ -33,7 +34,10 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <BusinessFooter />
+      </body>
     </html>
   );
 }

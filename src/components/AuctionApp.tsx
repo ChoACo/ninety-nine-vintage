@@ -1,19 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { AdminAccessGate } from "@/src/components/admin/AdminAccessGate";
 import { AdminPage } from "@/src/components/admin";
 import BulkAuctionImportModal from "@/src/components/admin/BulkAuctionImportModal";
+import { ShippingWorkPanel } from "@/src/components/admin/ShippingWorkPanel";
 import { AuthModal } from "@/src/components/auth";
 import { ChatPage } from "@/src/components/chat/ChatPage";
 import { FloatingAdminChat } from "@/src/components/chat/FloatingAdminChat";
 import {
   AuctionClock,
+  Button,
   Navigation,
   SiteHeader,
   type NavigationTarget,
 } from "@/src/components/common";
+import type { OwnerMode } from "@/src/components/common/SiteHeader";
 import { Toast } from "@/src/components/common/Toast";
 import {
   FeedList,
@@ -25,47 +27,73 @@ import { AccountPage } from "@/src/components/profile";
 import { useAuthSession } from "@/src/hooks/useAuthSession";
 import { useOnlineMembers } from "@/src/hooks/useOnlineMembers";
 import { useSupabaseProducts } from "@/src/hooks/useSupabaseProducts";
-import { isStaffRole, type AppRole } from "@/src/lib/supabase/auth";
+import {
+  canAccessOperationsCenter,
+  canManageProducts,
+  getPublicRoleLabel,
+  isMemberRole,
+  isOwnerRole,
+  isStaffRole,
+  shouldTrackPresence,
+  type AppRole,
+} from "@/src/lib/supabase/auth";
 import { placeBid } from "@/src/lib/supabase/bids";
 import {
-  getOrCreateMemberSupportConversation,
-  reopenMemberSupportConversation,
+  getOrCreateProductInquiryConversation,
   sendSupportMessage,
+  type SupportViewerRole,
 } from "@/src/lib/supabase/supportChat";
 import {
   createProduct,
   createProductsBatch,
 } from "@/src/lib/supabase/products";
-import type { Role } from "@/src/types/auction";
 import { formatKRW } from "@/src/utils/formatters";
 
-type AuthMode = "member" | "staff";
-
-function toUiRole(role: AppRole): Role {
-  return role === "admin" || role === "operator" ? role : "user";
+function toSupportRole(
+  role: AppRole,
+  ownerMode: OwnerMode,
+): SupportViewerRole | null {
+  if (isMemberRole(role)) return "member";
+  if (role === "admin") return ownerMode === "admin" ? "admin" : "operator";
+  if (role === "employee" || role === "operator") return role;
+  return null;
 }
 
 export function AuctionApp() {
   const [activePage, setActivePage] = useState<NavigationTarget>("feed");
   const [authOpen, setAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<AuthMode>("member");
   const [newAuctionOpen, setNewAuctionOpen] = useState(false);
   const [bulkAuctionOpen, setBulkAuctionOpen] = useState(false);
   const [operationsRevision, setOperationsRevision] = useState(0);
+  const [ownerMode, setOwnerMode] = useState<OwnerMode>("operator");
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
   const auth = useAuthSession();
-  const role = toUiRole(auth.role);
   const displayName = auth.profile?.displayName ?? "";
-  const isMember = Boolean(auth.user) && auth.role === "member";
+  const publicDisplayName = isOwnerRole(auth.role) ? "" : displayName;
+  const isMember = Boolean(auth.user) && isMemberRole(auth.role);
+  const showOnlineMembers = shouldTrackPresence(auth.role);
+  const operationsRole =
+    isOwnerRole(auth.role) && ownerMode === "admin" ? "admin" : "operator";
+
+  useEffect(() => {
+    // A fresh owner session always starts in the publicly ordinary operator
+    // experience. Elevation is an explicit, owner-only UI action each time.
+    const timer = window.setTimeout(() => setOwnerMode("operator"), 0);
+    return () => window.clearTimeout(timer);
+  }, [auth.user?.id]);
 
   const {
     members: onlineMembers,
     hasMore: hasMoreOnlineMembers,
     status: onlineMembersStatus,
     error: onlineMembersError,
-  } = useOnlineMembers();
+  } = useOnlineMembers({
+    enabled: !auth.isLoading && showOnlineMembers,
+    userId: auth.user?.id ?? null,
+    role: auth.user ? auth.role : null,
+  });
   const {
     posts,
     isLoading: productsLoading,
@@ -84,23 +112,22 @@ export function AuctionApp() {
     return () => window.clearTimeout(timer);
   }, [toastMessage]);
 
-  const openAuthentication = useCallback((mode: AuthMode = "member") => {
-    setAuthMode(mode);
+  const openAuthentication = useCallback(() => {
     setAuthOpen(true);
   }, []);
 
   const requireMember = useCallback(() => {
-    if (auth.user && auth.role === "member") return auth.user;
+    if (auth.user && isMemberRole(auth.role)) return auth.user;
 
     if (auth.user) {
       throw new Error(
-        auth.role === "admin" || auth.role === "operator"
-          ? "관리자·운영자 계정은 입찰이나 회원 문의를 보낼 수 없습니다."
+        isStaffRole(auth.role)
+          ? "운영 스태프 계정은 입찰이나 회원 문의를 보낼 수 없습니다."
           : "이 로그인 방식에는 회원 권한이 없습니다. 로그아웃 후 카카오로 다시 로그인해 주세요.",
       );
     }
 
-    openAuthentication("member");
+    openAuthentication();
     throw new Error("입찰과 상품 문의는 카카오 회원 로그인 후 이용할 수 있어요.");
   }, [auth.role, auth.user, openAuthentication]);
 
@@ -136,10 +163,7 @@ export function AuctionApp() {
         .map((line) => line.trim())
         .find(Boolean) ?? post.title
     ).slice(0, 160);
-    let conversation = await getOrCreateMemberSupportConversation();
-    if (conversation.status === "closed") {
-      conversation = await reopenMemberSupportConversation();
-    }
+    const conversation = await getOrCreateProductInquiryConversation(postId);
     await sendSupportMessage(
       conversation.id,
       member.id,
@@ -149,9 +173,9 @@ export function AuctionApp() {
   };
 
   const handleCreateAuction = async (draft: NewAuctionDraft) => {
-    if (!isStaffRole(auth.role)) {
-      openAuthentication("staff");
-      throw new Error("관리자 또는 운영자 계정으로 로그인해 주세요.");
+    if (!canManageProducts(auth.role)) {
+      openAuthentication();
+      throw new Error("상품 업무 권한이 있는 운영 스태프로 로그인해 주세요.");
     }
 
     await createProduct(draft);
@@ -169,9 +193,9 @@ export function AuctionApp() {
     drafts: NewAuctionDraft[],
     onProgress: Parameters<typeof createProductsBatch>[1],
   ) => {
-    if (!isStaffRole(auth.role)) {
-      openAuthentication("staff");
-      throw new Error("관리자 또는 운영자 계정으로 로그인해 주세요.");
+    if (!canManageProducts(auth.role)) {
+      openAuthentication();
+      throw new Error("상품 업무 권한이 있는 운영 스태프로 로그인해 주세요.");
     }
 
     await createProductsBatch(drafts, onProgress);
@@ -201,54 +225,84 @@ export function AuctionApp() {
         <main className="mx-auto w-full max-w-7xl px-4 pb-28 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pb-12">
           <ChatPage
             userId={auth.user?.id ?? null}
-            role={
-              auth.user && auth.role !== "unauthorized" ? auth.role : null
-            }
-            onRequestSignIn={() => openAuthentication("member")}
+            role={auth.user ? toSupportRole(auth.role, ownerMode) : null}
+            onRequestSignIn={openAuthentication}
           />
         </main>
       );
     }
 
     if (activePage === "profile") {
+      if (auth.user && isStaffRole(auth.role)) {
+        return (
+          <StaffAccountPage
+            role={auth.role}
+            displayName={publicDisplayName}
+            onOpenWorkspace={() => setActivePage("admin")}
+            onSignOut={handleSignOut}
+          />
+        );
+      }
+
       return (
         <AccountPage
           userId={auth.user?.id}
-          displayName={displayName}
+          displayName={publicDisplayName}
           avatarUrl={auth.profile?.avatarUrl}
           email={auth.user?.email}
-          role={role}
-          onSignIn={() => openAuthentication("member")}
+          role="user"
+          onSignIn={openAuthentication}
           onSignOut={handleSignOut}
         />
       );
     }
 
     if (activePage === "admin") {
-      return role === "admin" || role === "operator" ? (
-        <AdminPage
-          key={operationsRevision}
-          role={role}
-          onCreateProduct={() => setNewAuctionOpen(true)}
-          onOpenBulkImport={() => setBulkAuctionOpen(true)}
-          onProductsChanged={refreshProducts}
-          onNotify={showToast}
-        />
-      ) : (
-        <AdminAccessGate onSwitchToStaff={() => openAuthentication("staff")} />
+      if (canAccessOperationsCenter(auth.role)) {
+        return (
+          <AdminPage
+            key={`${operationsRevision}-${operationsRole}`}
+            role={operationsRole}
+            onCreateProduct={() => setNewAuctionOpen(true)}
+            onOpenBulkImport={() => setBulkAuctionOpen(true)}
+            onProductsChanged={refreshProducts}
+            onNotify={showToast}
+          />
+        );
+      }
+
+      if (auth.role === "employee") {
+        return (
+          <EmployeeOperationsPage
+            onCreateProduct={() => setNewAuctionOpen(true)}
+            onOpenBulkImport={() => setBulkAuctionOpen(true)}
+          />
+        );
+      }
+
+      return (
+        <AdminAccessGate onSwitchToStaff={openAuthentication} />
       );
     }
 
     return (
       <main className="mx-auto w-full max-w-[1800px] px-3 pb-28 pt-6 sm:px-4 sm:pt-8 lg:px-5 lg:pb-12">
-        <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_235px] xl:grid-cols-[170px_minmax(0,1fr)_235px] xl:gap-4">
-          <OnlineMembersSidebar
-            members={onlineMembers}
-            hasMore={hasMoreOnlineMembers}
-            status={onlineMembersStatus}
-            error={onlineMembersError}
-            className="hidden xl:block"
-          />
+        <div
+          className={`grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_235px] xl:gap-4 ${
+            showOnlineMembers
+              ? "xl:grid-cols-[170px_minmax(0,1fr)_235px]"
+              : "xl:grid-cols-[minmax(0,1fr)_235px]"
+          }`}
+        >
+          {showOnlineMembers ? (
+            <OnlineMembersSidebar
+              members={onlineMembers}
+              hasMore={hasMoreOnlineMembers}
+              status={onlineMembersStatus}
+              error={onlineMembersError}
+              className="hidden xl:block"
+            />
+          ) : null}
 
           <div className="min-w-0">
             <AuctionClock />
@@ -273,7 +327,7 @@ export function AuctionApp() {
 
             <FeedList
               posts={posts}
-              currentUserName={displayName}
+              currentUserName={publicDisplayName}
               onBid={handleBid}
               onInquiry={handleProductInquiry}
               isLoading={productsLoading}
@@ -286,7 +340,7 @@ export function AuctionApp() {
           {isMember ? (
             <LiveBidSidebar
               posts={posts}
-              currentUserName={displayName}
+              currentUserName={publicDisplayName}
               onBid={handleBid}
               className="hidden lg:block"
             />
@@ -299,7 +353,7 @@ export function AuctionApp() {
               {!auth.user ? (
                 <button
                   type="button"
-                  onClick={() => openAuthentication("member")}
+                  onClick={openAuthentication}
                   className="mt-4 min-h-11 rounded-xl bg-[#fee500] px-4 text-sm font-black text-[#191919]"
                 >
                   카카오 로그인
@@ -319,17 +373,19 @@ export function AuctionApp() {
 
       <div className="relative mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
         <SiteHeader
-          role={role}
+          role={auth.role}
           isAuthenticated={Boolean(auth.user)}
-          displayName={displayName}
-          onOpenAuth={() => openAuthentication("member")}
+          displayName={publicDisplayName}
+          onOpenAuth={openAuthentication}
+          ownerMode={ownerMode}
+          onOwnerModeChange={isOwnerRole(auth.role) ? setOwnerMode : undefined}
           isSigningOut={isSigningOut}
           onSignOut={auth.user ? handleSignOut : undefined}
         />
         <Navigation
           activePage={activePage}
           onNavigate={setActivePage}
-          role={role}
+          role={auth.role}
           className="mt-3"
         />
       </div>
@@ -338,41 +394,27 @@ export function AuctionApp() {
         {renderPage()}
       </div>
 
-      <footer className="relative mx-auto w-full max-w-7xl px-4 pb-28 pt-3 text-center text-xs font-bold text-[var(--text-muted)] sm:px-6 lg:px-8 lg:pb-8">
-        <p>나인티나인 빈티지 · 다미네 구제</p>
-        <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-2">
-          <Link href="/signup" className="underline underline-offset-2">
-            카카오 회원가입 안내
-          </Link>
-          <Link href="/privacy" className="underline underline-offset-2">
-            개인정보처리방침
-          </Link>
-        </div>
-      </footer>
-
       <NewAuctionModal
-        open={newAuctionOpen && (role === "admin" || role === "operator")}
+        open={newAuctionOpen && canManageProducts(auth.role)}
         onClose={() => setNewAuctionOpen(false)}
         onSubmit={handleCreateAuction}
       />
 
       <BulkAuctionImportModal
-        open={bulkAuctionOpen && (role === "admin" || role === "operator")}
+        open={bulkAuctionOpen && canManageProducts(auth.role)}
         onClose={() => setBulkAuctionOpen(false)}
         onSubmit={handleCreateAuctionsBatch}
       />
 
       <AuthModal
-        key={`${authMode}-${authOpen ? "open" : "closed"}`}
+        key={authOpen ? "open" : "closed"}
         open={authOpen}
-        initialMode={authMode}
         onClose={() => setAuthOpen(false)}
-        onAuthenticated={() => showToast("로그인했습니다.")}
       />
 
       <FloatingAdminChat
         userId={auth.user?.id ?? null}
-        role={auth.user && auth.role !== "unauthorized" ? auth.role : null}
+        role={auth.user ? toSupportRole(auth.role, ownerMode) : null}
         hidden={activePage === "chat"}
       />
 
@@ -382,5 +424,139 @@ export function AuctionApp() {
         onDismiss={() => setToastMessage("")}
       />
     </div>
+  );
+}
+
+function StaffAccountPage({
+  role,
+  displayName,
+  onOpenWorkspace,
+  onSignOut,
+}: {
+  role: AppRole;
+  displayName: string;
+  onOpenWorkspace: () => void;
+  onSignOut: () => void | Promise<void>;
+}) {
+  const roleLabel = getPublicRoleLabel(role);
+  const safeDisplayName = isOwnerRole(role) ? "" : displayName.trim();
+
+  return (
+    <main className="mx-auto w-full max-w-4xl px-4 pb-28 pt-8 sm:px-6 lg:pb-12">
+      <section className="theme-panel overflow-hidden rounded-[2rem] border shadow-[0_22px_60px_rgba(92,67,51,0.09)]">
+        <div className="bg-[linear-gradient(135deg,var(--accent-surface)_0%,var(--info-surface)_100%)] px-6 py-8 sm:px-9">
+          <p className="text-sm font-black tracking-[0.14em] text-[var(--accent-text)]">
+            OPERATIONS ACCOUNT
+          </p>
+          <div className="mt-4 flex items-center gap-4">
+            <span
+              aria-hidden="true"
+              className="grid size-16 place-items-center rounded-2xl bg-[var(--surface)] text-2xl font-black text-[var(--accent-text)] shadow-sm"
+            >
+              운영
+            </span>
+            <div>
+              <h2 className="text-2xl font-black text-[var(--text-strong)]">
+                {safeDisplayName || "운영 계정"}
+              </h2>
+              <span className="mt-1 inline-flex rounded-full bg-[var(--surface)]/80 px-3 py-1 text-sm font-black text-[var(--success-text)]">
+                {roleLabel}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-6 sm:px-9">
+          <p className="break-keep text-[17px] font-bold leading-8 text-[var(--text-muted)]">
+            운영 계정의 로그인 주소와 내부 식별 정보는 공개 화면에 표시하지 않습니다.
+            허용된 업무는 서버 역할 정책으로 확인합니다.
+          </p>
+          <div className="mt-5 flex flex-wrap justify-end gap-2">
+            <Button variant="secondary" onClick={onOpenWorkspace}>
+              {role === "employee" ? "업무 도구 열기" : "운영 센터 열기"}
+            </Button>
+            <Button variant="ghost" onClick={() => void onSignOut()}>
+              로그아웃
+            </Button>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function EmployeeOperationsPage({
+  onCreateProduct,
+  onOpenBulkImport,
+}: {
+  onCreateProduct: () => void;
+  onOpenBulkImport: () => void;
+}) {
+  return (
+    <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-8 sm:px-6 lg:pb-12">
+      <header className="mb-7">
+        <p className="text-sm font-black tracking-[0.16em] text-[var(--info-text)]">
+          EMPLOYEE WORKSPACE
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl font-black tracking-tight text-[var(--text-strong)]">
+            직원 업무 도구
+          </h1>
+          <span className="rounded-full bg-[var(--info-surface)] px-3 py-1.5 text-sm font-black text-[var(--info-text)]">
+            2등급 직원
+          </span>
+        </div>
+        <p className="mt-3 max-w-3xl break-keep text-[17px] font-bold leading-8 text-[var(--text-muted)]">
+          상품 등록과 배송 대기 처리에 필요한 권한만 사용할 수 있습니다. 회원 관리와
+          상담함은 이 계정에 노출되지 않습니다.
+        </p>
+      </header>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <section className="theme-panel rounded-[1.6rem] border p-6">
+          <p className="text-xs font-black tracking-[0.14em] text-[var(--accent-text)]">
+            BULK REGISTRATION
+          </p>
+          <h2 className="mt-2 text-xl font-black text-[var(--text-strong)]">
+            상품 일괄 등록
+          </h2>
+          <p className="mt-2 break-keep font-bold leading-7 text-[var(--text-muted)]">
+            Excel 상품 정보와 이미지 폴더를 검토한 뒤 여러 경매글을 등록합니다.
+          </p>
+          <Button className="mt-5" onClick={onOpenBulkImport}>
+            일괄 등록 열기
+          </Button>
+        </section>
+
+        <section className="theme-panel rounded-[1.6rem] border p-6">
+          <p className="text-xs font-black tracking-[0.14em] text-[var(--info-text)]">
+            SINGLE REGISTRATION
+          </p>
+          <h2 className="mt-2 text-xl font-black text-[var(--text-strong)]">
+            상품 개별 등록
+          </h2>
+          <p className="mt-2 break-keep font-bold leading-7 text-[var(--text-muted)]">
+            예외 상품 한 건의 사진·설명·공개 시각을 확인해 등록합니다.
+          </p>
+          <Button
+            className="mt-5"
+            variant="secondary"
+            onClick={onCreateProduct}
+          >
+            상품 1건 등록
+          </Button>
+        </section>
+      </div>
+
+      <section className="theme-panel mt-4 rounded-[1.6rem] border p-5 sm:p-6">
+        <h2 className="text-xl font-black text-[var(--text-strong)]">배송 대기 업무</h2>
+        <p className="mt-1 break-keep font-bold leading-7 text-[var(--text-muted)]">
+          접수된 배송지와 상품을 확인하고 운송장 번호를 등록합니다.
+        </p>
+        <div className="mt-4">
+          <ShippingWorkPanel />
+        </div>
+      </section>
+    </main>
   );
 }

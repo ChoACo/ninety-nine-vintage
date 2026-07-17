@@ -1,11 +1,53 @@
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "./client";
 
-export type AppRole = "member" | "operator" | "admin" | "unauthorized";
-export type StaffRole = Extract<AppRole, "operator" | "admin">;
+export type AppRole =
+  | "member"
+  | "band_member"
+  | "employee"
+  | "operator"
+  | "admin"
+  | "unauthorized";
 
-const OPERATOR_EMAIL_DOMAIN = "staff.ninety-nine-vintage.store";
-const OPERATOR_ID_PATTERN = /^[a-z][a-z0-9_-]{2,31}$/;
+/** Database-only role names returned by `current_access_role()`. */
+export type AccessRole =
+  | "owner"
+  | "operator"
+  | "employee"
+  | "band_member"
+  | "member";
+
+/**
+ * `admin` is the legacy, server-owned value for the service owner. Keep it as
+ * an internal authorization key, but never expose the value or a grade-0 label
+ * in member-facing UI.
+ */
+export type OwnerRole = Extract<AppRole, "admin">;
+export type StaffRole = Extract<AppRole, "employee" | "operator" | "admin">;
+export type OperationsCenterRole = Extract<AppRole, "operator" | "admin">;
+export type ProductOperationsRole = Extract<
+  AppRole,
+  "employee" | "operator" | "admin"
+>;
+export type MemberRole = Extract<AppRole, "member" | "band_member">;
+export type PresenceRole = Extract<AppRole, "member" | "band_member" | "operator">;
+
+export type PublicRoleGrade = 1 | 2 | 2.5 | 3;
+
+export interface PublicRoleDescriptor {
+  label: string;
+  grade: PublicRoleGrade | null;
+}
+
+const PUBLIC_ROLE: Record<AppRole, PublicRoleDescriptor> = {
+  // The owner is intentionally indistinguishable from an operator in public UI.
+  admin: { label: "운영자", grade: null },
+  operator: { label: "운영자", grade: 1 },
+  employee: { label: "직원", grade: 2 },
+  band_member: { label: "회원", grade: 2.5 },
+  member: { label: "회원", grade: 3 },
+  unauthorized: { label: "방문자", grade: null },
+};
 
 export class AuthenticationError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -15,39 +57,103 @@ export class AuthenticationError extends Error {
 }
 
 export function parseAppRole(value: unknown): AppRole {
-  return value === "admin" || value === "operator" || value === "member"
+  if (value === "owner") return "admin";
+  return value === "admin" ||
+    value === "operator" ||
+    value === "employee" ||
+    value === "band_member" ||
+    value === "member"
     ? value
     : "unauthorized";
+}
+
+/**
+ * Convert the server's private `owner` role to the existing internal app key.
+ * The private database value must never be rendered directly in public UI.
+ */
+export function mapAccessRoleToAppRole(value: unknown): AppRole {
+  return parseAppRole(value);
 }
 
 export function getUserRole(user: User | null | undefined): AppRole {
   const rawRole = user?.app_metadata?.role;
   const explicitRole = parseAppRole(rawRole);
-  if (explicitRole === "admin" || explicitRole === "operator") {
-    return explicitRole;
-  }
   const provider = user?.app_metadata?.provider;
   const providers = user?.app_metadata?.providers;
   const hasKakaoProvider =
     provider === "kakao" ||
     (Array.isArray(providers) && providers.includes("kakao"));
-  const hasMemberCompatibleRole = rawRole == null || explicitRole === "member";
 
-  return hasKakaoProvider && hasMemberCompatibleRole
-    ? "member"
-    : "unauthorized";
+  // Every account, including the private service owner, authenticates through
+  // Kakao. A legacy email/password JWT must never become authorized merely
+  // because it still carries an old role claim.
+  if (!hasKakaoProvider) return "unauthorized";
+
+  if (
+    explicitRole === "admin" ||
+    explicitRole === "operator" ||
+    explicitRole === "employee"
+  ) {
+    return explicitRole;
+  }
+  const hasMemberCompatibleRole =
+    rawRole == null ||
+    explicitRole === "member" ||
+    explicitRole === "band_member";
+
+  if (!hasMemberCompatibleRole) return "unauthorized";
+  return explicitRole === "band_member" ? "band_member" : "member";
 }
 
 export function isStaffRole(role: AppRole): role is StaffRole {
+  return role === "admin" || role === "operator" || role === "employee";
+}
+
+export function isOwnerRole(role: AppRole): role is OwnerRole {
+  return role === "admin";
+}
+
+export function isMemberRole(role: AppRole): role is MemberRole {
+  return role === "member" || role === "band_member";
+}
+
+export function canAccessOperationsCenter(
+  role: AppRole,
+): role is OperationsCenterRole {
   return role === "admin" || role === "operator";
 }
 
-export function isOperatorId(value: string): boolean {
-  return OPERATOR_ID_PATTERN.test(value);
+export function canManageProducts(
+  role: AppRole,
+): role is ProductOperationsRole {
+  return isStaffRole(role);
 }
 
-export function operatorIdToEmail(operatorId: string): string {
-  return `${operatorId}@${OPERATOR_EMAIL_DOMAIN}`;
+export function canManageShippingQueue(
+  role: AppRole,
+): role is ProductOperationsRole {
+  return isStaffRole(role);
+}
+
+export function canAccessOperationsWorkspace(role: AppRole): boolean {
+  return canAccessOperationsCenter(role) || role === "employee";
+}
+
+export function shouldTrackPresence(role: AppRole): boolean {
+  return role === "member" || role === "band_member" || role === "operator";
+}
+
+export function getPublicRoleDescriptor(
+  role: AppRole,
+): PublicRoleDescriptor {
+  return PUBLIC_ROLE[role];
+}
+
+export function getPublicRoleLabel(role: AppRole): string {
+  const descriptor = getPublicRoleDescriptor(role);
+  return descriptor.grade == null
+    ? descriptor.label
+    : `${descriptor.grade}등급 ${descriptor.label}`;
 }
 
 export async function signInWithKakao(): Promise<void> {
@@ -59,76 +165,6 @@ export async function signInWithKakao(): Promise<void> {
   // scopes. This server-owned OIDC flow omits scope entirely, so Kakao applies
   // only the consent items that are actually configured in the app console.
   window.location.assign("/api/auth/kakao/start");
-}
-
-/**
- * Staff credentials use one field intentionally: an administrator enters their
- * email, while an operator enters a provisioned non-email operator ID. The
- * database-backed is_staff RPC remains the source of truth for access.
- */
-export async function signInStaff(
-  identifier: string,
-  password: string,
-): Promise<User> {
-  const normalizedIdentifier = identifier.trim().toLowerCase();
-  const isEmailLogin = normalizedIdentifier.includes("@");
-
-  if (!normalizedIdentifier || !password) {
-    throw new AuthenticationError("아이디와 비밀번호를 모두 입력해 주세요.");
-  }
-
-  let email: string;
-  if (isEmailLogin) {
-    email = normalizedIdentifier;
-  } else {
-    if (!isOperatorId(normalizedIdentifier)) {
-      throw new AuthenticationError(
-        "발급받은 운영자 아이디 형식을 확인해 주세요.",
-      );
-    }
-    email = operatorIdToEmail(normalizedIdentifier);
-  }
-  const client = getSupabaseBrowserClient();
-  const { data, error } = await client.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error || !data.user) {
-    throw new AuthenticationError(
-      isEmailLogin
-        ? "관리자 이메일 또는 비밀번호를 확인해 주세요."
-        : "운영자 아이디 또는 비밀번호를 확인해 주세요.",
-      error ? { cause: error } : undefined,
-    );
-  }
-
-  const role = getUserRole(data.user);
-  const expectedRole: StaffRole = isEmailLogin ? "admin" : "operator";
-  const operatorId = data.user.app_metadata?.operator_id;
-  const hasExpectedOperatorId =
-    expectedRole !== "operator" || operatorId === normalizedIdentifier;
-
-  if (role !== expectedRole || !hasExpectedOperatorId) {
-    await client.auth.signOut();
-    throw new AuthenticationError(
-      isEmailLogin
-        ? "관리자 권한이 없는 계정입니다."
-        : "등록된 운영자 계정이 아닙니다.",
-    );
-  }
-
-  const { data: hasStaffAccess, error: staffAccessError } = await client.rpc(
-    "is_staff",
-  );
-  if (staffAccessError || !hasStaffAccess) {
-    await client.auth.signOut();
-    throw new AuthenticationError("등록된 스태프 권한을 확인하지 못했습니다.", {
-      cause: staffAccessError ?? undefined,
-    });
-  }
-
-  return data.user;
 }
 
 export async function signOut(): Promise<void> {

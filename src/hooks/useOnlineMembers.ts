@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createSupabasePresenceClient } from "@/src/lib/supabase/client";
 
-const ONLINE_MEMBERS_CHANNEL = "site-online-members-v1";
-const VISITOR_ID_STORAGE_KEY = "damine-vintage-presence-id";
-const VALID_VISITOR_ID = /^[a-z0-9-]{8,64}$/i;
-const VISITOR_ID_TTL_MS = 12 * 60 * 60 * 1_000;
+import {
+  isOwnerRole,
+  shouldTrackPresence,
+  type AppRole,
+} from "@/src/lib/supabase/auth";
+import { getSupabaseBrowserClient } from "@/src/lib/supabase/client";
+
 const MAX_VISIBLE_ONLINE_MEMBERS = 50;
+const ONLINE_HEARTBEAT_INTERVAL_MS = 25_000;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export interface OnlineMember {
   id: string;
@@ -23,202 +28,108 @@ export interface OnlineMembersState {
   error: string | null;
 }
 
-interface StoredVisitorIdentity {
-  id: string;
-  expiresAt: number;
+interface UseOnlineMembersOptions {
+  enabled?: boolean;
+  userId?: string | null;
+  role?: AppRole | null;
 }
 
-function createVisitorId(): string {
-  if (typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+interface OnlineMemberRow {
+  id?: unknown;
+  display_name?: unknown;
 }
 
-function getOrCreateVisitorId(): string {
-  try {
-    const now = Date.now();
-    const savedIdentity = window.localStorage.getItem(VISITOR_ID_STORAGE_KEY);
-    if (savedIdentity) {
-      let parsed: Partial<StoredVisitorIdentity> | null = null;
-      try {
-        parsed = JSON.parse(savedIdentity) as Partial<StoredVisitorIdentity>;
-      } catch {
-        parsed = null;
-      }
-      if (
-        parsed &&
-        typeof parsed.id === "string" &&
-        VALID_VISITOR_ID.test(parsed.id) &&
-        typeof parsed.expiresAt === "number" &&
-        parsed.expiresAt > now &&
-        parsed.expiresAt <= now + VISITOR_ID_TTL_MS
-      ) {
-        return parsed.id;
-      }
-    }
-
-    const visitorId = createVisitorId();
-    const identity: StoredVisitorIdentity = {
-      id: visitorId,
-      expiresAt: now + VISITOR_ID_TTL_MS,
-    };
-    window.localStorage.setItem(
-      VISITOR_ID_STORAGE_KEY,
-      JSON.stringify(identity),
-    );
-    return visitorId;
-  } catch {
-    return createVisitorId();
-  }
+function normalizeOnlineMember(value: unknown): OnlineMember | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as OnlineMemberRow;
+  if (typeof row.id !== "string" || !UUID_PATTERN.test(row.id)) return null;
+  if (typeof row.display_name !== "string") return null;
+  const displayName = row.display_name.trim();
+  if (!displayName || displayName.length > 80) return null;
+  return { id: row.id, displayName };
 }
 
-function getAnonymousDisplayName(visitorId: string): string {
-  const compactId = visitorId.replace(/[^a-z0-9]/gi, "").toUpperCase();
-  return `방문자 ${compactId.slice(-6).padStart(6, "0")}`;
-}
-
-function refreshVisitorIdLease(visitorId: string): void {
-  try {
-    const savedIdentity = window.localStorage.getItem(VISITOR_ID_STORAGE_KEY);
-    if (!savedIdentity) return;
-    const parsed = JSON.parse(savedIdentity) as Partial<StoredVisitorIdentity>;
-    if (parsed.id !== visitorId) return;
-
-    const identity: StoredVisitorIdentity = {
-      id: visitorId,
-      expiresAt: Date.now() + VISITOR_ID_TTL_MS,
-    };
-    window.localStorage.setItem(
-      VISITOR_ID_STORAGE_KEY,
-      JSON.stringify(identity),
-    );
-  } catch {
-    // Storage can be unavailable in private browsing. Presence remains usable
-    // with the in-memory visitor id created for this mount.
-  }
-}
-
-export function useOnlineMembers(): OnlineMembersState {
+export function useOnlineMembers({
+  enabled = true,
+  userId = null,
+  role = null,
+}: UseOnlineMembersOptions = {}): OnlineMembersState {
   const [members, setMembers] = useState<readonly OnlineMember[]>([]);
   const [hasMore, setHasMore] = useState(false);
-  const [status, setStatus] =
-    useState<OnlinePresenceStatus>("connecting");
+  const [status, setStatus] = useState<OnlinePresenceStatus>("connecting");
   const [error, setError] = useState<string | null>(null);
+  const isDisabled =
+    !enabled ||
+    !userId ||
+    !role ||
+    isOwnerRole(role) ||
+    !shouldTrackPresence(role);
 
   useEffect(() => {
-    let active = true;
-    let cleanupChannel: (() => void) | undefined;
-    let leaseTimer: number | undefined;
+    if (isDisabled) return;
 
-    const reportUnavailable = () => {
-      window.queueMicrotask(() => {
+    let active = true;
+    let requestInFlight = false;
+    const client = getSupabaseBrowserClient();
+
+    const syncServerVerifiedMembers = async () => {
+      if (!active || requestInFlight) return;
+      requestInFlight = true;
+
+      try {
+        const { error: heartbeatError } = await client.rpc("touch_my_last_seen");
+        if (heartbeatError) throw heartbeatError;
+
+        const { data, error: directoryError } = await client.rpc(
+          "get_online_member_directory",
+          { p_limit: MAX_VISIBLE_ONLINE_MEMBERS + 1 },
+        );
+        if (directoryError) throw directoryError;
+
+        const nextMembers = (Array.isArray(data) ? data : [])
+          .map(normalizeOnlineMember)
+          .filter((member): member is OnlineMember => member !== null)
+          .sort((left, right) =>
+            left.displayName.localeCompare(right.displayName, "ko-KR"),
+          );
+
+        if (!active) return;
+        setMembers(nextMembers.slice(0, MAX_VISIBLE_ONLINE_MEMBERS));
+        setHasMore(nextMembers.length > MAX_VISIBLE_ONLINE_MEMBERS);
+        setStatus("connected");
+        setError(null);
+      } catch {
         if (!active) return;
         setMembers([]);
         setHasMore(false);
         setStatus("error");
-        setError("Supabase 실시간 접속 상태를 사용할 수 없습니다.");
-      });
-    };
-
-    const connect = async () => {
-      try {
-        const client = createSupabasePresenceClient();
-        const visitorId = getOrCreateVisitorId();
-        if (!active) return;
-
-        const channel = client.channel(ONLINE_MEMBERS_CHANNEL, {
-          config: {
-            presence: {
-              key: visitorId,
-              enabled: true,
-            },
-          },
-        });
-
-        const syncMembers = () => {
-          if (!active) return;
-
-          const presenceKeys = Object.entries(channel.presenceState())
-            .filter(
-              ([presenceKey, presences]) =>
-                presences.length > 0 && VALID_VISITOR_ID.test(presenceKey),
-            )
-            .map(([presenceKey]) => presenceKey)
-            .sort();
-          const nextMembers = presenceKeys
-            .slice(0, MAX_VISIBLE_ONLINE_MEMBERS)
-            .map((presenceKey) => ({
-              id: presenceKey,
-              displayName: getAnonymousDisplayName(presenceKey),
-            }));
-
-          setMembers(nextMembers);
-          setHasMore(presenceKeys.length > MAX_VISIBLE_ONLINE_MEMBERS);
-        };
-
-        channel
-          .on("presence", { event: "sync" }, syncMembers)
-          .subscribe((nextStatus) => {
-            if (!active) return;
-
-            if (nextStatus === "SUBSCRIBED") {
-              setError(null);
-              refreshVisitorIdLease(visitorId);
-              void channel
-                .track({})
-                .then((response) => {
-                  if (!active) return;
-                  if (response !== "ok") {
-                    throw new Error(`Presence track failed: ${response}`);
-                  }
-                  setStatus("connected");
-                })
-                .catch(() => {
-                  if (!active) return;
-                  setMembers([]);
-                  setHasMore(false);
-                  setStatus("error");
-                  setError("실시간 접속 상태를 연결하지 못했습니다.");
-                });
-              return;
-            }
-
-            if (
-              nextStatus === "CHANNEL_ERROR" ||
-              nextStatus === "TIMED_OUT" ||
-              nextStatus === "CLOSED"
-            ) {
-              setMembers([]);
-              setHasMore(false);
-              setStatus("error");
-              setError("실시간 접속 상태 연결이 끊어졌습니다.");
-            }
-          });
-
-        leaseTimer = window.setInterval(
-          () => refreshVisitorIdLease(visitorId),
-          VISITOR_ID_TTL_MS / 4,
-        );
-        cleanupChannel = () => {
-          if (leaseTimer !== undefined) window.clearInterval(leaseTimer);
-          void channel.untrack().catch(() => undefined);
-          void client.removeChannel(channel).catch(() => undefined);
-        };
-      } catch {
-        reportUnavailable();
+        setError("온라인 접속 상태를 확인하지 못했습니다.");
+      } finally {
+        requestInFlight = false;
       }
     };
 
-    void connect();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void syncServerVerifiedMembers();
+      }
+    };
+
+    void syncServerVerifiedMembers();
+    const interval = window.setInterval(
+      () => void syncServerVerifiedMembers(),
+      ONLINE_HEARTBEAT_INTERVAL_MS,
+    );
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       active = false;
-      if (leaseTimer !== undefined) window.clearInterval(leaseTimer);
-      cleanupChannel?.();
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [isDisabled]);
 
-  return { members, hasMore, status, error };
+  return isDisabled
+    ? { members: [], hasMore: false, status: "connected", error: null }
+    : { members, hasMore, status, error };
 }

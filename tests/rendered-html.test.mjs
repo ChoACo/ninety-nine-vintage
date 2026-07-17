@@ -98,6 +98,8 @@ test("uses Kakao membership and server-only operator provisioning", async () => 
   assert.doesNotMatch(auth, /:\s*"member";\s*\n\}/);
   assert.match(auth, /client\.rpc\([\s\S]*"is_staff"/);
   assert.match(authSession, /getUserRole\(nextSession\.user\) === "unauthorized"/);
+  assert.match(authSession, /hasAuthorizedSession/);
+  assert.match(authSession, /client\.rpc\("is_staff"\)/);
   assert.match(authSession, /client\.auth\.signOut\(\)/);
   assert.match(auth, /operator01/);
   assert.match(auth, /operator02/);

@@ -5,6 +5,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/src/lib/supabase/client";
 import {
   getUserRole,
+  isStaffRole,
   signOut as signOutFromSupabase,
   type AppRole,
 } from "@/src/lib/supabase/auth";
@@ -144,6 +145,23 @@ export function useAuthSession(): AuthSessionState {
     let mounted = true;
     const client = getSupabaseBrowserClient();
 
+    const hasAuthorizedSession = async (user: User): Promise<boolean> => {
+      const role = getUserRole(user);
+      if (role === "unauthorized") return false;
+      if (!isStaffRole(role)) return true;
+
+      const { data, error: staffAccessError } = await client.rpc("is_staff");
+      return !staffAccessError && data === true;
+    };
+
+    const rejectSession = async () => {
+      await client.auth.signOut();
+      if (!mounted) return;
+      setSession(null);
+      setProfile(null);
+      setError("카카오 회원 또는 등록된 스태프 계정으로 로그인해 주세요.");
+    };
+
     const initialize = async () => {
       try {
         const { data, error: sessionError } = await client.auth.getSession();
@@ -152,13 +170,9 @@ export function useAuthSession(): AuthSessionState {
 
         if (
           data.session?.user &&
-          getUserRole(data.session.user) === "unauthorized"
+          !(await hasAuthorizedSession(data.session.user))
         ) {
-          await client.auth.signOut();
-          if (!mounted) return;
-          setSession(null);
-          setProfile(null);
-          setError("카카오 회원 또는 등록된 스태프 계정으로 로그인해 주세요.");
+          await rejectSession();
           return;
         }
 
@@ -188,6 +202,26 @@ export function useAuthSession(): AuthSessionState {
         setError("카카오 회원 또는 등록된 스태프 계정으로 로그인해 주세요.");
         window.setTimeout(() => {
           if (mounted) void client.auth.signOut();
+        }, 0);
+        return;
+      }
+
+      if (nextSession?.user && isStaffRole(getUserRole(nextSession.user))) {
+        setSession(null);
+        setProfile(null);
+        setIsLoading(true);
+        window.setTimeout(() => {
+          void (async () => {
+            if (!(await hasAuthorizedSession(nextSession.user))) {
+              await rejectSession();
+              if (mounted) setIsLoading(false);
+              return;
+            }
+            if (!mounted) return;
+            setSession(nextSession);
+            setIsLoading(false);
+            await loadProfile(nextSession.user);
+          })();
         }, 0);
         return;
       }

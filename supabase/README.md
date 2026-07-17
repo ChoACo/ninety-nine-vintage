@@ -18,7 +18,7 @@
 - Products Realtime publication
 - 매분 공개 시각이 지난 `pending` 상품을 `active`로 바꾸는 Supabase Cron
 - 카카오 회원 전용 프로필·입찰 RPC와 20:56/21:00 서버 시각 경계
-- 기존 관리자 보존 및 `operator01~03` 운영자 슬롯 검증
+- 기존 관리자 보존 및 환경 변수로 지정한 두 운영자 슬롯 검증
 - 회원별 비공개 운영팀 상담, 읽음 처리, Realtime publication
 
 브라우저에는 publishable key만 사용합니다. `service_role` 또는 secret key는

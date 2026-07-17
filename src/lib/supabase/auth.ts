@@ -4,10 +4,8 @@ import { getSupabaseBrowserClient } from "./client";
 export type AppRole = "member" | "operator" | "admin" | "unauthorized";
 export type StaffRole = Extract<AppRole, "operator" | "admin">;
 
-export const OPERATOR_IDS = ["operator01", "operator02", "operator03"] as const;
-export type OperatorId = (typeof OPERATOR_IDS)[number];
-
 const OPERATOR_EMAIL_DOMAIN = "staff.ninety-nine-vintage.store";
+const OPERATOR_ID_PATTERN = /^[a-z][a-z0-9_-]{2,31}$/;
 
 export class AuthenticationError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -44,11 +42,11 @@ export function isStaffRole(role: AppRole): role is StaffRole {
   return role === "admin" || role === "operator";
 }
 
-export function isOperatorId(value: string): value is OperatorId {
-  return (OPERATOR_IDS as readonly string[]).includes(value);
+export function isOperatorId(value: string): boolean {
+  return OPERATOR_ID_PATTERN.test(value);
 }
 
-export function operatorIdToEmail(operatorId: OperatorId): string {
+export function operatorIdToEmail(operatorId: string): string {
   return `${operatorId}@${OPERATOR_EMAIL_DOMAIN}`;
 }
 
@@ -75,7 +73,8 @@ export async function signInWithKakao(): Promise<void> {
 
 /**
  * Staff credentials use one field intentionally: an administrator enters their
- * email, while an operator enters one of the three non-email operator IDs.
+ * email, while an operator enters a provisioned non-email operator ID. The
+ * database-backed is_staff RPC remains the source of truth for access.
  */
 export async function signInStaff(
   identifier: string,
@@ -94,7 +93,7 @@ export async function signInStaff(
   } else {
     if (!isOperatorId(normalizedIdentifier)) {
       throw new AuthenticationError(
-        "운영자 아이디는 operator01, operator02, operator03 중 하나를 입력해 주세요.",
+        "발급받은 운영자 아이디 형식을 확인해 주세요.",
       );
     }
     email = operatorIdToEmail(normalizedIdentifier);

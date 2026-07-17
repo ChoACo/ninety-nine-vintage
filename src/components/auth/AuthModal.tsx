@@ -177,8 +177,8 @@ export default function AuthModal({
         ) : (
           <form role="tabpanel" onSubmit={handleStaffLogin} className="space-y-4 pt-6">
             <div className="rounded-2xl border border-[#ead8c6] bg-[#fff5e9] px-4 py-3 text-sm font-bold leading-6 text-[#806351]">
-              운영자는 <span className="text-[#a85041]">operator01~03</span>,
-              기존 관리자는 등록된 이메일을 입력해 주세요.
+              운영자는 발급받은 아이디를, 기존 관리자는 등록된 이메일을 입력해
+              주세요.
             </div>
 
             <label className="block text-sm font-black text-[#4c4039]">
@@ -188,7 +188,7 @@ export default function AuthModal({
                 value={identifier}
                 onChange={(event) => setIdentifier(event.target.value)}
                 autoComplete="username"
-                placeholder="operator01 또는 admin@example.com"
+                placeholder="운영자 아이디 또는 admin@example.com"
                 className={inputClasses}
                 disabled={isSubmitting}
                 autoCapitalize="none"

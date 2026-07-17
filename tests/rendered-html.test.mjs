@@ -80,13 +80,14 @@ test("keeps native build dependencies approved in both pnpm config locations", a
   }
 });
 
-test("uses Kakao membership and server-only operator provisioning", async () => {
-  const [auth, authSession, modal, callback, provision, auctionApp] = await Promise.all([
+test("uses Kakao membership and two configurable server-provisioned operators", async () => {
+  const [auth, authSession, modal, callback, provision, environmentExample, auctionApp] = await Promise.all([
     source("src/lib/supabase/auth.ts"),
     source("src/hooks/useAuthSession.ts"),
     source("src/components/auth/AuthModal.tsx"),
     source("app/auth/callback/page.tsx"),
     source("scripts/provision-operators.mjs"),
+    source(".env.example"),
     source("src/components/AuctionApp.tsx"),
   ]);
 
@@ -102,13 +103,25 @@ test("uses Kakao membership and server-only operator provisioning", async () => 
   assert.match(authSession, /isStaffRole\(role\) \? "is_staff" : "is_member"/);
   assert.match(authSession, /client\.rpc\(accessFunction\)/);
   assert.match(authSession, /client\.auth\.signOut\(\)/);
-  assert.match(auth, /operator01/);
-  assert.match(auth, /operator02/);
-  assert.match(auth, /operator03/);
+  assert.match(auth, /OPERATOR_ID_PATTERN/);
+  assert.doesNotMatch(auth, /["']operator0[123]["']/i);
   assert.match(modal, /카카오로 로그인/);
+  assert.match(modal, /운영자는 발급받은 아이디/);
+  assert.doesNotMatch(modal, /operator01~03/);
   assert.match(callback, /exchangeCodeForSession/);
   assert.match(provision, /email_confirm:\s*true/);
   assert.match(provision, /SUPABASE_SECRET_KEY/);
+  assert.match(provision, /password\.length < 12/);
+  assert.match(provision, /idEnvironmentName:\s*"OPERATOR01_ID"/);
+  assert.match(provision, /idEnvironmentName:\s*"OPERATOR02_ID"/);
+  assert.match(provision, /removeUnexpectedOperatorSlots/);
+  assert.match(provision, /user\.app_metadata\?\.role === "operator"/);
+  assert.match(provision, /countRetiredOperatorUsers/);
+  assert.doesNotMatch(provision, /OPERATOR03_(?:ID|PASSWORD)/);
+  assert.doesNotMatch(provision, /auth\.admin\.deleteUser/);
+  assert.match(environmentExample, /OPERATOR01_ID=/);
+  assert.match(environmentExample, /OPERATOR02_ID=/);
+  assert.doesNotMatch(environmentExample, /OPERATOR03_(?:ID|PASSWORD)/);
   assert.doesNotMatch(provision, /sb_secret_|service_role\s*=\s*["'][A-Za-z0-9]/);
   assert.doesNotMatch(auctionApp, /RoleToggle|MOCK_BIDDER|chatThreadState/);
 });
@@ -155,19 +168,22 @@ test("enforces private member-to-staff chat in SQL and UI", async () => {
   assert.match(staffInbox, /내가 담당하기/);
 });
 
-test("keeps the administrator intact and reserves exactly three operator IDs", async () => {
-  const [migration, hardening] = await Promise.all([
+test("keeps the administrator intact and reconciles exactly two configured operator slots", async () => {
+  const [migration, hardening, configurableIds, provision] = await Promise.all([
     source("supabase/migrations/20260717210000_add_accounts_support_and_bids.sql"),
     source("supabase/migrations/20260717220000_harden_auth_chat_bids.sql"),
+    source("supabase/migrations/20260718010000_allow_configured_operator_ids.sql"),
+    source("scripts/provision-operators.mjs"),
   ]);
 
   assert.match(migration, /app_metadata\.role = 'admin' account remains an administrator/);
   assert.doesNotMatch(migration, /update\s+auth\.users/i);
-  assert.match(migration, /\('operator01', '운영자 1'\)/);
-  assert.match(migration, /\('operator02', '운영자 2'\)/);
-  assert.match(migration, /\('operator03', '운영자 3'\)/);
   assert.match(migration, /in \('admin', 'operator'\)/);
-  assert.match(hardening, /username in \('operator01', 'operator02', 'operator03'\)/);
+  assert.match(configurableIds, /drop constraint if exists operator_accounts_reserved_username_check/);
+  assert.match(configurableIds, /delete from public\.operator_accounts/);
+  assert.match(provision, /operatorDefinitions = \[[\s\S]*OPERATOR01_ID[\s\S]*OPERATOR02_ID/);
+  assert.match(provision, /configuredIds\.has\(slot\.username\)/);
+  assert.doesNotMatch(provision, /OPERATOR03_(?:ID|PASSWORD)/);
   assert.match(hardening, /users\.raw_app_meta_data ->> 'operator_id' = new\.username/);
   assert.match(hardening, /operators\.auth_user_id = auth\.uid\(\)/);
 });

@@ -94,6 +94,34 @@ async function templateWorkbookFile() {
   });
 }
 
+async function fixedColumnWorkbookFile(headerLabels) {
+  const workbook = new ExcelJS.Workbook();
+  const genericSheet = workbook.addWorksheet("일반 헤더 시트");
+  genericSheet.getCell("A1").value = "상품설명";
+  genericSheet.getCell("B1").value = "시작가";
+  genericSheet.getCell("C1").value = "이미지명";
+  genericSheet.getCell("A6").value = "일반 양식 상품";
+  genericSheet.getCell("B6").value = 1_000;
+  genericSheet.getCell("C6").value = "generic.jpg";
+
+  const fixedSheet = workbook.addWorksheet("고정 열 양식");
+  if (headerLabels) {
+    fixedSheet.getCell("A1").value = headerLabels.title;
+    fixedSheet.getCell("X1").value = headerLabels.description;
+    fixedSheet.getCell("Y1").value = headerLabels.price;
+    fixedSheet.getCell("AH1").value = headerLabels.images;
+  }
+  fixedSheet.getCell("A6").value = "고정 양식 상품";
+  fixedSheet.getCell("X6").value = "고정 열에서 읽은 설명";
+  fixedSheet.getCell("Y6").value = 45_000;
+  fixedSheet.getCell("AH6").value = "fixed.jpg";
+
+  const bytes = await workbook.xlsx.writeBuffer();
+  return new File([bytes], "fixed-columns.xlsx", {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+}
+
 function imageFile(relativePath) {
   const name = relativePath.split("/").at(-1);
   const file = new File([new Uint8Array([0xff, 0xd8, 0xff])], name, {
@@ -166,6 +194,70 @@ test("detects the real template sheet and imports only rows 6 and later", async 
     parsed.rows.map((row) => row.rowNumber),
     [6, 7],
   );
+});
+
+test("prioritizes fixed A/X/Y/AH columns without relying on header names", async () => {
+  const { parseAuctionWorkbook } = await loadBatchAuctionModule();
+  const cases = [
+    {
+      name: "missing headers",
+      labels: undefined,
+      expectedHeaders: [
+        "A열 상품명",
+        "X열 상품 설명",
+        "Y열 시작가",
+        "AH열 이미지명",
+      ],
+    },
+    {
+      name: "renamed headers",
+      labels: {
+        title: "내부 상품 코드",
+        description: "판매 상세 텍스트",
+        price: "기준 금액",
+        images: "사진 목록 문자열",
+      },
+      expectedHeaders: [
+        "내부 상품 코드",
+        "판매 상세 텍스트",
+        "기준 금액",
+        "사진 목록 문자열",
+      ],
+    },
+  ];
+
+  for (const testCase of cases) {
+    const parsed = await parseAuctionWorkbook(
+      await fixedColumnWorkbookFile(testCase.labels),
+    );
+
+    assert.equal(parsed.sheetName, "고정 열 양식", testCase.name);
+    assert.deepEqual(
+      [
+        parsed.detectedHeaders.title?.columnNumber,
+        parsed.detectedHeaders.description?.columnNumber,
+        parsed.detectedHeaders.startingPrice?.columnNumber,
+        parsed.detectedHeaders.imageNames[0]?.columnNumber,
+      ],
+      [1, 24, 25, 34],
+      testCase.name,
+    );
+    assert.deepEqual(
+      [
+        parsed.detectedHeaders.title?.header,
+        parsed.detectedHeaders.description?.header,
+        parsed.detectedHeaders.startingPrice?.header,
+        parsed.detectedHeaders.imageNames[0]?.header,
+      ],
+      testCase.expectedHeaders,
+      testCase.name,
+    );
+    assert.deepEqual(
+      parsed.rows.map((row) => row.rowNumber),
+      [6],
+      testCase.name,
+    );
+  }
 });
 
 test("requires a globally unique basename for a bare image reference", async () => {

@@ -95,6 +95,12 @@ const MAX_WORKSHEET_COLUMNS = 256;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const HEADER_SCAN_LIMIT = 30;
 export const FIRST_PRODUCT_ROW = 6;
+const FIXED_TEMPLATE_COLUMNS = {
+  title: 1,
+  description: 24,
+  startingPrice: 25,
+  imageNames: 34,
+} as const;
 
 const HEADER_ALIASES: Record<BatchAuctionCanonicalField, readonly string[]> = {
   description: [
@@ -229,6 +235,120 @@ interface HeaderCandidate {
   score: number;
   rowNumber: number;
   headers: DetectedAuctionHeaders;
+}
+
+interface FixedTemplateCandidate {
+  candidate: HeaderCandidate;
+  evidenceScore: number;
+  validDataRowCount: number;
+}
+
+function fixedTemplateColumn(
+  headerRow: ParsedAuctionWorkbookRow | undefined,
+  columnNumber: number,
+  fallbackHeader: string,
+): DetectedHeaderColumn {
+  return {
+    columnNumber,
+    header: cellAsText(headerRow?.cells[columnNumber - 1]) || fallbackHeader,
+  };
+}
+
+function detectFixedTemplateForSheet(
+  sheetName: string,
+  rows: readonly ParsedAuctionWorkbookRow[],
+): FixedTemplateCandidate | null {
+  let evidenceScore = 0;
+  let validDataRowCount = 0;
+
+  rows.forEach((row) => {
+    if (row.rowNumber < FIRST_PRODUCT_ROW) return;
+
+    const hasTitle = Boolean(
+      cellAsText(row.cells[FIXED_TEMPLATE_COLUMNS.title - 1]),
+    );
+    const hasDescription = Boolean(
+      cellAsText(row.cells[FIXED_TEMPLATE_COLUMNS.description - 1]),
+    );
+    const hasStartingPrice =
+      parseStartingPrice(
+        row.cells[FIXED_TEMPLATE_COLUMNS.startingPrice - 1],
+      ) !== null;
+    const hasImageName = Boolean(
+      cellAsText(row.cells[FIXED_TEMPLATE_COLUMNS.imageNames - 1]),
+    );
+    const hasFixedTemplateEvidence =
+      (hasStartingPrice && (hasTitle || hasDescription || hasImageName)) ||
+      (hasDescription && hasImageName);
+
+    if (!hasFixedTemplateEvidence) return;
+
+    evidenceScore +=
+      (hasTitle ? 3 : 0) +
+      (hasDescription ? 4 : 0) +
+      (hasStartingPrice ? 5 : 0) +
+      (hasImageName ? 4 : 0);
+    if (
+      (hasTitle || hasDescription) &&
+      hasStartingPrice &&
+      hasImageName
+    ) {
+      validDataRowCount += 1;
+      evidenceScore += 30;
+    }
+  });
+
+  if (evidenceScore === 0) return null;
+
+  const headerRow = rows.find((row) => row.rowNumber === 1);
+  const fixedColumnNumbers = new Set<number>(
+    Object.values(FIXED_TEMPLATE_COLUMNS),
+  );
+  const unusedHeaders = (headerRow?.cells ?? []).flatMap((cell, index) => {
+    const header = cellAsText(cell);
+    const columnNumber = index + 1;
+    return header && !fixedColumnNumbers.has(columnNumber)
+      ? [{ columnNumber, header }]
+      : [];
+  });
+  const headerRowNumber = headerRow?.rowNumber ?? 1;
+
+  return {
+    evidenceScore,
+    validDataRowCount,
+    candidate: {
+      score: evidenceScore,
+      rowNumber: headerRowNumber,
+      headers: {
+        sheetName,
+        headerRowNumber,
+        title: fixedTemplateColumn(
+          headerRow,
+          FIXED_TEMPLATE_COLUMNS.title,
+          "A열 상품명",
+        ),
+        description: fixedTemplateColumn(
+          headerRow,
+          FIXED_TEMPLATE_COLUMNS.description,
+          "X열 상품 설명",
+        ),
+        startingPrice: fixedTemplateColumn(
+          headerRow,
+          FIXED_TEMPLATE_COLUMNS.startingPrice,
+          "Y열 시작가",
+        ),
+        imageNames: [
+          fixedTemplateColumn(
+            headerRow,
+            FIXED_TEMPLATE_COLUMNS.imageNames,
+            "AH열 이미지명",
+          ),
+        ],
+        duplicateFields: [],
+        unusedHeaders,
+      },
+    },
+  };
 }
 
 function detectHeadersForRow(
@@ -425,31 +545,64 @@ export async function parseAuctionWorkbook(
       }
     | undefined;
 
-  parsedSheets.forEach((sheet) => {
-    sheet.rows.slice(0, HEADER_SCAN_LIMIT).forEach((row) => {
-      const candidate = detectHeadersForRow(sheet.name, row);
-      const validDataRowCount = countValidDataRows(sheet.rows, candidate);
-      if (
-        !best ||
-        candidate.score > best.candidate.score ||
-        (candidate.score === best.candidate.score &&
-          validDataRowCount > best.validDataRowCount)
-      ) {
-        best = {
-          sheetName: sheet.name,
-          rows: sheet.rows,
-          candidate,
-          validDataRowCount,
-        };
+  let fixedTemplateBest:
+    | {
+        sheetName: string;
+        rows: ParsedAuctionWorkbookRow[];
+        candidate: HeaderCandidate;
+        evidenceScore: number;
+        validDataRowCount: number;
       }
-    });
+    | undefined;
+
+  parsedSheets.forEach((sheet) => {
+    const fixedTemplate = detectFixedTemplateForSheet(sheet.name, sheet.rows);
+    if (
+      fixedTemplate &&
+      (!fixedTemplateBest ||
+        fixedTemplate.validDataRowCount >
+          fixedTemplateBest.validDataRowCount ||
+        (fixedTemplate.validDataRowCount ===
+          fixedTemplateBest.validDataRowCount &&
+          fixedTemplate.evidenceScore > fixedTemplateBest.evidenceScore))
+    ) {
+      fixedTemplateBest = {
+        sheetName: sheet.name,
+        rows: sheet.rows,
+        candidate: fixedTemplate.candidate,
+        evidenceScore: fixedTemplate.evidenceScore,
+        validDataRowCount: fixedTemplate.validDataRowCount,
+      };
+    }
   });
 
-  if (!best) {
+  if (!fixedTemplateBest) {
+    parsedSheets.forEach((sheet) => {
+      sheet.rows.slice(0, HEADER_SCAN_LIMIT).forEach((row) => {
+        const candidate = detectHeadersForRow(sheet.name, row);
+        const validDataRowCount = countValidDataRows(sheet.rows, candidate);
+        if (
+          !best ||
+          candidate.score > best.candidate.score ||
+          (candidate.score === best.candidate.score &&
+            validDataRowCount > best.validDataRowCount)
+        ) {
+          best = {
+            sheetName: sheet.name,
+            rows: sheet.rows,
+            candidate,
+            validDataRowCount,
+          };
+        }
+      });
+    });
+  }
+
+  const selectedSheet = fixedTemplateBest ?? best;
+  if (!selectedSheet) {
     throw new Error("Excel 헤더 행을 확인하지 못했습니다.");
   }
 
-  const selectedSheet = best;
   const dataRows = selectedSheet.rows
     .filter(
       (row) =>

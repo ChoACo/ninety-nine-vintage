@@ -288,6 +288,11 @@ test("uses real member delivery data with a default-closed address panel", async
 
   assert.match(accountPage, /\[isAddressOpen, setIsAddressOpen\] = useState\(false\)/);
   assert.match(accountPage, /aria-expanded=\{isAddressOpen\}/);
+  assert.match(
+    accountPage,
+    /onClick=\{\(\) => setIsAddressOpen\(\(current\) => !current\)\}/,
+  );
+  assert.match(accountPage, /hidden=\{!isAddressOpen\}/);
   assert.match(accountPage, /선택 상품 택배 접수하기/);
   assert.ok(
     accountPage.indexOf("선택 상품 택배 접수하기") <

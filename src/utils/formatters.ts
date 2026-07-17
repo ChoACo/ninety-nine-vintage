@@ -107,7 +107,7 @@ export function getRelativeKoreanDateKey(
   );
 }
 
-/** Mock Data 등에서 한국 표준시 날짜/시각 ISO 문자열을 만들 때 사용합니다. */
+/** 테스트나 서버 변환에서 한국 표준시 날짜/시각 ISO 문자열을 만들 때 사용합니다. */
 export function getRelativeKoreanDateTime(
   dayOffset: number,
   time = "09:00:00",

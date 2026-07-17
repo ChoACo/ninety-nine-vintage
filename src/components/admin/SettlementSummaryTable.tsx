@@ -1,5 +1,4 @@
 /* eslint-disable @next/next/no-img-element -- 낙찰 썸네일은 추후 상품 CDN URL을 사용합니다. */
-import type { BuyerInfo } from "@/src/types/auction";
 import { formatKRW } from "@/src/utils/formatters";
 
 import type {
@@ -9,7 +8,6 @@ import type {
 
 interface SettlementSummaryTableProps {
   settlements: readonly AdminSettlementGroup[];
-  onOpenChat: (buyer: BuyerInfo) => void;
 }
 
 const statusClasses: Record<SettlementStatusTone, string> = {
@@ -45,35 +43,18 @@ function ProductThumbnails({ group }: { group: AdminSettlementGroup }) {
   );
 }
 
-function StatusAndChat({
-  group,
-  onOpenChat,
-}: {
-  group: AdminSettlementGroup;
-  onOpenChat: (buyer: BuyerInfo) => void;
-}) {
+function StatusBadge({ group }: { group: AdminSettlementGroup }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span
-        className={`rounded-full border-2 px-3 py-1.5 text-[17px] font-black ${statusClasses[group.statusTone]}`}
-      >
-        {group.statusLabel}
-      </span>
-      <button
-        type="button"
-        onClick={() => onOpenChat(group.buyer)}
-        className="min-h-11 rounded-full border-2 border-[#d7ad9e] bg-white px-4 py-2 text-[17px] font-black text-[#a55545] transition hover:bg-[#fff0ea] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#f0cec4]"
-        aria-label={`${group.buyer.name} 고객과 1대1 채팅`}
-      >
-        💬 1:1 톡
-      </button>
-    </div>
+    <span
+      className={`inline-flex rounded-full border-2 px-3 py-1.5 text-[17px] font-black ${statusClasses[group.statusTone]}`}
+    >
+      {group.statusLabel}
+    </span>
   );
 }
 
 export function SettlementSummaryTable({
   settlements,
-  onOpenChat,
 }: SettlementSummaryTableProps) {
   if (settlements.length === 0) {
     return (
@@ -119,7 +100,7 @@ export function SettlementSummaryTable({
                   {formatKRW(group.totalWinningBid)}
                 </td>
                 <td className="px-4 py-5">
-                  <StatusAndChat group={group} onOpenChat={onOpenChat} />
+                  <StatusBadge group={group} />
                 </td>
               </tr>
             ))}
@@ -145,7 +126,7 @@ export function SettlementSummaryTable({
               <ProductThumbnails group={group} />
             </div>
             <div className="mt-4">
-              <StatusAndChat group={group} onOpenChat={onOpenChat} />
+              <StatusBadge group={group} />
             </div>
           </li>
         ))}

@@ -3,16 +3,12 @@
 import { useMemo, useState } from "react";
 
 import type {
-  AdminCustomerChatPayload,
-  AdminCustomerChatThread,
   AdminSaleRecord,
   AdminShipmentBatch,
-  BuyerInfo,
   ShipmentRegistrationPayload,
 } from "@/src/types/auction";
 import { formatKRW } from "@/src/utils/formatters";
 
-import { AdminCsChatModal } from "./AdminCsChatModal";
 import { AdminShipmentBoard } from "./AdminShipmentBoard";
 import { buildRecentSevenClosingDays, buildShipmentBatchesFromSales } from "./adminUtils";
 import { PickingPreviewModal } from "./PickingPreviewModal";
@@ -22,12 +18,8 @@ import { ShipmentRegistrationModal } from "./ShipmentRegistrationModal";
 export interface AdminPageProps {
   sales: readonly AdminSaleRecord[];
   shipments?: readonly AdminShipmentBatch[];
-  customerChats?: readonly AdminCustomerChatThread[];
   onRegisterShipment?: (
     payload: ShipmentRegistrationPayload,
-  ) => void | Promise<void>;
-  onSendCustomerMessage?: (
-    payload: AdminCustomerChatPayload,
   ) => void | Promise<void>;
   onNotify?: (message: string) => void;
 }
@@ -35,25 +27,18 @@ export interface AdminPageProps {
 export function AdminPage({
   sales,
   shipments,
-  customerChats = [],
   onRegisterShipment,
-  onSendCustomerMessage,
   onNotify,
 }: AdminPageProps) {
   const [fallbackShipments, setFallbackShipments] = useState<
     AdminShipmentBatch[]
   >(() => buildShipmentBatchesFromSales(sales));
-  const [fallbackChats, setFallbackChats] = useState<
-    AdminCustomerChatThread[]
-  >([]);
   const [previewBatch, setPreviewBatch] =
     useState<AdminShipmentBatch | null>(null);
   const [registrationBatch, setRegistrationBatch] =
     useState<AdminShipmentBatch | null>(null);
-  const [chatBuyer, setChatBuyer] = useState<BuyerInfo | null>(null);
 
   const shipmentBatches = shipments ?? fallbackShipments;
-  const chatThreads = customerChats.length > 0 ? customerChats : fallbackChats;
 
   const salesWithLiveShippingStatus = useMemo(() => {
     const shippedAuctionIds = new Set(
@@ -101,9 +86,6 @@ export function AdminPage({
     (batch) => batch.status === "packing",
   ).length;
 
-  const activeChatThread = chatBuyer
-    ? chatThreads.find((thread) => thread.userId === chatBuyer.userId)
-    : undefined;
 
   const handleRegisterShipment = async (
     payload: ShipmentRegistrationPayload,
@@ -129,68 +111,22 @@ export function AdminPage({
     onNotify?.("송장이 등록되어 배송 중 / 발송 완료 영역으로 이동했습니다.");
   };
 
-  const handleSendCustomerMessage = async (
-    payload: AdminCustomerChatPayload,
-  ) => {
-    if (onSendCustomerMessage) {
-      await onSendCustomerMessage(payload);
-      return;
-    }
-
-    const sentAt = new Date().toISOString();
-    setFallbackChats((current) => {
-      const existing = current.find((thread) => thread.userId === payload.userId);
-      const message = {
-        id: `admin-cs-local-${Date.now()}`,
-        sender: "admin" as const,
-        text: payload.text,
-        sentAt,
-      };
-
-      if (!existing) {
-        return [
-          ...current,
-          {
-            id: `admin-chat-${payload.userId}`,
-            userId: payload.userId,
-            customerName: payload.customerName,
-            lastMessage: payload.text,
-            lastMessageAt: sentAt,
-            messages: [message],
-          },
-        ];
-      }
-
-      return current.map((thread) =>
-        thread.userId === payload.userId
-          ? {
-              ...thread,
-              lastMessage: payload.text,
-              lastMessageAt: sentAt,
-              messages: [...thread.messages, message],
-            }
-          : thread,
-      );
-    });
-    onNotify?.(`${payload.customerName} 고객에게 메시지를 보냈습니다.`);
-  };
-
   return (
     <main className="mx-auto w-full max-w-[1500px] px-4 pb-28 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pb-12">
       <header className="mb-7 flex flex-col gap-5 sm:mb-9 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-[17px] font-black tracking-[0.15em] text-[#688493]">
-            ADMIN LOGISTICS &amp; CS
+            ADMIN LOGISTICS
           </p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-[#493b31] sm:text-4xl">
             다미네 구제 관리자 페이지
           </h1>
           <p className="mt-3 max-w-3xl text-[17px] font-bold leading-8 text-[#796b60]">
-            합배송 피킹부터 송장 등록, 최근 7일 낙찰 고객 CS까지 한 화면에서 처리합니다.
+            합배송 피킹부터 송장 등록과 최근 7일 낙찰 현황을 한 화면에서 처리합니다. 고객 상담은 상담 대화함에서 관리합니다.
           </p>
         </div>
         <span className="w-fit rounded-full border-2 border-[#e5d5c4] bg-[#fffaf3] px-4 py-2 text-[17px] font-black text-[#8a7060] shadow-sm">
-          운영자 전용
+          관리자 전용
         </span>
       </header>
 
@@ -235,10 +171,7 @@ export function AdminPage({
 
       <div className="my-10 h-px bg-[#dfd2c4]" />
 
-      <RecentClosingList
-        days={recentDays}
-        onOpenChat={setChatBuyer}
-      />
+      <RecentClosingList days={recentDays} />
 
       <PickingPreviewModal
         batch={previewBatch}
@@ -248,12 +181,6 @@ export function AdminPage({
         batch={registrationBatch}
         onRegister={handleRegisterShipment}
         onClose={() => setRegistrationBatch(null)}
-      />
-      <AdminCsChatModal
-        buyer={chatBuyer}
-        thread={activeChatThread}
-        onSendMessage={handleSendCustomerMessage}
-        onClose={() => setChatBuyer(null)}
       />
     </main>
   );

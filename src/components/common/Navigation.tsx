@@ -38,6 +38,10 @@ export default function Navigation({
         {navigationItems.map((item) => {
           const selected = activePage === item.value;
           const isLocked = item.adminOnly && role !== "admin";
+          const visibleLabel =
+            item.value === "chat" && (role === "operator" || role === "admin")
+              ? "상담 대화함"
+              : item.label;
 
           return (
             <button
@@ -46,8 +50,8 @@ export default function Navigation({
               aria-current={selected ? "page" : undefined}
               aria-label={
                 isLocked
-                  ? `${item.label}, 운영자 모드에서 이용 가능`
-                  : item.label
+                  ? `${visibleLabel}, 관리자 계정에서 이용 가능`
+                  : visibleLabel
               }
               onClick={() => onNavigate(item.value)}
               className={`group relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-1.5 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#eb7765] sm:flex-row sm:gap-2 sm:text-base ${
@@ -62,7 +66,7 @@ export default function Navigation({
               >
                 {item.icon}
               </span>
-              <span className="whitespace-nowrap">{item.label}</span>
+              <span className="whitespace-nowrap">{visibleLabel}</span>
               {isLocked ? (
                 <span
                   aria-hidden="true"

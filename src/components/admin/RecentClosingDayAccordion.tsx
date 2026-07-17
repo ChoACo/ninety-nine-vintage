@@ -2,7 +2,6 @@
 
 import { useId, useState } from "react";
 
-import type { BuyerInfo } from "@/src/types/auction";
 import { formatKRW } from "@/src/utils/formatters";
 
 import type { RecentClosingDay } from "./adminTypes";
@@ -11,13 +10,11 @@ import { SettlementSummaryTable } from "./SettlementSummaryTable";
 interface RecentClosingDayAccordionProps {
   day: RecentClosingDay;
   defaultOpen?: boolean;
-  onOpenChat: (buyer: BuyerInfo) => void;
 }
 
 export function RecentClosingDayAccordion({
   day,
   defaultOpen = false,
-  onOpenChat,
 }: RecentClosingDayAccordionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const panelId = useId();
@@ -74,7 +71,6 @@ export function RecentClosingDayAccordion({
           >
             <SettlementSummaryTable
               settlements={day.settlements}
-              onOpenChat={onOpenChat}
             />
           </div>
         </div>

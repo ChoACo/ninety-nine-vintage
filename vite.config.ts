@@ -50,8 +50,8 @@ export default defineConfig(async () => {
     const { default: tailwindcss } = await import("@tailwindcss/vite");
 
     return {
-      // The root index.html is a separate double-click demo. Disable Nitro's
-      // index.html auto-detection so vinext's SSR service owns every app route.
+      // Disable static HTML auto-detection so vinext's SSR service owns every
+      // application route, including the OAuth callback.
       plugins: [vinext(), tailwindcss(), nitro({ renderer: false })],
     };
   }

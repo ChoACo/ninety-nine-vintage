@@ -9,6 +9,7 @@ export interface BidConfirmModalProps {
   open: boolean;
   amount: number;
   itemTitle: string;
+  isFinalBid?: boolean;
   onClose: () => void;
   onConfirm: () => void | Promise<void>;
 }
@@ -17,6 +18,7 @@ export default function BidConfirmModal({
   open,
   amount,
   itemTitle,
+  isFinalBid = false,
   onClose,
   onConfirm,
 }: BidConfirmModalProps) {
@@ -54,7 +56,11 @@ export default function BidConfirmModal({
       open={open}
       onClose={isSubmitting ? () => undefined : handleClose}
       title="입찰 전 마지막 확인"
-      description="금액을 다시 한번 확인해 주세요. ‘예’를 눌러야 입찰이 완료됩니다."
+      description={
+        isFinalBid
+          ? "오후 8시 56분 이후 무입찰 상품의 첫 입찰은 즉시 확정됩니다."
+          : "금액을 다시 한번 확인해 주세요. ‘예’를 눌러야 입찰이 완료됩니다."
+      }
       size="sm"
       showCloseButton={false}
       closeOnBackdrop={false}
@@ -70,7 +76,9 @@ export default function BidConfirmModal({
         </p>
 
         <div className="mt-5 rounded-2xl border-2 border-[#efab92] bg-[#fff0e6] px-4 py-3 text-center text-[17px] font-black leading-7 text-[#9b3f34]">
-          ⚠️ 입찰 후 취소 불가 (미입금 시 누적 경고 부여)
+          {isFinalBid
+            ? "⚠️ 이 입찰은 즉시 낙찰 확정되며 추가 입찰·취소가 불가능합니다."
+            : "⚠️ 입찰 후 취소 불가 (미입금 시 누적 경고 부여)"}
         </div>
 
         {error ? (

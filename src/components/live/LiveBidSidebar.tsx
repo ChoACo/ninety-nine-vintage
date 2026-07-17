@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- 외부 Mock 상품 이미지를 그대로 표시하는 데모 위젯 */
+/* eslint-disable @next/next/no-img-element -- Supabase Storage의 공개 상품 이미지를 표시합니다. */
 import { useMemo, useState } from "react";
 import BidConfirmModal from "@/src/components/feed/BidConfirmModal";
 import { useAuctionPolicyClock } from "@/src/hooks/useAuctionPolicyClock";
@@ -91,6 +91,8 @@ function BidItem({
         >
           {bidDecision?.reason === "auction-closed"
             ? "⛔ 오늘 경매 마감"
+            : bidDecision?.reason === "late-first-bid-finalized"
+              ? "✅ 확정 입찰 완료"
             : bidDecision?.reason === "new-bid-cutoff"
               ? "⛔ 신규 입찰 마감"
               : "+1,000원 즉시 재입찰"}
@@ -117,16 +119,26 @@ export default function LiveBidSidebar({
   const [confirmPostId, setConfirmPostId] = useState<string | null>(null);
   const auctionNow = useAuctionPolicyClock();
 
-  const { outbidPosts, leadingPosts } = useMemo(() => {
+  const { outbidPosts, leadingPosts, confirmedPosts } = useMemo(() => {
     const availablePosts = posts.filter((post) => post.status === "active");
+    const userPosts = availablePosts.filter((post) =>
+      post.bidHistory.some(
+        (bid) => bid.bidderName.trim() === currentUserName.trim(),
+      ),
+    );
 
     return {
       outbidPosts: availablePosts.filter(
-        (post) => getUserBidStatus(post, currentUserName) === "user-outbid",
+        (post) =>
+          !post.bidLockedAt &&
+          getUserBidStatus(post, currentUserName) === "user-outbid",
       ),
       leadingPosts: availablePosts.filter(
-        (post) => getUserBidStatus(post, currentUserName) === "user-leading",
+        (post) =>
+          !post.bidLockedAt &&
+          getUserBidStatus(post, currentUserName) === "user-leading",
       ),
+      confirmedPosts: userPosts.filter((post) => Boolean(post.bidLockedAt)),
     };
   }, [currentUserName, posts]);
 
@@ -144,8 +156,6 @@ export default function LiveBidSidebar({
       now: auctionNow,
     });
 
-    // TODO: DB 연동 필요 - onBid 저장 트랜잭션에서도 최신 입찰 원장을 읽고
-    // assertAuctionBidAllowed를 다시 호출해 20:56 동시 입찰을 검증합니다.
     await onBid(confirmPost.id, getQuickBidAmount(confirmPost));
     setConfirmPostId(null);
   };
@@ -170,9 +180,9 @@ export default function LiveBidSidebar({
           </div>
           <span
             className="shrink-0 rounded-full bg-[#f2e9df] px-2.5 py-1 text-[14px] font-black text-[#795f51]"
-            aria-label={`내가 참여한 상품 ${outbidPosts.length + leadingPosts.length}개`}
+            aria-label={`내가 참여한 상품 ${outbidPosts.length + leadingPosts.length + confirmedPosts.length}개`}
           >
-            {outbidPosts.length + leadingPosts.length}개
+            {outbidPosts.length + leadingPosts.length + confirmedPosts.length}개
           </span>
         </div>
 
@@ -216,6 +226,32 @@ export default function LiveBidSidebar({
         </section>
 
         <section
+          aria-labelledby="confirmed-products-title"
+          className="mt-3 rounded-[1.25rem] border border-[#e8c99e] bg-[#fff6df] p-2.5"
+        >
+          <div className="mb-2.5 flex items-center justify-between gap-2 px-1">
+            <h3
+              id="confirmed-products-title"
+              className="break-keep text-[17px] font-black text-[#815d2f]"
+            >
+              <span aria-hidden="true">✓</span> 확정 입찰 상품
+            </h3>
+            <span className="rounded-full bg-white/80 px-2 py-0.5 text-[14px] font-black text-[#815d2f]">
+              {confirmedPosts.length}
+            </span>
+          </div>
+          {confirmedPosts.length > 0 ? (
+            <ul className="space-y-2">
+              {confirmedPosts.map((post) => (
+                <BidItem key={post.id} post={post} />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState>즉시 확정된 상품이 아직 없어요.</EmptyState>
+          )}
+        </section>
+
+        <section
           aria-labelledby="leading-products-title"
           className="mt-3 rounded-[1.25rem] border border-[#b9dcc4] bg-[#e7f5eb] p-2.5"
         >
@@ -254,6 +290,11 @@ export default function LiveBidSidebar({
           open
           amount={confirmAmount}
           itemTitle={getItemLabel(confirmPost)}
+          isFinalBid={getAuctionBidDecision({
+            post: confirmPost,
+            currentUserName,
+            now: auctionNow,
+          }).finalOnAccept}
           onClose={() => setConfirmPostId(null)}
           onConfirm={handleConfirm}
         />

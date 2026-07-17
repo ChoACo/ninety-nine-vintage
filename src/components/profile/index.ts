@@ -15,3 +15,4 @@ export { ShippingRequestList } from "./ShippingRequestList";
 export { ShippingWallet } from "./ShippingWallet";
 export { UserInfoForm } from "./UserInfoForm";
 export { WonAuctionList } from "./WonAuctionList";
+export { AccountPage } from "./AccountPage";

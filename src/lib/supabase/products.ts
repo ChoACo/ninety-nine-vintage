@@ -31,6 +31,9 @@ const PRODUCT_COLUMNS = [
   "bid_increment",
   "image_urls",
   "bid_history",
+  "bid_locked_at",
+  "final_bid_amount",
+  "final_bid_id",
 ].join(",");
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
@@ -91,6 +94,8 @@ export function mapProductRowToAuctionPost(row: ProductRow): AuctionPost {
     currentPrice: row.current_price,
     bidIncrement: row.bid_increment,
     imageUrls: row.image_urls,
+    bidLockedAt: row.bid_locked_at ?? undefined,
+    finalBidAmount: row.final_bid_amount ?? undefined,
     bidHistory: parseBidHistory(row.bid_history),
   };
 }

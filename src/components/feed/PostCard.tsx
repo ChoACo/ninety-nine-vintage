@@ -109,7 +109,7 @@ export default function PostCard({
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [inquiryModalOpen, setInquiryModalOpen] = useState(false);
   const [pendingBidAmount, setPendingBidAmount] = useState<number | null>(null);
-  const isSold = post.status === "closed";
+  const isSold = post.status === "closed" || Boolean(post.bidLockedAt);
   const isFirstBid = post.participantCount === 0;
   const quickBidAmount = getQuickBidAmount(post);
   const minimumBidAmount = getMinimumBidAmount(post);
@@ -161,15 +161,14 @@ export default function PostCard({
       now: auctionNow,
     });
 
-    // TODO: DB 연동 필요 - 서버에서 최종 입찰 가능 금액을 재검증하고
-    // 최신 bidHistory를 조회한 트랜잭션 안에서 assertAuctionBidAllowed를 다시
-    // 실행한 뒤 관리자도 수정할 수 없는 입찰 원장에 기록해야 합니다.
+    // onBid는 Supabase place_bid RPC를 호출하며 서버 시각과 최신 원장을
+    // 행 잠금 트랜잭션 안에서 다시 검증합니다.
     await onBid?.(post.id, pendingBidAmount);
     setPendingBidAmount(null);
   };
 
   const sendInquiry = async (message: string) => {
-    // TODO: DB 연동 필요 - 상품 ID와 문의 내용을 관리자 1:1 채팅방 API로 전송합니다.
+    // 상품 ID와 본문은 회원 본인의 Supabase 비공개 상담방에 저장됩니다.
     await onInquiry(post.id, message);
   };
 
@@ -252,7 +251,7 @@ export default function PostCard({
               >
                 {bidDecision.reason === "existing-participant"
                   ? "✅ 기존 참여자 입찰 가능 · 오후 9시까지"
-                  : "무입찰 상품 · 첫 입찰자만 계속 참여 가능"}
+                  : "⚠️ 무입찰 상품 · 첫 입찰 즉시 확정"}
               </p>
             ) : null}
 
@@ -265,6 +264,8 @@ export default function PostCard({
               >
                 {bidDecision.reason === "new-bid-cutoff"
                   ? "⛔ 신규 입찰 마감 (기존 참여자 전용)"
+                  : bidDecision.reason === "late-first-bid-finalized"
+                    ? "✅ 확정 입찰 완료"
                   : bidDecision.reason === "auction-closed"
                     ? "⛔ 오늘 경매 마감"
                     : "판매 완료"}
@@ -308,6 +309,7 @@ export default function PostCard({
         open={pendingBidAmount !== null}
         amount={pendingBidAmount ?? 0}
         itemTitle={productLabel}
+        isFinalBid={bidDecision.finalOnAccept}
         onClose={() => setPendingBidAmount(null)}
         onConfirm={confirmBid}
       />

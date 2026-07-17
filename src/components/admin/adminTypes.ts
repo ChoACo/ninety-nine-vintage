@@ -1,11 +1,7 @@
 import type {
-  AdminCustomerChatPayload,
-  AdminCustomerChatThread,
   AdminSaleRecord,
   BuyerInfo,
 } from "@/src/types/auction";
-
-export type { AdminCustomerChatThread };
 
 export type SettlementStatusTone = "warning" | "mint" | "blue" | "slate";
 
@@ -26,7 +22,3 @@ export interface RecentClosingDay {
   sales: readonly AdminSaleRecord[];
   settlements: readonly AdminSettlementGroup[];
 }
-
-export type SendAdminCustomerMessage = (
-  payload: AdminCustomerChatPayload,
-) => void | Promise<void>;

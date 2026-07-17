@@ -22,8 +22,8 @@ export function AdminAccessGate({ onSwitchToAdmin }: AdminAccessGateProps) {
             Supabase 관리자 인증이 필요해요
           </h2>
           <p className="mx-auto mt-4 max-w-lg break-keep text-[17px] font-bold leading-8 text-[#7d6d63]">
-            관리자 계정으로 로그인하면 경매글 등록, 발송 피킹, 송장 등록과
-            고객 상담 기능을 안전하게 사용할 수 있어요.
+            관리자 계정으로 로그인하면 경매글 등록, 발송 피킹과 송장 등록을
+            안전하게 사용할 수 있어요. 운영자 상담은 상담 대화함에서 분리됩니다.
           </p>
           <Button size="lg" className="mt-7" onClick={onSwitchToAdmin}>
             관리자 로그인

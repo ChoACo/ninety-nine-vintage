@@ -13,6 +13,7 @@ export type AuctionBidDecisionReason =
   | "open-to-all"
   | "existing-participant"
   | "empty-item-first-bid"
+  | "late-first-bid-finalized"
   | "new-bid-cutoff"
   | "auction-closed"
   | "item-pending"
@@ -31,11 +32,13 @@ export interface AuctionBidDecision {
   reason: AuctionBidDecisionReason;
   userHasBidHistory: boolean;
   hasAnyBidHistory: boolean;
+  /** 허용된 입찰이 저장과 동시에 최종 확정되어야 하는지 여부 */
+  finalOnAccept: boolean;
   message: string;
 }
 
 export interface AuctionBidPolicyInput {
-  post: Pick<AuctionPost, "status" | "bidHistory">;
+  post: Pick<AuctionPost, "status" | "bidHistory" | "bidLockedAt">;
   currentUserName: string;
   now?: Date | string | number;
 }
@@ -102,7 +105,7 @@ function normalizeIdentity(name: string): string {
  *
  * - 20:56 전: 누구나 입찰 가능
  * - 20:56~21:00: 입찰 원장이 있는 기존 참여자만 가능
- * - 단, 원장이 0건인 상품은 첫 입찰까지 누구나 가능하며 첫 기록 직후 잠김
+ * - 단, 원장이 0건인 상품은 첫 입찰까지 누구나 가능하며 그 입찰이 즉시 확정·잠김
  * - 21:00 이후: 전원 마감
  *
  * 실제 DB 연동 시에도 반드시 서버 트랜잭션 안에서 최신 bidHistory를 다시 읽은 뒤
@@ -122,7 +125,21 @@ export function getAuctionBidDecision({
       (bid) => normalizeIdentity(bid.bidderName) === normalizedUserName,
     );
 
-  const base = { phase, userHasBidHistory, hasAnyBidHistory };
+  const base = {
+    phase,
+    userHasBidHistory,
+    hasAnyBidHistory,
+    finalOnAccept: false,
+  };
+
+  if (post.bidLockedAt) {
+    return {
+      ...base,
+      allowed: false,
+      reason: "late-first-bid-finalized",
+      message: "오후 8시 56분 이후 첫 입찰로 확정된 상품입니다.",
+    };
+  }
 
   if (post.status === "pending") {
     return {
@@ -174,7 +191,8 @@ export function getAuctionBidDecision({
       ...base,
       allowed: true,
       reason: "empty-item-first-bid",
-      message: "현재 무입찰 상품입니다. 첫 입찰자만 이후 입찰할 수 있습니다.",
+      finalOnAccept: true,
+      message: "현재 무입찰 상품입니다. 이 입찰은 즉시 확정되며 추가 입찰할 수 없습니다.",
     };
   }
 

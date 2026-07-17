@@ -2,24 +2,31 @@
 
 import type { Role } from "@/src/types/auction";
 import Button from "./Button";
-import RoleToggle from "./RoleToggle";
 
 export interface SiteHeaderProps {
   role: Role;
-  onRoleChange: (role: Role) => void;
+  isAuthenticated: boolean;
+  displayName?: string;
+  onOpenAuth: () => void;
   onCreateAuction?: () => void;
-  isAdminAuthenticated?: boolean;
-  isAdminSigningOut?: boolean;
-  onAdminSignOut?: () => void | Promise<void>;
+  isSigningOut?: boolean;
+  onSignOut?: () => void | Promise<void>;
 }
+
+const ROLE_LABEL: Record<Role, string> = {
+  user: "일반 회원",
+  operator: "운영자",
+  admin: "관리자",
+};
 
 export default function SiteHeader({
   role,
-  onRoleChange,
+  isAuthenticated,
+  displayName,
+  onOpenAuth,
   onCreateAuction,
-  isAdminAuthenticated = false,
-  isAdminSigningOut = false,
-  onAdminSignOut,
+  isSigningOut = false,
+  onSignOut,
 }: SiteHeaderProps) {
   return (
     <header className="rounded-[2rem] border border-white/80 bg-[#fffaf3]/90 p-4 shadow-[0_14px_40px_rgba(101,75,54,0.1)] backdrop-blur sm:p-5">
@@ -42,30 +49,30 @@ export default function SiteHeader({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <span
-            aria-live="polite"
-            className={`rounded-full px-3 py-1.5 text-sm font-bold ${
-              isAdminAuthenticated
-                ? "bg-[#e5f4eb] text-[#35684f]"
-                : "bg-[#f4ece4] text-[#806c60]"
-            }`}
-          >
-            {isAdminAuthenticated ? "관리자 인증됨" : "관리자 로그인 필요"}
-          </span>
-          <RoleToggle role={role} onToggle={onRoleChange} compact />
-          {isAdminAuthenticated && onAdminSignOut ? (
+          {isAuthenticated ? (
+            <span className="rounded-full bg-[#e5f4eb] px-3 py-1.5 text-sm font-bold text-[#35684f]">
+              {displayName || ROLE_LABEL[role]} · {ROLE_LABEL[role]}
+            </span>
+          ) : (
+            <Button size="sm" onClick={onOpenAuth}>
+              카카오로 시작하기
+            </Button>
+          )}
+
+          {role === "admin" && onCreateAuction ? (
+            <Button onClick={onCreateAuction} size="sm">
+              <span aria-hidden="true">+</span> 경매글 작성
+            </Button>
+          ) : null}
+
+          {isAuthenticated && onSignOut ? (
             <Button
               variant="ghost"
               size="sm"
-              isLoading={isAdminSigningOut}
-              onClick={() => void onAdminSignOut()}
+              isLoading={isSigningOut}
+              onClick={() => void onSignOut()}
             >
-              {isAdminSigningOut ? "로그아웃 중..." : "관리자 로그아웃"}
-            </Button>
-          ) : null}
-          {role === "admin" && onCreateAuction ? (
-            <Button onClick={onCreateAuction} size="sm" className="ml-auto sm:ml-0">
-              <span aria-hidden="true">+</span> 경매글 작성
+              {isSigningOut ? "로그아웃 중..." : "로그아웃"}
             </Button>
           ) : null}
         </div>

@@ -69,7 +69,7 @@ export default function AuctionClock({ className = "" }: AuctionClockProps) {
               {isClosed
                 ? "오늘 입찰은 종료되었습니다. 미판매 상품은 다음 경매에서 다시 참여할 수 있습니다."
                 : isRestricted
-                  ? "기존 참여자만 계속 입찰할 수 있습니다. 단, 입찰 0건 상품은 첫 입찰자에게 열려 있습니다."
+                  ? "기존 참여자는 오후 9시까지 입찰할 수 있습니다. 입찰 0건 상품의 첫 입찰은 즉시 낙찰 확정됩니다."
                   : `오후 8시 56분부터 신규 참여가 제한되며 ${formatKoreanTime(deadline)}에 마감됩니다.`}
             </p>
           </div>

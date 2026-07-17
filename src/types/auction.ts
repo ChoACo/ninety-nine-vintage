@@ -1,4 +1,5 @@
-export type Role = "user" | "admin";
+/** 서버가 발급한 JWT app_metadata에서만 파생하는 애플리케이션 역할입니다. */
+export type Role = "user" | "operator" | "admin";
 
 export type AuctionStatus = "pending" | "active" | "closed";
 
@@ -64,6 +65,10 @@ export interface AuctionPost {
   currentPrice: number;
   bidIncrement: number;
   imageUrls: string[];
+  /** 20:56 이후 무입찰 상품의 첫 입찰이 즉시 확정된 시각 */
+  bidLockedAt?: ISODateString;
+  /** 즉시 확정된 금액. 회원 UUID는 공개 피드에 노출하지 않습니다. */
+  finalBidAmount?: number;
   /** 최신 입찰이 첫 번째인 읽기 전용 공개 기록 */
   readonly bidHistory: readonly BidHistoryRecord[];
 }
@@ -160,28 +165,6 @@ export interface ShipmentRegistrationPayload {
   shippedAt: ISODateString;
 }
 
-export interface AdminCustomerChatPayload {
-  userId: string;
-  customerName: string;
-  text: string;
-}
-
-export interface AdminCustomerChatMessage {
-  id: string;
-  sender: "customer" | "admin";
-  text: string;
-  sentAt: ISODateString;
-}
-
-export interface AdminCustomerChatThread {
-  id: string;
-  userId: string;
-  customerName: string;
-  lastMessage: string;
-  lastMessageAt: ISODateString;
-  messages: readonly AdminCustomerChatMessage[];
-}
-
 export interface BuyerInfo {
   userId: string;
   name: string;
@@ -224,22 +207,4 @@ export interface CountdownParts {
 export interface WeekdayGroup<T> {
   weekday: KoreanWeekday;
   items: T[];
-}
-
-export interface ChatMessage {
-  id: string;
-  sender: "me" | "admin";
-  text: string;
-  sentAt: ISODateString;
-}
-
-export interface ChatThread {
-  id: string;
-  name: string;
-  initials: string;
-  accent: string;
-  lastMessage: string;
-  lastMessageAt: ISODateString;
-  unread: number;
-  messages: ChatMessage[];
 }

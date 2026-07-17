@@ -1,14 +1,11 @@
-import type { BuyerInfo } from "@/src/types/auction";
-
 import type { RecentClosingDay } from "./adminTypes";
 import { RecentClosingDayAccordion } from "./RecentClosingDayAccordion";
 
 interface RecentClosingListProps {
   days: readonly RecentClosingDay[];
-  onOpenChat: (buyer: BuyerInfo) => void;
 }
 
-export function RecentClosingList({ days, onOpenChat }: RecentClosingListProps) {
+export function RecentClosingList({ days }: RecentClosingListProps) {
   return (
     <section aria-labelledby="recent-closing-title" className="space-y-4">
       <div>
@@ -32,7 +29,6 @@ export function RecentClosingList({ days, onOpenChat }: RecentClosingListProps) 
             key={day.dateKey}
             day={day}
             defaultOpen={index === 0}
-            onOpenChat={onOpenChat}
           />
         ))}
       </div>

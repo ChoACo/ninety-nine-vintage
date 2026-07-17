@@ -1,4 +1,12 @@
 {
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "unrs-resolver",
+      "workerd"
+    ]
+  },
   "name": "site-creator-vinext-starter",
   "version": "0.1.0",
   "private": true,

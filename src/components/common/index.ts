@@ -4,3 +4,4 @@ export { default as Modal } from "./Modal";
 export { default as Navigation } from "./Navigation";
 export type { NavigationTarget } from "./Navigation";
 export { default as SiteHeader } from "./SiteHeader";
+export { default as ThemeToggle } from "./ThemeToggle";

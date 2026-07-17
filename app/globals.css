@@ -6,12 +6,82 @@
   --coral: #e98775;
   --cream: #fffaf4;
   --sky: #c9dfe7;
+  --surface: #fffaf4;
+  --surface-raised: #fffdf9;
+  --surface-muted: #f5eee6;
+  --surface-glass: rgba(255, 250, 243, 0.9);
+  --input-surface: #ffffff;
+  --text-strong: #382f2a;
+  --text-muted: #7f6f65;
+  --border: #eadfd5;
+  --border-strong: #decdbf;
+  --accent: #ec7866;
+  --accent-hover: #df6958;
+  --accent-text: #a9493e;
+  --accent-surface: #fff0ea;
+  --info-surface: #edf7fa;
+  --info-text: #315b68;
+  --info-border: #c9dfe7;
+  --success-surface: #e5f4eb;
+  --success-text: #35684f;
+  --warning-surface: #fff7df;
+  --warning-text: #80643a;
+  --danger-surface: #fff0ef;
+  --danger-text: #a95050;
+  --app-gradient: radial-gradient(circle at top left, #fff6ec 0%, #f8f3ec 38%, #f3f7f6 100%);
+  --coral-glow: rgba(243, 207, 196, 0.2);
+  --sky-glow: rgba(191, 221, 229, 0.2);
+  --header-shadow: 0 14px 40px rgba(101, 75, 54, 0.1);
+  --panel-shadow: 0 18px 48px rgba(79, 57, 42, 0.1);
   color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --background: #1c1714;
+  --foreground: #f3e9e1;
+  --coral: #f08b78;
+  --cream: #27201c;
+  --sky: #78a8b4;
+  --surface: #27201c;
+  --surface-raised: #302722;
+  --surface-muted: #211b18;
+  --surface-glass: rgba(39, 32, 28, 0.92);
+  --input-surface: #332a25;
+  --text-strong: #fff8f2;
+  --text-muted: #c8b8ad;
+  --border: #51433b;
+  --border-strong: #6c574c;
+  --accent: #f08b78;
+  --accent-hover: #ff9a84;
+  --accent-text: #ffad99;
+  --accent-surface: #4a2d27;
+  --info-surface: #20343a;
+  --info-text: #acd4df;
+  --info-border: #466a74;
+  --success-surface: #20362d;
+  --success-text: #a9d9bf;
+  --warning-surface: #3e3320;
+  --warning-text: #efd28f;
+  --danger-surface: #432629;
+  --danger-text: #ffaaa6;
+  --app-gradient: radial-gradient(circle at top left, #35241f 0%, #1c1714 42%, #172023 100%);
+  --coral-glow: rgba(240, 139, 120, 0.11);
+  --sky-glow: rgba(120, 168, 180, 0.1);
+  --header-shadow: 0 18px 46px rgba(0, 0, 0, 0.28);
+  --panel-shadow: 0 20px 56px rgba(0, 0, 0, 0.24);
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-muted: var(--surface-muted);
+  --color-text-strong: var(--text-strong);
+  --color-text-muted: var(--text-muted);
+  --color-theme-border: var(--border);
+  --color-theme-accent: var(--accent);
   --font-sans: "Pretendard Variable", Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
 }
 
@@ -37,11 +107,42 @@ body {
   line-height: 1.65;
 }
 
+.theme-app-shell {
+  background: var(--app-gradient);
+  color: var(--foreground);
+}
+
+.theme-coral-glow {
+  background: var(--coral-glow);
+}
+
+.theme-sky-glow {
+  background: var(--sky-glow);
+}
+
+.theme-surface-glass {
+  border-color: var(--border);
+  background: var(--surface-glass);
+  box-shadow: var(--header-shadow);
+}
+
+.theme-panel {
+  border-color: var(--border);
+  background: var(--surface);
+  box-shadow: var(--panel-shadow);
+}
+
 button,
 input,
 textarea,
 select {
   font: inherit;
+}
+
+input,
+textarea,
+select {
+  color-scheme: inherit;
 }
 
 button,
@@ -50,8 +151,8 @@ button,
 }
 
 ::selection {
-  background: #f4c9be;
-  color: #4a3f39;
+  background: color-mix(in srgb, var(--accent) 42%, var(--surface));
+  color: var(--text-strong);
 }
 
 ::-webkit-scrollbar {
@@ -60,18 +161,183 @@ button,
 }
 
 ::-webkit-scrollbar-track {
-  background: #f5eee6;
+  background: var(--surface-muted);
 }
 
 ::-webkit-scrollbar-thumb {
-  border: 3px solid #f5eee6;
+  border: 3px solid var(--surface-muted);
   border-radius: 999px;
-  background: #d8c8bb;
+  background: var(--border-strong);
 }
 
 :focus-visible {
-  outline: 3px solid rgba(220, 127, 109, 0.38);
+  outline: 3px solid color-mix(in srgb, var(--accent) 48%, transparent);
   outline-offset: 3px;
+}
+
+/*
+ * Legacy palette bridge
+ *
+ * The application predates semantic color tokens and still contains many
+ * warm off-white utility colors. These selectors keep every existing page,
+ * portal and form readable in dark mode while components are progressively
+ * migrated to the tokens above. Brand-yellow Kakao controls and gallery
+ * images are intentionally not transformed.
+ */
+:root[data-theme="dark"] :where(
+  [class~="bg-white"],
+  [class~="bg-white/45"],
+  [class~="bg-white/55"],
+  [class~="bg-white/60"],
+  [class~="bg-white/65"],
+  [class~="bg-white/70"],
+  [class~="bg-white/75"],
+  [class~="bg-white/80"],
+  [class~="bg-white/85"],
+  [class~="bg-white/90"],
+  [class*="bg-[#fff"],
+  [class*="bg-[#ffe"],
+  [class*="bg-[#faf"],
+  [class*="bg-[#f9"],
+  [class*="bg-[#f8"],
+  [class*="bg-[#f7"],
+  [class*="bg-[#f6"],
+  [class*="bg-[#f5"],
+  [class*="bg-[#f4e"],
+  [class*="bg-[#f3e"],
+  [class*="bg-[#f2e"],
+  [class*="bg-[#f1e"],
+  [class*="bg-[#eee"],
+  [class*="bg-[#ece"],
+  [class*="bg-[#eadf"]
+) {
+  background-color: var(--surface-raised) !important;
+}
+
+:root[data-theme="dark"] :where(
+  [class*="bg-[#ffe2"],
+  [class*="bg-[#ffe3"],
+  [class*="bg-[#ffe5"],
+  [class*="bg-[#ffe7"],
+  [class*="bg-[#ffec"],
+  [class*="bg-[#fff0"],
+  [class*="bg-[#fff1"],
+  [class*="bg-[#fff2"],
+  [class*="bg-[#fff3e"],
+  [class*="bg-[#fff4"]
+) {
+  background-color: var(--accent-surface) !important;
+}
+
+:root[data-theme="dark"] :where(
+  [class*="bg-[#dcebed"],
+  [class*="bg-[#deeff4"],
+  [class*="bg-[#e4f0f3"],
+  [class*="bg-[#e5f1f4"],
+  [class*="bg-[#e6f3f7"],
+  [class*="bg-[#e7f3f5"],
+  [class*="bg-[#eaf6fa"],
+  [class*="bg-[#edf6f7"],
+  [class*="bg-[#edf7f9"],
+  [class*="bg-[#edf7fa"],
+  [class*="bg-[#eef7f8"],
+  [class*="bg-[#eef8fa"],
+  [class*="bg-[#f2f9fa"],
+  [class*="bg-[#f4fafb"],
+  [class*="bg-[#f4fbfc"]
+) {
+  background-color: var(--info-surface) !important;
+}
+
+:root[data-theme="dark"] :where(
+  [class*="bg-[#dff1e8"],
+  [class*="bg-[#e1f3e6"],
+  [class*="bg-[#e3f6ed"],
+  [class*="bg-[#e4f1e8"],
+  [class*="bg-[#e4f2e9"],
+  [class*="bg-[#e5f4eb"],
+  [class*="bg-[#e7f5eb"],
+  [class*="bg-[#e8f5ee"],
+  [class*="bg-[#e9f8ef"],
+  [class*="bg-[#eaf5ed"],
+  [class*="bg-[#edf8f1"],
+  [class*="bg-[#f3faf4"],
+  [class*="bg-[#f3faf5"],
+  [class*="bg-[#f6fbf7"]
+) {
+  background-color: var(--success-surface) !important;
+}
+
+:root[data-theme="dark"] :where(
+  [class*="bg-[#fff3dc"],
+  [class*="bg-[#fff6df"],
+  [class*="bg-[#fff7df"],
+  [class*="bg-[#fff8df"],
+  [class*="bg-[#fff8e8"]
+) {
+  background-color: var(--warning-surface) !important;
+}
+
+/* Kakao yellow is a fixed brand color in both themes. */
+:root[data-theme="dark"] [class~="bg-[#fee500]"] {
+  background-color: #fee500 !important;
+  color: #191919 !important;
+}
+
+:root[data-theme="dark"] [class~="bg-[#fee500]"]:hover {
+  background-color: #f5dc00 !important;
+}
+
+:root[data-theme="dark"] :where(
+  [class*="text-[#2"],
+  [class*="text-[#3"],
+  [class*="text-[#4"]
+) {
+  color: var(--text-strong) !important;
+}
+
+:root[data-theme="dark"] :where(
+  [class*="text-[#5"],
+  [class*="text-[#6"],
+  [class*="text-[#7"],
+  [class*="text-[#8"],
+  [class*="text-[#9"]
+) {
+  color: var(--text-muted) !important;
+}
+
+:root[data-theme="dark"] :where(
+  [class*="text-[#a"],
+  [class*="text-[#b"],
+  [class*="text-[#c"]
+) {
+  color: var(--accent-text) !important;
+}
+
+:root[data-theme="dark"] :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  textarea,
+  select
+) {
+  border-color: var(--border-strong) !important;
+  background-color: var(--input-surface) !important;
+  color: var(--text-strong) !important;
+}
+
+:root[data-theme="dark"] :where(input, textarea)::placeholder {
+  color: #a99487 !important;
+  opacity: 1;
+}
+
+:root[data-theme="dark"] input[type="file"]::file-selector-button {
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-strong);
+}
+
+:root[data-theme="dark"] option {
+  background: var(--input-surface);
+  color: var(--text-strong);
 }
 
 @media (max-width: 420px) {

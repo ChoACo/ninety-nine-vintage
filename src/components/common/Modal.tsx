@@ -140,21 +140,21 @@ export default function Modal({
         className={`relative flex max-h-[calc(100dvh-1rem)] w-full flex-col overflow-hidden rounded-[1.75rem] border outline-none sm:max-h-[calc(100dvh-2rem)] ${
           tone === "dark"
             ? "border-white/15 bg-[#2b343b] text-white shadow-[0_28px_90px_rgba(18,22,25,0.52)]"
-            : "border-white/70 bg-[#fffaf4] shadow-[0_24px_80px_rgba(48,40,33,0.3)]"
+            : "border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] shadow-[0_24px_80px_rgba(48,40,33,0.3)]"
         } ${sizeClasses[size]} ${className}`}
       >
         <div
           className={`flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4 sm:px-6 ${
             tone === "dark"
               ? "border-white/10 bg-white/[0.035]"
-              : "border-[#eee0d4]"
+              : "border-[var(--border)] bg-[var(--surface)]"
           }`}
         >
           <div className="min-w-0">
             <h2
               id={titleId}
               className={`text-lg font-bold sm:text-xl ${
-                tone === "dark" ? "text-white" : "text-[#382f2a]"
+                tone === "dark" ? "text-white" : "text-[var(--text-strong)]"
               }`}
             >
               {title}
@@ -163,7 +163,7 @@ export default function Modal({
               <p
                 id={descriptionId}
                 className={`mt-1 text-[17px] leading-7 ${
-                  tone === "dark" ? "text-white/60" : "text-[#7b6b60]"
+                  tone === "dark" ? "text-white/60" : "text-[var(--text-muted)]"
                 }`}
               >
                 {description}
@@ -178,7 +178,7 @@ export default function Modal({
               className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border text-xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ec7866] ${
                 tone === "dark"
                   ? "border-white/15 bg-white/10 text-white hover:bg-white/20"
-                  : "border-[#eadbcd] bg-white text-[#6e5d52] hover:bg-[#fff1e4]"
+                  : "border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-muted)] hover:bg-[var(--accent-surface)]"
               }`}
               aria-label="닫기"
             >

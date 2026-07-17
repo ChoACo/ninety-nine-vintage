@@ -32,7 +32,7 @@ export default function Navigation({
   return (
     <nav
       aria-label="주요 메뉴"
-      className={`fixed inset-x-3 bottom-3 z-40 mx-auto max-w-xl rounded-[1.4rem] border border-white/80 bg-[#fffaf4]/95 p-1.5 shadow-[0_12px_40px_rgba(87,67,53,0.18)] backdrop-blur-xl md:static md:max-w-none md:bg-white/70 md:shadow-sm ${className}`}
+      className={`theme-surface-glass fixed inset-x-3 bottom-3 z-40 mx-auto max-w-xl rounded-[1.4rem] border p-1.5 backdrop-blur-xl md:static md:max-w-none md:shadow-sm ${className}`}
     >
       <div className="grid grid-cols-4 gap-1">
         {navigationItems.map((item) => {
@@ -57,8 +57,8 @@ export default function Navigation({
               onClick={() => onNavigate(item.value)}
               className={`group relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-1.5 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#eb7765] sm:flex-row sm:gap-2 sm:text-base ${
                 selected
-                  ? "bg-[#ffe3d8] text-[#b44c3f] shadow-sm"
-                  : "text-[#79675d] hover:bg-[#f8eee5] hover:text-[#4e413a]"
+                  ? "bg-[var(--accent-surface)] text-[var(--accent-text)] shadow-sm"
+                  : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-strong)]"
               }`}
             >
               <span
@@ -71,7 +71,7 @@ export default function Navigation({
               {isLocked ? (
                 <span
                   aria-hidden="true"
-                  className="absolute ml-9 -mt-7 rounded-full bg-[#eee4db] px-1 text-[9px] text-[#7f6f65] sm:relative sm:ml-0 sm:mt-0"
+                  className="absolute ml-9 -mt-7 rounded-full bg-[var(--surface-muted)] px-1 text-[9px] text-[var(--text-muted)] sm:relative sm:ml-0 sm:mt-0"
                 >
                   잠금
                 </span>

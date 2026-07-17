@@ -1,0 +1,64 @@
+.toggle {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface-glass);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.option {
+  min-width: 72px;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-radius: 0.8rem;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 800;
+  line-height: 1;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.option:hover {
+  background: var(--accent-surface);
+}
+
+.option[data-active="true"] {
+  background: var(--surface-raised);
+  color: var(--text-strong);
+  box-shadow: 0 3px 10px rgba(101, 75, 54, 0.14);
+}
+
+.option:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 48%, transparent);
+  outline-offset: 2px;
+}
+
+:global(html[data-theme="dark"]) .toggle {
+  border-color: var(--border-strong);
+  background: var(--surface-glass);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+:global(html[data-theme="dark"]) .option {
+  color: var(--text-muted);
+}
+
+:global(html[data-theme="dark"]) .option:hover {
+  background: var(--accent-surface);
+}
+
+:global(html[data-theme="dark"]) .option[data-active="true"] {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface-raised));
+  color: var(--text-strong);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.24);
+}

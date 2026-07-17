@@ -52,6 +52,44 @@ test("keeps the OAuth callback on the vinext SSR router", async () => {
   assert.doesNotMatch(html, /404: NOT_FOUND|Code: NOT_FOUND/);
 });
 
+test("server-renders a persistent light and dark theme selector", async () => {
+  const [layout, globalStyles, toggle, toggleStyles, header, commonExports] = await Promise.all([
+    source("app/layout.tsx"),
+    source("app/globals.css"),
+    source("src/components/common/ThemeToggle.tsx"),
+    source("src/components/common/ThemeToggle.module.css"),
+    source("src/components/common/SiteHeader.tsx"),
+    source("src/components/common/index.ts"),
+  ]);
+  const response = await render();
+  assert.equal(response.status, 200);
+  const html = await response.text();
+
+  assert.match(layout, /data-theme="light"/);
+  assert.match(layout, /suppressHydrationWarning/);
+  assert.match(layout, /localStorage\.getItem\(storageKey\)/);
+  assert.match(layout, /root\.dataset\.theme = theme/);
+  assert.match(globalStyles, /:root\[data-theme="dark"\]/);
+  assert.match(globalStyles, /--app-gradient:/);
+  assert.match(globalStyles, /--surface-raised:/);
+  assert.match(globalStyles, /\[class~="bg-\[#fee500\]"\]/);
+  assert.match(toggle, /THEME_STORAGE_KEY = "damine-theme"/);
+  assert.match(toggle, /localStorage\.setItem\(THEME_STORAGE_KEY, nextTheme\)/);
+  assert.match(toggle, /aria-pressed=\{theme === "light"\}/);
+  assert.match(toggle, /aria-pressed=\{theme === "dark"\}/);
+  assert.match(toggle, /addEventListener\("storage", syncTheme\)/);
+  assert.match(toggleStyles, /min-height:\s*44px/);
+  assert.match(toggleStyles, /html\[data-theme="dark"\]/);
+  assert.match(header, /<ThemeToggle \/>/);
+  assert.match(commonExports, /ThemeToggle/);
+
+  assert.match(html, /<html[^>]*data-theme="light"/i);
+  assert.match(html, /damine-theme/);
+  assert.match(html, /aria-label="화면 테마 선택"/);
+  assert.match(html, /aria-pressed="true"[^>]*>라이트<\/button>/);
+  assert.match(html, /aria-pressed="false"[^>]*>다크<\/button>/);
+});
+
 test("keeps Vercel routes on the Nitro SSR output", async () => {
   const [viteConfig, vercelSource] = await Promise.all([
     source("vite.config.ts"),

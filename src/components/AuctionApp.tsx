@@ -252,19 +252,19 @@ export function AuctionApp() {
           <div className="min-w-0">
             <AuctionClock />
 
-            <section className="relative my-6 overflow-hidden rounded-[2rem] border border-[#eadfd3] bg-[#fffaf4] px-5 py-5 sm:px-7 sm:py-6">
-              <div aria-hidden="true" className="absolute -right-10 -top-14 h-36 w-36 rounded-full bg-[#f6d9d0]/70" />
+            <section className="theme-panel relative my-6 overflow-hidden rounded-[2rem] border px-5 py-5 sm:px-7 sm:py-6">
+              <div aria-hidden="true" className="absolute -right-10 -top-14 h-36 w-36 rounded-full bg-[var(--accent-surface)]/70" />
               <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-sm font-black tracking-[0.14em] text-[#bf6c5b]">DAMINE&apos;S VINTAGE CLOSET</p>
-                  <h2 className="mt-2 text-xl font-black tracking-[-0.035em] text-[#473c35] sm:text-2xl">
+                  <p className="text-sm font-black tracking-[0.14em] text-[var(--accent-text)]">DAMINE&apos;S VINTAGE CLOSET</p>
+                  <h2 className="mt-2 text-xl font-black tracking-[-0.035em] text-[var(--text-strong)] sm:text-2xl">
                     매일 만나는 믿을 수 있는 구제 옷, 다미네 구제
                   </h2>
-                  <p className="mt-2 max-w-2xl break-keep text-[17px] font-medium leading-7 text-[#7f6f65]">
+                  <p className="mt-2 max-w-2xl break-keep text-[17px] font-medium leading-7 text-[var(--text-muted)]">
                     오후 8시 56분부터 기존 참여자만 입찰할 수 있습니다. 단, 무입찰 상품은 오후 9시 전 첫 입찰이 즉시 확정됩니다.
                   </p>
                 </div>
-                <span className="w-fit shrink-0 rounded-full bg-[#e4f0f3] px-4 py-2 text-sm font-bold text-[#517783]">
+                <span className="w-fit shrink-0 rounded-full bg-[var(--info-surface)] px-4 py-2 text-sm font-bold text-[var(--info-text)]">
                   20:56 신규 제한 · 무입찰 첫 건 즉시 확정
                 </span>
               </div>
@@ -290,9 +290,9 @@ export function AuctionApp() {
               className="hidden lg:block"
             />
           ) : (
-            <aside className="sticky top-24 hidden rounded-[1.6rem] border border-[#ead8cc] bg-[#fffaf5]/95 p-5 text-center shadow-sm lg:block">
-              <p className="text-[17px] font-black text-[#493b34]">내 입찰 현황</p>
-              <p className="mt-2 break-keep text-[15px] font-bold leading-6 text-[#806f64]">
+            <aside className="theme-panel sticky top-24 hidden rounded-[1.6rem] border p-5 text-center lg:block">
+              <p className="text-[17px] font-black text-[var(--text-strong)]">내 입찰 현황</p>
+              <p className="mt-2 break-keep text-[15px] font-bold leading-6 text-[var(--text-muted)]">
                 카카오 회원으로 로그인하면 참여 중인 상품을 실시간으로 확인할 수 있어요.
               </p>
               {!auth.user ? (
@@ -312,9 +312,9 @@ export function AuctionApp() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,#fff6ec_0%,#f8f3ec_38%,#f3f7f6_100%)]">
-      <div aria-hidden="true" className="pointer-events-none fixed -left-20 top-36 h-72 w-72 rounded-full bg-[#f3cfc4]/20 blur-3xl" />
-      <div aria-hidden="true" className="pointer-events-none fixed -right-24 top-[45%] h-80 w-80 rounded-full bg-[#bfdde5]/20 blur-3xl" />
+    <div className="theme-app-shell relative min-h-screen overflow-hidden">
+      <div aria-hidden="true" className="theme-coral-glow pointer-events-none fixed -left-20 top-36 h-72 w-72 rounded-full blur-3xl" />
+      <div aria-hidden="true" className="theme-sky-glow pointer-events-none fixed -right-24 top-[45%] h-80 w-80 rounded-full blur-3xl" />
 
       <div className="relative mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
         <SiteHeader

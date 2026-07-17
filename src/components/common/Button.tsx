@@ -15,13 +15,13 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "bg-[#ec7866] text-white shadow-[0_8px_22px_rgba(211,101,83,0.24)] hover:bg-[#df6958] focus-visible:ring-[#ec7866]",
+    "bg-[var(--accent)] text-white shadow-[0_8px_22px_rgba(211,101,83,0.24)] hover:bg-[var(--accent-hover)] focus-visible:ring-[var(--accent)]",
   secondary:
-    "border border-[#d8e4e8] bg-[#edf7fa] text-[#315b68] hover:bg-[#deeff4] focus-visible:ring-[#75aebe]",
+    "border border-[var(--info-border)] bg-[var(--info-surface)] text-[var(--info-text)] hover:brightness-[1.04] focus-visible:ring-[var(--info-border)]",
   ghost:
-    "border border-[#eadbcd] bg-white/70 text-[#655348] hover:bg-[#fff6eb] focus-visible:ring-[#c99579]",
+    "border border-[var(--border)] bg-[var(--surface-raised)]/70 text-[var(--foreground)] hover:bg-[var(--surface-raised)] focus-visible:ring-[var(--border-strong)]",
   danger:
-    "bg-[#a95050] text-white hover:bg-[#944343] focus-visible:ring-[#a95050]",
+    "bg-[var(--danger-text)] text-white hover:brightness-110 focus-visible:ring-[var(--danger-text)]",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -44,7 +44,7 @@ export default function Button({
   return (
     <button
       type={type}
-      className={`inline-flex items-center justify-center gap-2 rounded-2xl font-bold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${sizeClasses[size]} ${fullWidth ? "w-full" : ""} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-2xl font-bold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${sizeClasses[size]} ${fullWidth ? "w-full" : ""} ${className}`}
       disabled={disabled || isLoading}
       aria-busy={isLoading || undefined}
       {...props}

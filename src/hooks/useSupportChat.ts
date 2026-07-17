@@ -368,12 +368,17 @@ export function useMemberSupportThreads(userId: string | null) {
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? null;
 
   const selectConversation = useCallback((conversationId: string) => {
+    if (selectedConversationIdRef.current === conversationId) {
+      void reloadMessages(conversationId);
+      return;
+    }
+
     messagesRequestIdRef.current += 1;
     selectedConversationIdRef.current = conversationId;
     setMessages([]);
     setIsMessagesLoading(true);
     setSelectedConversationId(conversationId);
-  }, []);
+  }, [reloadMessages]);
 
   const sendMessage = useCallback(
     async (body: string) => {
@@ -630,12 +635,17 @@ export function useStaffSupportInbox(
   );
 
   const selectConversation = useCallback((conversationId: string) => {
+    if (selectedConversationIdRef.current === conversationId) {
+      void reloadMessages(conversationId);
+      return;
+    }
+
     messagesRequestIdRef.current += 1;
     selectedConversationIdRef.current = conversationId;
     setMessages([]);
     setIsMessagesLoading(true);
     setSelectedConversationId(conversationId);
-  }, []);
+  }, [reloadMessages]);
 
   return {
     conversations,

@@ -258,7 +258,7 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
         {!chat.selectedConversation ? (
           <ChatState message="왼쪽에서 상담을 선택해 주세요." compact />
         ) : (
-          <div className="flex min-h-[560px] min-w-0 flex-col bg-[linear-gradient(180deg,#fffdf9_0%,#fff8f1_100%)]">
+          <div className="flex min-h-[560px] min-w-0 flex-col bg-[linear-gradient(180deg,var(--surface-raised)_0%,var(--surface)_100%)]">
             <header className="flex flex-wrap items-center gap-3 border-b border-[#eadfd5] bg-white/75 px-5 py-4">
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-lg font-black text-[#493f38]">
@@ -293,6 +293,44 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
                 </span>
               )}
             </header>
+
+            {chat.selectedConversation.conversationType === "product" ? (
+              <div className="border-b border-[var(--border)] bg-[var(--surface-muted)] px-5 py-3">
+                <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-3">
+                  {chat.selectedConversation.productImageUrlSnapshot ? (
+                    // The Storage public URL is dynamic per product and is shown
+                    // as a small, lazy-loaded support-context thumbnail.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={chat.selectedConversation.productImageUrlSnapshot}
+                      alt={`${chat.selectedConversation.productTitleSnapshot ?? chat.selectedConversation.subject ?? "문의 상품"} 사진`}
+                      loading="lazy"
+                      className="h-16 w-16 shrink-0 rounded-xl border border-[var(--border)] object-cover"
+                    />
+                  ) : (
+                    <span
+                      className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-[var(--surface-muted)] text-2xl"
+                      aria-hidden="true"
+                    >
+                      🧥
+                    </span>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-xs font-black tracking-[0.12em] text-[var(--accent-text)]">
+                      PRODUCT INQUIRY
+                    </p>
+                    <p className="mt-0.5 line-clamp-2 font-black text-[var(--text-strong)]">
+                      {chat.selectedConversation.productTitleSnapshot ??
+                        chat.selectedConversation.subject ??
+                        "문의 상품"}
+                    </p>
+                    <p className="mt-0.5 text-xs font-bold text-[var(--text-muted)]">
+                      상품번호 {chat.selectedConversation.productId?.slice(0, 8) ?? "확인 불가"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {chat.error && (
               <div role="alert" className="border-b border-[#efc4ba] bg-[#fff0ec] px-5 py-2 text-sm font-bold text-[#a85143]">

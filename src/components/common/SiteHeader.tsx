@@ -16,7 +16,9 @@ export interface SiteHeaderProps {
   displayName?: string;
   onOpenAuth: () => void;
   ownerMode?: OwnerMode;
-  onOwnerModeChange?: (mode: OwnerMode) => void;
+  onRequestOwnerModeChange?: (mode: OwnerMode) => void | Promise<void>;
+  isOwnerModeChanging?: boolean;
+  onOpenOwnerPage?: () => void;
   isSigningOut?: boolean;
   onSignOut?: () => void | Promise<void>;
 }
@@ -27,7 +29,9 @@ export default function SiteHeader({
   displayName,
   onOpenAuth,
   ownerMode = "operator",
-  onOwnerModeChange,
+  onRequestOwnerModeChange,
+  isOwnerModeChanging = false,
+  onOpenOwnerPage,
   isSigningOut = false,
   onSignOut,
 }: SiteHeaderProps) {
@@ -57,7 +61,7 @@ export default function SiteHeader({
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           <ThemeToggle />
 
-          {isAuthenticated && isOwnerRole(role) && onOwnerModeChange ? (
+          {isAuthenticated && isOwnerRole(role) && onRequestOwnerModeChange ? (
             <div
               role="group"
               aria-label="비공개 운영 권한 모드"
@@ -66,7 +70,8 @@ export default function SiteHeader({
               <button
                 type="button"
                 aria-pressed={ownerMode === "operator"}
-                onClick={() => onOwnerModeChange("operator")}
+                disabled={isOwnerModeChanging}
+                onClick={() => void onRequestOwnerModeChange("operator")}
                 className={`min-h-9 rounded-full px-3 text-xs font-black transition ${
                   ownerMode === "operator"
                     ? "bg-[var(--surface)] text-[var(--accent-text)] shadow-sm"
@@ -78,7 +83,8 @@ export default function SiteHeader({
               <button
                 type="button"
                 aria-pressed={ownerMode === "admin"}
-                onClick={() => onOwnerModeChange("admin")}
+                disabled={isOwnerModeChanging}
+                onClick={() => void onRequestOwnerModeChange("admin")}
                 className={`min-h-9 rounded-full px-3 text-xs font-black transition ${
                   ownerMode === "admin"
                     ? "bg-[var(--surface)] text-[var(--accent-text)] shadow-sm"
@@ -88,6 +94,15 @@ export default function SiteHeader({
                 관리자 모드
               </button>
             </div>
+          ) : null}
+
+          {isAuthenticated &&
+          isOwnerRole(role) &&
+          ownerMode === "admin" &&
+          onOpenOwnerPage ? (
+            <Button size="sm" variant="secondary" onClick={onOpenOwnerPage}>
+              전용 페이지
+            </Button>
           ) : null}
 
           {isAuthenticated ? (

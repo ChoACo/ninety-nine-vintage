@@ -29,6 +29,11 @@ import {
   type StaffMemberDirectoryEntry,
 } from "@/src/lib/supabase/operations";
 import { formatKRW } from "@/src/utils/formatters";
+import {
+  getPendingNicknameChangeRequests,
+  reviewNicknameChangeRequest,
+  type PendingNicknameChangeRequest,
+} from "@/src/lib/supabase/nickname";
 
 import { CollapsibleSection } from "./CollapsibleSection";
 import { RevenuePanel } from "./RevenuePanel";
@@ -165,7 +170,6 @@ export function AdminPage({
   );
   const [editingMember, setEditingMember] =
     useState<StaffMemberDirectoryEntry | null>(null);
-  const [editDisplayName, setEditDisplayName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [warningMember, setWarningMember] =
     useState<StaffMemberDirectoryEntry | null>(null);
@@ -176,6 +180,13 @@ export function AdminPage({
   const [deletingMember, setDeletingMember] =
     useState<StaffMemberDirectoryEntry | null>(null);
   const [memberActionError, setMemberActionError] = useState("");
+  const [nicknameRequests, setNicknameRequests] = useState<
+    PendingNicknameChangeRequest[]
+  >([]);
+  const [nicknameRequestError, setNicknameRequestError] = useState("");
+  const [reviewingNicknameRequestId, setReviewingNicknameRequestId] = useState<
+    string | null
+  >(null);
 
   const [products, setProducts] = useState<ManagedProduct[]>([]);
   const [productLoadStatus, setProductLoadStatus] =
@@ -183,7 +194,7 @@ export function AdminPage({
   const [productError, setProductError] = useState("");
   const [productQuery, setProductQuery] = useState("");
   const [productStatusFilter, setProductStatusFilter] =
-    useState<ProductStatusFilter>("all");
+    useState<ProductStatusFilter>("pending");
   const [productPage, setProductPage] = useState(1);
   const [editingProduct, setEditingProduct] =
     useState<ManagedProduct | null>(null);
@@ -212,6 +223,17 @@ export function AdminPage({
     }
   }, []);
 
+  const loadNicknameRequests = useCallback(async () => {
+    setNicknameRequestError("");
+    try {
+      setNicknameRequests(await getPendingNicknameChangeRequests());
+    } catch (error) {
+      setNicknameRequestError(
+        getErrorMessage(error, "닉네임 승인 요청을 불러오지 못했습니다."),
+      );
+    }
+  }, []);
+
   const loadProducts = useCallback(async () => {
     setProductLoadStatus("loading");
     setProductError("");
@@ -233,11 +255,12 @@ export function AdminPage({
   useEffect(() => {
     const loadTimer = window.setTimeout(() => {
       void loadMembers();
+      void loadNicknameRequests();
       void loadProducts();
     }, 0);
 
     return () => window.clearTimeout(loadTimer);
-  }, [loadMembers, loadProducts]);
+  }, [loadMembers, loadNicknameRequests, loadProducts]);
 
   const directoryMembers = useMemo(
     () =>
@@ -420,7 +443,6 @@ export function AdminPage({
 
   const openMemberEdit = (member: StaffMemberDirectoryEntry) => {
     setEditingMember(member);
-    setEditDisplayName(member.displayName ?? "");
     setEditPhone(member.phone ?? "");
     setMemberActionError("");
   };
@@ -430,11 +452,15 @@ export function AdminPage({
     setMutatingMemberId(editingMember.id);
     setMemberActionError("");
     try {
-      await updateManagedMember(editingMember.id, editDisplayName, editPhone);
+      await updateManagedMember(
+        editingMember.id,
+        editingMember.displayName ?? "회원",
+        editPhone,
+      );
       setMembers((current) =>
         current.map((entry) =>
           entry.id === editingMember.id
-            ? { ...entry, displayName: editDisplayName.trim(), phone: editPhone.trim() || null }
+            ? { ...entry, phone: editPhone.trim() || null }
             : entry,
         ),
       );
@@ -444,6 +470,36 @@ export function AdminPage({
       setMemberActionError(getErrorMessage(error, "회원 정보를 수정하지 못했습니다."));
     } finally {
       setMutatingMemberId(null);
+    }
+  };
+
+  const handleNicknameReview = async (
+    request: PendingNicknameChangeRequest,
+    approve: boolean,
+  ) => {
+    setReviewingNicknameRequestId(request.id);
+    setNicknameRequestError("");
+    try {
+      await reviewNicknameChangeRequest(request.id, approve);
+      setNicknameRequests((current) =>
+        current.filter((item) => item.id !== request.id),
+      );
+      if (approve) {
+        setMembers((current) =>
+          current.map((member) =>
+            member.id === request.memberId
+              ? { ...member, displayName: request.requestedNickname }
+              : member,
+          ),
+        );
+      }
+      onNotify?.(approve ? "닉네임 변경을 승인했습니다." : "닉네임 변경을 반려했습니다.");
+    } catch (error) {
+      setNicknameRequestError(
+        getErrorMessage(error, "닉네임 요청을 처리하지 못했습니다."),
+      );
+    } finally {
+      setReviewingNicknameRequestId(null);
     }
   };
 
@@ -588,12 +644,12 @@ export function AdminPage({
         </span>
       </header>
 
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4">
         <CollapsibleSection
           eyebrow="OVERVIEW"
           title="운영 현황"
           summary="회원과 상품의 현재 상태를 서버 기준으로 빠르게 확인합니다."
-          defaultOpen
+          className="order-4"
         >
           <div
             aria-label="운영 현황 요약"
@@ -649,6 +705,7 @@ export function AdminPage({
           eyebrow="REVENUE"
           title="매출 현황"
           summary="실제 입금이 확인된 하루 매출만 저장하고 일·주·월·연 단위로 합산합니다."
+          className="order-5"
         >
           <RevenuePanel />
         </CollapsibleSection>
@@ -657,6 +714,7 @@ export function AdminPage({
           eyebrow="SHIPPING"
           title="배송 대기 업무"
           summary="회원이 접수한 상품의 배송지와 운송장 처리 상태를 확인합니다."
+          className="order-3"
         >
           <ShippingWorkPanel />
         </CollapsibleSection>
@@ -665,11 +723,15 @@ export function AdminPage({
           eyebrow="MEMBERS"
           title="회원 관리"
           summary="전체 회원의 계정 상태, 배송 이용권, 상담·입찰 현황을 확인합니다."
+          className="order-6"
           actions={
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => void loadMembers()}
+              onClick={() => {
+                void loadMembers();
+                void loadNicknameRequests();
+              }}
               isLoading={memberLoadStatus === "loading"}
             >
               목록 새로고침
@@ -681,6 +743,53 @@ export function AdminPage({
               ? "회원 정보·상태·등급을 관리하고 필요할 때 운영자 권한을 지정할 수 있습니다."
               : "회원 정보·상태·등급과 배송 이용권을 이 화면에서 관리할 수 있습니다."}
           </p>
+
+          <section className="mb-5 rounded-[1.4rem] border border-[#e4d3c5] bg-[#fff7ef] p-4 sm:p-5" aria-labelledby="nickname-review-title">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black tracking-[0.14em] text-[#a86655]">NICKNAME REVIEW</p>
+                <h3 id="nickname-review-title" className="mt-1 text-lg font-black text-[#513f35]">
+                  닉네임 변경 승인
+                </h3>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-[#a86655]">
+                대기 {nicknameRequests.length}건
+              </span>
+            </div>
+            {nicknameRequestError ? (
+              <p role="alert" className="mt-3 rounded-xl bg-[#fff0ea] px-3 py-2 text-sm font-bold text-[#a84c3f]">
+                {nicknameRequestError}
+              </p>
+            ) : null}
+            {nicknameRequests.length === 0 ? (
+              <p className="mt-3 text-sm font-bold text-[#806f64]">현재 승인 대기 요청이 없습니다.</p>
+            ) : (
+              <ul className="mt-4 space-y-2">
+                {nicknameRequests.map((request) => {
+                  const isReviewing = reviewingNicknameRequestId === request.id;
+                  return (
+                    <li key={request.id} className="flex flex-col gap-3 rounded-2xl border border-[#e7d9ce] bg-white p-3 sm:flex-row sm:items-center">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-black text-[#4c3e36]">
+                          {request.currentNickname} <span aria-hidden="true">→</span>{" "}
+                          <strong className="text-[#b25f4f]">{request.requestedNickname}</strong>
+                        </p>
+                        <p className="mt-1 text-xs font-bold text-[#8a796e]">{formatDateTime(request.requestedAt)}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="ghost" disabled={Boolean(reviewingNicknameRequestId)} onClick={() => void handleNicknameReview(request, false)}>
+                          반려
+                        </Button>
+                        <Button size="sm" isLoading={isReviewing} disabled={Boolean(reviewingNicknameRequestId) && !isReviewing} onClick={() => void handleNicknameReview(request, true)}>
+                          승인
+                        </Button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
 
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_170px_170px]">
             <label className="text-sm font-black text-[#594a40]">
@@ -907,8 +1016,9 @@ export function AdminPage({
 
         <CollapsibleSection
           eyebrow="PRODUCTS"
-          title="상품 관리"
-          summary="예약·진행·마감 상품을 검색하고 공개 정보를 수정하거나 삭제합니다."
+          title="상품 대기열·관리"
+          summary="일괄 등록된 공개 대기 상품을 먼저 검수하고, 잘못된 항목은 공개 전에 수정하거나 삭제합니다. 진행·마감 상품도 상태 필터로 확인할 수 있습니다."
+          className="order-2"
           actions={
             <Button
               size="sm"
@@ -1054,7 +1164,9 @@ export function AdminPage({
         <CollapsibleSection
           eyebrow="REGISTRATION"
           title="상품 등록"
-          summary="한 건을 직접 등록하거나 여러 상품을 일괄 등록합니다."
+          summary="일괄 등록을 기본으로 사용하며, 예외 상품은 한 건씩 등록합니다. 일괄 상품은 공개 대기열로 이동합니다."
+          defaultOpen
+          className="order-1"
         >
           <div className="grid gap-4 lg:grid-cols-2">
             <article className="rounded-[1.4rem] border-2 border-[#b9d5db] bg-[#edf7fa] p-5 shadow-sm sm:p-6">
@@ -1086,14 +1198,10 @@ export function AdminPage({
         onClose={mutatingMemberId ? () => undefined : () => setEditingMember(null)}
         closeOnBackdrop={!mutatingMemberId}
         title="회원 정보 수정"
-        description="회원에게 표시되는 이름과 배송 연락처를 수정합니다."
+        description="배송 연락처를 수정합니다. 닉네임은 회원 요청 승인 절차로만 변경됩니다."
         size="sm"
       >
         <div className="space-y-4 p-5 sm:p-6">
-          <label className="block text-sm font-black text-[#594a40]">
-            표시 이름
-            <input value={editDisplayName} onChange={(event) => setEditDisplayName(event.target.value)} maxLength={80} className="mt-2 w-full rounded-xl border border-[#decdbf] bg-white px-4 py-3 font-semibold" />
-          </label>
           <label className="block text-sm font-black text-[#594a40]">
             연락처
             <input value={editPhone} onChange={(event) => setEditPhone(event.target.value)} maxLength={30} className="mt-2 w-full rounded-xl border border-[#decdbf] bg-white px-4 py-3 font-semibold" placeholder="미등록 가능" />

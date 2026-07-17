@@ -5,7 +5,7 @@ import { AdminAccessGate } from "@/src/components/admin/AdminAccessGate";
 import { AdminPage } from "@/src/components/admin";
 import BulkAuctionImportModal from "@/src/components/admin/BulkAuctionImportModal";
 import { ShippingWorkPanel } from "@/src/components/admin/ShippingWorkPanel";
-import { AuthModal } from "@/src/components/auth";
+import { AuthModal, OwnerModePinModal } from "@/src/components/auth";
 import { ChatPage } from "@/src/components/chat/ChatPage";
 import { FloatingAdminChat } from "@/src/components/chat/FloatingAdminChat";
 import {
@@ -24,6 +24,7 @@ import {
 } from "@/src/components/feed";
 import { LiveBidSidebar, OnlineMembersSidebar } from "@/src/components/live";
 import { AccountPage } from "@/src/components/profile";
+import { NicknameOnboardingModal } from "@/src/components/profile/NicknameOnboardingModal";
 import { useAuthSession } from "@/src/hooks/useAuthSession";
 import { useOnlineMembers } from "@/src/hooks/useOnlineMembers";
 import { useSupabaseProducts } from "@/src/hooks/useSupabaseProducts";
@@ -39,8 +40,11 @@ import {
 } from "@/src/lib/supabase/auth";
 import { placeBid } from "@/src/lib/supabase/bids";
 import {
-  getOrCreateProductInquiryConversation,
-  sendSupportMessage,
+  getOwnerModeStatus,
+  lockOwnerMode,
+} from "@/src/lib/ownerMode/client";
+import {
+  startProductInquiry,
   type SupportViewerRole,
 } from "@/src/lib/supabase/supportChat";
 import {
@@ -49,12 +53,11 @@ import {
 } from "@/src/lib/supabase/products";
 import { formatKRW } from "@/src/utils/formatters";
 
-function toSupportRole(
-  role: AppRole,
-  ownerMode: OwnerMode,
-): SupportViewerRole | null {
+function toSupportRole(role: AppRole): SupportViewerRole | null {
   if (isMemberRole(role)) return "member";
-  if (role === "admin") return ownerMode === "admin" ? "admin" : "operator";
+  // The private owner account participates in ordinary support work only as an
+  // operator. Cross-operator review lives exclusively on the gated owner page.
+  if (role === "admin") return "operator";
   if (role === "employee" || role === "operator") return role;
   return null;
 }
@@ -66,6 +69,10 @@ export function AuctionApp() {
   const [bulkAuctionOpen, setBulkAuctionOpen] = useState(false);
   const [operationsRevision, setOperationsRevision] = useState(0);
   const [ownerMode, setOwnerMode] = useState<OwnerMode>("operator");
+  const [ownerModeExpiresAt, setOwnerModeExpiresAt] = useState<string | null>(null);
+  const [ownerPinOpen, setOwnerPinOpen] = useState(false);
+  const [ownerPinRevision, setOwnerPinRevision] = useState(0);
+  const [isOwnerModeChanging, setIsOwnerModeChanging] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
@@ -78,14 +85,48 @@ export function AuctionApp() {
     isOwnerRole(auth.role) && ownerMode === "admin" ? "admin" : "operator";
 
   useEffect(() => {
-    // A fresh owner session always starts in the publicly ordinary operator
-    // experience. Elevation is an explicit, owner-only UI action each time.
-    const timer = window.setTimeout(() => setOwnerMode("operator"), 0);
+    let active = true;
+    // A fresh owner session starts in the ordinary operator experience. A
+    // still-valid server session may restore the private interface afterwards.
+    const timer = window.setTimeout(() => {
+      setOwnerMode("operator");
+      setOwnerModeExpiresAt(null);
+    }, 0);
+    if (auth.user && isOwnerRole(auth.role)) {
+      void getOwnerModeStatus()
+        .then((status) => {
+          if (active && status.unlocked && status.expiresAt) {
+            setOwnerMode("admin");
+            setOwnerModeExpiresAt(status.expiresAt);
+          }
+        })
+        .catch(() => {
+          // Fail closed. Ordinary operator work remains available.
+        });
+    }
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [auth.role, auth.user]);
+
+  useEffect(() => {
+    if (ownerMode !== "admin" || !ownerModeExpiresAt) return;
+    const remaining = new Date(ownerModeExpiresAt).getTime() - Date.now();
+    const timer = window.setTimeout(
+      () => {
+        setOwnerMode("operator");
+        setOwnerModeExpiresAt(null);
+        setOwnerPinOpen(false);
+      },
+      Math.max(0, Math.min(remaining, 2_147_000_000)),
+    );
     return () => window.clearTimeout(timer);
-  }, [auth.user?.id]);
+  }, [ownerMode, ownerModeExpiresAt]);
 
   const {
     members: onlineMembers,
+    totalCount: onlineMemberCount,
     hasMore: hasMoreOnlineMembers,
     status: onlineMembersStatus,
     error: onlineMembersError,
@@ -115,6 +156,34 @@ export function AuctionApp() {
   const openAuthentication = useCallback(() => {
     setAuthOpen(true);
   }, []);
+
+  const handleOwnerModeChange = async (mode: OwnerMode) => {
+    if (!auth.user || !isOwnerRole(auth.role) || isOwnerModeChanging) return;
+    if (mode === "admin") {
+      if (ownerMode === "admin") return;
+      setOwnerPinRevision((current) => current + 1);
+      setOwnerPinOpen(true);
+      return;
+    }
+
+    if (ownerMode === "operator") return;
+    setIsOwnerModeChanging(true);
+    try {
+      await lockOwnerMode();
+      setOwnerMode("operator");
+      setOwnerModeExpiresAt(null);
+      setOwnerPinOpen(false);
+      showToast("운영자 모드로 전환했습니다.");
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "운영자 모드로 전환하지 못했습니다.",
+      );
+    } finally {
+      setIsOwnerModeChanging(false);
+    }
+  };
 
   const requireMember = useCallback(() => {
     if (auth.user && isMemberRole(auth.role)) return auth.user;
@@ -153,22 +222,11 @@ export function AuctionApp() {
   };
 
   const handleProductInquiry = async (postId: string, message: string) => {
-    const member = requireMember();
+    requireMember();
     const post = posts.find((item) => item.id === postId);
     if (!post) throw new Error("문의할 상품을 찾지 못했습니다.");
 
-    const productLabel = (
-      post.description
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .find(Boolean) ?? post.title
-    ).slice(0, 160);
-    const conversation = await getOrCreateProductInquiryConversation(postId);
-    await sendSupportMessage(
-      conversation.id,
-      member.id,
-      [`[상품 문의 · ${post.id}]`, productLabel, "", message.trim()].join("\n"),
-    );
+    await startProductInquiry(postId, message);
     showToast("운영팀에 상품 문의를 전송했습니다.");
   };
 
@@ -207,6 +265,9 @@ export function AuctionApp() {
   const handleSignOut = async () => {
     setIsSigningOut(true);
     try {
+      if (auth.user && isOwnerRole(auth.role)) {
+        await lockOwnerMode().catch(() => undefined);
+      }
       await auth.signOut();
       setActivePage("feed");
       setNewAuctionOpen(false);
@@ -225,7 +286,7 @@ export function AuctionApp() {
         <main className="mx-auto w-full max-w-7xl px-4 pb-28 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pb-12">
           <ChatPage
             userId={auth.user?.id ?? null}
-            role={auth.user ? toSupportRole(auth.role, ownerMode) : null}
+            role={auth.user ? toSupportRole(auth.role) : null}
             onRequestSignIn={openAuthentication}
           />
         </main>
@@ -253,6 +314,7 @@ export function AuctionApp() {
           role="user"
           onSignIn={openAuthentication}
           onSignOut={handleSignOut}
+          onProfileRefresh={auth.refreshProfile}
         />
       );
     }
@@ -297,6 +359,7 @@ export function AuctionApp() {
           {showOnlineMembers ? (
             <OnlineMembersSidebar
               members={onlineMembers}
+              totalCount={onlineMemberCount}
               hasMore={hasMoreOnlineMembers}
               status={onlineMembersStatus}
               error={onlineMembersError}
@@ -367,7 +430,7 @@ export function AuctionApp() {
   };
 
   return (
-    <div className="theme-app-shell relative min-h-screen overflow-hidden">
+    <div className="theme-app-shell relative min-h-screen overflow-x-clip">
       <div aria-hidden="true" className="theme-coral-glow pointer-events-none fixed -left-20 top-36 h-72 w-72 rounded-full blur-3xl" />
       <div aria-hidden="true" className="theme-sky-glow pointer-events-none fixed -right-24 top-[45%] h-80 w-80 rounded-full blur-3xl" />
 
@@ -378,7 +441,15 @@ export function AuctionApp() {
           displayName={publicDisplayName}
           onOpenAuth={openAuthentication}
           ownerMode={ownerMode}
-          onOwnerModeChange={isOwnerRole(auth.role) ? setOwnerMode : undefined}
+          onRequestOwnerModeChange={
+            isOwnerRole(auth.role) ? handleOwnerModeChange : undefined
+          }
+          isOwnerModeChanging={isOwnerModeChanging}
+          onOpenOwnerPage={
+            isOwnerRole(auth.role) && ownerMode === "admin"
+              ? () => window.location.assign("/owner")
+              : undefined
+          }
           isSigningOut={isSigningOut}
           onSignOut={auth.user ? handleSignOut : undefined}
         />
@@ -412,9 +483,28 @@ export function AuctionApp() {
         onClose={() => setAuthOpen(false)}
       />
 
+      <NicknameOnboardingModal
+        enabled={Boolean(auth.user) && isMemberRole(auth.role)}
+        userId={auth.user?.id ?? null}
+        onCompleted={auth.refreshProfile}
+        onSignOut={handleSignOut}
+      />
+
+      <OwnerModePinModal
+        key={ownerPinRevision}
+        open={ownerPinOpen && isOwnerRole(auth.role)}
+        onClose={() => setOwnerPinOpen(false)}
+        onUnlocked={(expiresAt) => {
+          setOwnerMode("admin");
+          setOwnerModeExpiresAt(expiresAt);
+          setOwnerPinOpen(false);
+          showToast("전용 관리 모드를 열었습니다.");
+        }}
+      />
+
       <FloatingAdminChat
         userId={auth.user?.id ?? null}
-        role={auth.user ? toSupportRole(auth.role, ownerMode) : null}
+        role={auth.user ? toSupportRole(auth.role) : null}
         hidden={activePage === "chat"}
       />
 
@@ -503,7 +593,7 @@ function EmployeeOperationsPage({
             직원 업무 도구
           </h1>
           <span className="rounded-full bg-[var(--info-surface)] px-3 py-1.5 text-sm font-black text-[var(--info-text)]">
-            2등급 직원
+            직원
           </span>
         </div>
         <p className="mt-3 max-w-3xl break-keep text-[17px] font-bold leading-8 text-[var(--text-muted)]">

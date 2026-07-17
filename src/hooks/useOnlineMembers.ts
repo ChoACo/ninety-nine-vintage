@@ -17,12 +17,14 @@ const UUID_PATTERN =
 export interface OnlineMember {
   id: string;
   displayName: string;
+  isOperator: boolean;
 }
 
 export type OnlinePresenceStatus = "connecting" | "connected" | "error";
 
 export interface OnlineMembersState {
   members: readonly OnlineMember[];
+  totalCount: number;
   hasMore: boolean;
   status: OnlinePresenceStatus;
   error: string | null;
@@ -37,16 +39,26 @@ interface UseOnlineMembersOptions {
 interface OnlineMemberRow {
   id?: unknown;
   display_name?: unknown;
+  is_operator?: unknown;
+  total_count?: unknown;
 }
 
-function normalizeOnlineMember(value: unknown): OnlineMember | null {
+function normalizeOnlineMember(
+  value: unknown,
+): { member: OnlineMember; totalCount: number } | null {
   if (!value || typeof value !== "object") return null;
   const row = value as OnlineMemberRow;
   if (typeof row.id !== "string" || !UUID_PATTERN.test(row.id)) return null;
   if (typeof row.display_name !== "string") return null;
+  if (typeof row.is_operator !== "boolean") return null;
   const displayName = row.display_name.trim();
   if (!displayName || displayName.length > 80) return null;
-  return { id: row.id, displayName };
+  const totalCount = Number(row.total_count);
+  if (!Number.isSafeInteger(totalCount) || totalCount < 0) return null;
+  return {
+    member: { id: row.id, displayName, isOperator: row.is_operator },
+    totalCount,
+  };
 }
 
 export function useOnlineMembers({
@@ -55,6 +67,7 @@ export function useOnlineMembers({
   role = null,
 }: UseOnlineMembersOptions = {}): OnlineMembersState {
   const [members, setMembers] = useState<readonly OnlineMember[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [status, setStatus] = useState<OnlinePresenceStatus>("connecting");
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +87,7 @@ export function useOnlineMembers({
 
     const syncServerVerifiedMembers = async () => {
       if (!active || requestInFlight) return;
+      if (document.visibilityState !== "visible") return;
       requestInFlight = true;
 
       try {
@@ -82,25 +96,35 @@ export function useOnlineMembers({
 
         const { data, error: directoryError } = await client.rpc(
           "get_online_member_directory",
-          { p_limit: MAX_VISIBLE_ONLINE_MEMBERS + 1 },
+          { p_limit: MAX_VISIBLE_ONLINE_MEMBERS },
         );
         if (directoryError) throw directoryError;
 
-        const nextMembers = (Array.isArray(data) ? data : [])
+        const normalizedRows = (Array.isArray(data) ? data : [])
           .map(normalizeOnlineMember)
-          .filter((member): member is OnlineMember => member !== null)
+          .filter(
+            (
+              row,
+            ): row is { member: OnlineMember; totalCount: number } => row !== null,
+          );
+        const nextMembers = normalizedRows
+          .map((row) => row.member)
           .sort((left, right) =>
+            Number(right.isOperator) - Number(left.isOperator) ||
             left.displayName.localeCompare(right.displayName, "ko-KR"),
           );
+        const nextTotalCount = normalizedRows[0]?.totalCount ?? 0;
 
         if (!active) return;
-        setMembers(nextMembers.slice(0, MAX_VISIBLE_ONLINE_MEMBERS));
-        setHasMore(nextMembers.length > MAX_VISIBLE_ONLINE_MEMBERS);
+        setMembers(nextMembers);
+        setTotalCount(nextTotalCount);
+        setHasMore(nextTotalCount > nextMembers.length);
         setStatus("connected");
         setError(null);
       } catch {
         if (!active) return;
         setMembers([]);
+        setTotalCount(0);
         setHasMore(false);
         setStatus("error");
         setError("온라인 접속 상태를 확인하지 못했습니다.");
@@ -130,6 +154,12 @@ export function useOnlineMembers({
   }, [isDisabled]);
 
   return isDisabled
-    ? { members: [], hasMore: false, status: "connected", error: null }
-    : { members, hasMore, status, error };
+    ? {
+        members: [],
+        totalCount: 0,
+        hasMore: false,
+        status: "connected",
+        error: null,
+      }
+    : { members, totalCount, hasMore, status, error };
 }

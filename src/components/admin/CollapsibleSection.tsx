@@ -9,6 +9,7 @@ export interface CollapsibleSectionProps {
   children: ReactNode;
   defaultOpen?: boolean;
   actions?: ReactNode;
+  className?: string;
 }
 
 /**
@@ -22,6 +23,7 @@ export function CollapsibleSection({
   children,
   defaultOpen = false,
   actions,
+  className = "",
 }: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const generatedId = useId();
@@ -29,7 +31,7 @@ export function CollapsibleSection({
   const buttonId = `${generatedId}-button`;
 
   return (
-    <section className="overflow-hidden rounded-[1.75rem] border-2 border-[#eadfce] bg-[#fffaf4] shadow-[0_14px_40px_rgba(84,63,48,0.08)]">
+    <section className={`overflow-hidden rounded-[1.75rem] border-2 border-[#eadfce] bg-[#fffaf4] shadow-[0_14px_40px_rgba(84,63,48,0.08)] ${className}`}>
       <div className="flex items-start gap-3 px-4 py-4 sm:px-6 sm:py-5">
         <button
           id={buttonId}

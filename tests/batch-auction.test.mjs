@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import ExcelJS from "exceljs";
 import ts from "typescript";
 
 const rootUrl = new URL("../", import.meta.url);
@@ -13,8 +14,12 @@ async function loadBatchAuctionModule() {
   const importableSource = originalSource.replace(
     runtimeImport,
     "const isSupportedProductImageMimeType = (mimeType: string) => /^image\\//i.test(mimeType);",
+  ).replace(
+    'await import("exceljs")',
+    "globalThis.__batchAuctionExcelJS",
   );
   assert.notEqual(importableSource, originalSource, "Supabase 경로 별칭을 테스트 대역으로 교체해야 합니다.");
+  globalThis.__batchAuctionExcelJS = { default: ExcelJS };
 
   const transpiled = ts.transpileModule(importableSource, {
     compilerOptions: {
@@ -26,6 +31,67 @@ async function loadBatchAuctionModule() {
   return import(
     `data:text/javascript;base64,${Buffer.from(transpiled).toString("base64")}#${Date.now()}`
   );
+}
+
+async function templateWorkbookFile() {
+  const workbook = new ExcelJS.Workbook();
+
+  const addTemplateSheet = (name, productRows) => {
+    const worksheet = workbook.addWorksheet(name);
+    worksheet.getCell("A1").value = "상품명";
+    worksheet.getCell("X1").value = "상품 설명";
+    worksheet.getCell("Y1").value = "가격";
+    worksheet.getCell("AH1").value = "이미지 파일명";
+
+    // 실제 업로드 양식의 1~5행에는 헤더, 안내문, 예시 상품이 들어간다.
+    worksheet.getCell("X2").value = "필수";
+    worksheet.getCell("Y2").value = "조건부 필수";
+    worksheet.getCell("X3").value = "10자부터 입력 가능합니다.";
+    worksheet.getCell("A4").value = "양식 예시 상품 1";
+    worksheet.getCell("X4").value = "등록되면 안 되는 예시 설명";
+    worksheet.getCell("Y4").value = 10_000;
+    worksheet.getCell("AH4").value = "example-one.jpg";
+    worksheet.getCell("A5").value = "양식 예시 상품 2";
+    worksheet.getCell("X5").value = "등록되면 안 되는 예시 설명";
+    worksheet.getCell("Y5").value = 20_000;
+    worksheet.getCell("AH5").value = "example-two.jpg";
+
+    productRows.forEach((product, index) => {
+      const rowNumber = index + 6;
+      worksheet.getCell(`A${rowNumber}`).value = product.title;
+      worksheet.getCell(`X${rowNumber}`).value = product.description;
+      worksheet.getCell(`Y${rowNumber}`).value = product.price;
+      worksheet.getCell(`AH${rowNumber}`).value = product.images;
+    });
+  };
+
+  addTemplateSheet("다른 시트", [
+    {
+      title: "다른 상품",
+      description: "다른 시트 설명",
+      price: 5_000,
+      images: "other.jpg",
+    },
+  ]);
+  addTemplateSheet("경매 상품", [
+    {
+      title: "빈티지 코트",
+      description: "코트 설명",
+      price: 30_000,
+      images: "coat-front.jpg, coat-back.jpg",
+    },
+    {
+      title: "빈티지 셔츠",
+      description: "셔츠 설명",
+      price: 15_000,
+      images: "shirt.jpg",
+    },
+  ]);
+
+  const bytes = await workbook.xlsx.writeBuffer();
+  return new File([bytes], "auction-template.xlsx", {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
 }
 
 function imageFile(relativePath) {
@@ -57,7 +123,6 @@ function workbookWithImageCell(imageCell) {
 }
 
 const previewOptions = {
-  status: "pending",
   publishAt: "2030-01-01T01:00:00.000Z",
   bidIncrement: 1_000,
 };
@@ -80,6 +145,26 @@ test("normalizes unsupported Excel cell objects to null", async () => {
   assert.equal(
     normalizeWorkbookCellValue({ text: "링크 텍스트", hyperlink: "https://example.com" }),
     "링크 텍스트",
+  );
+});
+
+test("detects the real template sheet and imports only rows 6 and later", async () => {
+  const { FIRST_PRODUCT_ROW, parseAuctionWorkbook } =
+    await loadBatchAuctionModule();
+  const parsed = await parseAuctionWorkbook(await templateWorkbookFile());
+
+  assert.equal(FIRST_PRODUCT_ROW, 6);
+  assert.equal(parsed.sheetName, "경매 상품");
+  assert.equal(parsed.detectedHeaders.title?.columnNumber, 1);
+  assert.equal(parsed.detectedHeaders.description?.columnNumber, 24);
+  assert.equal(parsed.detectedHeaders.startingPrice?.columnNumber, 25);
+  assert.deepEqual(
+    parsed.detectedHeaders.imageNames.map((column) => column.columnNumber),
+    [34],
+  );
+  assert.deepEqual(
+    parsed.rows.map((row) => row.rowNumber),
+    [6, 7],
   );
 });
 
@@ -123,6 +208,24 @@ test("preserves comma-containing filenames and the Excel image order", async () 
     orderedPreview.drafts[0].imageFiles.map((file) => file.name),
     ["back.jpg", "front.jpg"],
   );
+
+  const third = imageFile("photos/side.jpg");
+  const mixedSeparatorPreview = buildBatchAuctionPreview(
+    workbookWithImageCell("back.jpg, front.jpg,\nside.jpg"),
+    [first, second, third],
+    previewOptions,
+  );
+
+  assert.equal(mixedSeparatorPreview.canSubmit, true);
+  assert.deepEqual(mixedSeparatorPreview.rows[0].imageNames, [
+    "back.jpg",
+    "front.jpg",
+    "side.jpg",
+  ]);
+  assert.deepEqual(
+    mixedSeparatorPreview.drafts[0].imageFiles.map((file) => file.name),
+    ["back.jpg", "front.jpg", "side.jpg"],
+  );
 });
 
 test("keeps workbook model limits, header tie-breaking, and picker reset guards", async () => {
@@ -134,6 +237,7 @@ test("keeps workbook model limits, header tie-breaking, and picker reset guards"
   assert.match(parser, /MAX_WORKBOOK_BYTES = 10 \* 1024 \* 1024/);
   assert.match(parser, /MAX_RAW_WORKSHEET_ROWS = 1_000/);
   assert.match(parser, /MAX_WORKSHEET_COLUMNS = 256/);
+  assert.match(parser, /FIRST_PRODUCT_ROW = 6/);
   assert.match(
     parser,
     /candidate\.score === best\.candidate\.score[\s\S]*validDataRowCount > best\.validDataRowCount/,
@@ -142,4 +246,8 @@ test("keeps workbook model limits, header tie-breaking, and picker reset guards"
     modal,
     /source === "directory"[\s\S]*multipleInputRef\.current[\s\S]*directoryInputRef\.current/,
   );
+  assert.match(parser, /status: "pending"/);
+  assert.match(modal, /getRelativeKoreanDateTime\(1, "10:00:00", now\)/);
+  assert.match(modal, /1~5행은 양식 안내로 제외하고 6행부터/);
+  assert.doesNotMatch(modal, /즉시 공개|status: "active"|publishMode/);
 });

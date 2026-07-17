@@ -164,7 +164,7 @@ export default function LiveBidSidebar({
     <>
       <aside
         aria-labelledby="my-live-bids-title"
-        className={`sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-[1.6rem] border border-[#ead8cc] bg-[#fffaf5]/95 p-4 shadow-[0_16px_40px_rgba(93,69,54,0.12)] backdrop-blur ${className}`}
+        className={`theme-panel sticky top-24 max-h-[calc(100dvh-7rem)] self-start overflow-y-auto overscroll-contain rounded-[1.6rem] border p-4 shadow-[0_16px_40px_rgba(93,69,54,0.12)] backdrop-blur motion-safe:transition-[top,box-shadow] motion-safe:duration-300 motion-safe:ease-out ${className}`}
       >
         <div className="flex items-start justify-between gap-2">
           <div>

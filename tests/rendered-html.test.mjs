@@ -265,11 +265,12 @@ test("uses console-approved Kakao OIDC consent as the only interactive login", a
 });
 
 test("enforces private member-to-staff chat in SQL and UI", async () => {
-  const [migration, hardening, kakaoOnly, routing, repository, chatPage, floatingChat, staffInbox, hook, auctionApp] = await Promise.all([
+  const [migration, hardening, kakaoOnly, routing, supportFix, repository, chatPage, floatingChat, staffInbox, hook, auctionApp] = await Promise.all([
     source("supabase/migrations/20260717210000_add_accounts_support_and_bids.sql"),
     source("supabase/migrations/20260717220000_harden_auth_chat_bids.sql"),
     source("supabase/migrations/20260717230000_require_kakao_for_members.sql"),
     source("supabase/migrations/20260718031000_route_support_by_operator.sql"),
+    source("supabase/migrations/20260718052000_fix_support_inbox_and_product_inquiries.sql"),
     source("src/lib/supabase/supportChat.ts"),
     source("src/components/chat/ChatPage.tsx"),
     source("src/components/chat/FloatingAdminChat.tsx"),
@@ -294,7 +295,10 @@ test("enforces private member-to-staff chat in SQL and UI", async () => {
   assert.match(hardening, /revoke update \(last_read_at\)/);
   assert.match(repository, /MAX_SUPPORT_MESSAGE_LENGTH = 2_000/);
   assert.match(repository, /fetchMemberSupportConversation/);
-  assert.match(repository, /getOrCreateProductInquiryConversation/);
+  assert.match(repository, /startProductInquiry/);
+  assert.match(repository, /"start_product_inquiry"/);
+  assert.match(supportFix, /create or replace function public\.start_product_inquiry/);
+  assert.match(supportFix, /where last_message_at is not null/);
   assert.match(repository, /getOrCreateEmployeeSupportConversation/);
   assert.match(repository, /fetchStaffSupportInbox\([\s\S]*inboxOperatorId/);
   assert.match(chatPage, /<MemberChat key=\{userId\} userId=\{userId\}/);
@@ -320,7 +324,7 @@ test("enforces private member-to-staff chat in SQL and UI", async () => {
   assert.match(routing, /conversations\.assigned_staff_id = auth\.uid\(\)/);
   assert.match(routing, /public\.is_owner\(\)/);
   assert.match(routing, /public\.can_send_support_message\(conversation_id\)/);
-  assert.match(auctionApp, /getOrCreateProductInquiryConversation\(postId\)/);
+  assert.match(auctionApp, /startProductInquiry\(postId, message\)/);
 });
 
 test("uses a row-locked server RPC as the only bid write path", async () => {
@@ -446,8 +450,8 @@ test("uses real member delivery data with a default-closed address panel", async
   assert.match(accountPage, /hidden=\{!isAddressOpen\}/);
   assert.match(accountPage, /선택 상품 택배 접수하기/);
   assert.ok(
-    accountPage.indexOf("선택 상품 택배 접수하기") <
-      accountPage.indexOf("택배 가능 횟수"),
+    accountPage.indexOf("택배 가능 횟수") <
+      accountPage.indexOf("선택 상품 택배 접수하기"),
   );
   assert.doesNotMatch(accountPage, /localStorage|data:image\//);
   assert.match(accountRepository, /\.from\("member_accounts"\)/);
@@ -501,7 +505,7 @@ test("provides a collapsible Supabase operator center with constrained product m
   assert.match(navigation, /role === "employee"/);
   assert.match(auctionApp, /canAccessOperationsCenter\(auth\.role\)/);
   assert.match(auctionApp, /ownerMode === "admin" \? "admin" : "operator"/);
-  assert.match(siteHeader, /isOwnerRole\(role\) && onOwnerModeChange/);
+  assert.match(siteHeader, /isOwnerRole\(role\) && onRequestOwnerModeChange/);
   assert.match(siteHeader, /운영자 모드/);
   assert.match(siteHeader, /관리자 모드/);
   assert.match(auctionApp, /onOpenBulkImport=\{\(\) => setBulkAuctionOpen\(true\)\}/);
@@ -533,6 +537,52 @@ test("provides a collapsible Supabase operator center with constrained product m
   assert.match(accessMigration, /create table if not exists public\.daily_revenue/);
   assert.match(accessMigration, /revenue_date date primary key/);
   assert.doesNotMatch(accessMigration, /auction_settlements/);
+});
+
+test("gates the private owner console with a short-lived server session", async () => {
+  const [
+    auctionApp,
+    siteHeader,
+    ownerServer,
+    ownerClient,
+    unlockRoute,
+    statusRoute,
+    lockRoute,
+    ownerPage,
+    ownerMigration,
+  ] = await Promise.all([
+    source("src/components/AuctionApp.tsx"),
+    source("src/components/common/SiteHeader.tsx"),
+    source("src/lib/ownerMode/server.ts"),
+    source("src/lib/ownerMode/client.ts"),
+    source("app/api/owner-mode/unlock/route.ts"),
+    source("app/api/owner-mode/status/route.ts"),
+    source("app/api/owner-mode/lock/route.ts"),
+    source("src/components/owner/OwnerPrivatePage.tsx"),
+    source("supabase/migrations/20260718053000_owner_mode_sessions.sql"),
+  ]);
+
+  assert.match(ownerServer, /process\.env\.OWNER_MODE_PIN/);
+  assert.match(ownerServer, /timingSafeStringEqual/);
+  assert.match(ownerServer, /HttpOnly/);
+  assert.match(ownerServer, /Secure/);
+  assert.match(ownerServer, /SameSite=Strict/);
+  assert.match(ownerServer, /hashTokenSha256\(context\.accessToken\)/);
+  assert.match(ownerMigration, /revoke all on public\.owner_mode_sessions from public, anon, authenticated/);
+  assert.match(ownerMigration, /owner_mode_unlock_limits/);
+  assert.match(ownerMigration, /process_owner_mode_pin_attempt/);
+  assert.match(ownerMigration, /for update;/);
+  assert.match(unlockRoute, /authenticateOwnerRequest/);
+  assert.match(statusRoute, /validateOwnerModeSession/);
+  assert.match(lockRoute, /revokeOwnerModeSession/);
+  assert.match(ownerClient, /Authorization: `Bearer \$\{accessToken\}`/);
+  assert.match(auctionApp, /if \(role === "admin"\) return "operator"/);
+  assert.match(siteHeader, /onRequestOwnerModeChange/);
+  assert.match(ownerPage, /<StaffChatInbox staffId=\{auth\.user\.id\} role="admin"/);
+
+  const response = await render("/owner");
+  assert.equal(response.status, 200);
+  assert.doesNotMatch(await response.text(), /404: NOT_FOUND|Code: NOT_FOUND/);
 });
 
 test("keeps the hidden Kakao owner private and enforces role, warning, and revenue rules", async () => {

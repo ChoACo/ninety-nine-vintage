@@ -57,7 +57,6 @@ export interface ParsedAuctionWorkbook {
 }
 
 export interface BatchAuctionDraftOptions {
-  status: NewAuctionDraft["status"];
   publishAt: string;
   bidIncrement: number;
 }
@@ -95,6 +94,7 @@ const MAX_RAW_WORKSHEET_ROWS = 1_000;
 const MAX_WORKSHEET_COLUMNS = 256;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const HEADER_SCAN_LIMIT = 30;
+export const FIRST_PRODUCT_ROW = 6;
 
 const HEADER_ALIASES: Record<BatchAuctionCanonicalField, readonly string[]> = {
   description: [
@@ -121,6 +121,7 @@ const HEADER_ALIASES: Record<BatchAuctionCanonicalField, readonly string[]> = {
     "시작가격",
     "경매시작가",
     "최저가",
+    "가격",
     "startingprice",
     "startprice",
     "startingbid",
@@ -300,7 +301,12 @@ function countValidDataRows(
   const detected = candidate.headers;
 
   return rows.filter((row) => {
-    if (row.rowNumber <= candidate.rowNumber) return false;
+    if (
+      row.rowNumber < FIRST_PRODUCT_ROW ||
+      row.rowNumber <= candidate.rowNumber
+    ) {
+      return false;
+    }
 
     const hasDescription = Boolean(
       cellAsText(valueAt(row, detected.description)) ||
@@ -445,7 +451,11 @@ export async function parseAuctionWorkbook(
 
   const selectedSheet = best;
   const dataRows = selectedSheet.rows
-    .filter((row) => row.rowNumber > selectedSheet.candidate.rowNumber)
+    .filter(
+      (row) =>
+        row.rowNumber >= FIRST_PRODUCT_ROW &&
+        row.rowNumber > selectedSheet.candidate.rowNumber,
+    )
     .slice(0, MAX_IMPORT_ROWS + 1);
   if (dataRows.length > MAX_IMPORT_ROWS) {
     throw new Error(`한 번에 최대 ${MAX_IMPORT_ROWS.toLocaleString("ko-KR")}개 상품을 등록할 수 있습니다.`);
@@ -644,14 +654,20 @@ function splitImageNames(
   const text = cellAsText(value);
   if (!text) return [];
 
-  const primaryParts = text.split(/\r?\n|[;|]/);
-  const parts =
-    primaryParts.length === 1 &&
-    text.includes(",") &&
-    !hasExactImageCandidate(text, index)
-      ? text.split(",")
-      : primaryParts;
-  return parts.map((part) => part.trim()).filter(Boolean);
+  return text
+    .split(/\r?\n|[;|]/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .flatMap((part) => {
+      if (!part.includes(",") || hasExactImageCandidate(part, index)) {
+        return [part];
+      }
+
+      return part
+        .split(",")
+        .map((nestedPart) => nestedPart.trim())
+        .filter(Boolean);
+    });
 }
 
 function parseStartingPrice(value: ParsedWorkbookCell | undefined): number | null {
@@ -881,7 +897,7 @@ export function buildBatchAuctionPreview(
       startingPrice: row.startingPrice,
       bidIncrement: options.bidIncrement,
       imageFiles: row.imageMatches.map((match) => match.file),
-      status: options.status,
+      status: "pending",
       publish_at: publishAt.toISOString(),
     };
   });

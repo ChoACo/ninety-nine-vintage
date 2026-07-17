@@ -107,7 +107,7 @@ function MemberFloatingChat({
           <div role="alert" className="bg-[#fff0ec] px-4 py-2 text-sm font-bold text-[#a75042]">{chat.error}</div>
         )}
 
-        <div ref={messagesRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[linear-gradient(180deg,#fffdfa_0%,#fff8f1_100%)] px-4 py-4" aria-live="polite">
+        <div ref={messagesRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[linear-gradient(180deg,var(--surface-raised)_0%,var(--surface)_100%)] px-4 py-4" aria-live="polite">
           {chat.isLoading ? (
             <p className="py-8 text-center text-sm font-bold text-[#81766f]">상담을 불러오는 중…</p>
           ) : chat.messages.length === 0 ? (

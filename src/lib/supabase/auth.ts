@@ -150,10 +150,7 @@ export function getPublicRoleDescriptor(
 }
 
 export function getPublicRoleLabel(role: AppRole): string {
-  const descriptor = getPublicRoleDescriptor(role);
-  return descriptor.grade == null
-    ? descriptor.label
-    : `${descriptor.grade}등급 ${descriptor.label}`;
+  return getPublicRoleDescriptor(role).label;
 }
 
 export async function signInWithKakao(): Promise<void> {

@@ -24,8 +24,6 @@ import {
 import { PRODUCT_IMAGE_FORMAT_LABEL } from "@/src/lib/supabase/productImagePolicy";
 import { formatKRW, getRelativeKoreanDateTime } from "@/src/utils/formatters";
 
-type PublishMode = "scheduled" | "immediate";
-
 interface BatchAuctionSubmitProgress {
   completed: number;
   total: number;
@@ -80,7 +78,6 @@ export default function BulkAuctionImportModal({
   const [parsedWorkbook, setParsedWorkbook] =
     useState<ParsedAuctionWorkbook | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [publishMode, setPublishMode] = useState<PublishMode>("scheduled");
   const [bidIncrement, setBidIncrement] = useState("1000");
   const [isParsing, setIsParsing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,25 +92,22 @@ export default function BulkAuctionImportModal({
   const workbookId = useId();
   const directoryId = useId();
   const multipleImagesId = useId();
-  const publishModeName = useId();
   const bidIncrementId = useId();
 
   const numericBidIncrement = Number(bidIncrement);
   const preview = useMemo<BatchAuctionPreview | null>(() => {
     if (!parsedWorkbook) return null;
     return buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
-      status: publishMode === "scheduled" ? "pending" : "active",
       publishAt: PREVIEW_PUBLISH_AT,
       bidIncrement: numericBidIncrement,
     });
-  }, [imageFiles, numericBidIncrement, parsedWorkbook, publishMode]);
+  }, [imageFiles, numericBidIncrement, parsedWorkbook]);
 
   const reset = () => {
     parseRequestRef.current += 1;
     setWorkbookFileName("");
     setParsedWorkbook(null);
     setImageFiles([]);
-    setPublishMode("scheduled");
     setBidIncrement("1000");
     setIsParsing(false);
     setIsSubmitting(false);
@@ -187,11 +181,7 @@ export default function BulkAuctionImportModal({
     if (!parsedWorkbook) return null;
     const now = new Date();
     return buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
-      status: publishMode === "scheduled" ? "pending" : "active",
-      publishAt:
-        publishMode === "scheduled"
-          ? getRelativeKoreanDateTime(1, "10:00:00", now)
-          : now.toISOString(),
+      publishAt: getRelativeKoreanDateTime(1, "10:00:00", now),
       bidIncrement: Number(bidIncrement),
     });
   };
@@ -254,7 +244,7 @@ export default function BulkAuctionImportModal({
       open={open}
       onClose={handleClose}
       title="Excel 경매 일괄 등록"
-      description="Excel 열을 자동 탐지하고, 선택한 사진 폴더의 이미지명을 상품별로 연결합니다. 실제 등록 전에 모든 행을 확인해 주세요."
+      description="Excel의 1~5행은 양식 안내로 제외하고 6행부터 상품을 읽습니다. 선택한 사진 폴더의 이미지명을 연결한 뒤 대기열에 등록합니다."
       size="gallery"
       closeOnBackdrop={!isSubmitting}
     >
@@ -274,7 +264,7 @@ export default function BulkAuctionImportModal({
               className="mt-3 block w-full text-sm font-semibold text-[#6e5b50] file:mr-3 file:rounded-full file:border-0 file:bg-[#e87462] file:px-4 file:py-2.5 file:text-sm file:font-black file:text-white disabled:opacity-60"
             />
             <p className="mt-2 text-xs font-semibold leading-5 text-[#89786d]">
-              .xlsx 파일에서 상품 설명 또는 상품명, 시작가, 이미지명 열을 자동으로 찾습니다.
+              .xlsx 파일의 A열 상품명, X열 상품 설명, Y열 시작가, AH열 이미지명을 읽으며 1~5행은 등록하지 않습니다.
             </p>
             {isParsing ? (
               <p className="mt-3 flex items-center gap-2 text-sm font-black text-[#b55f50]" role="status">
@@ -357,38 +347,15 @@ export default function BulkAuctionImportModal({
           </section>
         ) : null}
 
-        <section className="rounded-3xl border border-[#d9ded5] bg-white/80 p-4" aria-label="전체 상품 등록 옵션">
-          <h3 className="text-base font-black text-[#493f38]">3. 전체 상품 등록 옵션</h3>
+        <section className="rounded-3xl border border-[#d9ded5] bg-white/80 p-4" aria-label="전체 상품 대기열 등록 옵션">
+          <h3 className="text-base font-black text-[#493f38]">3. 대기열 등록 옵션</h3>
           <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_260px]">
-            <fieldset>
-              <legend className="text-sm font-black text-[#5a4c44]">공개 시각과 상태</legend>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <PublishOption
-                  name={publishModeName}
-                  checked={publishMode === "scheduled"}
-                  value="scheduled"
-                  title="다음날 오전 10시 예약"
-                  description="모든 행을 pending으로 등록합니다."
-                  onChange={() => {
-                    setPublishMode("scheduled");
-                    resetResult();
-                  }}
-                  disabled={isSubmitting}
-                />
-                <PublishOption
-                  name={publishModeName}
-                  checked={publishMode === "immediate"}
-                  value="immediate"
-                  title="즉시 공개"
-                  description="모든 행을 active로 등록합니다."
-                  onChange={() => {
-                    setPublishMode("immediate");
-                    resetResult();
-                  }}
-                  disabled={isSubmitting}
-                />
-              </div>
-            </fieldset>
+            <div className="rounded-2xl border border-[#ead5a9] bg-[#fff7df] px-4 py-3">
+              <p className="text-sm font-black text-[#735b31]">공개 대기 · 다음날 오전 10시 예약</p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-[#8a7040]">
+                모든 상품은 pending 상태로 대기열에 등록됩니다. 공개 전에 대기열에서 내용을 확인하고 수정하거나 삭제할 수 있습니다.
+              </p>
+            </div>
             <label htmlFor={bidIncrementId} className="text-sm font-black text-[#5a4c44]">
               전체 입찰 단위
               <input
@@ -537,7 +504,7 @@ export default function BulkAuctionImportModal({
               isLoading={isSubmitting}
               disabled={!preview?.canSubmit || isParsing}
             >
-              {isSubmitting ? "상품 등록 중…" : `${preview?.rows.length ?? 0}개 상품 등록`}
+              {isSubmitting ? "대기열 등록 중…" : `${preview?.rows.length ?? 0}개 대기열 등록`}
             </Button>
           ) : null}
         </div>
@@ -563,41 +530,5 @@ function DetectedColumn({
         {detected ? value : fallback}
       </dd>
     </div>
-  );
-}
-
-function PublishOption({
-  name,
-  checked,
-  value,
-  title,
-  description,
-  onChange,
-  disabled,
-}: {
-  name: string;
-  checked: boolean;
-  value: PublishMode;
-  title: string;
-  description: string;
-  onChange: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 transition ${checked ? "border-[#dc7e6c] bg-[#fff1eb] ring-2 ring-[#dc7e6c]/15" : "border-[#e2d6cc] bg-white"}`}>
-      <input
-        type="radio"
-        name={name}
-        value={value}
-        checked={checked}
-        onChange={onChange}
-        disabled={disabled}
-        className="mt-1 h-4 w-4 accent-[#df6f5d]"
-      />
-      <span>
-        <strong className="block text-sm font-black text-[#4d4039]">{title}</strong>
-        <span className="mt-1 block text-xs font-semibold leading-5 text-[#85756b]">{description}</span>
-      </span>
-    </label>
   );
 }

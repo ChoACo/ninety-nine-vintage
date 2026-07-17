@@ -27,6 +27,8 @@ export interface SupportConversation {
   conversationType: SupportConversationType;
   productId: string | null;
   subject: string | null;
+  productTitleSnapshot: string | null;
+  productImageUrlSnapshot: string | null;
   status: SupportConversationStatus;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
@@ -99,6 +101,8 @@ interface ConversationRow {
   conversation_type: SupportConversationType;
   product_id: string | null;
   subject: string | null;
+  product_title_snapshot: string | null;
+  product_image_url_snapshot: string | null;
   status: SupportConversationStatus;
   last_message_at: string | null;
   last_message_preview: string | null;
@@ -151,6 +155,8 @@ export type SupportChatDatabase = {
           conversation_type?: SupportConversationType;
           product_id?: string | null;
           subject?: string | null;
+          product_title_snapshot?: string | null;
+          product_image_url_snapshot?: string | null;
           status?: SupportConversationStatus;
           last_message_at?: string | null;
           last_message_preview?: string | null;
@@ -194,8 +200,12 @@ export type SupportChatDatabase = {
         Args: Record<PropertyKey, never>;
         Returns: ConversationRow[];
       };
-      get_or_create_product_inquiry_conversation: {
-        Args: { p_product_id: string };
+      start_product_inquiry: {
+        Args: {
+          p_product_id: string;
+          p_body: string;
+          p_client_nonce: string;
+        };
         Returns: ConversationRow[];
       };
       get_or_create_employee_support_conversation: {
@@ -249,6 +259,8 @@ function toConversation(row: ConversationRow): SupportConversation {
     conversationType: row.conversation_type,
     productId: row.product_id,
     subject: row.subject,
+    productTitleSnapshot: row.product_title_snapshot,
+    productImageUrlSnapshot: row.product_image_url_snapshot,
     status: row.status,
     lastMessageAt: row.last_message_at,
     lastMessagePreview: row.last_message_preview,
@@ -340,18 +352,24 @@ export async function getOrCreateMemberSupportConversation(): Promise<SupportCon
   return toConversation(row);
 }
 
-export async function getOrCreateProductInquiryConversation(
+export async function startProductInquiry(
   productId: string,
+  body: string,
 ): Promise<SupportConversation> {
+  const normalizedBody = normalizeMessageBody(body);
   const { data, error } = await getSupportClient().rpc(
-    "get_or_create_product_inquiry_conversation",
-    { p_product_id: productId },
+    "start_product_inquiry",
+    {
+      p_product_id: productId,
+      p_body: normalizedBody,
+      p_client_nonce: createClientNonce(),
+    },
   );
-  throwQueryError(error, "상품 문의 대화를 준비하지 못했어요. 잠시 후 다시 시도해 주세요.");
+  throwQueryError(error, "상품 문의를 전송하지 못했어요. 잠시 후 다시 시도해 주세요.");
 
   const row = data?.[0];
   if (!row) {
-    throw new SupportChatError("상품 문의 대화를 찾지 못했어요.", {
+    throw new SupportChatError("전송한 상품 문의를 찾지 못했어요.", {
       code: "conversation_not_found",
     });
   }
@@ -549,6 +567,7 @@ export async function fetchStaffSupportInbox(
     .from("support_conversations")
     .select("*")
     .eq("assigned_staff_id", inboxOperatorId)
+    .not("last_message_at", "is", null)
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
   const [conversationResult, readResult] = await Promise.all([

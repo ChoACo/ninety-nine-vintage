@@ -121,7 +121,7 @@ function ParticipantChat({
 
   return (
     <section className="overflow-hidden rounded-[2rem] border border-[#eadfd2] bg-white/85 shadow-[0_24px_70px_rgba(118,92,68,0.09)] backdrop-blur">
-      <div className="flex min-h-[620px] flex-col bg-[linear-gradient(180deg,#fffdf9_0%,#fff8f1_100%)]">
+      <div className="flex min-h-[620px] flex-col bg-[linear-gradient(180deg,var(--surface-raised)_0%,var(--surface)_100%)]">
         <header className="flex items-center gap-4 border-b border-[#eee4da] bg-[#fff8f0]/90 px-5 py-5 md:px-8">
           <span className="grid h-13 w-13 shrink-0 place-items-center rounded-2xl bg-[#cf7b69] text-sm font-black text-white" aria-hidden="true">
             운영
@@ -189,6 +189,44 @@ function ParticipantChat({
               </button>
             ))}
           </nav>
+        ) : null}
+
+        {!internal && chat.conversation?.conversationType === "product" ? (
+          <div className="border-b border-[var(--border)] bg-[var(--surface-muted)] px-5 py-3 md:px-8">
+            <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-3">
+              {chat.conversation.productImageUrlSnapshot ? (
+                // The Storage public URL is dynamic per product and is shown
+                // as a small, lazy-loaded support-context thumbnail.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={chat.conversation.productImageUrlSnapshot}
+                  alt={`${chat.conversation.productTitleSnapshot ?? chat.conversation.subject ?? "문의 상품"} 사진`}
+                  loading="lazy"
+                  className="h-16 w-16 shrink-0 rounded-xl border border-[var(--border)] object-cover"
+                />
+              ) : (
+                <span
+                  className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-[var(--surface-muted)] text-2xl"
+                  aria-hidden="true"
+                >
+                  🧥
+                </span>
+              )}
+              <div className="min-w-0">
+                <p className="text-xs font-black tracking-[0.12em] text-[var(--accent-text)]">
+                  문의한 상품
+                </p>
+                <p className="mt-0.5 line-clamp-2 font-black text-[var(--text-strong)]">
+                  {chat.conversation.productTitleSnapshot ??
+                    chat.conversation.subject ??
+                    "문의 상품"}
+                </p>
+                <p className="mt-0.5 text-xs font-bold text-[var(--text-muted)]">
+                  상품번호 {chat.conversation.productId?.slice(0, 8) ?? "확인 불가"}
+                </p>
+              </div>
+            </div>
+          </div>
         ) : null}
 
         <div ref={messagesRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-7 md:px-8" aria-live="polite">

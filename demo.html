@@ -36,6 +36,15 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+      // 배포 환경에서 이 객체를 실제 Supabase 프로젝트 값으로 덮어쓰세요.
+      // publishableKey에는 공개 가능한 anon/publishable key만 사용합니다.
+      window.__SUPABASE_CONFIG__ = window.__SUPABASE_CONFIG__ || {
+        url: "",
+        publishableKey: "",
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <style>
       :root { color-scheme: light; }
@@ -99,8 +108,8 @@
       } = React;
 
       /* ------------------------------------------------------------------
-       * Mock Data
-       * 실제 서비스에서는 이 영역을 API/Firebase 응답으로 교체하면 됩니다.
+       * 상품 외 화면에 사용하는 standalone 데모 데이터
+       * 경매 상품은 아래 Supabase 연동을 통해서만 조회·저장합니다.
        * ------------------------------------------------------------------ */
       const unsplash = (id, width = 1400) =>
         `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&fm=jpg&w=${width}&q=82`;
@@ -157,271 +166,225 @@
         return deadline.toISOString();
       }
 
-      function nextActiveDeadline() {
-        const now = new Date();
-        let deadline = getTodayKstTime(now, 21, 0);
-        if (deadline <= now) deadline = new Date(deadline.getTime() + 86400000);
+      function nextScheduledPublishAt(now = new Date()) {
+        const parts = getKstParts(now);
+        return new Date(
+          Date.UTC(parts.year, parts.month - 1, parts.day + 1, 10 - 9, 0, 0),
+        ).toISOString();
+      }
+
+      function nextActiveDeadline(publishAt = new Date()) {
+        const publishedAt = publishAt instanceof Date ? publishAt : new Date(publishAt);
+        let deadline = getTodayKstTime(publishedAt, 21, 0);
+        if (deadline <= publishedAt) deadline = new Date(deadline.getTime() + 86400000);
         return deadline.toISOString();
       }
 
-      function todaySettlementDeadline() {
-        return getTodayKstTime(new Date(), 21, 0).toISOString();
-      }
-
-      function minutesAgo(minutes) {
-        return new Date(Date.now() - minutes * 60 * 1000).toISOString();
-      }
-
-      const ACTIVE_AUCTION_DEADLINE = todaySettlementDeadline();
       const QUICK_BID_INCREMENT = 1000;
       const SHIPPING_FEE = 4000;
+      const PRODUCT_IMAGES_BUCKET = "product-images";
 
-      const MOCK_POSTS = [
-        {
-          id: "auction-burberry-trench",
-          title: "버버리 체크 안감 빈티지 트렌치코트",
-          category: "여성 아우터 · 66~77",
-          createdAt: dateAt(0, 10, 10),
-          closesAt: ACTIVE_AUCTION_DEADLINE,
-          status: "active",
-          description:
-            "버버리 체크 안감 트렌치코트 여성 66~77 가슴 57cm 총장 108cm 얼룩·찢김 없음 상태 A",
-          condition: "드라이클리닝 완료 · 상태 A",
-          currentPrice: 68000,
-          startingPrice: 39000,
-          bidIncrement: QUICK_BID_INCREMENT,
-          participantCount: 5,
-          imageUrls: TRENCH_IMAGES,
-          bidHistory: Object.freeze([
-            { id: "bid-trench-5", bidderName: "김민수", amount: 68000, bidAt: minutesAgo(18) },
-            { id: "bid-trench-4", bidderName: "박정희", amount: 65000, bidAt: minutesAgo(82) },
-            { id: "bid-trench-3", bidderName: "이영숙", amount: 59000, bidAt: minutesAgo(176) },
-            { id: "bid-trench-2", bidderName: "최수진", amount: 52000, bidAt: minutesAgo(268) },
-            { id: "bid-trench-1", bidderName: "정미경", amount: 44000, bidAt: minutesAgo(392) },
-          ]),
-        },
-        {
-          id: "auction-camel-coat",
-          title: "울 100% 카멜 핸드메이드 코트",
-          category: "여성 아우터 · 66",
-          createdAt: dateAt(0, 10, 45),
-          closesAt: ACTIVE_AUCTION_DEADLINE,
-          status: "active",
-          description:
-            "울 100% 카멜 핸드메이드 코트 여성 66 가슴 54cm 총장 102cm 세탁 완료 상태 A+",
-          condition: "드라이클리닝 완료 · 상태 A",
-          currentPrice: 25000,
-          startingPrice: 25000,
-          bidIncrement: QUICK_BID_INCREMENT,
-          participantCount: 0,
-          imageUrls: COAT_IMAGES,
-          bidHistory: Object.freeze([]),
-        },
-        {
-          id: "auction-linen-blouse",
-          title: "프랑스 자수 린넨 블라우스",
-          category: "여성 상의 · 55~66",
-          createdAt: dateAt(0, 11, 20),
-          closesAt: ACTIVE_AUCTION_DEADLINE,
-          status: "active",
-          description:
-            "프랑스 자수 린넨 블라우스 여성 55~66 가슴 52cm 총장 64cm 비침 적음 상태 A",
-          condition: "오염 없음 · 상태 A",
-          currentPrice: 22000,
-          startingPrice: 12000,
-          bidIncrement: QUICK_BID_INCREMENT,
-          participantCount: 4,
-          imageUrls: BLOUSE_IMAGES,
-          bidHistory: Object.freeze([
-            { id: "bid-blouse-4", bidderName: "윤혜진", amount: 22000, bidAt: minutesAgo(31) },
-            { id: "bid-blouse-3", bidderName: "김나은", amount: 19000, bidAt: minutesAgo(114) },
-            { id: "bid-blouse-2", bidderName: "오미숙", amount: 16000, bidAt: minutesAgo(225) },
-            { id: "bid-blouse-1", bidderName: "한경희", amount: 13000, bidAt: minutesAgo(348) },
-          ]),
-        },
-        {
-          id: "auction-floral-dress",
-          title: "레트로 플라워 쉬폰 롱 원피스",
-          category: "여성 원피스 · 66~77",
-          createdAt: dateAt(0, 12, 5),
-          closesAt: ACTIVE_AUCTION_DEADLINE,
-          status: "active",
-          description:
-            "레트로 플라워 쉬폰 롱 원피스 여성 66~77 가슴 55cm 총장 116cm 안감·허리끈 있음 상태 A",
-          condition: "안감 양호 · 상태 A-",
-          currentPrice: 31000,
-          startingPrice: 15000,
-          bidIncrement: QUICK_BID_INCREMENT,
-          participantCount: 4,
-          imageUrls: DRESS_IMAGES,
-          bidHistory: Object.freeze([
-            { id: "bid-dress-4", bidderName: "강선영", amount: 31000, bidAt: minutesAgo(24) },
-            { id: "bid-dress-3", bidderName: "박은주", amount: 27000, bidAt: minutesAgo(128) },
-            { id: "bid-dress-2", bidderName: "조현숙", amount: 21000, bidAt: minutesAgo(241) },
-            { id: "bid-dress-1", bidderName: "문지영", amount: 17000, bidAt: minutesAgo(386) },
-          ]),
-        },
-        {
-          id: "auction-cable-knit",
-          title: "폴로 랄프로렌 케이블 니트",
-          category: "여성 니트 · 66",
-          createdAt: dateAt(0, 13, 10),
-          closesAt: ACTIVE_AUCTION_DEADLINE,
-          status: "active",
-          description:
-            "폴로 랄프로렌 케이블 니트 여성 66 가슴 51cm 총장 63cm 늘어남·큰 보풀 없음 상태 A+",
-          condition: "보풀 적음 · 상태 A-",
-          currentPrice: 24000,
-          startingPrice: 18000,
-          bidIncrement: QUICK_BID_INCREMENT,
-          participantCount: 2,
-          imageUrls: KNIT_IMAGES,
-          bidHistory: Object.freeze([
-            { id: "bid-knit-2", bidderName: "서정아", amount: 24000, bidAt: minutesAgo(57) },
-            { id: "bid-knit-1", bidderName: "임미자", amount: 20000, bidAt: minutesAgo(292) },
-          ]),
-        },
-        {
-          id: "auction-levis-501",
-          title: "빈티지 리바이스 501 데님",
-          category: "공용 하의 · 31인치",
-          createdAt: dateAt(-1, 9, 10),
-          closesAt: dateAt(-1, 21, 0),
-          status: "active",
-          description:
-            "미국 빈티지 리바이스 501 허리 31인치 총장 101cm 원형 밑단 원단 탄탄 상태 A",
-          condition: "자연스러운 사용감 · 상태 B+",
-          currentPrice: 59000,
-          startingPrice: 25000,
-          bidIncrement: QUICK_BID_INCREMENT,
-          participantCount: 4,
-          imageUrls: DENIM_IMAGES,
-          bidHistory: Object.freeze([
-            { id: "bid-denim-5", bidderName: "김나은", amount: 59000, bidAt: dateAt(-1, 20, 56) },
-            { id: "bid-denim-4", bidderName: "신동호", amount: 57000, bidAt: dateAt(-1, 20, 51) },
-            { id: "bid-denim-3", bidderName: "김나은", amount: 53000, bidAt: dateAt(-1, 20, 44) },
-            { id: "bid-denim-2", bidderName: "백승호", amount: 44000, bidAt: dateAt(-1, 18, 22) },
-            { id: "bid-denim-1", bidderName: "홍재민", amount: 31000, bidAt: dateAt(-1, 14, 9) },
-          ]),
-        },
-        {
-          id: "auction-navy-jacket",
-          title: "네이비 금장 버튼 테일러드 재킷",
-          category: "여성 아우터 · 66~77",
-          createdAt: dateAt(-1, 10, 25),
-          closesAt: dateAt(-1, 21, 0),
-          status: "active",
-          description:
-            "네이비 금장 테일러드 재킷 여성 66~77 가슴 56cm 총장 69cm 안감·단추 깨끗 상태 A",
-          condition: "안감 양호 · 상태 A-",
-          currentPrice: 33000,
-          startingPrice: 18000,
-          bidIncrement: QUICK_BID_INCREMENT,
-          participantCount: 3,
-          imageUrls: COAT_IMAGES,
-          bidHistory: Object.freeze([
-            { id: "bid-jacket-3", bidderName: "한미영", amount: 33000, bidAt: dateAt(-1, 18, 32) },
-            { id: "bid-jacket-2", bidderName: "송정숙", amount: 27000, bidAt: dateAt(-1, 16, 4) },
-            { id: "bid-jacket-1", bidderName: "배영희", amount: 21000, bidAt: dateAt(-1, 13, 20) },
-          ]),
-        },
-        {
-          id: "auction-silk-blouse",
-          title: "아이보리 실크 블렌드 블라우스",
-          category: "여성 상의 · 55~66",
-          createdAt: dateAt(-2, 9, 40),
-          closesAt: dateAt(-2, 21, 0),
-          status: "active",
-          description:
-            "아이보리 실크 블렌드 블라우스 여성 55~66 가슴 53cm 총장 65cm 목선 깨끗 상태 A",
-          condition: "전문 세탁 완료 · 상태 A",
-          currentPrice: 19000,
-          startingPrice: 19000,
-          bidIncrement: QUICK_BID_INCREMENT,
-          participantCount: 0,
-          imageUrls: BLOUSE_IMAGES,
-          bidHistory: Object.freeze([]),
-        },
-        {
-          id: "auction-green-cardigan",
-          title: "메리노울 그린 라운드 카디건",
-          category: "여성 니트 · 66",
-          createdAt: dateAt(-2, 11, 15),
-          closesAt: dateAt(-2, 21, 0),
-          status: "active",
-          description:
-            "메리노울 그린 라운드 카디건 여성 66 가슴 52cm 총장 61cm 보풀·단추 빠짐 없음 상태 A-",
-          condition: "보풀 정리 완료 · 상태 A-",
-          currentPrice: 28000,
-          startingPrice: 16000,
-          bidIncrement: QUICK_BID_INCREMENT,
-          participantCount: 2,
-          imageUrls: KNIT_IMAGES,
-          bidHistory: Object.freeze([
-            { id: "bid-cardigan-2", bidderName: "김선자", amount: 28000, bidAt: dateAt(-1, 17, 50) },
-            { id: "bid-cardigan-1", bidderName: "문혜숙", amount: 21000, bidAt: dateAt(-2, 15, 35) },
-          ]),
-        },
-        {
-          id: "auction-check-dress",
-          title: "잔체크 셔츠형 롱 원피스",
-          category: "여성 원피스 · 77",
-          createdAt: dateAt(-3, 10, 5),
-          closesAt: dateAt(-3, 21, 0),
-          status: "active",
-          description:
-            "잔체크 셔츠형 롱 원피스 여성 77 가슴 57cm 총장 112cm 허리끈 포함 상태 A-",
-          condition: "생활감 적음 · 상태 A-",
-          currentPrice: 24000,
-          startingPrice: 14000,
-          bidIncrement: QUICK_BID_INCREMENT,
-          participantCount: 2,
-          imageUrls: DRESS_IMAGES,
-          bidHistory: Object.freeze([
-            { id: "bid-check-2", bidderName: "이정아", amount: 24000, bidAt: dateAt(-2, 19, 10) },
-            { id: "bid-check-1", bidderName: "오미란", amount: 17000, bidAt: dateAt(-3, 14, 45) },
-          ]),
-        },
-        {
-          id: "auction-denim-jacket",
-          title: "빈티지 워싱 데님 재킷",
-          category: "공용 아우터 · 100",
-          createdAt: dateAt(-4, 9, 30),
-          closesAt: dateAt(-4, 21, 0),
-          status: "active",
-          description:
-            "빈티지 워싱 데님 재킷 공용 100 가슴 58cm 총장 67cm 지퍼·포켓 양호 상태 B+",
-          condition: "자연스러운 워싱 · 상태 B+",
-          currentPrice: 41000,
-          startingPrice: 22000,
-          bidIncrement: QUICK_BID_INCREMENT,
-          participantCount: 3,
-          imageUrls: DENIM_IMAGES,
-          bidHistory: Object.freeze([
-            { id: "bid-denim-jacket-3", bidderName: "장성호", amount: 41000, bidAt: dateAt(-1, 20, 2) },
-            { id: "bid-denim-jacket-2", bidderName: "박동수", amount: 34000, bidAt: dateAt(-3, 18, 18) },
-            { id: "bid-denim-jacket-1", bidderName: "최경수", amount: 26000, bidAt: dateAt(-4, 11, 12) },
-          ]),
-        },
-        {
-          id: "auction-beige-knit",
-          title: "베이지 꽈배기 브이넥 니트",
-          category: "여성 니트 · 77",
-          createdAt: dateAt(-5, 10, 0),
-          closesAt: dateAt(-5, 21, 0),
-          status: "active",
-          description:
-            "베이지 꽈배기 브이넥 니트 여성 77 가슴 57cm 총장 64cm 보풀 정리 상태 B+",
-          condition: "보풀 정리 완료 · 상태 B+",
-          currentPrice: 15000,
-          startingPrice: 15000,
-          bidIncrement: QUICK_BID_INCREMENT,
-          participantCount: 0,
-          imageUrls: KNIT_IMAGES,
-          bidHistory: Object.freeze([]),
-        },
-      ];
+      let supabaseClient;
 
+      function getSupabaseClient() {
+        if (supabaseClient) return supabaseClient;
+
+        const config = window.__SUPABASE_CONFIG__ || {};
+        const url = String(config.url || "").trim();
+        const publishableKey = String(
+          config.publishableKey || config.anonKey || "",
+        ).trim();
+
+        if (!url || !publishableKey) {
+          throw new Error(
+            "Supabase 연결 설정이 없습니다. window.__SUPABASE_CONFIG__의 url과 publishableKey를 입력해 주세요.",
+          );
+        }
+        if (!window.supabase?.createClient) {
+          throw new Error(
+            "Supabase SDK를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.",
+          );
+        }
+
+        supabaseClient = window.supabase.createClient(url, publishableKey, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+          },
+        });
+        return supabaseClient;
+      }
+
+      function createUuid() {
+        if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+
+        const bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        const hex = Array.from(bytes, (value) =>
+          value.toString(16).padStart(2, "0"),
+        );
+        return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex
+          .slice(6, 8)
+          .join("")}-${hex.slice(8, 10).join("")}-${hex
+          .slice(10)
+          .join("")}`;
+      }
+
+      function getImageExtension(file) {
+        const fileExtension = String(file.name || "")
+          .split(".")
+          .pop()
+          .toLowerCase();
+        if (/^[a-z0-9]{1,8}$/.test(fileExtension)) return fileExtension;
+
+        const mimeExtension = String(file.type || "")
+          .split("/")
+          .pop()
+          .toLowerCase();
+        return /^[a-z0-9]{1,8}$/.test(mimeExtension)
+          ? mimeExtension
+          : "jpg";
+      }
+
+      function toArray(value) {
+        if (Array.isArray(value)) return value;
+        if (typeof value !== "string" || !value.trim()) return [];
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [value];
+        }
+      }
+
+      function isSupabaseAdmin(user) {
+        return user?.app_metadata?.role === "admin";
+      }
+
+      function mapProductRow(row) {
+        const description = String(row.description || "").trim();
+        const publishAt = row.publish_at || row.created_at || new Date().toISOString();
+        const startingPrice = Number(row.starting_price || 0);
+        const bidHistory = toArray(row.bid_history);
+
+        return {
+          id: String(row.id),
+          title:
+            String(row.title || "").trim() ||
+            description.split(/\r?\n/)[0] ||
+            "구제 의류 상품",
+          description,
+          category: String(row.category || "구제 의류"),
+          condition: "상품 설명 참고",
+          createdAt: row.created_at || publishAt,
+          publish_at: publishAt,
+          closesAt: row.closes_at || nextActiveDeadline(publishAt),
+          status: row.status,
+          startingPrice,
+          currentPrice: Number(row.current_price ?? startingPrice),
+          bidIncrement: Number(row.bid_increment || QUICK_BID_INCREMENT),
+          participantCount: Number(row.participant_count || 0),
+          imageUrls: toArray(row.image_urls).filter(Boolean),
+          bidHistory: Object.freeze(bidHistory),
+        };
+      }
+
+      async function fetchPublishedProducts() {
+        const client = getSupabaseClient();
+        const { data, error } = await client
+          .from("products")
+          .select("*")
+          .eq("status", "active")
+          .lte("publish_at", new Date().toISOString())
+          .order("publish_at", { ascending: false });
+
+        if (error) throw error;
+        return (data || []).map(mapProductRow);
+      }
+
+      async function uploadProductImages(client, productId, files) {
+        const storage = client.storage.from(PRODUCT_IMAGES_BUCKET);
+        const uploadedPaths = [];
+        const publicUrls = [];
+
+        try {
+          for (const [index, file] of files.entries()) {
+            const extension = getImageExtension(file);
+            const path = `products/${productId}/${Date.now()}-${index}-${createUuid()}.${extension}`;
+            const { error } = await storage.upload(path, file, {
+              cacheControl: "31536000",
+              contentType: file.type || `image/${extension}`,
+              upsert: false,
+            });
+            if (error) throw error;
+
+            uploadedPaths.push(path);
+            const { data } = storage.getPublicUrl(path);
+            if (!data?.publicUrl) {
+              throw new Error("업로드한 사진의 공개 주소를 만들지 못했습니다.");
+            }
+            publicUrls.push(data.publicUrl);
+          }
+
+          return { publicUrls, uploadedPaths };
+        } catch (error) {
+          if (uploadedPaths.length) {
+            await storage.remove(uploadedPaths).catch(() => undefined);
+          }
+          throw error;
+        }
+      }
+
+      async function createSupabaseProduct(values) {
+        const client = getSupabaseClient();
+        const {
+          data: { user },
+          error: authError,
+        } = await client.auth.getUser();
+        if (authError || !isSupabaseAdmin(user)) {
+          throw new Error("관리자 인증이 만료되었습니다. 다시 로그인해 주세요.");
+        }
+
+        const productId = createUuid();
+        const { publicUrls, uploadedPaths } = await uploadProductImages(
+          client,
+          productId,
+          values.imageFiles,
+        );
+        const now = new Date().toISOString();
+        const productRow = {
+          id: productId,
+          title: values.title,
+          description: values.description,
+          category: "구제 의류",
+          starting_price: values.startingPrice,
+          current_price: values.startingPrice,
+          bid_increment: QUICK_BID_INCREMENT,
+          participant_count: 0,
+          image_urls: publicUrls,
+          status: values.status,
+          publish_at: values.publish_at,
+          closes_at: nextActiveDeadline(values.publish_at),
+          created_at: now,
+          bid_history: [],
+        };
+        const { error } = await client.from("products").insert(productRow);
+
+        if (error) {
+          await client.storage
+            .from(PRODUCT_IMAGES_BUCKET)
+            .remove(uploadedPaths)
+            .catch(() => undefined);
+          throw error;
+        }
+
+        return mapProductRow(productRow);
+      }
+
+      // 경매 상품은 Supabase products 테이블에서만 불러옵니다.
       const DEFAULT_PROFILE = {
         id: "user-naeun",
         name: "김나은",
@@ -792,8 +755,15 @@
       }
 
       function getBidAccess(post, currentUserName, value = new Date()) {
-        if (post.status === "closed") return { allowed: false, reason: "판매 완료" };
         const now = value instanceof Date ? value : new Date(value);
+        const publishAt = post.publish_at ? new Date(post.publish_at) : null;
+        if (
+          post.status === "pending" ||
+          (publishAt && Number.isFinite(publishAt.getTime()) && publishAt > now)
+        ) {
+          return { allowed: false, reason: "공개 예약 상품" };
+        }
+        if (post.status === "closed") return { allowed: false, reason: "판매 완료" };
         const cutoff = getTodayKstTime(now, 20, 56);
         const deadline = getTodayKstTime(now, 21, 0);
         if (now >= deadline) return { allowed: false, reason: "오늘 경매 마감" };
@@ -1125,7 +1095,7 @@
 
       function RoleToggle({ role, onChange }) {
         return (
-          <div className="inline-flex rounded-2xl border border-sand/80 bg-white/75 p-1 shadow-sm" aria-label="임시 권한 전환">
+          <div className="inline-flex rounded-2xl border border-sand/80 bg-white/75 p-1 shadow-sm" aria-label="사용자 모드 전환">
             <button
               onClick={() => onChange("user")}
               className={`rounded-xl px-3 py-2 text-xs font-extrabold transition sm:px-4 ${
@@ -1142,7 +1112,7 @@
               }`}
               aria-pressed={role === "admin"}
             >
-              운영자(관리자) 모드
+              관리자 로그인
             </button>
           </div>
         );
@@ -1671,7 +1641,6 @@
       }
 
       const ONLINE_MEMBERS = ["김*수", "이*영", "박*진", "최*희", "정*자", "한*숙", "오*철"];
-      const MOCK_LIVE_BIDDERS = ["김민수", "이선영", "박정진", "최은희", "정미자", "한경숙"];
 
       function OnlineMembersSidebar({ className = "" }) {
         return (
@@ -1778,6 +1747,7 @@
         const sold = post.status === "closed";
         const quickBidAmount = getQuickBidAmount(post);
         const contentLabel = post.description.split("\n").find((line) => line.trim())?.trim() || "경매 상품";
+        const displayDate = post.publish_at || post.createdAt;
         const bidState = getUserBidState(post, currentUserName);
         const bidPresentation = BID_STATUS_PRESENTATION[bidState.status];
         const displayedPrice = bidState.leadingBid?.amount || post.startingPrice;
@@ -1803,7 +1773,7 @@
         return (
           <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-[1.45rem] border border-white/90 bg-white/80 shadow-card backdrop-blur animate-rise">
             <header className="flex items-center justify-between gap-2 border-b border-sand/60 bg-white/45 px-4 py-3">
-              <time dateTime={post.createdAt} className="min-w-0 truncate text-sm font-black">{formatDate(post.createdAt)} 작성</time>
+              <time dateTime={displayDate} className="min-w-0 truncate text-sm font-black">{formatDate(displayDate)} 작성</time>
               <Button variant="secondary" size="sm" className="min-h-11 shrink-0 px-3 text-[15px] font-black" onClick={() => setInquiryOpen(true)}>
                 상품 문의하기
               </Button>
@@ -1870,19 +1840,38 @@
         );
       }
 
-      function FeedPage({ posts, currentUserName, auctionNow, onBid, onInquiry }) {
+      function FeedPage({
+        posts,
+        currentUserName,
+        auctionNow,
+        onBid,
+        onInquiry,
+        loading,
+        error,
+        onRetry,
+      }) {
         const [selectedDate, setSelectedDate] = useState("all");
+        const publishedPosts = useMemo(
+          () => posts.filter((post) => {
+            if (post.status !== "active" || !post.publish_at) return false;
+            const publishTime = new Date(post.publish_at).getTime();
+            return Number.isFinite(publishTime) && publishTime <= auctionNow.getTime();
+          }),
+          [posts, auctionNow],
+        );
         const dateKeys = useMemo(
-          () => [...new Set(posts.map((post) => toLocalDateKey(post.createdAt)))].sort().reverse(),
-          [posts],
+          () => [...new Set(publishedPosts.map((post) => toLocalDateKey(post.publish_at || post.createdAt)))].sort().reverse(),
+          [publishedPosts],
         );
         const visiblePosts = useMemo(
           () => selectedDate === "all"
-            ? posts
-            : posts.filter((post) => toLocalDateKey(post.createdAt) === selectedDate),
-          [posts, selectedDate],
+            ? publishedPosts
+            : publishedPosts.filter((post) => toLocalDateKey(post.publish_at || post.createdAt) === selectedDate),
+          [publishedPosts, selectedDate],
         );
-        const availableCount = posts.filter((post) => post.status !== "closed").length;
+        const availableCount = publishedPosts.filter(
+          (post) => post.status === "active" && getBidAccess(post, currentUserName, auctionNow).allowed,
+        ).length;
 
         return (
           <div className="space-y-5 sm:space-y-6">
@@ -1894,7 +1883,7 @@
               </div>
               <div className="flex items-center gap-3 rounded-2xl bg-white/70 px-4 py-3 text-sm font-bold text-muted shadow-sm">
                 <span className="grid h-9 w-9 place-items-center rounded-full bg-sky/60 text-lg">옷</span>
-                <span>전체 {posts.length}건 · 입찰 가능 {availableCount}건</span>
+                <span>전체 {publishedPosts.length}건 · 입찰 가능 {availableCount}건</span>
               </div>
             </section>
 
@@ -1906,7 +1895,19 @@
               <span className="font-bold text-muted">{visiblePosts.length}벌</span>
             </div>
 
-            {visiblePosts.length > 0 ? (
+            {loading ? (
+              <div className="rounded-[1.7rem] border border-sand bg-white/70 px-5 py-14 text-center shadow-sm" role="status" aria-live="polite">
+                <span className="mx-auto block h-8 w-8 animate-spin rounded-full border-4 border-coral/30 border-t-coral" aria-hidden="true" />
+                <strong className="mt-4 block text-lg">경매 상품을 불러오는 중입니다</strong>
+                <p className="mt-1 font-bold text-muted">Supabase에서 최신 상품을 확인하고 있어요.</p>
+              </div>
+            ) : error ? (
+              <div className="rounded-[1.7rem] border border-[#efb7aa] bg-[#fff2ec] px-5 py-10 text-center shadow-sm" role="alert">
+                <strong className="block text-lg text-[#9d4235]">경매 상품을 불러오지 못했어요</strong>
+                <p className="mx-auto mt-2 max-w-2xl break-keep font-bold leading-7 text-muted">{error}</p>
+                <Button className="mt-5" onClick={onRetry}>다시 불러오기</Button>
+              </div>
+            ) : visiblePosts.length > 0 ? (
               <section className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="날짜별 구제 의류 경매 피드">
                 {visiblePosts.map((post) => <PostCard key={post.id} post={post} currentUserName={currentUserName} auctionNow={auctionNow} onBid={onBid} onInquiry={onInquiry} />)}
               </section>
@@ -2415,13 +2416,107 @@
       /* ------------------------------------------------------------------
        * Admin Components
        * ------------------------------------------------------------------ */
+      function AdminLoginModal({ open, onClose, onAuthenticated }) {
+        const [email, setEmail] = useState("");
+        const [password, setPassword] = useState("");
+        const [error, setError] = useState("");
+        const [loading, setLoading] = useState(false);
+
+        useEffect(() => {
+          if (!open) return;
+          setEmail("");
+          setPassword("");
+          setError("");
+          setLoading(false);
+        }, [open]);
+
+        const submit = async (event) => {
+          event.preventDefault();
+          setLoading(true);
+          setError("");
+
+          try {
+            const client = getSupabaseClient();
+            const { data, error: signInError } =
+              await client.auth.signInWithPassword({
+                email: email.trim(),
+                password,
+              });
+            if (signInError) throw signInError;
+            if (!isSupabaseAdmin(data.user)) {
+              await client.auth.signOut();
+              throw new Error("관리자 권한이 등록된 계정만 이용할 수 있어요.");
+            }
+
+            onAuthenticated(data.user);
+          } catch (signInError) {
+            setError(
+              signInError?.message ||
+                "관리자 로그인에 실패했습니다. 계정 정보를 확인해 주세요.",
+            );
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        return (
+          <Modal
+            open={open}
+            onClose={loading ? () => undefined : onClose}
+            title="관리자 로그인"
+            description="Supabase Auth에 등록된 관리자 계정으로 로그인해 주세요."
+            className="max-w-md"
+            closeOnBackdrop={!loading}
+            closeOnEscape={!loading}
+            showCloseButton={!loading}
+          >
+            <form onSubmit={submit} className="space-y-4 p-5 sm:p-6">
+              <label className="block">
+                <span className="mb-2 block text-sm font-extrabold">이메일</span>
+                <input
+                  type="email"
+                  autoComplete="username"
+                  required
+                  autoFocus
+                  value={email}
+                  onChange={(event) => { setEmail(event.target.value); setError(""); }}
+                  disabled={loading}
+                  className="h-12 w-full rounded-2xl border border-sand bg-white px-4 outline-none focus:border-coral focus:ring-4 focus:ring-coral/15"
+                  placeholder="admin@example.com"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-extrabold">비밀번호</span>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(event) => { setPassword(event.target.value); setError(""); }}
+                  disabled={loading}
+                  className="h-12 w-full rounded-2xl border border-sand bg-white px-4 outline-none focus:border-coral focus:ring-4 focus:ring-coral/15"
+                  placeholder="비밀번호를 입력해 주세요"
+                />
+              </label>
+              {error ? <p role="alert" className="rounded-2xl bg-[#ffe8df] px-4 py-3 text-sm font-extrabold leading-6 text-[#a74336]">{error}</p> : null}
+              <div className="grid grid-cols-2 gap-2 border-t border-sand pt-4">
+                <Button variant="outline" onClick={onClose} disabled={loading}>취소</Button>
+                <Button type="submit" disabled={loading} aria-busy={loading || undefined}>
+                  {loading ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white/45 border-t-white" aria-hidden="true" />로그인 중...</> : "관리자 로그인"}
+                </Button>
+              </div>
+            </form>
+          </Modal>
+        );
+      }
+
       function AdminAccessGate({ onUnlock }) {
         return (
           <section className="mx-auto mt-10 max-w-xl rounded-[2rem] border border-white/90 bg-white/70 p-7 text-center shadow-card sm:p-10">
             <span className="mx-auto grid h-16 w-16 place-items-center rounded-[1.5rem] bg-coral/15 text-2xl">🔒</span>
             <h1 className="mt-5 text-2xl font-black sm:text-3xl">관리자 권한이 필요해요</h1>
-            <p className="mx-auto mt-3 max-w-sm text-[17px] font-bold leading-7 text-muted">상단의 임시 권한 토글을 운영자 모드로 바꾸면 판매 내역과 구매자 배송 정보를 테스트할 수 있습니다.</p>
-            <Button className="mt-6" onClick={onUnlock}>운영자 모드로 전환</Button>
+            <p className="mx-auto mt-3 max-w-sm text-[17px] font-bold leading-7 text-muted">Supabase Auth 관리자 계정으로 로그인하면 판매 내역과 구매자 배송 정보를 확인할 수 있습니다.</p>
+            <Button className="mt-6" onClick={onUnlock}>관리자 로그인</Button>
           </section>
         );
       }
@@ -2695,41 +2790,229 @@
 
       function NewAuctionModal({ open, onClose, onSubmit }) {
         const emptyForm = {
-          category: "여성 의류 · 66",
           description: "",
-          condition: "세탁 완료 · 상태 A",
           startingPrice: "20000",
-          imageUrls: COAT_IMAGES.join("\n"),
         };
         const [form, setForm] = useState(emptyForm);
-        const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+        const [photos, setPhotos] = useState([]);
+        const [publishMode, setPublishMode] = useState("scheduled");
+        const [error, setError] = useState("");
+        const [isSubmitting, setIsSubmitting] = useState(false);
+        const fileInputRef = useRef(null);
+        const photosRef = useRef([]);
+        const photosInputId = useId();
+        const publishModeName = useId();
 
-        useEffect(() => { if (open) setForm(emptyForm); }, [open]);
+        useEffect(() => {
+          photosRef.current = photos;
+        }, [photos]);
 
-        const submit = (event) => {
-          event.preventDefault();
-          const images = form.imageUrls.split(/\n|,/).map((value) => value.trim()).filter(Boolean);
-          onSubmit({
-            ...form,
-            title: form.description.trim().split(/\r?\n/)[0] || "새 구제 의류",
-            startingPrice: Number(form.startingPrice),
-            imageUrls: images.length ? images : [COAT_IMAGES[0]],
-          });
+        const releasePhotos = (items) => {
+          items.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
+        };
+
+        const clearPhotos = () => {
+          releasePhotos(photosRef.current);
+          photosRef.current = [];
+          setPhotos([]);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        };
+
+        const resetForm = () => {
+          setForm(emptyForm);
+          clearPhotos();
+          setPublishMode("scheduled");
+          setError("");
+          setIsSubmitting(false);
+        };
+
+        const closeModal = () => {
+          if (isSubmitting) return;
+          resetForm();
           onClose();
         };
 
+        const update = (field, value) => {
+          setForm((current) => ({ ...current, [field]: value }));
+          setError("");
+        };
+
+        const selectPhotos = (event) => {
+          const selectedFiles = Array.from(event.target.files || []);
+          const imageFiles = selectedFiles.filter((file) => file.type.startsWith("image/"));
+          const nextPhotos = imageFiles.map((file) => ({
+            id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+            file,
+            previewUrl: URL.createObjectURL(file),
+          }));
+
+          if (nextPhotos.length) {
+            const next = [...photosRef.current, ...nextPhotos];
+            photosRef.current = next;
+            setPhotos(next);
+          }
+          setError(
+            imageFiles.length === selectedFiles.length
+              ? ""
+              : "이미지 형식의 파일만 선택할 수 있어요.",
+          );
+          event.target.value = "";
+        };
+
+        const removePhoto = (photoId) => {
+          const removed = photosRef.current.find((photo) => photo.id === photoId);
+          if (removed) URL.revokeObjectURL(removed.previewUrl);
+          const next = photosRef.current.filter((photo) => photo.id !== photoId);
+          photosRef.current = next;
+          setPhotos(next);
+          setError("");
+        };
+
+        useEffect(() => {
+          if (open) resetForm();
+        }, [open]);
+
+        useEffect(() => () => releasePhotos(photosRef.current), []);
+
+        const submit = async (event) => {
+          event.preventDefault();
+          const description = form.description.trim();
+          const startingPrice = Number(form.startingPrice);
+
+          if (!description) {
+            setError("상품 설명을 입력해 주세요.");
+            return;
+          }
+          if (!Number.isInteger(startingPrice) || startingPrice < 1000) {
+            setError("시작가는 1,000원 이상의 정수로 입력해 주세요.");
+            return;
+          }
+          if (!photos.length) {
+            setError("상품 사진을 하나 이상 선택해 주세요.");
+            return;
+          }
+
+          const now = new Date();
+          const scheduled = publishMode === "scheduled";
+          setIsSubmitting(true);
+          setError("");
+
+          try {
+            await onSubmit({
+              title: description.split(/\r?\n/)[0] || "새 구제 의류",
+              description,
+              startingPrice,
+              imageFiles: photos.map((photo) => photo.file),
+              status: scheduled ? "pending" : "active",
+              publish_at: scheduled ? nextScheduledPublishAt(now) : now.toISOString(),
+            });
+            resetForm();
+            onClose();
+          } catch (submitError) {
+            setError(
+              submitError?.message ||
+                "상품을 등록하지 못했어요. 잠시 후 다시 시도해 주세요.",
+            );
+          } finally {
+            setIsSubmitting(false);
+          }
+        };
+
         return (
-          <Modal open={open} onClose={onClose} title="새 경매글 작성" className="max-w-2xl">
+          <Modal
+            open={open}
+            onClose={closeModal}
+            title="새 경매글 작성"
+            description="상품 설명과 사진을 확인한 뒤 공개 시간을 선택해 주세요."
+            className="max-w-2xl"
+            closeOnBackdrop={!isSubmitting}
+            closeOnEscape={!isSubmitting}
+            showCloseButton={!isSubmitting}
+          >
             <form onSubmit={submit} className="space-y-4 p-5 sm:p-6">
               <div className="grid gap-4 sm:grid-cols-2">
-                <label><span className="mb-2 block text-sm font-extrabold">카테고리</span><input required value={form.category} onChange={(e) => update("category", e.target.value)} className="h-12 w-full rounded-2xl border border-sand bg-white px-4 outline-none focus:border-coral focus:ring-4 focus:ring-coral/15" /></label>
-                <label><span className="mb-2 block text-sm font-extrabold">상품 상태</span><input required value={form.condition} onChange={(e) => update("condition", e.target.value)} className="h-12 w-full rounded-2xl border border-sand bg-white px-4 outline-none focus:border-coral focus:ring-4 focus:ring-coral/15" /></label>
                 <label><span className="mb-2 block text-sm font-extrabold">시작가</span><input required min="1000" step="1000" type="number" value={form.startingPrice} onChange={(e) => update("startingPrice", e.target.value)} className="h-12 w-full rounded-2xl border border-sand bg-white px-4 outline-none focus:border-coral focus:ring-4 focus:ring-coral/15" /></label>
                 <label><span className="mb-2 block text-sm font-extrabold">입찰 단위</span><input readOnly value="1,000원 (고정)" className="h-12 w-full rounded-2xl border border-sand bg-cream px-4 font-bold text-muted outline-none" /></label>
                 <label className="sm:col-span-2"><span className="mb-2 block text-sm font-extrabold">상품 설명</span><textarea required autoFocus rows="5" value={form.description} onChange={(e) => update("description", e.target.value)} className="w-full resize-none rounded-2xl border border-sand bg-white px-4 py-3 outline-none focus:border-coral focus:ring-4 focus:ring-coral/15" placeholder={"첫 줄: 상품명·사이즈를 적어 주세요.\n둘째 줄부터: 실측, 사용감, 오염 여부를 자세히 적어 주세요."} /><span className="mt-1.5 block text-sm font-bold text-muted">첫 줄이 카드의 굵은 대표 문구로 표시됩니다.</span></label>
-                <label className="sm:col-span-2"><span className="mb-2 block text-sm font-extrabold">사진 URL (줄바꿈으로 구분)</span><textarea rows="4" value={form.imageUrls} onChange={(e) => update("imageUrls", e.target.value)} className="w-full resize-none rounded-2xl border border-sand bg-white px-4 py-3 text-xs leading-5 outline-none focus:border-coral focus:ring-4 focus:ring-coral/15" /><span className="mt-1.5 block text-[11px] text-muted">단일 HTML 데모이므로 로컬 파일 대신 인터넷 이미지 URL을 사용합니다.</span></label>
+                <div className="sm:col-span-2">
+                  <label htmlFor={photosInputId} className="mb-2 block text-sm font-extrabold">상품 사진</label>
+                  <input
+                    ref={fileInputRef}
+                    id={photosInputId}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={selectPhotos}
+                    className="block min-h-12 w-full cursor-pointer rounded-2xl border border-sand bg-white text-sm font-bold text-muted file:mr-4 file:min-h-12 file:cursor-pointer file:border-0 file:bg-[#f3d9cd] file:px-4 file:font-extrabold file:text-[#8d493c] hover:file:bg-[#ecc8bb] focus:outline-none focus:ring-4 focus:ring-coral/15"
+                  />
+                  <span className="mt-1.5 block text-xs font-bold leading-5 text-muted">여러 장을 한 번에 선택할 수 있으며, 첫 사진이 대표 이미지로 보여요.</span>
+
+                  {photos.length ? (
+                    <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label="선택한 상품 사진">
+                      {photos.map((photo, index) => (
+                        <li key={photo.id} className="relative overflow-hidden rounded-2xl border border-sand bg-white shadow-sm">
+                          <img src={photo.previewUrl} alt={`선택한 상품 사진 ${index + 1}`} className="h-32 w-full object-cover" />
+                          <div className="px-2.5 py-2">
+                            <p className="truncate text-xs font-bold text-muted">{index === 0 ? "대표 · " : ""}{photo.file.name}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removePhoto(photo.id)}
+                            className="absolute right-2 top-2 grid h-10 w-10 place-items-center rounded-full border-2 border-white bg-ink/80 text-xl font-black text-white shadow-md transition hover:bg-coral-dark focus:outline-none focus:ring-4 focus:ring-coral/30"
+                            aria-label={`${photo.file.name} 사진 삭제`}
+                          >
+                            ×
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="mt-3 rounded-2xl border border-dashed border-sand bg-white/45 px-4 py-7 text-center text-sm font-bold text-muted">선택한 사진이 없습니다.</div>
+                  )}
+                </div>
               </div>
-              <div className="flex gap-2 pt-2"><Button variant="outline" className="flex-1" onClick={onClose}>취소</Button><Button type="submit" className="flex-[1.5]">상품 등록</Button></div>
+
+              <fieldset className="rounded-2xl border border-sand bg-white/55 p-3.5 sm:p-4">
+                <legend className="px-1 text-sm font-extrabold text-ink">오픈 시간</legend>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className={`flex min-h-20 cursor-pointer items-start gap-3 rounded-2xl border-2 p-3.5 transition ${publishMode === "scheduled" ? "border-coral bg-[#fff2ec] shadow-sm" : "border-sand bg-white hover:border-coral/50"}`}>
+                    <input
+                      type="radio"
+                      name={publishModeName}
+                      value="scheduled"
+                      checked={publishMode === "scheduled"}
+                      onChange={() => { setPublishMode("scheduled"); setError(""); }}
+                      className="mt-1 h-5 w-5 accent-[#d96654]"
+                    />
+                    <span><strong className="block break-keep text-[15px]">다음날 오전 10시 예약 등록</strong><small className="mt-1 block break-keep font-bold leading-5 text-muted">예약 대기 상태로 저장 후 자동 공개</small></span>
+                  </label>
+                  <label className={`flex min-h-20 cursor-pointer items-start gap-3 rounded-2xl border-2 p-3.5 transition ${publishMode === "immediate" ? "border-coral bg-[#fff2ec] shadow-sm" : "border-sand bg-white hover:border-coral/50"}`}>
+                    <input
+                      type="radio"
+                      name={publishModeName}
+                      value="immediate"
+                      checked={publishMode === "immediate"}
+                      onChange={() => { setPublishMode("immediate"); setError(""); }}
+                      className="mt-1 h-5 w-5 accent-[#d96654]"
+                    />
+                    <span><strong className="block text-[15px]">즉시 올리기</strong><small className="mt-1 block break-keep font-bold leading-5 text-muted">등록 완료와 동시에 경매 피드에 공개</small></span>
+                  </label>
+                </div>
+              </fieldset>
+
+              {error ? <p role="alert" className="rounded-2xl bg-[#ffe8df] px-4 py-3 text-sm font-extrabold leading-6 text-[#a74336]">{error}</p> : null}
+
+              <div className="flex flex-col-reverse gap-2 border-t border-sand pt-4 sm:flex-row">
+                <Button variant="outline" className="flex-1" onClick={closeModal} disabled={isSubmitting}>취소</Button>
+                <Button type="submit" className="flex-[1.5]" disabled={isSubmitting} aria-busy={isSubmitting || undefined}>
+                  {isSubmitting ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/45 border-t-white" aria-hidden="true" />
+                      사진 업로드 중...
+                    </>
+                  ) : "상품 등록"}
+                </Button>
+              </div>
             </form>
           </Modal>
         );
@@ -2754,7 +3037,11 @@
       function App() {
         const [page, setPage] = useState("feed");
         const [role, setRole] = useState("user");
-        const [posts, setPosts] = useState(MOCK_POSTS);
+        const [posts, setPosts] = useState([]);
+        const [productsLoading, setProductsLoading] = useState(true);
+        const [productsError, setProductsError] = useState("");
+        const [adminAuthenticated, setAdminAuthenticated] = useState(false);
+        const [adminLoginOpen, setAdminLoginOpen] = useState(false);
         const [profile, setProfile] = useState(loadSavedProfile);
         const [auctionNow, setAuctionNow] = useState(() => new Date());
         const [wonItems, setWonItems] = useState(WON_AUCTIONS);
@@ -2774,48 +3061,109 @@
 
         const showToast = useCallback((message) => setToast(message), []);
 
+        const loadPublishedProducts = useCallback(
+          async ({ showLoading = true } = {}) => {
+            if (showLoading) setProductsLoading(true);
+
+            try {
+              const products = await fetchPublishedProducts();
+              setPosts(products);
+              setProductsError("");
+              return true;
+            } catch (loadError) {
+              setProductsError(
+                loadError?.message ||
+                  "Supabase에서 상품 목록을 불러오지 못했습니다.",
+              );
+              return false;
+            } finally {
+              if (showLoading) setProductsLoading(false);
+            }
+          },
+          [],
+        );
+
         useEffect(() => {
           const timer = window.setInterval(() => setAuctionNow(new Date()), 1000);
           return () => window.clearInterval(timer);
         }, []);
 
         useEffect(() => {
-          let bidderCursor = 0;
-          let postCursor = 0;
-          const timer = window.setInterval(() => {
-            if (document.hidden) return;
-            setPosts((current) => {
-              const bidder = MOCK_LIVE_BIDDERS[bidderCursor % MOCK_LIVE_BIDDERS.length];
-              const leadingPosts = current.filter((post) =>
-                post.status === "active" &&
-                getUserBidState(post, DEFAULT_PROFILE.name).status === "user-leading" &&
-                getBidAccess(post, bidder, new Date()).allowed,
-              );
-              if (!leadingPosts.length) return current;
+          let active = true;
+          let productChannel;
 
-              const target = leadingPosts[postCursor % leadingPosts.length];
-              postCursor += 1;
-              bidderCursor += 1;
-              const amount = target.currentPrice + QUICK_BID_INCREMENT;
-              const bidRecord = Object.freeze({
-                id: `bid-mock-live-${Date.now()}`,
-                bidderName: bidder,
-                amount,
-                bidAt: new Date().toISOString(),
+          const connect = async () => {
+            await loadPublishedProducts();
+            if (!active) return;
+
+            let client;
+            try {
+              client = getSupabaseClient();
+            } catch {
+              return;
+            }
+            productChannel = client
+              .channel("standalone-products-feed")
+              .on(
+                "postgres_changes",
+                {
+                  event: "*",
+                  schema: "public",
+                  table: "products",
+                },
+                () => {
+                  void loadPublishedProducts({ showLoading: false });
+                },
+              )
+              .subscribe((status) => {
+                if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+                  setProductsError(
+                    "상품 실시간 연결이 끊어졌습니다. 다시 불러오기를 눌러 주세요.",
+                  );
+                }
               });
+          };
 
-              // TODO: 실제 서비스에서는 Firebase/WebSocket 실시간 입찰 이벤트로 교체하세요.
-              return current.map((post) => post.id === target.id ? {
-                ...post,
-                currentPrice: amount,
-                participantCount: post.bidHistory.some((bid) => bid.bidderName === bidder)
-                  ? post.participantCount
-                  : post.participantCount + 1,
-                bidHistory: Object.freeze([bidRecord, ...post.bidHistory]),
-              } : post);
+          void connect();
+          return () => {
+            active = false;
+            if (productChannel) {
+              void getSupabaseClient().removeChannel(productChannel);
+            }
+          };
+        }, [loadPublishedProducts]);
+
+        useEffect(() => {
+          let active = true;
+          let authSubscription;
+
+          try {
+            const client = getSupabaseClient();
+            const applySession = (session) => {
+              if (!active) return;
+              const isAdmin = isSupabaseAdmin(session?.user);
+              setAdminAuthenticated(isAdmin);
+              if (!isAdmin) setRole("user");
+            };
+
+            void client.auth
+              .getSession()
+              .then(({ data }) => {
+                applySession(data.session);
+              })
+              .catch(() => applySession(null));
+            const { data } = client.auth.onAuthStateChange((_event, session) => {
+              applySession(session);
             });
-          }, 22000);
-          return () => window.clearInterval(timer);
+            authSubscription = data.subscription;
+          } catch {
+            setAdminAuthenticated(false);
+          }
+
+          return () => {
+            active = false;
+            authSubscription?.unsubscribe();
+          };
         }, []);
 
         const appendChatMessage = (threadId, text) => {
@@ -3057,28 +3405,42 @@
           }
         };
 
-        const createAuction = (values) => {
-          const now = new Date();
-          const newPost = {
-            id: `auction-${Date.now()}`,
-            title: values.title,
-            category: values.category,
-            description: values.description,
-            condition: values.condition,
-            startingPrice: values.startingPrice,
-            currentPrice: values.startingPrice,
-            bidIncrement: QUICK_BID_INCREMENT,
-            participantCount: 0,
-            imageUrls: values.imageUrls,
-            bidHistory: Object.freeze([]),
-            createdAt: now.toISOString(),
-            closesAt: nextActiveDeadline(),
-            status: "active",
-          };
-          // TODO: 실제 서비스에서는 관리자 게시물 생성 API를 호출하세요.
-          setPosts((current) => [newPost, ...current]);
-          setPage("feed");
-          showToast("새 경매글이 피드에 등록되었습니다.");
+        const createAuction = async (values) => {
+          if (!values.imageFiles?.length) {
+            throw new Error("상품 사진이 필요합니다.");
+          }
+          if (!adminAuthenticated) {
+            setAdminLoginOpen(true);
+            throw new Error("관리자 로그인이 필요합니다.");
+          }
+
+          await createSupabaseProduct(values);
+          await loadPublishedProducts({ showLoading: false });
+          if (values.status === "active") setPage("feed");
+          showToast(
+            values.status === "pending"
+              ? "새 경매글이 다음날 오전 10시 공개로 예약되었습니다."
+              : "새 경매글이 피드에 즉시 등록되었습니다.",
+          );
+        };
+
+        const requestRoleChange = (nextRole) => {
+          if (nextRole === "user") {
+            setRole("user");
+            return;
+          }
+          if (adminAuthenticated) {
+            setRole("admin");
+            return;
+          }
+          setAdminLoginOpen(true);
+        };
+
+        const completeAdminLogin = () => {
+          setAdminAuthenticated(true);
+          setRole("admin");
+          setAdminLoginOpen(false);
+          showToast("관리자 계정으로 로그인했습니다.");
         };
 
         const salesWithCurrentProfile = useMemo(() => ADMIN_SALES.map((sale) =>
@@ -3094,20 +3456,21 @@
 
         return (
           <>
-            <SiteHeader page={page} role={role} onRoleChange={setRole} onNavigate={navigate} onCreateAuction={() => setCreateOpen(true)} />
+            <SiteHeader page={page} role={role} onRoleChange={requestRoleChange} onNavigate={navigate} onCreateAuction={() => setCreateOpen(true)} />
             <main className="mx-auto min-h-[calc(100vh-80px)] max-w-[1800px] px-3 pb-28 pt-5 sm:px-4 sm:pt-7 md:pb-14 lg:px-5">
               {page === "feed" && (
                 <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_235px] xl:grid-cols-[170px_minmax(0,1fr)_235px] xl:gap-4">
                   <OnlineMembersSidebar className="hidden xl:block" />
-                  <div className="min-w-0"><FeedPage posts={posts} currentUserName={DEFAULT_PROFILE.name} auctionNow={auctionNow} onBid={placeBid} onInquiry={sendProductInquiry} /></div>
+                  <div className="min-w-0"><FeedPage posts={posts} currentUserName={DEFAULT_PROFILE.name} auctionNow={auctionNow} onBid={placeBid} onInquiry={sendProductInquiry} loading={productsLoading} error={productsError} onRetry={() => loadPublishedProducts()} /></div>
                   <LiveBidSidebar posts={posts} currentUserName={DEFAULT_PROFILE.name} auctionNow={auctionNow} onBid={placeBid} className="hidden lg:block" />
                 </div>
               )}
               {page === "chat" && <div className="mx-auto max-w-7xl"><ChatPage threads={chatThreads} messages={chatMessages} onSendMessage={appendChatMessage} /></div>}
               {page === "profile" && <div className="mx-auto max-w-7xl"><ProfilePage profile={profile} onSave={saveProfile} wonItems={wonItems} now={auctionNow} onStartBatchPayment={() => openBatchPayment(true)} onViewAccount={() => openBatchPayment(false)} keepItems={keepItems} onRequestShipping={requestShipping} shippingQueue={shippingQueue.filter((item) => !item.buyerId || item.buyerId === profile.id)} shippedItems={shippedItems.filter((item) => !item.buyerId || item.buyerId === profile.id)} onCopyTracking={copyTracking} onRecharge={openRecharge} /></div>}
-              {page === "admin" && <div className="mx-auto max-w-7xl"><AdminPage role={role} sales={salesWithCurrentProfile} shippingQueue={shippingQueue} shippedItems={shippedItems} adminCsMessages={adminCsMessages} onUnlock={() => setRole("admin")} onRegisterShipment={registerShipment} onSendAdminCsMessage={appendAdminCsMessage} /></div>}
+              {page === "admin" && <div className="mx-auto max-w-7xl"><AdminPage role={role} sales={salesWithCurrentProfile} shippingQueue={shippingQueue} shippedItems={shippedItems} adminCsMessages={adminCsMessages} onUnlock={() => requestRoleChange("admin")} onRegisterShipment={registerShipment} onSendAdminCsMessage={appendAdminCsMessage} /></div>}
             </main>
             <Navigation page={page} role={role} onNavigate={navigate} mobile />
+            <AdminLoginModal open={adminLoginOpen} onClose={() => setAdminLoginOpen(false)} onAuthenticated={completeAdminLogin} />
             <NewAuctionModal open={createOpen} onClose={() => setCreateOpen(false)} onSubmit={createAuction} />
             <PaymentModal
               open={Boolean(paymentSession)}

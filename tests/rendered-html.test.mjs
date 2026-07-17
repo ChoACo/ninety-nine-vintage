@@ -46,26 +46,32 @@ test("server-renders the Dami vintage auction feed", async () => {
   );
   assert.match(html, /매일 만나는 믿을 수 있는 구제 옷, 다미네 구제/);
   assert.match(html, /날짜별 구제 의류 경매/);
-  assert.match(html, /버버리 체크 안감 트렌치코트 여성 66~77/);
-  assert.match(html, /울 100% 카멜 핸드메이드 코트/);
   assert.match(html, /전체보기/);
-  assert.match(html, /상품 문의하기/);
-  assert.match(html, /입찰 현황 보기/);
-  assert.match(
-    html,
-    /입찰하기|신규 입찰 마감 \(기존 참여자 전용\)|오늘 경매 마감/,
-  );
+  assert.match(html, /Supabase에서 경매 상품을 불러오는 중이에요/);
+  assert.doesNotMatch(html, /버버리 체크 안감 트렌치코트 여성 66~77/);
+  assert.doesNotMatch(html, /울 100% 카멜 핸드메이드 코트/);
   assert.match(html, /내 실시간 경매 현황/);
-  assert.match(html, /재입찰 필요 상품/);
   assert.match(html, /현재 접속 중인 회원/);
-  assert.match(html, /내 입찰 최고가/);
-  assert.match(html, /재입찰 필요!/);
   assert.match(html, /관리자 직통/);
   assert.doesNotMatch(html, /경매 진행 중|개별 남은 시간/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
 
-test("keeps the high-volume feed, mock data, and inquiry UI modular", async () => {
+test("keeps Vercel routes on vinext SSR instead of the standalone HTML demo", async () => {
+  const [viteConfig, vercelConfigSource] = await Promise.all([
+    readFile(new URL("../vite.config.ts", import.meta.url), "utf8"),
+    readFile(new URL("../vercel.json", import.meta.url), "utf8"),
+  ]);
+  const vercelConfig = JSON.parse(vercelConfigSource);
+
+  assert.match(viteConfig, /process\.env\.VERCEL === "1"/);
+  assert.match(viteConfig, /nitro\(\{ renderer: false \}\)/);
+  assert.equal(vercelConfig.framework, "nitro");
+  assert.equal(vercelConfig.buildCommand, "pnpm exec vite build");
+  assert.equal(vercelConfig.outputDirectory, null);
+});
+
+test("keeps the auction UI modular while Supabase owns the product source", async () => {
   const requiredFiles = [
     "src/data/mockData.ts",
     "src/hooks/useAuctionClock.ts",
@@ -77,6 +83,11 @@ test("keeps the high-volume feed, mock data, and inquiry UI modular", async () =
     "src/utils/auctionBidPolicy.ts",
     "src/utils/formatters.ts",
     "src/utils/shipping.ts",
+    "src/lib/supabase/client.ts",
+    "src/lib/supabase/database.types.ts",
+    "src/lib/supabase/products.ts",
+    "src/lib/supabase/adminAuth.ts",
+    "src/hooks/useSupabaseProducts.ts",
     "src/components/common/Navigation.tsx",
     "src/components/feed/DateFilterChips.tsx",
     "src/components/feed/ProductInquiryModal.tsx",
@@ -109,15 +120,19 @@ test("keeps the high-volume feed, mock data, and inquiry UI modular", async () =
     "src/components/admin/RecentClosingDayAccordion.tsx",
     "src/components/admin/SettlementSummaryTable.tsx",
     "src/components/admin/AdminCsChatModal.tsx",
+    "src/components/admin/AdminLoginModal.tsx",
+    "supabase/migrations/20260717000000_create_products.sql",
+    ".env.example",
   ];
 
   await Promise.all(
     requiredFiles.map((path) => access(new URL(`../${path}`, import.meta.url))),
   );
 
-  const [page, mockData, feedFiles, liveFiles, profileFiles, adminFiles] =
+  const [page, auctionApp, mockData, feedFiles, liveFiles, profileFiles, adminFiles] =
     await Promise.all([
       readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../src/components/AuctionApp.tsx", import.meta.url), "utf8"),
       readFile(new URL("../src/data/mockData.ts", import.meta.url), "utf8"),
       readdir(new URL("../src/components/feed/", import.meta.url)),
       readdir(new URL("../src/components/live/", import.meta.url)),
@@ -127,6 +142,8 @@ test("keeps the high-volume feed, mock data, and inquiry UI modular", async () =
 
   assert.match(page, /<AuctionApp \/>/);
   assert.doesNotMatch(page, /useState|mockData|auctionPosts/);
+  assert.match(auctionApp, /useSupabaseProducts\(\)/);
+  assert.doesNotMatch(auctionApp, /\bauctionPosts\b|useMockLiveBids/);
   assert.match(mockData, /TODO: DB 연동 필요/);
   assert.match(mockData, /다미네 구제 운영자/);
   assert.match(mockData, /images\.unsplash\.com/);
@@ -161,7 +178,6 @@ test("keeps bidding transparent, cutoff-aware, and mistake-proof", async () => {
     onlineSidebar,
     floatingChat,
     chatPage,
-    mockLiveBids,
     auctionBidPolicy,
     auctionPolicyClock,
   ] = await Promise.all([
@@ -180,7 +196,6 @@ test("keeps bidding transparent, cutoff-aware, and mistake-proof", async () => {
     readFile(new URL("../src/components/live/OnlineMembersSidebar.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/chat/FloatingAdminChat.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/chat/ChatPage.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../src/hooks/useMockLiveBids.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/utils/auctionBidPolicy.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/hooks/useAuctionPolicyClock.ts", import.meta.url), "utf8"),
   ]);
@@ -236,7 +251,9 @@ test("keeps bidding transparent, cutoff-aware, and mistake-proof", async () => {
 
   assert.match(feedList, /xl:grid-cols-3/);
   assert.match(feedList, /currentUserName=\{currentUserName\}/);
-  assert.match(feedList, /getKoreanDateKey\(post\.createdAt\)/);
+  assert.match(feedList, /getKoreanDateKey\(post\.publish_at \?\? post\.createdAt\)/);
+  assert.match(feedList, /post\.status !== "active"/);
+  assert.match(feedList, /publishTime <= auctionNow\.getTime\(\)/);
   assert.match(dateFilterChips, /전체보기/);
   assert.match(dateFilterChips, /오늘 \(\$\{dateLabel\}\)/);
   assert.match(dateFilterChips, /어제 \(\$\{dateLabel\}\)/);
@@ -266,8 +283,6 @@ test("keeps bidding transparent, cutoff-aware, and mistake-proof", async () => {
   assert.match(floatingChat, /thread\.messages/);
   assert.match(chatPage, /🟢 온라인/);
   assert.match(chatPage, /⚪ 오프라인/);
-  assert.match(mockLiveBids, /intervalMs = 22_000/);
-  assert.match(mockLiveBids, /getUserBidStatus\(post, currentUserName\) === "user-leading"/);
   assert.match(auctionBidPolicy, /NEW_BID_CUTOFF_SECONDS\s*=\s*20 \* 60 \* 60 \+ 56 \* 60/);
   assert.match(auctionBidPolicy, /AUCTION_CLOSE_SECONDS\s*=\s*21 \* 60 \* 60/);
   assert.match(auctionBidPolicy, /if \(userHasBidHistory\)/);
@@ -282,7 +297,8 @@ test("keeps bidding transparent, cutoff-aware, and mistake-proof", async () => {
   assert.match(auctionApp, /<OnlineMembersSidebar/);
   assert.match(auctionApp, /<LiveBidSidebar/);
   assert.match(auctionApp, /<FloatingAdminChat/);
-  assert.match(auctionApp, /useMockLiveBids/);
+  assert.match(auctionApp, /useSupabaseProducts\(\)/);
+  assert.doesNotMatch(auctionApp, /useMockLiveBids|\bauctionPosts\b/);
   assert.doesNotMatch(auctionApp, /setActivePage\("chat"\)/);
   assert.doesNotMatch(auctionApp, /new Date\(target\.closesAt\)|target\.closesAt.*Date\.now/);
 
@@ -551,6 +567,99 @@ test("runs the admin warehouse, tracking sync, recent settlements, and direct CS
   assert.match(auctionApp, /onSendCustomerMessage=\{handleSendCustomerMessage\}/);
 });
 
+test("persists auction products and images through Supabase", async () => {
+  const [
+    modal,
+    auctionApp,
+    feedList,
+    postCard,
+    auctionTypes,
+    auctionBidPolicy,
+    supabaseClient,
+    productRepository,
+    productsHook,
+    adminAuth,
+    adminLoginModal,
+    migration,
+    envExample,
+    packageJson,
+  ] = await Promise.all([
+    readFile(new URL("../src/components/feed/NewAuctionModal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/AuctionApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/feed/FeedList.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/feed/PostCard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/types/auction.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/utils/auctionBidPolicy.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/supabase/client.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/supabase/products.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/hooks/useSupabaseProducts.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/supabase/adminAuth.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/admin/AdminLoginModal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/migrations/20260717000000_create_products.sql", import.meta.url), "utf8"),
+    readFile(new URL("../.env.example", import.meta.url), "utf8"),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+  ]);
+
+  assert.doesNotMatch(modal, /카테고리|상품 상태|사진 URL/);
+  assert.match(modal, /type="file"/);
+  assert.match(modal, /\bmultiple\b/);
+  assert.match(modal, /accept="image\/\*"/);
+  assert.match(modal, /URL\.createObjectURL\(file\)/);
+  assert.match(modal, /URL\.revokeObjectURL/);
+  assert.match(modal, /사진 삭제/);
+  assert.match(modal, /useState<PublishMode>\("scheduled"\)/);
+  assert.match(modal, /다음날 오전 10시 예약 등록/);
+  assert.match(modal, /즉시 올리기/);
+  assert.match(modal, /status: isScheduled \? "pending" : "active"/);
+  assert.match(modal, /publish_at: isScheduled/);
+  assert.match(modal, /사진 업로드 중\.\.\./);
+
+  assert.match(supabaseClient, /createClient<Database>/);
+  assert.match(supabaseClient, /NEXT_PUBLIC_SUPABASE_URL/);
+  assert.match(supabaseClient, /NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
+  assert.doesNotMatch(supabaseClient, /SERVICE_ROLE|service_role/);
+  assert.match(productRepository, /product-images/);
+  assert.match(productRepository, /Date\.now\(\).*crypto\.randomUUID\(\)/);
+  assert.match(productRepository, /\.upload\(path, file/);
+  assert.match(productRepository, /\.getPublicUrl\(data\.path\)/);
+  assert.match(productRepository, /image_urls: uploaded\.imageUrls/);
+  assert.match(productRepository, /\.from\("products"\)\.insert\(row\)/);
+  assert.match(productRepository, /\.eq\("status", "active"\)/);
+  assert.match(productRepository, /\.lte\("publish_at", nowIso\)/);
+  assert.match(productRepository, /\.order\("publish_at", \{ ascending: false \}\)/);
+  assert.match(productRepository, /isSupabaseAdmin\(user\)/);
+  assert.doesNotMatch(productRepository, /FileReader|readAsDataURL/);
+
+  assert.match(productsHook, /channel\("products-feed"\)/);
+  assert.match(productsHook, /"postgres_changes"/);
+  assert.match(productsHook, /table: "products"/);
+  assert.match(productsHook, /removeChannel\(channel\)/);
+  assert.match(auctionApp, /useSupabaseProducts\(\)/);
+  assert.match(auctionApp, /await createProduct\(draft\)/);
+  assert.doesNotMatch(auctionApp, /\bauctionPosts\b|readImageFilesAsDataUrls|useMockLiveBids/);
+  assert.match(feedList, /post\.status !== "active"/);
+  assert.match(feedList, /publishTime <= auctionNow\.getTime\(\)/);
+  assert.match(postCard, /post\.publish_at \?\? post\.createdAt/);
+
+  assert.match(adminAuth, /signInWithPassword/);
+  assert.match(adminAuth, /app_metadata\?\.role === "admin"/);
+  assert.match(adminLoginModal, /Supabase 관리자 로그인/);
+  assert.match(auctionTypes, /"pending" \| "active" \| "closed"/);
+  assert.match(auctionBidPolicy, /reason: "item-pending"/);
+
+  assert.match(migration, /create table if not exists public\.products/);
+  assert.match(migration, /'product-images'/);
+  assert.match(migration, /status = 'active' and publish_at <= now\(\)/);
+  assert.match(migration, /app_metadata/);
+  assert.match(migration, /supabase_realtime add table public\.products/);
+  assert.match(migration, /cron\.schedule/);
+  assert.match(migration, /status = 'pending'[\s\S]*publish_at <= now\(\)/);
+  assert.match(envExample, /NEXT_PUBLIC_SUPABASE_URL/);
+  assert.match(envExample, /NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
+  assert.match(packageJson, /@supabase\/supabase-js/);
+  await assert.rejects(access(new URL("../src/utils/imageFiles.ts", import.meta.url)));
+});
+
 test("keeps the double-click index.html synchronized with the updated business rules", async () => {
   const standalone = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const postCardSource = standalone.slice(
@@ -580,6 +689,14 @@ test("keeps the double-click index.html synchronized with the updated business r
   const standaloneAppStateSource = standalone.slice(
     standalone.indexOf("function App()"),
     standalone.indexOf("ReactDOM.createRoot"),
+  );
+  const newAuctionModalSource = standalone.slice(
+    standalone.indexOf("function NewAuctionModal"),
+    standalone.indexOf("function Toast"),
+  );
+  const createAuctionSource = standalone.slice(
+    standalone.indexOf("const createAuction"),
+    standalone.indexOf("const salesWithCurrentProfile"),
   );
 
   assert.match(standalone, /다미네 구제 \| 믿고 참여하는 구제 의류 경매/);
@@ -625,11 +742,44 @@ test("keeps the double-click index.html synchronized with the updated business r
   assert.match(standalone, /🟢 내가 입찰 중인 상품/);
   assert.match(standalone, /🟢 온라인/);
   assert.match(standalone, /⚪ 오프라인/);
-  assert.match(standalone, /22000/);
   assert.match(standalone, /max-w-\[1800px\]/);
   assert.match(standalone, /xl:grid-cols-\[170px_minmax\(0,1fr\)_235px\]/);
-  assert.match(standalone, /버버리 체크 안감 트렌치코트 여성 66~77 가슴 57cm/);
-  assert.doesNotMatch(standalone, /클래식한 베이지 컬러의 정품 빈티지 제품/);
+
+  assert.doesNotMatch(newAuctionModalSource, /카테고리|상품 상태|사진 URL/);
+  assert.match(newAuctionModalSource, /type="file"/);
+  assert.match(newAuctionModalSource, /\bmultiple\b/);
+  assert.match(newAuctionModalSource, /accept="image\/\*"/);
+  assert.match(newAuctionModalSource, /URL\.createObjectURL\(file\)/);
+  assert.match(newAuctionModalSource, /URL\.revokeObjectURL/);
+  assert.match(newAuctionModalSource, /사진 삭제/);
+  assert.match(newAuctionModalSource, /useState\("scheduled"\)/);
+  assert.match(newAuctionModalSource, /다음날 오전 10시 예약 등록/);
+  assert.match(newAuctionModalSource, /즉시 올리기/);
+  assert.match(newAuctionModalSource, /status: scheduled \? "pending" : "active"/);
+  assert.match(newAuctionModalSource, /publish_at: scheduled/);
+  assert.match(standalone, /function nextScheduledPublishAt/);
+  assert.match(standalone, /post\.status === "pending"/);
+  assert.match(standaloneAppStateSource, /const \[posts, setPosts\] = useState\(\[\]\)/);
+  assert.match(standaloneAppStateSource, /fetchPublishedProducts\(\)/);
+  assert.match(standaloneAppStateSource, /"postgres_changes"/);
+  assert.match(standaloneAppStateSource, /table: "products"/);
+  assert.match(createAuctionSource, /await createSupabaseProduct\(values\)/);
+  assert.match(createAuctionSource, /await loadPublishedProducts/);
+  assert.match(standalone, /window\.__SUPABASE_CONFIG__/);
+  assert.match(standalone, /@supabase\/supabase-js@2/);
+  assert.match(standalone, /signInWithPassword/);
+  assert.match(standalone, /app_metadata\?\.role === "admin"/);
+  assert.match(standalone, /storage\.from\(PRODUCT_IMAGES_BUCKET\)/);
+  assert.match(standalone, /\.upload\(path, file/);
+  assert.match(standalone, /getPublicUrl\(path\)/);
+  assert.match(standalone, /client\.from\("products"\)\.insert\(productRow\)/);
+  assert.match(standalone, /\.eq\("status", "active"\)/);
+  assert.match(standalone, /\.lte\("publish_at", new Date\(\)\.toISOString\(\)\)/);
+  assert.match(standalone, /publish_at: values\.publish_at/);
+  assert.match(standalone, /closes_at: nextActiveDeadline\(values\.publish_at\)/);
+  assert.match(standalone, /status: values\.status/);
+  assert.match(newAuctionModalSource, /사진 업로드 중\.\.\./);
+  assert.doesNotMatch(standalone, /MOCK_POSTS|FileReader|readAsDataURL|readImageFileAsDataUrl/);
 
   assert.match(standalone, /shippingCount: 2/);
   assert.match(standalone, /shippingAddresses:\s*\[/);

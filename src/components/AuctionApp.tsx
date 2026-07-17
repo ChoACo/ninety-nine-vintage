@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminAccessGate } from "@/src/components/admin/AdminAccessGate";
+import AdminLoginModal from "@/src/components/admin/AdminLoginModal";
 import { AdminPage } from "@/src/components/admin";
 import { ChatPage } from "@/src/components/chat/ChatPage";
 import { FloatingAdminChat } from "@/src/components/chat/FloatingAdminChat";
@@ -26,14 +27,12 @@ import {
   adminSaleRecords,
   adminCustomerChats,
   adminShipmentBatches,
-  auctionPosts,
   chatThreads,
   currentUser,
   paymentAccount,
   wonAuctions,
 } from "@/src/data/mockData";
 import type {
-  AuctionPost,
   AdminCustomerChatPayload,
   AdminCustomerChatThread,
   AdminShipmentBatch,
@@ -44,17 +43,17 @@ import type {
   ShipmentRegistrationPayload,
   WonAuction,
 } from "@/src/types/auction";
-import {
-  getMinimumBidAmount,
-  QUICK_BID_INCREMENT,
-} from "@/src/utils/bidding";
+import { getMinimumBidAmount } from "@/src/utils/bidding";
 import {
   assertAuctionBidAllowed,
   AuctionBidPolicyError,
 } from "@/src/utils/auctionBidPolicy";
-import { formatKRW, getNextAuctionDeadline } from "@/src/utils/formatters";
+import { formatKRW } from "@/src/utils/formatters";
+import { createProduct } from "@/src/lib/supabase/products";
+import { getSupabaseBrowserClient } from "@/src/lib/supabase/client";
+import { isSupabaseAdmin } from "@/src/lib/supabase/adminAuth";
 import { useFulfillmentFlow } from "@/src/hooks/useFulfillmentFlow";
-import useMockLiveBids from "@/src/hooks/useMockLiveBids";
+import { useSupabaseProducts } from "@/src/hooks/useSupabaseProducts";
 
 const PROFILE_STORAGE_KEY = "damine-vintage-profile";
 const AUCTION_STORAGE_KEY = "damine-vintage-won-auctions";
@@ -65,7 +64,13 @@ const MOCK_BIDDER_IDENTITY = currentUser.name;
 export function AuctionApp() {
   const [role, setRole] = useState<Role>("user");
   const [activePage, setActivePage] = useState<NavigationTarget>("feed");
-  const [posts, setPosts] = useState<AuctionPost[]>(auctionPosts);
+  const {
+    posts,
+    setPosts,
+    isLoading: productsLoading,
+    error: productsError,
+    refreshProducts,
+  } = useSupabaseProducts();
   const [chatThreadState, setChatThreadState] =
     useState<ChatThread[]>(chatThreads);
   const [adminShipmentState, setAdminShipmentState] =
@@ -73,7 +78,46 @@ export function AuctionApp() {
   const [adminCustomerChatState, setAdminCustomerChatState] =
     useState<AdminCustomerChatThread[]>(adminCustomerChats);
   const [newAuctionOpen, setNewAuctionOpen] = useState(false);
+  const [adminLoginOpen, setAdminLoginOpen] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+
+  useEffect(() => {
+    let client;
+
+    try {
+      client = getSupabaseBrowserClient();
+    } catch {
+      return undefined;
+    }
+
+    let active = true;
+    const applyUser = (user: Parameters<typeof isSupabaseAdmin>[0]) => {
+      if (!active) return;
+      const isAdmin = isSupabaseAdmin(user);
+      setIsAdminAuthenticated(isAdmin);
+      if (!isAdmin) {
+        setRole((currentRole) =>
+          currentRole === "admin" ? "user" : currentRole,
+        );
+      }
+    };
+
+    void client.auth
+      .getUser()
+      .then(({ data }) => applyUser(data.user))
+      .catch(() => applyUser(null));
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((_event, session) => {
+      applyUser(session?.user);
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -259,68 +303,6 @@ export function AuctionApp() {
       }),
     [profile, wonAuctionState],
   );
-
-  const handleExternalBid = useCallback(
-    (postId: string, bidderName: string, amount: number) => {
-      const target = posts.find((post) => post.id === postId);
-
-      if (!target) return;
-
-      try {
-        assertAuctionBidAllowed({
-          post: target,
-          currentUserName: bidderName,
-          now: new Date(),
-        });
-      } catch (error) {
-        // Mock 외부 회원도 실제 회원과 똑같은 20:56/21:00 정책을 적용합니다.
-        if (error instanceof AuctionBidPolicyError) return;
-        throw error;
-      }
-
-      const bidRecord: BidHistoryRecord = Object.freeze({
-        id: `bid-mock-live-${Date.now()}`,
-        bidderName,
-        amount,
-        bidAt: new Date().toISOString(),
-      });
-
-      setPosts((currentPosts) =>
-        currentPosts.map((post) => {
-          if (
-            post.id !== postId ||
-            post.status === "closed" ||
-            amount <= post.currentPrice
-          ) {
-            return post;
-          }
-
-          const alreadyParticipated = post.bidHistory.some(
-            (bid) => bid.bidderName === bidderName,
-          );
-
-          return {
-            ...post,
-            currentPrice: amount,
-            participantCount: alreadyParticipated
-              ? post.participantCount
-              : post.participantCount + 1,
-            bidHistory: Object.freeze([bidRecord, ...post.bidHistory]),
-          };
-        }),
-      );
-
-      // TODO: DB 연동 필요 - 실제 서비스에서는 서버 실시간 입찰 구독이 이 상태를 갱신합니다.
-      showToast("다른 회원의 새 입찰로 내 경매 현황이 갱신되었습니다.");
-    },
-    [posts, showToast],
-  );
-
-  useMockLiveBids({
-    posts,
-    currentUserName: MOCK_BIDDER_IDENTITY,
-    onExternalBid: handleExternalBid,
-  });
 
   const handleBid = async (postId: string, amount: number) => {
     const target = posts.find((post) => post.id === postId);
@@ -533,29 +515,32 @@ export function AuctionApp() {
   };
 
   const handleCreateAuction = async (draft: NewAuctionDraft) => {
-    const now = new Date();
-    const newPost: AuctionPost = {
-      id: `auction-local-${Date.now()}`,
-      ...draft,
-      createdAt: now.toISOString(),
-      closesAt: getNextAuctionDeadline(now).toISOString(),
-      status: "active",
-      participantCount: 0,
-      currentPrice: draft.startingPrice,
-      bidIncrement: QUICK_BID_INCREMENT,
-      bidHistory: Object.freeze([]),
-    };
+    await createProduct(draft);
+    await refreshProducts();
+    if (draft.status === "active") setActivePage("feed");
 
-    setPosts((currentPosts) => [newPost, ...currentPosts]);
-    setActivePage("feed");
-
-    // TODO: DB 연동 필요 - 관리자 경매 게시물 생성 API 호출 위치입니다.
-    showToast("새 경매글이 피드 가장 위에 등록됐어요.");
+    showToast(
+      draft.status === "pending"
+        ? "새 경매글을 다음날 오전 10시 공개로 예약했어요."
+        : "새 경매글이 피드 가장 위에 등록됐어요.",
+    );
   };
 
   const handleRoleChange = (nextRole: Role) => {
+    if (nextRole === "admin" && !isAdminAuthenticated) {
+      setAdminLoginOpen(true);
+      return;
+    }
+
     setRole(nextRole);
     showToast(nextRole === "admin" ? "운영자 모드로 전환했어요." : "일반 사용자 모드로 전환했어요.");
+  };
+
+  const handleAdminAuthenticated = () => {
+    setIsAdminAuthenticated(true);
+    setAdminLoginOpen(false);
+    setRole("admin");
+    showToast("Supabase 관리자 인증을 완료했어요.");
   };
 
   const renderPage = () => {
@@ -628,6 +613,9 @@ export function AuctionApp() {
               currentUserName={MOCK_BIDDER_IDENTITY}
               onBid={handleBid}
               onInquiry={handleProductInquiry}
+              isLoading={productsLoading}
+              loadError={productsError}
+              onRetry={refreshProducts}
             />
           </div>
 
@@ -669,6 +657,12 @@ export function AuctionApp() {
         open={newAuctionOpen}
         onClose={() => setNewAuctionOpen(false)}
         onSubmit={handleCreateAuction}
+      />
+
+      <AdminLoginModal
+        open={adminLoginOpen}
+        onClose={() => setAdminLoginOpen(false)}
+        onAuthenticated={handleAdminAuthenticated}
       />
 
       <FloatingAdminChat

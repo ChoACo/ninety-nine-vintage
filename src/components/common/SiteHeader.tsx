@@ -37,7 +37,7 @@ export default function SiteHeader({
 
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           <span className="rounded-full bg-[#e7f2f5] px-3 py-1.5 text-sm font-bold text-[#467481]">
-            임시 권한 테스트
+            Supabase 관리자 인증
           </span>
           <RoleToggle role={role} onToggle={onRoleChange} compact />
           {role === "admin" && onCreateAuction ? (

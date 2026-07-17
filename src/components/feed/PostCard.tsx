@@ -122,6 +122,7 @@ export default function PostCard({
   const bidPresentation = bidStatusStyles[bidState.status];
   const displayedPrice = bidState.leadingBid?.amount ?? post.startingPrice;
   const productLabel = getProductLabel(post.description);
+  const publishedAt = post.publish_at ?? post.createdAt;
 
   useEffect(() => {
     if (bidDecision.allowed) return;
@@ -177,13 +178,13 @@ export default function PostCard({
       <header className="flex items-center justify-between gap-2 border-b border-[#eee0d5] bg-white/45 px-4 py-3">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <time
-            dateTime={post.createdAt}
+            dateTime={publishedAt}
             className="text-[15px] font-black text-[#4b3f38]"
           >
-            {formatKoreanDate(post.createdAt, { includeWeekday: false })}
+            {formatKoreanDate(publishedAt, { includeWeekday: false })}
           </time>
           <span className="rounded-full bg-[#e7f3f5] px-2 py-1 text-sm font-bold text-[#4c7781]">
-            {getKoreanWeekday(post.createdAt)}요일
+            {getKoreanWeekday(publishedAt)}요일
           </span>
         </div>
         <button

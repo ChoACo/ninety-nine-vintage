@@ -1,6 +1,6 @@
 export type Role = "user" | "admin";
 
-export type AuctionStatus = "active" | "closed";
+export type AuctionStatus = "pending" | "active" | "closed";
 
 export type ISODateString = string;
 
@@ -55,6 +55,8 @@ export interface AuctionPost {
   description: string;
   category: string;
   createdAt: ISODateString;
+  /** 예약 공개 시각. 기존 데이터는 createdAt을 공개 시각으로 사용합니다. */
+  publish_at?: ISODateString;
   closesAt: ISODateString;
   status: AuctionStatus;
   participantCount: number;

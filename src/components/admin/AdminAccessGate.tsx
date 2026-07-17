@@ -19,14 +19,14 @@ export function AdminAccessGate({ onSwitchToAdmin }: AdminAccessGateProps) {
           </span>
           <p className="mt-6 text-[17px] font-black tracking-[0.16em] text-[#b96858]">ADMIN ACCESS</p>
           <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#453a34] sm:text-3xl">
-            운영자 모드에서 확인할 수 있어요
+            Supabase 관리자 인증이 필요해요
           </h2>
           <p className="mx-auto mt-4 max-w-lg break-keep text-[17px] font-bold leading-8 text-[#7d6d63]">
-            상단의 임시 권한 토글을 운영자로 바꾸면 발송 피킹, 송장 등록,
-            최근 7일 마감 내역과 고객 1:1 상담 기능을 테스트할 수 있어요.
+            관리자 계정으로 로그인하면 경매글 등록, 발송 피킹, 송장 등록과
+            고객 상담 기능을 안전하게 사용할 수 있어요.
           </p>
           <Button size="lg" className="mt-7" onClick={onSwitchToAdmin}>
-            운영자 모드로 전환
+            관리자 로그인
             <span aria-hidden="true">→</span>
           </Button>
         </div>

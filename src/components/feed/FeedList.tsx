@@ -15,6 +15,9 @@ export interface FeedListProps {
   currentUserName: string;
   onBid?: BidHandler;
   onInquiry: InquiryHandler;
+  isLoading?: boolean;
+  loadError?: string;
+  onRetry?: () => void | Promise<void>;
   title?: string;
   description?: string;
 }
@@ -24,17 +27,35 @@ export default function FeedList({
   currentUserName,
   onBid,
   onInquiry,
+  isLoading = false,
+  loadError = "",
+  onRetry,
   title = "날짜별 구제 의류 경매",
   description = "날짜별 상품을 빠르게 보고, 오후 8시 56분 신규 참여 제한 전에 여유 있게 입찰하세요.",
 }: FeedListProps) {
   const [selectedDate, setSelectedDate] = useState("all");
   const auctionNow = useAuctionPolicyClock();
+  const publishedPosts = useMemo(
+    () =>
+      posts.filter((post) => {
+        if (post.status !== "active") return false;
+        const publishTime = Date.parse(post.publish_at ?? post.createdAt);
+        return (
+          Number.isFinite(publishTime) && publishTime <= auctionNow.getTime()
+        );
+      }),
+    [auctionNow, posts],
+  );
   const dateKeys = useMemo(
     () =>
       Array.from(
-        new Set(posts.map((post) => getKoreanDateKey(post.createdAt))),
+        new Set(
+          publishedPosts.map((post) =>
+            getKoreanDateKey(post.publish_at ?? post.createdAt),
+          ),
+        ),
       ).sort((a, b) => b.localeCompare(a)),
-    [posts],
+    [publishedPosts],
   );
   const effectiveSelectedDate =
     selectedDate === "all" || dateKeys.includes(selectedDate)
@@ -43,11 +64,13 @@ export default function FeedList({
   const filteredPosts = useMemo(
     () =>
       effectiveSelectedDate === "all"
-        ? posts
-        : posts.filter(
-            (post) => getKoreanDateKey(post.createdAt) === effectiveSelectedDate,
+        ? publishedPosts
+        : publishedPosts.filter(
+            (post) =>
+              getKoreanDateKey(post.publish_at ?? post.createdAt) ===
+              effectiveSelectedDate,
           ),
-    [effectiveSelectedDate, posts],
+    [effectiveSelectedDate, publishedPosts],
   );
   const availableCount = filteredPosts.filter(
     (post) =>
@@ -89,7 +112,48 @@ export default function FeedList({
         />
       </div>
 
-      {filteredPosts.length > 0 ? (
+      {loadError && publishedPosts.length > 0 ? (
+        <p
+          role="status"
+          className="mb-4 rounded-2xl border border-[#edc2b5] bg-[#fff3ed] px-4 py-3 text-sm font-bold text-[#805044]"
+        >
+          {loadError} 기존에 불러온 상품을 표시하고 있어요.
+        </p>
+      ) : null}
+
+      {isLoading && publishedPosts.length === 0 ? (
+        <div
+          role="status"
+          className="flex min-h-44 items-center justify-center gap-3 rounded-[1.5rem] border border-[#ead9cb] bg-[#fffaf4] px-6 py-12 text-center text-base font-black text-[#68564c]"
+        >
+          <span
+            aria-hidden="true"
+            className="h-6 w-6 animate-spin rounded-full border-2 border-[#e6cfc0] border-t-[#df6f5d]"
+          />
+          Supabase에서 경매 상품을 불러오는 중이에요.
+        </div>
+      ) : loadError && publishedPosts.length === 0 ? (
+        <div
+          role="alert"
+          className="rounded-[1.5rem] border border-[#edc2b5] bg-[#fff3ed] px-6 py-10 text-center"
+        >
+          <h3 className="text-lg font-black text-[#8f4035]">
+            상품 목록을 연결하지 못했어요
+          </h3>
+          <p className="mx-auto mt-2 max-w-xl break-keep text-sm font-semibold leading-6 text-[#805f54]">
+            {loadError}
+          </p>
+          {onRetry ? (
+            <button
+              type="button"
+              onClick={() => void onRetry()}
+              className="mt-5 min-h-11 rounded-full bg-[#df6f5d] px-5 text-sm font-black text-white transition hover:bg-[#c95b4b] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#df6f5d]/20"
+            >
+              다시 불러오기
+            </button>
+          ) : null}
+        </div>
+      ) : filteredPosts.length > 0 ? (
         <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredPosts.map((post) => (
             <PostCard

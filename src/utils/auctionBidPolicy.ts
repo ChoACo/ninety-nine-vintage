@@ -15,6 +15,7 @@ export type AuctionBidDecisionReason =
   | "empty-item-first-bid"
   | "new-bid-cutoff"
   | "auction-closed"
+  | "item-pending"
   | "item-sold";
 
 export interface KoreanAuctionTime {
@@ -122,6 +123,15 @@ export function getAuctionBidDecision({
     );
 
   const base = { phase, userHasBidHistory, hasAnyBidHistory };
+
+  if (post.status === "pending") {
+    return {
+      ...base,
+      allowed: false,
+      reason: "item-pending",
+      message: "예약 공개 전인 상품입니다.",
+    };
+  }
 
   if (post.status === "closed") {
     return {

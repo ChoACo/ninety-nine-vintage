@@ -1,4 +1,5 @@
 export { AdminPage, type AdminPageProps } from "./AdminPage";
+export { default as AdminLoginModal } from "./AdminLoginModal";
 export { AdminCsChatModal } from "./AdminCsChatModal";
 export { AdminShipmentBoard } from "./AdminShipmentBoard";
 export { PickingPreviewModal } from "./PickingPreviewModal";

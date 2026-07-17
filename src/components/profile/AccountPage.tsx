@@ -8,6 +8,8 @@ import { Button, Modal } from "@/src/components/common";
 import { useMemberAccount } from "@/src/hooks/useMemberAccount";
 import type {
   MemberShippingAddress,
+  MemberWonProduct,
+  ProductPaymentStatus,
   SaveShippingAddressInput,
   WonProductShippingStatus,
 } from "@/src/lib/supabase/memberAccount";
@@ -17,6 +19,12 @@ import {
 } from "@/src/lib/supabase/kakaoProfile";
 import { formatKRW } from "@/src/utils/formatters";
 import { deleteMyAccount } from "@/src/lib/supabase/account";
+import {
+  createPortOnePaymentId,
+  requestProductPayment,
+  type ProductPaymentMethod,
+  type ProductPaymentResult,
+} from "@/src/lib/portone/payment";
 
 interface AccountPageProps {
   userId?: string;
@@ -48,6 +56,38 @@ const shippingStatusLabel: Record<WonProductShippingStatus, string> = {
   requested: "택배 접수 완료",
   shipped: "발송 완료",
 };
+
+const paymentStatusLabel: Record<ProductPaymentStatus, string> = {
+  대기중: "결제 대기",
+  가상계좌발급: "가상계좌 입금 대기",
+  결제완료: "결제 완료",
+};
+
+const paymentMethodOptions: Array<{
+  value: ProductPaymentMethod;
+  label: string;
+  description: string;
+  icon: string;
+}> = [
+  {
+    value: "CARD",
+    label: "신용·체크카드",
+    description: "카드사를 선택해 안전하게 결제합니다.",
+    icon: "▣",
+  },
+  {
+    value: "EASY_PAY",
+    label: "카카오페이",
+    description: "카카오페이 결제창으로 바로 이동합니다.",
+    icon: "K",
+  },
+  {
+    value: "VIRTUAL_ACCOUNT",
+    label: "가상계좌",
+    description: "전용 입금 계좌와 입금 기한을 발급받습니다.",
+    icon: "₩",
+  },
+];
 
 const genderLabel = {
   female: "여성",
@@ -219,11 +259,68 @@ const closedAtFormatter = new Intl.DateTimeFormat("ko-KR", {
   day: "numeric",
 });
 
+const paymentDueFormatter = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  month: "long",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
 function formatClosedAt(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? "마감일 확인 필요"
     : `${closedAtFormatter.format(date)} 낙찰`;
+}
+
+function formatPaymentDue(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "입금 기한 확인 필요"
+    : paymentDueFormatter.format(date) + "까지";
+}
+
+function formatPaymentMethod(value: string | null): string | null {
+  if (!value) return null;
+  if (value.startsWith("CARD")) return "신용·체크카드";
+  if (value.startsWith("EASY_PAY")) {
+    return value.includes("KAKAOPAY") ? "카카오페이" : "간편결제";
+  }
+  if (value.startsWith("VIRTUAL_ACCOUNT")) return "가상계좌";
+  return "기타 결제수단";
+}
+
+const vbankBankLabels: Record<string, string> = {
+  KDB: "산업은행",
+  IBK: "기업은행",
+  KOOKMIN: "국민은행",
+  SUHYUP: "수협은행",
+  NONGHYUP: "NH농협은행",
+  LOCAL_NONGHYUP: "지역농축협",
+  WOORI: "우리은행",
+  STANDARD_CHARTERED: "SC제일은행",
+  CITI: "한국씨티은행",
+  DAEGU: "아이엠뱅크",
+  BUSAN: "부산은행",
+  KWANGJU: "광주은행",
+  JEJU: "제주은행",
+  JEONBUK: "전북은행",
+  KYONGNAM: "경남은행",
+  KFCC: "새마을금고",
+  SHINHYUP: "신협",
+  SAVINGS_BANK: "저축은행",
+  POST: "우체국",
+  HANA: "하나은행",
+  SHINHAN: "신한은행",
+  K_BANK: "케이뱅크",
+  KAKAO: "카카오뱅크",
+  TOSS: "토스뱅크",
+};
+
+function formatVbankBank(value: string | null): string {
+  if (!value) return "입금 은행";
+  return vbankBankLabels[value] ?? value;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -379,6 +476,193 @@ function AddressEditorModal({
   );
 }
 
+function ProductPaymentModal({
+  product,
+  onClose,
+  onCompleted,
+  onRefresh,
+}: {
+  product: MemberWonProduct;
+  onClose: () => void;
+  onCompleted: (result: ProductPaymentResult) => Promise<void>;
+  onRefresh: () => Promise<void>;
+}) {
+  const existingMethod = paymentMethodOptions.some(
+    (option) => option.value === product.requestedPaymentMethod,
+  )
+    ? (product.requestedPaymentMethod as ProductPaymentMethod)
+    : null;
+  const reuseCurrentAttempt =
+    Boolean(product.paymentId) && product.portoneStatus !== "FAILED";
+  const [payMethod, setPayMethod] = useState<ProductPaymentMethod>(
+    reuseCurrentAttempt && existingMethod ? existingMethod : "CARD",
+  );
+  const [paymentId] = useState(() =>
+    reuseCurrentAttempt && product.paymentId
+      ? product.paymentId
+      : createPortOnePaymentId(product.productId),
+  );
+  const [lockedMethod, setLockedMethod] = useState<ProductPaymentMethod | null>(
+    reuseCurrentAttempt ? existingMethod : null,
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const selectedMethod = paymentMethodOptions.find(
+    (option) => option.value === payMethod,
+  );
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setError("");
+    setLockedMethod(payMethod);
+
+    try {
+      const result = await requestProductPayment({
+        productId: product.productId,
+        payMethod,
+        paymentId,
+      });
+      await onCompleted(result);
+    } catch (paymentError) {
+      try {
+        await onRefresh();
+      } catch {
+        // The checkout error remains the primary message.
+      }
+      setError(getErrorMessage(paymentError, "결제를 진행하지 못했습니다."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      onClose={() => {
+        if (!isSubmitting) onClose();
+      }}
+      closeOnBackdrop={!isSubmitting}
+      title="낙찰 상품 결제"
+      description="결제 금액은 서버의 최종 낙찰 원장으로 다시 확인합니다."
+      size="sm"
+    >
+      <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
+        <div className="flex gap-4 rounded-2xl border border-[#ead8c8] bg-[#fff8ee] p-4">
+          {product.imageUrls[0] ? (
+            <img
+              src={product.imageUrls[0]}
+              alt=""
+              className="size-20 shrink-0 rounded-xl bg-[#eee7df] object-cover"
+            />
+          ) : (
+            <span className="grid size-20 shrink-0 place-items-center rounded-xl bg-[#eee7df] text-xs font-bold text-[#8c8178]">
+              사진 없음
+            </span>
+          )}
+          <div className="min-w-0">
+            <strong className="line-clamp-2 block font-black leading-6 text-[#473a32]">
+              {product.title}
+            </strong>
+            <span className="mt-2 block text-xl font-black text-[#b85e4f]">
+              {formatKRW(product.finalBidAmount)}
+            </span>
+            <span className="mt-1 block text-xs font-bold text-[#887568]">
+              최종 낙찰 금액
+            </span>
+          </div>
+        </div>
+
+        <fieldset disabled={isSubmitting}>
+          <legend className="text-sm font-black text-[#55463c]">
+            결제 수단 선택
+          </legend>
+          <div className="mt-3 grid gap-2">
+            {paymentMethodOptions.map((option) => {
+              const selected = option.value === payMethod;
+              return (
+                <label
+                  key={option.value}
+                  className={
+                    "flex min-h-20 cursor-pointer items-center gap-3 rounded-2xl border-2 px-4 py-3 transition " +
+                    (selected
+                      ? "border-[#dc806d] bg-[#fff0e9] shadow-sm"
+                      : "border-[#e4d8ce] bg-white hover:border-[#d8b9ad]")
+                  }
+                >
+                  <input
+                    type="radio"
+                    name="payment-method"
+                    value={option.value}
+                    checked={selected}
+                    onChange={() => setPayMethod(option.value)}
+                    disabled={
+                      isSubmitting ||
+                      (lockedMethod !== null && option.value !== lockedMethod)
+                    }
+                    className="size-5 shrink-0 accent-[#d86f5c]"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className={
+                      "grid size-10 shrink-0 place-items-center rounded-xl text-lg font-black " +
+                      (selected
+                        ? "bg-[#dd7b68] text-white"
+                        : "bg-[#f2ebe5] text-[#7d6b60]")
+                    }
+                  >
+                    {option.icon}
+                  </span>
+                  <span className="min-w-0">
+                    <strong className="block font-black text-[#4a3e36]">
+                      {option.label}
+                    </strong>
+                    <span className="mt-0.5 block break-keep text-xs font-bold leading-5 text-[#807066]">
+                      {option.description}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        <p className="rounded-2xl border border-[#d8e2df] bg-[#f4f8f6] px-4 py-3 text-xs font-bold leading-5 text-[#62756f]">
+          현재 포트원 V2 테스트 환경입니다. 실제 청구 전환은 PG 심사와 운영 채널
+          설정을 마친 뒤 진행합니다.
+        </p>
+
+        {error ? (
+          <p
+            role="alert"
+            className="rounded-2xl border border-[#f0c5bb] bg-[#fff0ea] px-4 py-3 text-sm font-bold leading-6 text-[#a9493e]"
+          >
+            {error}
+          </p>
+        ) : null}
+
+        <div className="flex flex-col-reverse gap-2 border-t border-[#eee0d5] pt-4 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            취소
+          </Button>
+          <Button type="submit" isLoading={isSubmitting}>
+            {isSubmitting
+              ? "결제 확인 중..."
+              : (selectedMethod?.label ?? "선택 수단") + "로 결제하기"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function MemberAccountPanel({ userId }: { userId: string }) {
   const accordionId = useId();
   const member = useMemberAccount(userId);
@@ -391,6 +675,8 @@ function MemberAccountPanel({ userId }: { userId: string }) {
   );
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
+  const [paymentProduct, setPaymentProduct] =
+    useState<MemberWonProduct | null>(null);
 
   if (member.isLoading) {
     return (
@@ -426,6 +712,11 @@ function MemberAccountPanel({ userId }: { userId: string }) {
     member.addresses.find((address) => address.isDefault) ??
     member.addresses[0] ??
     null;
+  const currentPaymentProduct = paymentProduct
+    ? member.wonProducts.find(
+        (product) => product.productId === paymentProduct.productId,
+      ) ?? paymentProduct
+    : null;
   const effectiveAddressId = member.addresses.some(
     (address) => address.id === selectedAddressId,
   )
@@ -433,7 +724,12 @@ function MemberAccountPanel({ userId }: { userId: string }) {
     : (defaultAddress?.id ?? "");
   const readyProductIds = new Set(
     member.wonProducts
-      .filter((product) => product.shippingStatus === "ready")
+      .filter(
+        (product) =>
+          product.shippingStatus === "ready" &&
+          product.paymentStatus === "결제완료" &&
+          product.portoneStatus === "PAID",
+      )
       .map((product) => product.productId),
   );
   const effectiveSelectedIds = [...selectedProductIds].filter((id) =>
@@ -528,6 +824,20 @@ function MemberAccountPanel({ userId }: { userId: string }) {
         message: getErrorMessage(error, "택배 접수를 완료하지 못했습니다."),
       });
     }
+  };
+
+  const completePayment = async (result: ProductPaymentResult) => {
+    await member.refresh();
+    setPaymentProduct(null);
+    setFeedback({
+      type: "success",
+      message:
+        result.paymentStatus === "결제완료"
+          ? "결제가 완료되었습니다. 이제 택배 접수를 진행할 수 있습니다."
+          : result.paymentStatus === "가상계좌발급"
+            ? "가상계좌가 발급되었습니다. 기한 안에 입금해 주세요."
+            : "결제 요청을 접수했습니다. 결제 상태를 다시 확인해 주세요.",
+    });
   };
 
   return (
@@ -660,7 +970,7 @@ function MemberAccountPanel({ userId }: { userId: string }) {
               WON &amp; KEEP
             </p>
             <h2 className="mt-1 text-xl font-black text-[#3f4d4f] sm:text-2xl">
-              낙찰·보관 상품 택배 접수
+              낙찰 상품 결제·택배 접수
             </h2>
           </div>
           <span className="text-sm font-bold text-[#718083]">
@@ -670,7 +980,7 @@ function MemberAccountPanel({ userId }: { userId: string }) {
 
         {!accountActive ? (
           <p role="alert" className="mt-4 rounded-2xl bg-[#fff0ea] px-4 py-3 font-bold text-[#a64e42]">
-            현재 회원 상태에서는 택배 접수를 진행할 수 없습니다.
+            현재 회원 상태에서는 결제와 택배 접수를 진행할 수 없습니다.
           </p>
         ) : null}
 
@@ -681,8 +991,25 @@ function MemberAccountPanel({ userId }: { userId: string }) {
         ) : (
           <ul className="mt-5 grid gap-3 sm:grid-cols-2">
             {member.wonProducts.map((product) => {
-              const ready = product.shippingStatus === "ready";
+              const paid =
+                product.paymentStatus === "결제완료" &&
+                product.portoneStatus === "PAID";
+              const ready = product.shippingStatus === "ready" && paid;
               const selected = ready && selectedProductIds.has(product.productId);
+              const paymentMethod = formatPaymentMethod(product.paymentMethod);
+              const paymentLabel =
+                product.portoneStatus === "FAILED"
+                  ? "결제 실패"
+                  : product.portoneStatus === "CANCELLED"
+                    ? "결제 취소"
+                    : product.portoneStatus === "PARTIAL_CANCELLED"
+                      ? "부분 취소 확인 필요"
+                      : product.portoneStatus === "PAY_PENDING"
+                        ? "결제 승인 대기"
+                        : paymentStatusLabel[product.paymentStatus];
+              const canOpenPayment =
+                product.paymentStatus === "대기중" &&
+                product.portoneStatus !== "CANCELLED";
 
               return (
                 <li key={product.productId}>
@@ -701,7 +1028,10 @@ function MemberAccountPanel({ userId }: { userId: string }) {
                       onChange={() => toggleProduct(product.productId)}
                       disabled={!ready || member.isMutating}
                       className="mt-1 size-5 shrink-0 accent-[#df7966]"
-                      aria-label={`${product.title} 택배 접수 선택`}
+                      aria-label={
+                        product.title +
+                        (paid ? " 택배 접수 선택" : " 결제 후 택배 접수 가능")
+                      }
                     />
                     {product.imageUrls[0] ? (
                       <img
@@ -725,15 +1055,73 @@ function MemberAccountPanel({ userId }: { userId: string }) {
                         {formatClosedAt(product.closedAt)}
                       </span>
                       <span className="mt-1 block text-xs font-black text-[#53756c]">
-                        {shippingStatusLabel[product.shippingStatus]}
+                        {paid
+                          ? shippingStatusLabel[product.shippingStatus]
+                          : "결제 후 택배 접수 가능"}
                       </span>
+                      <span
+                        className={
+                          "mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-black " +
+                          (product.paymentStatus === "결제완료"
+                            ? "bg-[#dff1e6] text-[#376a50]"
+                            : product.paymentStatus === "가상계좌발급"
+                              ? "bg-[#e3f0f4] text-[#376676]"
+                              : "bg-[#fff0e5] text-[#9a5c43]")
+                        }
+                      >
+                        {paymentLabel}
+                      </span>
+                      {paymentMethod ? (
+                        <span className="mt-1 block text-xs font-bold text-[#6d7774]">
+                          {paymentMethod}
+                        </span>
+                      ) : null}
                     </span>
                   </label>
+                  {product.paymentStatus === "가상계좌발급" ? (
+                    <div className="mt-2 rounded-2xl border border-[#c9dce2] bg-[#eff7f8] px-4 py-3 text-sm font-bold leading-6 text-[#496b74]">
+                      <p className="font-black">
+                        {formatVbankBank(product.vbankBank)}{" "}
+                        {product.vbankNum || "계좌번호 확인 중"}
+                      </p>
+                      <p className="mt-0.5 text-xs">
+                        {product.vbankDue
+                          ? formatPaymentDue(product.vbankDue)
+                          : "입금 기한은 결제 내역에서 확인해 주세요."}
+                      </p>
+                    </div>
+                  ) : null}
+                  {canOpenPayment ? (
+                    <Button
+                      size="sm"
+                      fullWidth
+                      className="mt-2"
+                      onClick={() => {
+                        setFeedback(null);
+                        setPaymentProduct(product);
+                      }}
+                      disabled={!accountActive || member.isMutating}
+                    >
+                      결제하기
+                    </Button>
+                  ) : null}
+                  {product.portoneStatus === "CANCELLED" ||
+                  product.portoneStatus === "PARTIAL_CANCELLED" ? (
+                    <p className="mt-2 rounded-xl bg-[#fff0ea] px-3 py-2 text-xs font-bold leading-5 text-[#9a4f43]">
+                      취소 상태 확인이 필요합니다. 추가 결제나 배송 전에 운영팀에 문의해
+                      주세요.
+                    </p>
+                  ) : null}
                 </li>
               );
             })}
           </ul>
         )}
+
+        <p className="mt-5 rounded-2xl border border-[#ead8c8] bg-[#fff8ee] px-4 py-3 text-sm font-bold leading-6 text-[#776456]">
+          결제가 완료된 상품만 택배 접수 대상으로 선택할 수 있습니다. 가상계좌는
+          입금 확인 웹훅이 도착하면 자동으로 결제 완료로 바뀝니다.
+        </p>
 
         <label className="mt-5 block text-sm font-black text-[#4f5e5f]">
           택배를 받을 배송지
@@ -799,6 +1187,15 @@ function MemberAccountPanel({ userId }: { userId: string }) {
           forceDefault={member.addresses.length === 0}
           onClose={() => setEditorOpen(false)}
           onSave={saveAddress}
+        />
+      ) : null}
+      {currentPaymentProduct ? (
+        <ProductPaymentModal
+          key={`${currentPaymentProduct.productId}:${currentPaymentProduct.paymentId ?? "new"}:${currentPaymentProduct.portoneStatus ?? "none"}`}
+          product={currentPaymentProduct}
+          onClose={() => setPaymentProduct(null)}
+          onCompleted={completePayment}
+          onRefresh={member.refresh}
         />
       ) : null}
     </div>

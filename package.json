@@ -17,11 +17,13 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
-    "test": "vinext build && node --test tests/batch-auction.test.mjs tests/kakao-oidc.test.mjs tests/rendered-html.test.mjs",
+    "test": "vinext build && node --test tests/batch-auction.test.mjs tests/kakao-oidc.test.mjs tests/portone-payment.test.mjs tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@portone/browser-sdk": "0.1.9",
+    "@portone/server-sdk": "0.19.0",
     "@supabase/supabase-js": "2.110.6",
     "drizzle-orm": "0.45.2",
     "exceljs": "4.4.0",

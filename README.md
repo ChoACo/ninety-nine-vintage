@@ -141,12 +141,24 @@ RLS의 핵심 원칙은 다음과 같습니다.
 
 ## 배포
 
-Vercel 프로젝트에 아래 공개 환경 변수만 등록합니다.
+Vercel 프로젝트에 Supabase 공개값과 PortOne 결제창 공개 식별자를 등록합니다.
 
 ```text
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+VITE_PORTONE_STORE_ID
+VITE_PORTONE_CHANNEL_KEY
+VITE_PORTONE_CARD_CHANNEL_KEY
+VITE_PORTONE_VIRTUAL_ACCOUNT_CHANNEL_KEY
+VITE_PORTONE_KAKAOPAY_CHANNEL_KEY
+VITE_PORTONE_WEBHOOK_URL
 ```
+
+서버에는 `SUPABASE_SECRET_KEY`, `PORTONE_API_SECRET`,
+`PORTONE_WEBHOOK_SECRET`을 별도로 등록합니다. 세 값은 브라우저에 노출되는
+`VITE_` 또는 `NEXT_PUBLIC_` 접두사를 붙이면 안 됩니다. Store ID, 결제수단별
+채널, 웹훅 등록과 테스트 절차는 [PortOne V2 설정 문서](docs/portone-v2-setup.md)를
+따릅니다.
 
 `vercel.json`과 Vite 설정은 vinext를 정적 사이트가 아닌 Nitro/Vercel SSR 출력으로 빌드합니다. pnpm이 네이티브 빌드 스크립트를 차단하지 않도록 `pnpm-workspace.yaml`의 허용 목록도 유지합니다.
 
@@ -169,6 +181,8 @@ pnpm dlx vercel@latest --prod --yes
 - 사진 업로드 후 Storage Public URL과 상품 레코드가 함께 저장되는지
 - 운영 센터에서 회원 상태를 조회하고 상품 단건/일괄 등록·수정·삭제가 권한대로 동작하는지
 - 회원 배송지 패널이 기본으로 닫히며 낙찰 상품 택배 접수 후 배송 이용권이 1회 차감되는지
+- 낙찰자만 서버 확정 낙찰가로 결제창을 열 수 있고 카드·카카오페이·가상계좌가 각 채널로 열리는지
+- 가상계좌 발급과 입금 완료 웹훅이 단건 조회 검증 후 반영되며 미결제·취소 상품의 배송이 차단되는지
 - 20:56 전후, 무입찰 즉시 확정, 21:00 마감 경계가 정확한지
 - 회원 A가 회원 B의 상담방·메시지를 REST와 Realtime 모두에서 읽지 못하는지
 - 운영자는 본인 상담에만 답변하고 총책임 운영 계정은 운영자별 상담을 읽기 전용으로만 확인하는지

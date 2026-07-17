@@ -58,6 +58,16 @@ const policySections = [
                 <td className="px-4 py-3">낙찰 상품 배송과 배송 문의 처리</td>
               </tr>
               <tr>
+                <td className="px-4 py-3 font-bold">상품 결제 시</td>
+                <td className="px-4 py-3">
+                  결제 고유번호, 결제수단, 결제상태, 가상계좌 은행·계좌번호·입금기한
+                </td>
+                <td className="px-4 py-3">결제 시 필수</td>
+                <td className="px-4 py-3">
+                  결제 처리·입금 확인, 중복 결제 방지, 취소·환불 및 거래 분쟁 대응
+                </td>
+              </tr>
+              <tr>
                 <td className="px-4 py-3 font-bold">서비스 이용 시 자동 생성</td>
                 <td className="px-4 py-3">닉네임, 최근 접속 시각</td>
                 <td className="px-4 py-3">서비스 이용 시</td>
@@ -102,8 +112,9 @@ const policySections = [
     content: (
       <p>
         서비스 운영을 위해 Supabase에 회원 인증·데이터베이스·파일 저장 및 실시간
-        통신 처리를, Vercel에 웹 애플리케이션 배포와 전송 처리를 위탁합니다. 수탁자는
-        서비스 제공에 필요한 범위에서만 정보를 처리하도록 관리합니다.
+        통신 처리를, Vercel에 웹 애플리케이션 배포와 전송 처리를, 포트원(PortOne)에
+        신용카드·간편결제·가상계좌 결제 연동과 결제상태 확인 처리를 위탁합니다.
+        수탁자는 서비스 제공에 필요한 범위에서만 정보를 처리하도록 관리합니다.
       </p>
     ),
   },
@@ -184,7 +195,7 @@ export default function PrivacyPolicyPage() {
         </div>
         <div className="mt-8 border-t border-[var(--border)] pt-6 text-sm font-bold leading-6 text-[var(--text-muted)]">
           <p>개인정보처리자: 나인 티나인 빈티지 · 대표자 이영준</p>
-          <p className="mt-1">공고일자: 2026년 7월 17일 · 시행일자: 2026년 7월 17일</p>
+          <p className="mt-1">공고일자: 2026년 7월 18일 · 시행일자: 2026년 7월 18일</p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href="/terms"

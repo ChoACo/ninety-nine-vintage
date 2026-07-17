@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@portone/browser-sdk':
+        specifier: 0.1.9
+        version: 0.1.9
+      '@portone/server-sdk':
+        specifier: 0.19.0
+        version: 0.19.0
       '@supabase/supabase-js':
         specifier: 2.110.6
         version: 2.110.6
@@ -1176,6 +1182,12 @@ packages:
 
   '@poppinss/exception@1.2.3':
     resolution: {integrity: sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw==}
+
+  '@portone/browser-sdk@0.1.9':
+    resolution: {integrity: sha512-GiLziqmKKSrorjWDvWjPhtD1nBd4zlY1crIPX5Kisx797MQYveqhtSMYwuyjRgwgInfEWonXjXWkHd5bTFUiWQ==}
+
+  '@portone/server-sdk@0.19.0':
+    resolution: {integrity: sha512-JIbD9HEEqaYuuW0zKU/sapqH1HQBf/Len+8ZPnMRb7E7tHnqRGrKPLS+fom34xUTiF3ZVKTrDjHeQHQ2YZc2og==}
 
   '@resvg/resvg-wasm@2.4.0':
     resolution: {integrity: sha512-C7c51Nn4yTxXFKvgh2txJFNweaVcfUPQxwEUFw4aWsCmfiBDJsTSwviIF8EcwjQ6k8bPyMWCl1vw4BdxE569Cg==}
@@ -4865,6 +4877,10 @@ snapshots:
       supports-color: 10.2.2
 
   '@poppinss/exception@1.2.3': {}
+
+  '@portone/browser-sdk@0.1.9': {}
+
+  '@portone/server-sdk@0.19.0': {}
 
   '@resvg/resvg-wasm@2.4.0': {}
 

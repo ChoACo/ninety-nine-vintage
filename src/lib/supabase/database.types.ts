@@ -10,6 +10,16 @@ export type ProductStatus = "pending" | "active" | "closed";
 export type SupportConversationStatus = "open" | "closed";
 export type MemberAccountStatus = "active" | "suspended";
 export type ShippingRequestStatus = "requested" | "shipped";
+export type PortOnePayMethod = "CARD" | "EASY_PAY" | "VIRTUAL_ACCOUNT";
+export type ProductPaymentStatus = "대기중" | "가상계좌발급" | "결제완료";
+export type PortOnePaymentStatus =
+  | "READY"
+  | "PAY_PENDING"
+  | "VIRTUAL_ACCOUNT_ISSUED"
+  | "PAID"
+  | "FAILED"
+  | "PARTIAL_CANCELLED"
+  | "CANCELLED";
 
 export type Database = {
   public: {
@@ -190,6 +200,165 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [];
+      };
+      payment_attempts: {
+        Row: {
+          payment_id: string;
+          order_id: string;
+          requested_method: PortOnePayMethod;
+          store_id: string;
+          expected_amount: number;
+          currency: string;
+          payment_method: string | null;
+          vbank_num: string | null;
+          vbank_bank: string | null;
+          vbank_due: string | null;
+          payment_status: ProductPaymentStatus;
+          portone_status: PortOnePaymentStatus | null;
+          portone_status_changed_at: string | null;
+          paid_at: string | null;
+          verified_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          payment_id: string;
+          order_id: string;
+          requested_method: PortOnePayMethod;
+          store_id: string;
+          expected_amount: number;
+          currency?: string;
+          payment_method?: string | null;
+          vbank_num?: string | null;
+          vbank_bank?: string | null;
+          vbank_due?: string | null;
+          payment_status?: ProductPaymentStatus;
+          portone_status?: PortOnePaymentStatus | null;
+          portone_status_changed_at?: string | null;
+          paid_at?: string | null;
+          verified_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          payment_id?: string;
+          order_id?: string;
+          requested_method?: PortOnePayMethod;
+          store_id?: string;
+          expected_amount?: number;
+          currency?: string;
+          payment_method?: string | null;
+          vbank_num?: string | null;
+          vbank_bank?: string | null;
+          vbank_due?: string | null;
+          payment_status?: ProductPaymentStatus;
+          portone_status?: PortOnePaymentStatus | null;
+          portone_status_changed_at?: string | null;
+          paid_at?: string | null;
+          verified_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payment_attempts_order_id_fkey";
+            columns: ["order_id"];
+            isOneToOne: false;
+            referencedRelation: "payment_orders";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      payment_orders: {
+        Row: {
+          id: string;
+          product_id: string;
+          buyer_id: string | null;
+          buyer_deleted_at: string | null;
+          order_name: string;
+          expected_amount: number;
+          currency: string;
+          payment_id: string;
+          requested_method: PortOnePayMethod;
+          store_id: string;
+          payment_method: string | null;
+          vbank_num: string | null;
+          vbank_bank: string | null;
+          vbank_due: string | null;
+          payment_status: ProductPaymentStatus;
+          portone_status: PortOnePaymentStatus | null;
+          portone_status_changed_at: string | null;
+          paid_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          buyer_id?: string | null;
+          buyer_deleted_at?: string | null;
+          order_name: string;
+          expected_amount: number;
+          currency?: string;
+          payment_id: string;
+          requested_method: PortOnePayMethod;
+          store_id: string;
+          payment_method?: string | null;
+          vbank_num?: string | null;
+          vbank_bank?: string | null;
+          vbank_due?: string | null;
+          payment_status?: ProductPaymentStatus;
+          portone_status?: PortOnePaymentStatus | null;
+          portone_status_changed_at?: string | null;
+          paid_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          product_id?: string;
+          buyer_id?: string | null;
+          buyer_deleted_at?: string | null;
+          order_name?: string;
+          expected_amount?: number;
+          currency?: string;
+          payment_id?: string;
+          requested_method?: PortOnePayMethod;
+          store_id?: string;
+          payment_method?: string | null;
+          vbank_num?: string | null;
+          vbank_bank?: string | null;
+          vbank_due?: string | null;
+          payment_status?: ProductPaymentStatus;
+          portone_status?: PortOnePaymentStatus | null;
+          portone_status_changed_at?: string | null;
+          paid_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payment_orders_buyer_id_fkey";
+            columns: ["buyer_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payment_orders_current_attempt_fkey";
+            columns: ["payment_id", "id"];
+            isOneToOne: false;
+            referencedRelation: "payment_attempts";
+            referencedColumns: ["payment_id", "order_id"];
+          },
+          {
+            foreignKeyName: "payment_orders_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: true;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       products: {
         Row: {
@@ -605,6 +774,14 @@ export type Database = {
           final_bid_amount: number;
           shipping_status: "ready" | "requested" | "shipped";
           shipment_request_id: string | null;
+          payment_id: string | null;
+          payment_method: string | null;
+          vbank_num: string | null;
+          vbank_bank: string | null;
+          vbank_due: string | null;
+          payment_status: ProductPaymentStatus;
+          requested_method: PortOnePayMethod | null;
+          portone_status: PortOnePaymentStatus | null;
         }[];
       };
       get_online_member_directory: {
@@ -678,6 +855,22 @@ export type Database = {
           final_bid_id: string | null;
         }[];
       };
+      prepare_portone_payment: {
+        Args: {
+          p_member_id: string;
+          p_product_id: string;
+          p_payment_id: string;
+          p_requested_method: PortOnePayMethod;
+          p_store_id: string;
+        };
+        Returns: {
+          payment_id: string;
+          product_id: string;
+          order_name: string;
+          expected_amount: number;
+          payment_status: ProductPaymentStatus;
+        }[];
+      };
       reopen_my_support_conversation: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -699,6 +892,25 @@ export type Database = {
       set_member_account_status: {
         Args: { p_member_id: string; p_status: MemberAccountStatus };
         Returns: MemberAccountStatus;
+      };
+      sync_portone_payment: {
+        Args: {
+          p_payment_id: string;
+          p_portone_status: PortOnePaymentStatus;
+          p_store_id: string;
+          p_amount: number;
+          p_currency: string;
+          p_payment_method: string | null;
+          p_vbank_num: string | null;
+          p_vbank_bank: string | null;
+          p_vbank_due: string | null;
+          p_status_changed_at: string;
+          p_paid_at: string | null;
+        };
+        Returns: {
+          payment_status: ProductPaymentStatus;
+          portone_status: PortOnePaymentStatus | null;
+        }[];
       };
       touch_my_last_seen: {
         Args: Record<PropertyKey, never>;

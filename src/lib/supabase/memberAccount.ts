@@ -2,6 +2,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "./client";
 
 export type WonProductShippingStatus = "ready" | "requested" | "shipped";
+export type ProductPaymentStatus = "대기중" | "가상계좌발급" | "결제완료";
+export type PortOnePaymentStatus =
+  | "READY"
+  | "PAY_PENDING"
+  | "VIRTUAL_ACCOUNT_ISSUED"
+  | "PAID"
+  | "FAILED"
+  | "PARTIAL_CANCELLED"
+  | "CANCELLED";
 
 export interface MemberAccount {
   memberId: string;
@@ -30,6 +39,14 @@ export interface MemberWonProduct {
   imageUrls: string[];
   closedAt: string;
   finalBidAmount: number;
+  paymentId: string | null;
+  paymentMethod: string | null;
+  vbankNum: string | null;
+  vbankBank: string | null;
+  vbankDue: string | null;
+  paymentStatus: ProductPaymentStatus;
+  requestedPaymentMethod: string | null;
+  portoneStatus: PortOnePaymentStatus | null;
   shippingStatus: WonProductShippingStatus;
   shipmentRequestId: string | null;
 }
@@ -70,6 +87,14 @@ interface WonProductRow {
   image_urls: string[];
   closed_at: string;
   final_bid_amount: number;
+  payment_id: string | null;
+  payment_method: string | null;
+  vbank_num: string | null;
+  vbank_bank: string | null;
+  vbank_due: string | null;
+  payment_status: ProductPaymentStatus | null;
+  requested_method: string | null;
+  portone_status: PortOnePaymentStatus | null;
   shipping_status: WonProductShippingStatus;
   shipment_request_id: string | null;
 }
@@ -153,6 +178,32 @@ function toWonProduct(row: WonProductRow): MemberWonProduct {
     throw new MemberAccountError("낙찰 금액 데이터가 올바르지 않습니다.");
   }
 
+  const paymentStatus = row.payment_status ?? "대기중";
+  if (
+    !(["대기중", "가상계좌발급", "결제완료"] as const).includes(
+      paymentStatus,
+    )
+  ) {
+    throw new MemberAccountError("결제 상태 데이터가 올바르지 않습니다.");
+  }
+  const portoneStatus = row.portone_status ?? null;
+  if (
+    portoneStatus !== null &&
+    !(
+      [
+        "READY",
+        "PAY_PENDING",
+        "VIRTUAL_ACCOUNT_ISSUED",
+        "PAID",
+        "FAILED",
+        "PARTIAL_CANCELLED",
+        "CANCELLED",
+      ] as const
+    ).includes(portoneStatus)
+  ) {
+    throw new MemberAccountError("결제사 상태 데이터가 올바르지 않습니다.");
+  }
+
   return {
     productId: row.product_id,
     title: row.title,
@@ -161,6 +212,14 @@ function toWonProduct(row: WonProductRow): MemberWonProduct {
       : [],
     closedAt: row.closed_at,
     finalBidAmount,
+    paymentId: row.payment_id,
+    paymentMethod: row.payment_method,
+    vbankNum: row.vbank_num,
+    vbankBank: row.vbank_bank,
+    vbankDue: row.vbank_due,
+    paymentStatus,
+    requestedPaymentMethod: row.requested_method,
+    portoneStatus,
     shippingStatus: row.shipping_status,
     shipmentRequestId: row.shipment_request_id,
   };

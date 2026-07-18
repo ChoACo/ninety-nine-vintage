@@ -328,3 +328,69 @@ test("persists editable tracking data through bounded staff RPCs", async () => {
   assert.match(panel, /운송장 수정/);
   assert.match(panel, /확정 등록/);
 });
+
+test("enforces postal codes for new member shipping mutations without rewriting legacy rows", async () => {
+  const [migration, snapshotMigration] = await Promise.all([
+    readFile(
+      new URL(
+        "supabase/migrations/20260718075000_require_member_shipping_postal_code.sql",
+        rootUrl,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "supabase/migrations/20260718073000_shipping_excel_tracking.sql",
+        rootUrl,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(
+    migration,
+    /create or replace function public\.enforce_member_shipping_address_postal_code\(\)[\s\S]*security definer[\s\S]*set search_path = ''/,
+  );
+  assert.match(
+    migration,
+    /create trigger shipping_addresses_validate_postal_code\s+before insert or update on public\.shipping_addresses/,
+  );
+  assert.match(
+    migration,
+    /v_postal_code !~ '\^\[0-9\]\{5\}\$'/,
+  );
+  assert.match(
+    migration,
+    /from public\.owner_hidden_test_members as hidden_test[\s\S]*hidden_test\.test_user_id = new\.member_id[\s\S]*hidden_test\.retired_at is null/,
+  );
+  assert.match(
+    migration,
+    /create or replace function public\.enforce_member_shipping_request_postal_code\(\)[\s\S]*security definer[\s\S]*set search_path = ''/,
+  );
+  assert.match(
+    migration,
+    /new\.address_snapshot ->> 'postalCode'/,
+  );
+  assert.match(
+    migration,
+    /create trigger shipping_requests_validate_postal_snapshot\s+before insert on public\.shipping_requests/,
+  );
+  assert.match(
+    migration,
+    /revoke all on function public\.enforce_member_shipping_address_postal_code\(\)[\s\S]*from public, anon, authenticated, service_role/,
+  );
+  assert.match(
+    migration,
+    /revoke all on function public\.enforce_member_shipping_request_postal_code\(\)[\s\S]*from public, anon, authenticated, service_role/,
+  );
+  assert.doesNotMatch(migration, /update public\.shipping_addresses/);
+  assert.doesNotMatch(migration, /update public\.shipping_requests/);
+  assert.match(
+    snapshotMigration,
+    /create trigger shipping_requests_set_postal_snapshot\s+before insert on public\.shipping_requests/,
+  );
+  assert.ok(
+    "shipping_requests_set_postal_snapshot" <
+      "shipping_requests_validate_postal_snapshot",
+  );
+});

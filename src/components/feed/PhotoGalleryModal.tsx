@@ -6,7 +6,8 @@ import Modal from "@/src/components/common/Modal";
 
 export interface PhotoGalleryModalProps {
   open: boolean;
-  images: string[];
+  images: readonly string[];
+  thumbnailImages?: readonly string[];
   title: string;
   initialIndex?: number;
   onClose: () => void;
@@ -20,6 +21,7 @@ function clampIndex(index: number, length: number) {
 export default function PhotoGalleryModal({
   open,
   images,
+  thumbnailImages,
   title,
   initialIndex = 0,
   onClose,
@@ -91,6 +93,7 @@ export default function PhotoGalleryModal({
             src={images[activeIndex]}
             alt={`${title} 사진 ${activeIndex + 1}`}
             className="max-h-full max-w-full select-none rounded-xl object-contain shadow-[0_18px_52px_rgba(0,0,0,0.34)]"
+            decoding="async"
             draggable={false}
           />
 
@@ -143,9 +146,11 @@ export default function PhotoGalleryModal({
                   }`}
                 >
                   <img
-                    src={image}
+                    src={thumbnailImages?.[index] || image}
                     alt=""
                     className="h-full w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                     draggable={false}
                   />
                 </button>

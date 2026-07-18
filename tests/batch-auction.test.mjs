@@ -123,6 +123,69 @@ async function fixedColumnWorkbookFile(headerLabels) {
   });
 }
 
+async function fixedContentWorkbookFile() {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("상품 본문 양식");
+  worksheet.getCell("A1").value = "상품명";
+  worksheet.getCell("D1").value = "사이즈 및 추천 사이즈";
+  worksheet.getCell("W1").value = "상태점수";
+  worksheet.getCell("X1").value = "기존 상품 설명";
+  worksheet.getCell("Y1").value = "시작가";
+  worksheet.getCell("AH1").value = "이미지명";
+
+  const products = [
+    ["[S] BOSS 셔츠 화이트", "95\n 추천   S ~ M", 1, "기존 설명 1", 10_000, "boss.jpg"],
+    ["[XL] Code:graphy 셔츠 네이비", "105 / 추천 XL", "2", "기존 설명 2", 20_000, "codegraphy.jpg"],
+    ["[M] 빈티지 데님", "100 / 추천 M", 4, "기존 설명 3", 30_000, "denim.jpg"],
+    ["BOSS [L] 체크 셔츠", "100 / 추천 L", 3, "기존 설명 4", 40_000, "check.jpg"],
+    ["[F] 실크 스카프", "FREE", 5, "기존 설명 5", 50_000, "scarf.jpg"],
+  ];
+
+  products.forEach(([title, size, conditionScore, description, price, image], index) => {
+    const rowNumber = index + 6;
+    worksheet.getCell(`A${rowNumber}`).value = title;
+    worksheet.getCell(`D${rowNumber}`).value = size;
+    worksheet.getCell(`W${rowNumber}`).value = conditionScore;
+    worksheet.getCell(`X${rowNumber}`).value = description;
+    worksheet.getCell(`Y${rowNumber}`).value = price;
+    worksheet.getCell(`AH${rowNumber}`).value = image;
+  });
+
+  const bytes = await workbook.xlsx.writeBuffer();
+  return new File([bytes], "fixed-content.xlsx", {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+}
+
+async function preferredFixedContentWorkbookFile() {
+  const workbook = new ExcelJS.Workbook();
+  const addSheet = (name, { withSizeAndCondition }) => {
+    const worksheet = workbook.addWorksheet(name);
+    worksheet.getCell("A1").value = "상품명";
+    worksheet.getCell("X1").value = "상품 설명";
+    worksheet.getCell("Y1").value = "시작가";
+    worksheet.getCell("AH1").value = "이미지명";
+    worksheet.getCell("A6").value = `${name} 상품`;
+    worksheet.getCell("X6").value = `${name} 설명`;
+    worksheet.getCell("Y6").value = 10_000;
+    worksheet.getCell("AH6").value = `${name}.jpg`;
+    if (withSizeAndCondition) {
+      worksheet.getCell("D1").value = "사이즈 및 추천 사이즈";
+      worksheet.getCell("W1").value = "상태점수";
+      worksheet.getCell("D6").value = "100 / 추천 M";
+      worksheet.getCell("W6").value = 3;
+    }
+  };
+
+  addSheet("구형 양식", { withSizeAndCondition: false });
+  addSheet("신규 양식", { withSizeAndCondition: true });
+
+  const bytes = await workbook.xlsx.writeBuffer();
+  return new File([bytes], "preferred-fixed-content.xlsx", {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+}
+
 function imageFile(relativePath) {
   const name = relativePath.split("/").at(-1);
   const file = new File([new Uint8Array([0xff, 0xd8, 0xff])], name, {
@@ -185,6 +248,8 @@ test("detects the real template sheet and imports only rows 6 and later", async 
   assert.equal(FIRST_PRODUCT_ROW, 6);
   assert.equal(parsed.sheetName, "경매 상품");
   assert.equal(parsed.detectedHeaders.title?.columnNumber, 1);
+  assert.equal(parsed.detectedHeaders.size?.columnNumber, 4);
+  assert.equal(parsed.detectedHeaders.conditionScore?.columnNumber, 23);
   assert.equal(parsed.detectedHeaders.description?.columnNumber, 24);
   assert.equal(parsed.detectedHeaders.startingPrice?.columnNumber, 25);
   assert.deepEqual(
@@ -197,7 +262,7 @@ test("detects the real template sheet and imports only rows 6 and later", async 
   );
 });
 
-test("prioritizes fixed A/X/Y/AH columns without relying on header names", async () => {
+test("prioritizes fixed A/D/W/X/Y/AH columns without relying on header names", async () => {
   const { parseAuctionWorkbook } = await loadBatchAuctionModule();
   const cases = [
     {
@@ -205,6 +270,8 @@ test("prioritizes fixed A/X/Y/AH columns without relying on header names", async
       labels: undefined,
       expectedHeaders: [
         "A열 상품명",
+        "D열 사이즈",
+        "W열 상태점수",
         "X열 상품 설명",
         "Y열 시작가",
         "AH열 이미지명",
@@ -220,6 +287,8 @@ test("prioritizes fixed A/X/Y/AH columns without relying on header names", async
       },
       expectedHeaders: [
         "내부 상품 코드",
+        "D열 사이즈",
+        "W열 상태점수",
         "판매 상세 텍스트",
         "기준 금액",
         "사진 목록 문자열",
@@ -236,16 +305,20 @@ test("prioritizes fixed A/X/Y/AH columns without relying on header names", async
     assert.deepEqual(
       [
         parsed.detectedHeaders.title?.columnNumber,
+        parsed.detectedHeaders.size?.columnNumber,
+        parsed.detectedHeaders.conditionScore?.columnNumber,
         parsed.detectedHeaders.description?.columnNumber,
         parsed.detectedHeaders.startingPrice?.columnNumber,
         parsed.detectedHeaders.imageNames[0]?.columnNumber,
       ],
-      [1, 24, 25, 34],
+      [1, 4, 23, 24, 25, 34],
       testCase.name,
     );
     assert.deepEqual(
       [
         parsed.detectedHeaders.title?.header,
+        parsed.detectedHeaders.size?.header,
+        parsed.detectedHeaders.conditionScore?.header,
         parsed.detectedHeaders.description?.header,
         parsed.detectedHeaders.startingPrice?.header,
         parsed.detectedHeaders.imageNames[0]?.header,
@@ -259,6 +332,157 @@ test("prioritizes fixed A/X/Y/AH columns without relying on header names", async
       testCase.name,
     );
   }
+});
+
+test("builds fixed-template product bodies from A, D, and W while retaining X only as source", async () => {
+  const { buildBatchAuctionPreview, parseAuctionWorkbook } =
+    await loadBatchAuctionModule();
+  const parsed = await parseAuctionWorkbook(await fixedContentWorkbookFile());
+  const preview = buildBatchAuctionPreview(
+    parsed,
+    [
+      imageFile("photos/boss.jpg"),
+      imageFile("photos/codegraphy.jpg"),
+      imageFile("photos/denim.jpg"),
+      imageFile("photos/check.jpg"),
+      imageFile("photos/scarf.jpg"),
+    ],
+    previewOptions,
+  );
+
+  assert.equal(preview.canSubmit, true);
+  assert.deepEqual(
+    preview.rows.map((row) => row.title),
+    [
+      "BOSS 셔츠 화이트",
+      "Code:graphy 셔츠 네이비",
+      "빈티지 데님",
+      "BOSS [L] 체크 셔츠",
+      "실크 스카프",
+    ],
+    "맨 앞의 대괄호 토큰 하나만 제거해야 합니다.",
+  );
+  assert.deepEqual(
+    preview.rows.map((row) => row.condition),
+    ["새상품", "상태 좋음", "사용감 있음", null, null],
+  );
+  assert.equal(
+    preview.drafts[0].description,
+    "Name: BOSS 셔츠 화이트\nSize : 95 추천 S ~ M\n상품상태: 새상품",
+  );
+  assert.equal(preview.rows[0].size, "95 추천 S ~ M");
+  assert.equal(
+    preview.drafts[1].description,
+    "Name: Code:graphy 셔츠 네이비\nSize : 105 / 추천 XL\n상품상태: 상태 좋음",
+  );
+  assert.equal(
+    preview.drafts[2].description,
+    "Name: 빈티지 데님\nSize : 100 / 추천 M\n상품상태: 사용감 있음",
+  );
+  assert.equal(
+    preview.drafts[3].description,
+    "Name: BOSS [L] 체크 셔츠\nSize : 100 / 추천 L",
+    "상태점수 3은 상품상태 줄을 표시하지 않아야 합니다.",
+  );
+  assert.equal(
+    preview.drafts[4].description,
+    "Name: 실크 스카프\nSize : FREE",
+    "상태점수 5는 상품상태 줄을 표시하지 않아야 합니다.",
+  );
+  assert.deepEqual(
+    preview.rows.map((row) => row.sourceDescription),
+    ["기존 설명 1", "기존 설명 2", "기존 설명 3", "기존 설명 4", "기존 설명 5"],
+  );
+  assert.ok(
+    preview.drafts.every((draft) => !draft.description.includes("기존 설명")),
+    "X열 원문은 공개 상품 본문에 포함하지 않아야 합니다.",
+  );
+});
+
+test("rejects a fixed-template row when cleaned A or required D content is empty", async () => {
+  const { buildBatchAuctionPreview, parseAuctionWorkbook } =
+    await loadBatchAuctionModule();
+  const parsed = await parseAuctionWorkbook(await fixedContentWorkbookFile());
+  parsed.rows[0].cells[0] = "[S]";
+  parsed.rows[0].cells[3] = null;
+
+  const preview = buildBatchAuctionPreview(
+    parsed,
+    [
+      imageFile("photos/boss.jpg"),
+      imageFile("photos/codegraphy.jpg"),
+      imageFile("photos/denim.jpg"),
+      imageFile("photos/check.jpg"),
+      imageFile("photos/scarf.jpg"),
+    ],
+    previewOptions,
+  );
+
+  assert.equal(preview.canSubmit, false);
+  assert.ok(
+    preview.rows[0].issues.some((issue) => issue.code === "missing_title"),
+  );
+  assert.ok(
+    preview.rows[0].issues.some((issue) => issue.code === "missing_size"),
+  );
+});
+
+test("rejects empty and out-of-range W scores while accepting only 1 through 5", async () => {
+  const { buildBatchAuctionPreview, parseAuctionWorkbook } =
+    await loadBatchAuctionModule();
+  const parsed = await parseAuctionWorkbook(await fixedContentWorkbookFile());
+  const invalidScores = [null, 0, 6, "임의문자", "1.0"];
+  parsed.rows.forEach((row, index) => {
+    row.cells[22] = invalidScores[index];
+  });
+
+  const preview = buildBatchAuctionPreview(
+    parsed,
+    [
+      imageFile("photos/boss.jpg"),
+      imageFile("photos/codegraphy.jpg"),
+      imageFile("photos/denim.jpg"),
+      imageFile("photos/check.jpg"),
+      imageFile("photos/scarf.jpg"),
+    ],
+    previewOptions,
+  );
+
+  assert.equal(preview.canSubmit, false);
+  preview.rows.forEach((row) => {
+    assert.ok(
+      row.issues.some((issue) => issue.code === "invalid_condition_score"),
+      `${row.rowNumber}행의 잘못된 W열 값은 오류여야 합니다.`,
+    );
+  });
+});
+
+test("prefers complete D and W fixed data over a legacy X-only sheet", async () => {
+  const { parseAuctionWorkbook } = await loadBatchAuctionModule();
+  const parsed = await parseAuctionWorkbook(
+    await preferredFixedContentWorkbookFile(),
+  );
+
+  assert.equal(parsed.sheetName, "신규 양식");
+  assert.equal(parsed.rows.length, 1);
+  assert.equal(parsed.rows[0].cells[3], "100 / 추천 M");
+  assert.equal(parsed.rows[0].cells[22], 3);
+});
+
+test("preserves a leading bracket label in generic non-fixed imports", async () => {
+  const { buildBatchAuctionPreview } = await loadBatchAuctionModule();
+  const workbook = workbookWithImageCell("coat.jpg");
+  workbook.rows[0].cells[0] = "[Vintage] 별도 헤더 코트";
+
+  const preview = buildBatchAuctionPreview(
+    workbook,
+    [imageFile("photos/coat.jpg")],
+    previewOptions,
+  );
+
+  assert.equal(preview.canSubmit, true);
+  assert.equal(preview.drafts[0].title, "[Vintage] 별도 헤더 코트");
+  assert.equal(preview.drafts[0].description, "[Vintage] 별도 헤더 코트");
 });
 
 test("requires a globally unique basename for a bare image reference", async () => {
@@ -342,6 +566,9 @@ test("keeps workbook model limits, header tie-breaking, and picker reset guards"
   assert.match(parser, /status: "pending"/);
   assert.match(modal, /getNextAuctionPublishAt\(now\)\.toISOString\(\)/);
   assert.match(modal, /1~5행은 양식 안내로 제외하고 6행부터/);
+  assert.match(modal, /A열 상품명, D열 사이즈·추천 사이즈, W열/);
+  assert.match(modal, /W열에는 1~5 중 하나를 입력해야 합니다/);
+  assert.match(modal, /1=새상품, 2=상태[\s\S]*좋음, 4=사용감 있음/);
   assert.doesNotMatch(modal, /즉시 공개|status: "active"|publishMode/);
 });
 

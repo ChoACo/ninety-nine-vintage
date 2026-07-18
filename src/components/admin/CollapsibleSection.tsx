@@ -14,7 +14,8 @@ export interface CollapsibleSectionProps {
 
 /**
  * 운영 센터의 각 업무를 서로 독립적으로 펼치는 접근성 친화 섹션입니다.
- * 내용은 접어도 DOM에 남겨 두어 입력값과 스크롤 문맥을 잃지 않습니다.
+ * 처음 펼치기 전에는 무거운 본문을 마운트하지 않습니다. 한 번 펼친 내용은
+ * 다시 접어도 DOM에 남겨 두어 입력값과 스크롤 문맥을 잃지 않습니다.
  */
 export function CollapsibleSection({
   title,
@@ -26,9 +27,15 @@ export function CollapsibleSection({
   className = "",
 }: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [hasBeenOpened, setHasBeenOpened] = useState(defaultOpen);
   const generatedId = useId();
   const contentId = `${generatedId}-content`;
   const buttonId = `${generatedId}-button`;
+
+  const toggleSection = () => {
+    if (!isOpen) setHasBeenOpened(true);
+    setIsOpen((current) => !current);
+  };
 
   return (
     <section className={`overflow-hidden rounded-[1.75rem] border-2 border-[#eadfce] bg-[#fffaf4] shadow-[0_14px_40px_rgba(84,63,48,0.08)] ${className}`}>
@@ -38,7 +45,7 @@ export function CollapsibleSection({
           type="button"
           aria-expanded={isOpen}
           aria-controls={contentId}
-          onClick={() => setIsOpen((current) => !current)}
+          onClick={toggleSection}
           className="group flex min-w-0 flex-1 items-start justify-between gap-4 rounded-2xl text-left outline-none focus-visible:ring-2 focus-visible:ring-[#dc7563] focus-visible:ring-offset-4 focus-visible:ring-offset-[#fffaf4]"
         >
           <span className="min-w-0">
@@ -77,16 +84,18 @@ export function CollapsibleSection({
           isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
         }`}
       >
-        <div className="min-h-0 overflow-hidden">
-          <div
-            className={`border-t border-[#eadfd5] px-4 py-5 transition-opacity duration-200 sm:px-6 sm:py-6 ${
-              isOpen ? "opacity-100" : "pointer-events-none opacity-0"
-            }`}
-          >
-            {actions ? <div className="mb-4 sm:hidden">{actions}</div> : null}
-            {children}
+        {hasBeenOpened ? (
+          <div className="min-h-0 overflow-hidden">
+            <div
+              className={`border-t border-[#eadfd5] px-4 py-5 transition-opacity duration-200 sm:px-6 sm:py-6 ${
+                isOpen ? "opacity-100" : "pointer-events-none opacity-0"
+              }`}
+            >
+              {actions ? <div className="mb-4 sm:hidden">{actions}</div> : null}
+              {children}
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </section>
   );

@@ -96,7 +96,7 @@ export default function PaymentCompletePage() {
               : "!"}
         </div>
         <p className="mt-5 text-xs font-black tracking-[0.2em] text-[var(--accent-text)]">
-          PORTONE V2 · DAMINE VINTAGE
+          PORTONE V2 · NINETY-NINE VINTAGE
         </p>
 
         {state.status === "checking" ? (

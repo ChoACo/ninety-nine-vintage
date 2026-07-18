@@ -35,9 +35,10 @@ test("server-renders the Supabase-backed auction application", async () => {
   const html = await response.text();
   assert.match(
     html,
-    /<title>다미네 구제 \| 믿고 참여하는 구제 의류 경매<\/title>/i,
+    /<title>나인티 나인 빈티지 \| 투명한 빈티지 의류 경매<\/title>/i,
   );
-  assert.match(html, /매일 만나는 믿을 수 있는 구제 옷, 다미네 구제/);
+  assert.match(html, /나인티 나인 빈티지/);
+  assert.doesNotMatch(html, /다미네 구제|DAMINE VINTAGE/i);
   assert.match(html, /무입찰 첫 건은 즉시 확정/);
   assert.match(html, /Supabase에서 경매 상품을 불러오는 중이에요/);
   assert.match(html, /카카오로 시작하기/);
@@ -53,12 +54,13 @@ test("keeps the OAuth callback on the vinext SSR router", async () => {
 });
 
 test("publishes PG review business, terms, privacy, refund, and price information", async () => {
-  const [footer, termsSource, refundSource, privacySource, productCard] = await Promise.all([
+  const [footer, termsSource, refundSource, privacySource, productCard, soldFeed] = await Promise.all([
     source("src/components/common/BusinessFooter.tsx"),
     source("app/terms/page.tsx"),
     source("app/refund/page.tsx"),
     source("app/privacy/page.tsx"),
     source("src/components/feed/PostCard.tsx"),
+    source("src/components/feed/SoldAuctionFeed.tsx"),
   ]);
   const [homeResponse, termsResponse, privacyResponse, refundResponse] = await Promise.all([
     render("/"),
@@ -121,6 +123,89 @@ test("publishes PG review business, terms, privacy, refund, and price informatio
   assert.match(productCard, /시작 가격/);
   assert.match(productCard, /현재 입찰가/);
   assert.match(productCard, /formatKRW\(displayedPrice\)/);
+  assert.match(soldFeed, /공개 닉네임을 투명하게 확인/);
+  assert.doesNotMatch(soldFeed, /낙찰자 닉네임은[^\n]*일부만 표시/);
+});
+
+test("renders canonical product information with optional condition and legacy fallback", async () => {
+  const [detailSource, productCard] = await Promise.all([
+    source("src/utils/productFeedDetails.ts"),
+    source("src/components/feed/PostCard.tsx"),
+    source("src/components/feed/SoldAuctionFeed.tsx"),
+  ]);
+  const compiled = ts.transpileModule(detailSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.ES2022,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const details = await import(
+    `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`
+  );
+
+  assert.deepEqual(
+    details.getProductFeedDetails({
+      title: "BOSS 셔츠 화이트",
+      description:
+        "Name: BOSS 셔츠 화이트\nSize : 100 / 추천 L\n상품상태: 새상품",
+    }),
+    {
+      isCanonical: true,
+      name: "BOSS 셔츠 화이트",
+      size: "100 / 추천 L",
+      condition: "새상품",
+      legacyDescription:
+        "Name: BOSS 셔츠 화이트\nSize : 100 / 추천 L\n상품상태: 새상품",
+    },
+  );
+  assert.deepEqual(
+    details.getProductFeedDetails({
+      title: "구형 등록 상품",
+      description: "예전에 등록한 자유 형식 설명",
+    }),
+    {
+      isCanonical: false,
+      name: "예전에 등록한 자유 형식 설명",
+      size: undefined,
+      condition: undefined,
+      legacyDescription: "예전에 등록한 자유 형식 설명",
+    },
+  );
+  assert.deepEqual(
+    details.getProductFeedDetails({
+      title: "Code:graphy 셔츠 네이비",
+      description:
+        "Name: Code:graphy 셔츠 네이비\nSize : 95 / 추천 M",
+    }),
+    {
+      isCanonical: true,
+      name: "Code:graphy 셔츠 네이비",
+      size: "95 / 추천 M",
+      condition: undefined,
+      legacyDescription:
+        "Name: Code:graphy 셔츠 네이비\nSize : 95 / 추천 M",
+    },
+  );
+  for (const legacyDescription of [
+    "Size : 100 / 추천 L\nName: BOSS 셔츠 화이트",
+    "Name: BOSS 셔츠 화이트\nSize : 100 / 추천 L\n자유 설명",
+    "Name: BOSS 셔츠 화이트\nSize : 100 / 추천 L\n상품상태: 새상품\n추가 설명",
+    "Name: BOSS 셔츠 화이트\nName: 중복 상품명\nSize : 100 / 추천 L",
+  ]) {
+    const parsed = details.getProductFeedDetails({
+      title: "BOSS 셔츠 화이트",
+      description: legacyDescription,
+    });
+    assert.equal(parsed.isCanonical, false);
+    assert.equal(parsed.legacyDescription, legacyDescription);
+  }
+
+  assert.match(productCard, /aria-label="상품 정보"/);
+  assert.match(productCard, />Name:<\/dt>/);
+  assert.match(productCard, />Size :<\/dt>/);
+  assert.match(productCard, />상품상태:<\/dt>/);
+  assert.match(productCard, /productDetails\.isCanonical/);
+  assert.match(productCard, /productDetails\.legacyDescription/);
 });
 
 test("server-renders a persistent light and dark theme selector", async () => {
@@ -144,7 +229,8 @@ test("server-renders a persistent light and dark theme selector", async () => {
   assert.match(globalStyles, /--app-gradient:/);
   assert.match(globalStyles, /--surface-raised:/);
   assert.match(globalStyles, /\[class~="bg-\[#fee500\]"\]/);
-  assert.match(toggle, /THEME_STORAGE_KEY = "damine-theme"/);
+  assert.match(toggle, /THEME_STORAGE_KEY = "ninety-nine-theme"/);
+  assert.match(toggle, /LEGACY_THEME_STORAGE_KEY = "damine-theme"/);
   assert.match(toggle, /localStorage\.setItem\(THEME_STORAGE_KEY, nextTheme\)/);
   assert.match(toggle, /aria-pressed=\{theme === "light"\}/);
   assert.match(toggle, /aria-pressed=\{theme === "dark"\}/);
@@ -155,10 +241,17 @@ test("server-renders a persistent light and dark theme selector", async () => {
   assert.match(commonExports, /ThemeToggle/);
 
   assert.match(html, /<html[^>]*data-theme="light"/i);
+  assert.match(html, /ninety-nine-theme/);
   assert.match(html, /damine-theme/);
   assert.match(html, /aria-label="화면 테마 선택"/);
-  assert.match(html, /aria-pressed="true"[^>]*>라이트<\/button>/);
-  assert.match(html, /aria-pressed="false"[^>]*>다크<\/button>/);
+  assert.match(
+    html,
+    /aria-pressed="true"[^>]*>[\s\S]*?라이트[\s\S]*?<\/button>/,
+  );
+  assert.match(
+    html,
+    /aria-pressed="false"[^>]*>[\s\S]*?다크[\s\S]*?<\/button>/,
+  );
 });
 
 test("keeps Vercel routes on the Nitro SSR output", async () => {
@@ -462,6 +555,11 @@ test("uses real member delivery data with a default-closed address panel", async
   );
   assert.match(accountPage, /hidden=\{!isAddressOpen\}/);
   assert.match(accountPage, /선택 상품 택배 접수하기/);
+  assert.match(accountPage, /우편번호 <span[^>]*>\(필수\)<\/span>/);
+  assert.match(accountPage, /pattern="\[0-9\]\{5\}"/);
+  assert.match(accountPage, /autoComplete="postal-code"/);
+  assert.match(accountPage, /우편번호는 숫자 5자리로 입력해 주세요/);
+  assert.match(accountPage, /postalCode: normalizedPostalCode/);
   assert.ok(
     accountPage.indexOf("택배 가능 횟수") <
       accountPage.indexOf("선택 상품 택배 접수하기"),
@@ -471,6 +569,7 @@ test("uses real member delivery data with a default-closed address panel", async
   assert.match(accountRepository, /\.from\("shipping_addresses"\)/);
   assert.match(accountRepository, /"get_my_won_products"/);
   assert.match(accountRepository, /"request_product_shipping"/);
+  assert.match(accountRepository, /p_postal_code: postalCode/);
   assert.match(accountHook, /Promise\.all\(/);
   assert.match(migration, /create table if not exists public\.member_accounts/);
   assert.match(migration, /create table if not exists public\.shipping_addresses/);
@@ -608,11 +707,12 @@ test("keeps the owner publicly operator-only while providing audited private tes
 });
 
 test("keeps the hidden Kakao owner private and enforces role, warning, and revenue rules", async () => {
-  const [migration, routing, revenueFix, onlineDirectory, operatorPromotion, auth, presence, siteHeader, config] = await Promise.all([
+  const [migration, routing, revenueFix, onlineDirectory, publicGuestDirectory, operatorPromotion, auth, presence, siteHeader, config] = await Promise.all([
     source("supabase/migrations/20260718030000_add_role_levels_revenue_enforcement.sql"),
     source("supabase/migrations/20260718031000_route_support_by_operator.sql"),
     source("supabase/migrations/20260718032000_fix_monthly_revenue_lint.sql"),
     source("supabase/migrations/20260718033000_secure_online_member_heartbeat.sql"),
+    source("supabase/migrations/20260718101000_public_guest_online_directory.sql"),
     source("supabase/migrations/20260718034000_promote_initial_kakao_operator.sql"),
     source("src/lib/supabase/auth.ts"),
     source("src/hooks/useOnlineMembers.ts"),
@@ -638,7 +738,10 @@ test("keeps the hidden Kakao owner private and enforces role, warning, and reven
   assert.match(presence, /shouldTrackPresence\(role\)/);
   assert.match(presence, /"touch_my_last_seen"/);
   assert.match(presence, /"get_online_member_directory"/);
-  assert.doesNotMatch(presence, /\.track\(|presenceState|client\.channel/);
+  assert.match(presence, /PUBLIC_GUEST_PRESENCE_CHANNEL/);
+  assert.match(presence, /guestChannel\.track\(\{ guest_id: guestId \}\)/);
+  assert.match(presence, /guestChannel\.presenceState\(\)/);
+  assert.match(presence, /게스트\(\$\{guestId\}\)/);
   assert.match(routing, /roles\.role_code = 'operator'[\s\S]*has_kakao_identity/);
   assert.match(routing, /public\.is_owner\(\)/);
   assert.match(revenueFix, /with monthly as/);
@@ -648,6 +751,10 @@ test("keeps the hidden Kakao owner private and enforces role, warning, and reven
   assert.match(onlineDirectory, /statement_timestamp\(\) - interval '75 seconds'/);
   assert.match(onlineDirectory, /roles\.role_code in \('operator', 'band_member', 'member'\)/);
   assert.match(onlineDirectory, /grant execute on function public\.get_online_member_directory\(integer\) to authenticated/);
+  assert.doesNotMatch(publicGuestDirectory, /auth\.uid\(\) is null/);
+  assert.match(publicGuestDirectory, /roles\.role_code in \('operator', 'band_member', 'member'\)/);
+  assert.match(publicGuestDirectory, /not public\.is_owner_hidden_test_member/);
+  assert.match(publicGuestDirectory, /to anon, authenticated/);
   assert.match(operatorPromotion, /4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee/);
   assert.match(operatorPromotion, /set_member_access_role\(v_operator_id, 'operator'\)/);
   assert.match(operatorPromotion, /products\.inquiry_operator_id is null/);

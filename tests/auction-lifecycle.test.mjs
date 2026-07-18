@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
 
+import {
+  createCompositeCursorPage,
+} from "../src/lib/supabase/publicSoldAuctionPagination.ts";
+
 const rootUrl = new URL("../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
@@ -91,6 +95,66 @@ test("publishes sold snapshots with full public winner nicknames", async () => {
   assert.match(repository, /ownerCloseAuctionNow/);
   assert.match(repository, /ownerOverrideAuctionPrice/);
   assert.match(repository, /ownerPlaceTestBid/);
+});
+
+test("pages same-time sold auctions with a composite timestamp and UUID cursor", async () => {
+  const [migration, repository] = await Promise.all([
+    source(
+      "supabase/migrations/20260718100000_public_sold_archive_composite_cursor.sql",
+    ),
+    source("src/lib/supabase/auctionLifecycle.ts"),
+  ]);
+
+  assert.match(
+    migration,
+    /get_public_sold_auctions\([\s\S]*p_before_id uuid default null/,
+  );
+  assert.match(
+    migration,
+    /\(products\.closes_at, products\.id\) < \(p_before, p_before_id\)/,
+  );
+  assert.match(
+    migration,
+    /products_public_sold_archive_cursor_idx[\s\S]*closes_at desc, id desc/,
+  );
+  assert.match(migration, /is_owner_hidden_test_member\(winner\.bidder_id\) then '\*\*\*'/);
+  assert.match(
+    migration,
+    /to anon, authenticated/,
+  );
+  assert.match(repository, /PUBLIC_SOLD_AUCTIONS_PAGE_SIZE = 24/);
+  assert.match(
+    repository,
+    /limit: PUBLIC_SOLD_AUCTIONS_PAGE_SIZE \+ 1/,
+  );
+  assert.match(repository, /p_before_id: input\.beforeId \?\? null/);
+
+  const soldAt = "2026-07-18T12:00:00.000Z";
+  const allRows = Array.from({ length: 35 }, (_, index) => ({
+    productId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+    soldAt,
+  })).sort((left, right) => right.productId.localeCompare(left.productId));
+  const collected = [];
+  let cursor = null;
+
+  while (true) {
+    const eligibleRows = cursor
+      ? allRows.filter(
+          (row) =>
+            row.soldAt < cursor.soldAt ||
+            (row.soldAt === cursor.soldAt &&
+              row.productId < cursor.productId),
+        )
+      : allRows;
+    const page = createCompositeCursorPage(eligibleRows.slice(0, 25), 24);
+    collected.push(...page.items.map((row) => row.productId));
+    if (!page.hasMore || !page.nextCursor) break;
+    cursor = page.nextCursor;
+  }
+
+  assert.equal(collected.length, 35);
+  assert.deepEqual(collected, allRows.map((row) => row.productId));
+  assert.equal(new Set(collected).size, 35);
 });
 
 test("keeps hidden-test payment preparation service-only without weakening winner checks", async () => {

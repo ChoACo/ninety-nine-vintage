@@ -1008,6 +1008,26 @@ export type Database = {
         Returns: {
           id: string;
           display_name: string;
+          is_operator: boolean;
+          total_count: number;
+        }[];
+      };
+      get_public_sold_auctions: {
+        Args: {
+          p_limit?: number;
+          p_before?: string | null;
+          p_before_id?: string | null;
+        };
+        Returns: {
+          product_id: string;
+          title: string;
+          description: string;
+          image_urls: string[];
+          thumbnail_urls: string[];
+          sold_at: string;
+          winning_amount: number;
+          winner_display_name: string;
+          participant_count: number;
         }[];
       };
       get_shipping_work: {

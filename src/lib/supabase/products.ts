@@ -18,6 +18,7 @@ import { compressProductImageVariantsForUpload } from "../images/productImageCom
 
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export const PUBLISHED_PRODUCTS_PAGE_SIZE = 24;
 const PRODUCT_COLUMNS = [
   "id",
   "title",
@@ -614,17 +615,37 @@ export async function deleteManagedProduct(
   await removeUploadedImages(paths);
 }
 
-export async function fetchPublishedProducts(
-  now: Date = new Date(),
-): Promise<AuctionPost[]> {
+export interface PublishedProductsPage {
+  posts: AuctionPost[];
+  page: number;
+  hasMore: boolean;
+}
+
+export interface FetchPublishedProductsPageOptions {
+  page?: number;
+  now?: Date;
+}
+
+export async function fetchPublishedProductsPage({
+  page = 0,
+  now = new Date(),
+}: FetchPublishedProductsPageOptions = {}): Promise<PublishedProductsPage> {
+  if (!Number.isSafeInteger(page) || page < 0) {
+    throw new ProductRepositoryError("상품 페이지 번호가 올바르지 않습니다.");
+  }
+
   const client = getSupabaseBrowserClient();
   const nowIso = now.toISOString();
-  const { data, error } = await client
+  const rangeStart = page * PUBLISHED_PRODUCTS_PAGE_SIZE;
+  const rangeEnd = rangeStart + PUBLISHED_PRODUCTS_PAGE_SIZE - 1;
+  const { data, error, count } = await client
     .from("products")
-    .select(PRODUCT_COLUMNS)
+    .select(PRODUCT_COLUMNS, { count: "exact" })
     .eq("status", "active")
     .lte("publish_at", nowIso)
-    .order("publish_at", { ascending: false });
+    .order("publish_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(rangeStart, rangeEnd);
 
   if (error) {
     throw new ProductRepositoryError(
@@ -633,11 +654,31 @@ export async function fetchPublishedProducts(
     );
   }
 
-  return ((data ?? []) as unknown as ProductRow[])
+  const posts = ((data ?? []) as unknown as ProductRow[])
     .map(mapProductRowToAuctionPost)
     .filter(
       (post) =>
         post.status === "active" &&
         Date.parse(post.publish_at ?? post.createdAt) <= now.getTime(),
     );
+
+  return {
+    posts,
+    page,
+    hasMore:
+      typeof count === "number"
+        ? rangeStart + (data?.length ?? 0) < count
+        : (data?.length ?? 0) === PUBLISHED_PRODUCTS_PAGE_SIZE,
+  };
+}
+
+/**
+ * 기존 호출부 호환용 첫 페이지 조회입니다. 추가 페이지가 필요한 화면은
+ * fetchPublishedProductsPage를 사용해 서버 범위를 명시합니다.
+ */
+export async function fetchPublishedProducts(
+  now: Date = new Date(),
+): Promise<AuctionPost[]> {
+  const firstPage = await fetchPublishedProductsPage({ now });
+  return firstPage.posts;
 }

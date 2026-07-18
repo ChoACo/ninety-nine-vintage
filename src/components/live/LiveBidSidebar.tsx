@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- Supabase Storage의 공개 상품 이미지를 표시합니다. */
 import { useMemo, useState } from "react";
 import BidConfirmModal from "@/src/components/feed/BidConfirmModal";
-import { useAuctionPolicyClock } from "@/src/hooks/useAuctionPolicyClock";
+import { useAuctionPolicyMinuteClock } from "@/src/hooks/useAuctionPolicyClock";
 import type { AuctionPost } from "@/src/types/auction";
 import {
   assertAuctionBidAllowed,
@@ -117,7 +117,7 @@ export default function LiveBidSidebar({
   className = "",
 }: LiveBidSidebarProps) {
   const [confirmPostId, setConfirmPostId] = useState<string | null>(null);
-  const auctionNow = useAuctionPolicyClock();
+  const auctionNow = useAuctionPolicyMinuteClock();
 
   const { outbidPosts, leadingPosts, confirmedPosts } = useMemo(() => {
     const availablePosts = posts.filter((post) => post.status === "active");
@@ -153,7 +153,7 @@ export default function LiveBidSidebar({
     assertAuctionBidAllowed({
       post: confirmPost,
       currentUserName,
-      now: auctionNow,
+      now: new Date(),
     });
 
     await onBid(confirmPost.id, getQuickBidAmount(confirmPost));

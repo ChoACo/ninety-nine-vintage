@@ -97,7 +97,7 @@ function MemberFloatingChat({
         <header className="flex items-center gap-3 border-b border-[#e9ddd2] bg-[#fff5ec] px-4 py-3.5">
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#d47d6b] text-sm font-black text-white" aria-hidden="true">운영</span>
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-[17px] font-black text-[#493f39]">다미네 운영팀</h2>
+            <h2 className="truncate text-[17px] font-black text-[#493f39]">나인티 나인 빈티지 운영팀</h2>
             <p className="mt-0.5 text-sm font-bold text-[#81766f]">회원님만 볼 수 있는 비공개 상담</p>
           </div>
           <button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full border border-[#dfd2c7] bg-white text-xl text-[#675a52]" aria-label="상담 닫기">×</button>

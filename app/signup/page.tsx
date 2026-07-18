@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "카카오 회원가입 안내 | 나인티 나인 빈티지 · 다미네 구제",
+  title: "카카오 회원가입 안내 | 나인티 나인 빈티지",
   description: "카카오 회원가입 필수 수집 항목과 이용 목적 안내",
 };
 
@@ -11,7 +11,7 @@ export default function SignupGuidePage() {
     <main className="theme-app-shell grid min-h-dvh place-items-center px-4 py-10 sm:px-6">
       <section className="theme-panel w-full max-w-2xl rounded-[2rem] border px-5 py-8 shadow-sm sm:px-10 sm:py-10">
         <p className="text-xs font-black tracking-[0.18em] text-[var(--accent-text)]">
-          NINETY-NINE · DAMINE VINTAGE
+          NINETY-NINE VINTAGE
         </p>
         <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] text-[var(--text-strong)]">
           카카오로 회원가입

@@ -18,7 +18,7 @@ export default function BusinessFooter() {
       <div className="mx-auto grid w-full max-w-7xl gap-7 lg:grid-cols-[1.2fr_1fr] lg:gap-12">
         <section aria-labelledby="business-information-title">
           <p className="text-xs font-black tracking-[0.16em] text-[var(--accent-text)]">
-            NINETY-NINE · DAMINE VINTAGE
+            NINETY-NINE VINTAGE
           </p>
           <details className="group mt-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
             <summary className="cursor-pointer list-none rounded-2xl px-4 py-3 outline-none transition hover:bg-[var(--surface-raised)] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-muted)] [&::-webkit-details-marker]:hidden">

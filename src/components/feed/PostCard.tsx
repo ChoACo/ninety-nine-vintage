@@ -15,6 +15,7 @@ import {
 import { getMinimumBidAmount, getQuickBidAmount } from "@/src/utils/bidding";
 import { getUserBidState, type UserBidStatus } from "@/src/utils/bidStatus";
 import BidConfirmModal from "./BidConfirmModal";
+import { getProductFeedDetails } from "@/src/utils/productFeedDetails";
 import BidFormModal from "./BidFormModal";
 import BidHistoryModal from "./BidHistoryModal";
 import PhotoGallery from "./PhotoGallery";
@@ -82,16 +83,6 @@ const bidStatusStyles: Record<
   },
 };
 
-function getProductLabel(description: string) {
-  return (
-    description
-      .trim()
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .find(Boolean) ?? "구제 의류 상품"
-  );
-}
-
 export default function PostCard({
   post,
   currentUserName,
@@ -115,7 +106,8 @@ export default function PostCard({
   });
   const bidPresentation = bidStatusStyles[bidState.status];
   const displayedPrice = bidState.leadingBid?.amount ?? post.startingPrice;
-  const productLabel = getProductLabel(post.description);
+  const productDetails = getProductFeedDetails(post);
+  const productLabel = productDetails.name;
   const publishedAt = post.publish_at ?? post.createdAt;
 
   useEffect(() => {
@@ -152,7 +144,7 @@ export default function PostCard({
     assertAuctionBidAllowed({
       post,
       currentUserName,
-      now: auctionNow,
+      now: new Date(),
     });
 
     // onBid는 Supabase place_bid RPC를 호출하며 서버 시각과 최신 원장을
@@ -167,7 +159,7 @@ export default function PostCard({
   };
 
   return (
-    <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[#eadacd] bg-[#fffaf4] shadow-[0_12px_36px_rgba(91,67,50,0.09)]">
+    <article className="render-lazy flex h-full min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[#eadacd] bg-[#fffaf4] shadow-[0_12px_36px_rgba(91,67,50,0.09)]">
       <header className="flex items-center justify-between gap-2 border-b border-[#eee0d5] bg-white/45 px-4 py-3">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <time
@@ -198,11 +190,35 @@ export default function PostCard({
         />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="break-keep text-[#332a25]">
-            <p className="line-clamp-5 whitespace-pre-line text-[17px] font-extrabold leading-[1.6] tracking-[-0.015em] sm:text-[18px]">
-              {post.description.trim()}
-            </p>
-          </div>
+          {productDetails.isCanonical ? (
+            <dl
+              aria-label="상품 정보"
+              className="space-y-1.5 break-keep rounded-2xl border border-[#eadfd5] bg-white/45 px-3.5 py-3 text-[16px] font-extrabold leading-[1.55] tracking-[-0.015em] text-[#332a25] sm:text-[17px]"
+            >
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+                <dt className="font-black text-[#765f51]">Name:</dt>
+                <dd className="min-w-0 break-words">{productDetails.name}</dd>
+              </div>
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+                <dt className="font-black text-[#765f51]">Size :</dt>
+                <dd className="min-w-0 break-words">{productDetails.size}</dd>
+              </div>
+              {productDetails.condition ? (
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+                  <dt className="font-black text-[#765f51]">상품상태:</dt>
+                  <dd className="min-w-0 break-words">
+                    {productDetails.condition}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : (
+            <div className="break-keep text-[#332a25]">
+              <p className="line-clamp-5 whitespace-pre-line text-[17px] font-extrabold leading-[1.6] tracking-[-0.015em] sm:text-[18px]">
+                {productDetails.legacyDescription}
+              </p>
+            </div>
+          )}
 
           <div
             className={`mt-3 grid grid-cols-2 overflow-hidden rounded-2xl border-2 transition-colors ${bidPresentation.frame}`}

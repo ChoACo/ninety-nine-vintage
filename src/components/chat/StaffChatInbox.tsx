@@ -36,6 +36,7 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [draft, setDraft] = useState("");
+  const [isMobileConversationOpen, setIsMobileConversationOpen] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -120,8 +121,10 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
 
   return (
     <section className="overflow-hidden rounded-[2rem] border border-[#dfd3c7] bg-white/90 shadow-[0_24px_70px_rgba(91,70,53,0.12)]">
-      <div className="grid min-h-[650px] lg:grid-cols-[350px_1fr]">
-        <aside className="border-b border-[#eadfd5] bg-[#fff8f0] lg:border-b-0 lg:border-r">
+      <div className="grid min-h-[650px] md:grid-cols-[minmax(280px,330px)_minmax(0,1fr)] lg:grid-cols-[350px_1fr]">
+        <aside
+          className={`${isMobileConversationOpen ? "hidden md:block" : "block"} border-b border-[#eadfd5] bg-[#fff8f0] md:border-b-0 md:border-r`}
+        >
           <div className="border-b border-[#eadfd5] p-5">
             <p className="text-xs font-black tracking-[0.16em] text-[#b96d5d]">
               {isAuditMode ? "OPERATOR INBOX REVIEW" : "OPERATOR SUPPORT"}
@@ -143,7 +146,10 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
                     <button
                       key={operator.id}
                       type="button"
-                      onClick={() => setSelectedOperatorId(operator.id)}
+                      onClick={() => {
+                        setSelectedOperatorId(operator.id);
+                        setIsMobileConversationOpen(false);
+                      }}
                       className={`rounded-full px-3 py-2 text-sm font-black ${
                         selectedOperatorId === operator.id
                           ? "bg-[#6f7f72] text-white"
@@ -192,7 +198,7 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
             </div>
           </div>
 
-          <div className="max-h-[440px] space-y-1 overflow-y-auto p-2 lg:max-h-[495px]">
+          <div className="max-h-[440px] space-y-1 overflow-y-auto p-2 md:max-h-[495px]">
             {visibleConversations.length === 0 ? (
               <p className="m-3 rounded-2xl border border-dashed border-[#ddcfc3] bg-white/65 p-5 text-center text-sm font-bold leading-6 text-[#81736a]">
                 조건에 맞는 상담이 없습니다.
@@ -208,7 +214,10 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
                   <button
                     key={conversation.id}
                     type="button"
-                    onClick={() => chat.selectConversation(conversation.id)}
+                    onClick={() => {
+                      chat.selectConversation(conversation.id);
+                      setIsMobileConversationOpen(true);
+                    }}
                     className={`w-full rounded-2xl p-3 text-left transition ${
                       selected
                         ? "bg-white shadow-[0_8px_24px_rgba(97,73,55,0.10)]"
@@ -256,10 +265,36 @@ export function StaffChatInbox({ staffId, role }: StaffChatInboxProps) {
         </aside>
 
         {!chat.selectedConversation ? (
-          <ChatState message="왼쪽에서 상담을 선택해 주세요." compact />
+          <div className="hidden md:block">
+            <ChatState message="왼쪽에서 상담을 선택해 주세요." compact />
+          </div>
         ) : (
-          <div className="flex min-h-[560px] min-w-0 flex-col bg-[linear-gradient(180deg,var(--surface-raised)_0%,var(--surface)_100%)]">
+          <div
+            className={`${isMobileConversationOpen ? "flex" : "hidden"} min-h-[560px] min-w-0 flex-col bg-[linear-gradient(180deg,var(--surface-raised)_0%,var(--surface)_100%)] md:flex`}
+          >
             <header className="flex flex-wrap items-center gap-3 border-b border-[#eadfd5] bg-white/75 px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setIsMobileConversationOpen(false)}
+                className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-left text-sm font-black text-[var(--accent-text)] md:hidden"
+                aria-label="상담 목록으로 돌아가기"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="h-4 w-4"
+                >
+                  <path
+                    d="m15 18-6-6 6-6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                상담 목록
+              </button>
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-lg font-black text-[#493f38]">
                   {chat.selectedConversation.member?.displayName ??

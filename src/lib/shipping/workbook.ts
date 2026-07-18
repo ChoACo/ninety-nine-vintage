@@ -86,7 +86,7 @@ export async function downloadShippingRequestsWorkbook(
   assertExportable(items);
 
   const workbook = await createWorkbook();
-  workbook.creator = "NINETY-NINE · DAMINE VINTAGE";
+  workbook.creator = "NINETY-NINE VINTAGE";
   workbook.created = new Date();
   const worksheet = workbook.addWorksheet("택배 발송 신청", {
     views: [{ state: "frozen", ySplit: 1 }],

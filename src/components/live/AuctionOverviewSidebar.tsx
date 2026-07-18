@@ -18,15 +18,9 @@ function getAuctionState(post: AuctionPost) {
       classes: "bg-[var(--warning-surface)] text-[var(--warning-text)]",
     };
   }
-  if (post.participantCount > 0) {
-    return {
-      label: "입찰 진행",
-      classes: "bg-[var(--success-surface)] text-[var(--success-text)]",
-    };
-  }
   return {
-    label: "첫 입찰 대기",
-    classes: "bg-[var(--surface-muted)] text-[var(--text-muted)]",
+    label: "입찰 진행",
+    classes: "bg-[var(--success-surface)] text-[var(--success-text)]",
   };
 }
 
@@ -37,7 +31,12 @@ export default function AuctionOverviewSidebar({
   const inProgressPosts = useMemo(
     () =>
       posts
-        .filter((post) => post.status === "active")
+        .filter(
+          (post) =>
+            post.status === "active" &&
+            post.participantCount > 0 &&
+            post.bidHistory.length > 0,
+        )
         .toSorted((left, right) => {
           const lockedOrder = Number(Boolean(right.bidLockedAt)) - Number(Boolean(left.bidLockedAt));
           if (lockedOrder !== 0) return lockedOrder;
@@ -130,12 +129,12 @@ export default function AuctionOverviewSidebar({
         </ul>
       ) : (
         <p className="mt-4 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-muted)] px-3 py-5 text-center text-[15px] font-bold leading-6 text-[var(--text-muted)]">
-          현재 공개되어 진행 중인 상품이 없습니다.
+          현재 입찰자가 있는 진행 상품이 없습니다.
         </p>
       )}
 
       <p className="mt-3 break-keep text-center text-[13px] font-bold leading-5 text-[var(--text-muted)]">
-        진행 상품과 입찰 참여 수가 실시간으로 갱신됩니다.
+        입찰자가 있는 진행 상품과 참여 수가 실시간으로 갱신됩니다.
       </p>
     </aside>
   );

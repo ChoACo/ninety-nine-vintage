@@ -1,10 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getSupabaseBrowserClient } from "./client";
+import {
+  createCompositeCursorPage,
+  type PublicSoldAuctionCursor,
+} from "./publicSoldAuctionPagination";
+
+export type { PublicSoldAuctionCursor } from "./publicSoldAuctionPagination";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_PRICE = 1_000_000_000;
+export const PUBLIC_SOLD_AUCTIONS_PAGE_SIZE = 24;
 
 export class AuctionLifecycleError extends Error {
   readonly code?: string;
@@ -39,6 +46,12 @@ export interface PublicSoldAuction {
   /** 공개 입찰 기록과 동일한 회원 공개 닉네임입니다. */
   winnerDisplayName: string;
   participantCount: number;
+}
+
+export interface PublicSoldAuctionsPage {
+  auctions: PublicSoldAuction[];
+  hasMore: boolean;
+  nextCursor: PublicSoldAuctionCursor | null;
 }
 
 interface OwnerClosedAuctionRow {
@@ -125,25 +138,71 @@ function requireOptionalPrice(price: number | null | undefined) {
   if (price != null) requirePrice(price);
 }
 
-export async function fetchPublicSoldAuctions(options?: {
-  limit?: number;
-  before?: string;
-}): Promise<PublicSoldAuction[]> {
-  const limit = options?.limit ?? 30;
+function validatePublicSoldAuctionLimit(limit: number) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
     throw new AuctionLifecycleError(
       "판매 완료 조회 개수는 1~100개여야 합니다.",
     );
   }
-  if (options?.before && Number.isNaN(Date.parse(options.before))) {
+}
+
+function validatePublicSoldAuctionCursor(cursor: PublicSoldAuctionCursor) {
+  if (Number.isNaN(Date.parse(cursor.soldAt))) {
     throw new AuctionLifecycleError(
       "판매 완료 조회 기준 시각이 올바르지 않습니다.",
     );
   }
+  if (!UUID_PATTERN.test(cursor.productId)) {
+    throw new AuctionLifecycleError(
+      "판매 완료 조회 기준 상품이 올바르지 않습니다.",
+    );
+  }
+}
+
+function mapPublicSoldAuctionRow(row: PublicSoldAuctionRow): PublicSoldAuction {
+  return Object.freeze({
+    productId: row.product_id,
+    title: row.title,
+    description: row.description,
+    imageUrls: Object.freeze([...row.image_urls]),
+    thumbnailUrls: Object.freeze(
+      row.image_urls.map(
+        (imageUrl, index) => row.thumbnail_urls[index] || imageUrl,
+      ),
+    ),
+    soldAt: row.sold_at,
+    winningAmount: row.winning_amount,
+    winnerDisplayName: row.winner_display_name,
+    participantCount: row.participant_count,
+  });
+}
+
+async function queryPublicSoldAuctions(input: {
+  limit: number;
+  before?: string;
+  beforeId?: string;
+}): Promise<PublicSoldAuction[]> {
+  validatePublicSoldAuctionLimit(input.limit);
+  if (input.before && Number.isNaN(Date.parse(input.before))) {
+    throw new AuctionLifecycleError(
+      "판매 완료 조회 기준 시각이 올바르지 않습니다.",
+    );
+  }
+  if (input.beforeId && !UUID_PATTERN.test(input.beforeId)) {
+    throw new AuctionLifecycleError(
+      "판매 완료 조회 기준 상품이 올바르지 않습니다.",
+    );
+  }
+  if (input.beforeId && !input.before) {
+    throw new AuctionLifecycleError(
+      "판매 완료 조회 기준 시각이 필요합니다.",
+    );
+  }
 
   const { data, error } = await rpcClient().rpc("get_public_sold_auctions", {
-    p_limit: limit,
-    p_before: options?.before ?? null,
+    p_limit: input.limit,
+    p_before: input.before ?? null,
+    p_before_id: input.beforeId ?? null,
   });
   if (error) {
     throw new AuctionLifecycleError(
@@ -153,23 +212,42 @@ export async function fetchPublicSoldAuctions(options?: {
     );
   }
 
-  return ((data ?? []) as PublicSoldAuctionRow[]).map((row) =>
-    Object.freeze({
-      productId: row.product_id,
-      title: row.title,
-      description: row.description,
-      imageUrls: Object.freeze([...row.image_urls]),
-      thumbnailUrls: Object.freeze(
-        row.image_urls.map(
-          (imageUrl, index) => row.thumbnail_urls[index] || imageUrl,
-        ),
-      ),
-      soldAt: row.sold_at,
-      winningAmount: row.winning_amount,
-      winnerDisplayName: row.winner_display_name,
-      participantCount: row.participant_count,
-    }),
+  return ((data ?? []) as PublicSoldAuctionRow[]).map(
+    mapPublicSoldAuctionRow,
   );
+}
+
+export async function fetchPublicSoldAuctions(options?: {
+  limit?: number;
+  before?: string;
+}): Promise<PublicSoldAuction[]> {
+  return queryPublicSoldAuctions({
+    limit: options?.limit ?? 30,
+    before: options?.before,
+  });
+}
+
+export async function fetchPublicSoldAuctionsPage(options?: {
+  cursor?: PublicSoldAuctionCursor | null;
+}): Promise<PublicSoldAuctionsPage> {
+  const cursor = options?.cursor ?? null;
+  if (cursor) validatePublicSoldAuctionCursor(cursor);
+
+  const rows = await queryPublicSoldAuctions({
+    limit: PUBLIC_SOLD_AUCTIONS_PAGE_SIZE + 1,
+    before: cursor?.soldAt,
+    beforeId: cursor?.productId,
+  });
+  const page = createCompositeCursorPage(
+    rows,
+    PUBLIC_SOLD_AUCTIONS_PAGE_SIZE,
+  );
+
+  return {
+    auctions: page.items,
+    hasMore: page.hasMore,
+    nextCursor: page.nextCursor,
+  };
 }
 
 export async function ownerCloseAuctionNow(

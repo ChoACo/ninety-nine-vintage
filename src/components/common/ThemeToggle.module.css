@@ -5,17 +5,21 @@
   gap: 2px;
   padding: 3px;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: 0.8rem;
   background: var(--surface-glass);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .option {
-  min-width: 72px;
-  min-height: 44px;
-  padding: 0.5rem 0.75rem;
+  display: inline-flex;
+  min-width: 36px;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.4rem;
   border: 0;
-  border-radius: 0.8rem;
+  border-radius: 0.6rem;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -26,6 +30,44 @@
     background-color 160ms ease,
     color 160ms ease,
     box-shadow 160ms ease;
+}
+
+.icon {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (min-width: 48rem) {
+  .option {
+    min-width: 66px;
+    padding-inline: 0.65rem;
+  }
+
+  .label {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+  }
 }
 
 .option:hover {

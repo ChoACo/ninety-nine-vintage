@@ -126,7 +126,7 @@ export default function AuthCallbackPage() {
           ♡
         </div>
         <p className="mt-5 text-xs font-black tracking-[0.2em] text-[#b96858]">
-          DAMINE VINTAGE
+          NINETY-NINE VINTAGE
         </p>
         <h1 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--text-strong)]">
           {error ? "로그인을 완료하지 못했어요" : "카카오 로그인 확인 중"}

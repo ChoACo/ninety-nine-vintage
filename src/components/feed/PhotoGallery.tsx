@@ -38,6 +38,7 @@ function GalleryImage({ src, alt, className }: GalleryImageProps) {
       alt={alt}
       className={className}
       loading="lazy"
+      decoding="async"
       onError={() => setFailed(true)}
     />
   );
@@ -60,6 +61,7 @@ export default function PhotoGallery({
       : [],
   );
   const cleanImages = galleryItems.map((item) => item.image);
+  const cleanThumbnails = galleryItems.map((item) => item.thumbnail);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const thumbnails = galleryItems.slice(1, 4);
@@ -150,6 +152,7 @@ export default function PhotoGallery({
           open
           onClose={() => setModalOpen(false)}
           images={cleanImages}
+          thumbnailImages={cleanThumbnails}
           title={title}
           initialIndex={selectedIndex}
         />

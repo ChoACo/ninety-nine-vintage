@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "개인정보처리방침 | 나인티 나인 빈티지 · 다미네 구제",
-  description: "나인티 나인 빈티지(다미네 구제)의 개인정보 수집 및 이용 방침",
+  title: "개인정보처리방침 | 나인티 나인 빈티지",
+  description: "나인티 나인 빈티지의 개인정보 수집 및 이용 방침",
 };
 
 const policySections = [
@@ -250,13 +250,13 @@ export default function PrivacyPolicyPage() {
     <main className="theme-app-shell min-h-dvh px-4 py-8 sm:px-6 sm:py-12">
       <article className="theme-panel mx-auto max-w-4xl rounded-[2rem] border px-5 py-7 shadow-sm sm:px-10 sm:py-10">
         <p className="text-xs font-black tracking-[0.18em] text-[var(--accent-text)]">
-          NINETY-NINE · DAMINE VINTAGE
+          NINETY-NINE VINTAGE
         </p>
         <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] text-[var(--text-strong)]">
           개인정보처리방침
         </h1>
         <p className="mt-4 break-keep font-bold leading-7 text-[var(--text-muted)]">
-          나인티 나인 빈티지(다미네 구제)는 이용자의 개인정보를 소중히 다루며, 필요한
+          나인티 나인 빈티지는 이용자의 개인정보를 소중히 다루며, 필요한
           정보만 투명하게 처리합니다.
         </p>
         <div className="mt-7 space-y-7">

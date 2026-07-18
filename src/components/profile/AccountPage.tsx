@@ -383,8 +383,15 @@ function AddressEditorModal({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setIsSubmitting(true);
     setError("");
+
+    const normalizedPostalCode = postalCode.trim();
+    if (!/^\d{5}$/.test(normalizedPostalCode)) {
+      setError("우편번호는 숫자 5자리로 입력해 주세요.");
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       await onSave({
@@ -392,7 +399,7 @@ function AddressEditorModal({
         label,
         recipientName,
         phone,
-        postalCode,
+        postalCode: normalizedPostalCode,
         address: streetAddress,
         isDefault: forceDefault || isDefault,
       });
@@ -462,7 +469,7 @@ function AddressEditorModal({
           />
         </label>
         <label className="block text-sm font-black text-[#4c4039]">
-          우편번호
+          우편번호 <span className="text-[#bd5f50]">(필수)</span>
           <input
             type="text"
             inputMode="numeric"
@@ -475,10 +482,17 @@ function AddressEditorModal({
             minLength={5}
             maxLength={5}
             placeholder="5자리 우편번호"
+            aria-describedby="shipping-postal-code-help"
             required
             disabled={isSubmitting}
             className={inputClasses}
           />
+          <span
+            id="shipping-postal-code-help"
+            className="mt-1.5 block text-xs font-bold text-[#88766b]"
+          >
+            택배 접수에 필요한 숫자 5자리 우편번호를 입력해 주세요.
+          </span>
         </label>
         <label className="block text-sm font-black text-[#4c4039]">
           배송 주소

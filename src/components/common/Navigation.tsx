@@ -20,14 +20,42 @@ export interface NavigationProps {
 const navigationItems: Array<{
   value: NavigationTarget;
   label: string;
-  icon: string;
+  icon: "home" | "chat" | "profile" | "operations";
   staffOnly?: boolean;
 }> = [
-  { value: "feed", label: "경매 피드", icon: "⌂" },
-  { value: "chat", label: "채팅", icon: "○" },
-  { value: "profile", label: "내 정보", icon: "☺" },
-  { value: "admin", label: "운영 센터", icon: "⚙", staffOnly: true },
+  { value: "feed", label: "경매 피드", icon: "home" },
+  { value: "chat", label: "채팅", icon: "chat" },
+  { value: "profile", label: "내 정보", icon: "profile" },
+  { value: "admin", label: "운영 센터", icon: "operations", staffOnly: true },
 ];
+
+function NavigationIcon({
+  name,
+}: {
+  name: (typeof navigationItems)[number]["icon"];
+}) {
+  const paths = {
+    home: <path d="M3 10.7 12 3l9 7.7v8.8a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5Z" />,
+    chat: <path d="M5 18.5 3.7 21l3.7-1.1A9 9 0 1 0 3 12c0 2.5.7 4.7 2 6.5Zm3-8h8m-8 4h5" />,
+    profile: <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7.5 8c.7-4 3.2-6 7.5-6s6.8 2 7.5 6" />,
+    operations: <path d="M4 6.5h10m3 0h3M4 12h3m3 0h10M4 17.5h8m3 0h5M14 4v5M7 9.5v5m5 1v4" />,
+  } as const;
+
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-[21px] shrink-0"
+    >
+      {paths[name]}
+    </svg>
+  );
+}
 
 export default function Navigation({
   activePage,
@@ -38,7 +66,7 @@ export default function Navigation({
   return (
     <nav
       aria-label="주요 메뉴"
-      className={`theme-surface-glass fixed inset-x-3 bottom-3 z-40 mx-auto max-w-xl rounded-[1.4rem] border p-1.5 backdrop-blur-xl md:static md:max-w-none md:shadow-sm ${className}`}
+      className={`app-primary-navigation theme-surface-glass fixed inset-x-2 z-40 mx-auto max-w-[28rem] rounded-[1.35rem] border p-1.5 md:static md:max-w-3xl md:rounded-[1.5rem] md:shadow-sm ${className}`}
     >
       <div className="grid grid-cols-4 gap-1">
         {navigationItems.map((item) => {
@@ -74,25 +102,21 @@ export default function Navigation({
               onClick={() => {
                 if (!isLocked) onNavigate(item.value);
               }}
-              className={`group relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-1.5 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#eb7765] sm:flex-row sm:gap-2 sm:text-base ${
+              className={`group relative flex min-h-[3.25rem] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1rem] px-1 py-1.5 text-[11px] font-extrabold leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:min-h-14 sm:flex-row sm:gap-2 sm:px-3 sm:text-[15px] ${
                 selected
-                  ? "bg-[var(--accent-surface)] text-[var(--accent-text)] shadow-sm"
+                  ? "bg-[var(--accent-surface)] text-[var(--accent-text)] shadow-[0_4px_12px_rgba(131,75,61,0.10)]"
                   : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-strong)]"
               }`}
             >
-              <span
-                aria-hidden="true"
-                className={`text-lg leading-none ${selected ? "scale-105" : "opacity-75"}`}
-              >
-                {item.icon}
-              </span>
-              <span className="whitespace-nowrap">{visibleLabel}</span>
+              <NavigationIcon name={item.icon} />
+              <span className="max-w-full truncate whitespace-nowrap">{visibleLabel}</span>
               {isLocked ? (
                 <span
-                  aria-hidden="true"
-                  className="absolute ml-9 -mt-7 rounded-full bg-[var(--surface-muted)] px-1 text-[9px] text-[var(--text-muted)] sm:relative sm:ml-0 sm:mt-0"
+                  className="absolute right-1.5 top-1.5 grid size-3.5 place-items-center rounded-full bg-[var(--surface-muted)] text-[8px] text-[var(--text-muted)] sm:static sm:size-auto sm:px-1.5 sm:py-0.5 sm:text-[9px]"
+                  aria-label="잠금"
                 >
-                  잠금
+                  <span aria-hidden="true">●</span>
+                  <span className="sr-only sm:not-sr-only">잠금</span>
                 </span>
               ) : null}
             </button>

@@ -33,6 +33,8 @@ export interface DetectedAuctionHeaders {
   headerRowNumber: number;
   description: DetectedHeaderColumn | null;
   title: DetectedHeaderColumn | null;
+  size: DetectedHeaderColumn | null;
+  conditionScore: DetectedHeaderColumn | null;
   startingPrice: DetectedHeaderColumn | null;
   imageNames: DetectedHeaderColumn[];
   duplicateFields: Array<{
@@ -72,6 +74,10 @@ export interface BatchAuctionImageMatch {
 export interface BatchAuctionPreviewRow {
   rowNumber: number;
   title: string;
+  size: string;
+  condition: BatchAuctionCondition | null;
+  /** 기존 X열 원문입니다. 공개 본문에는 넣지 않고 진단/호환용으로만 보존합니다. */
+  sourceDescription: string;
   description: string;
   startingPrice: number | null;
   imageNames: string[];
@@ -79,6 +85,8 @@ export interface BatchAuctionPreviewRow {
   issues: BatchAuctionIssue[];
   draft: NewAuctionDraft | null;
 }
+
+export type BatchAuctionCondition = "새상품" | "상태 좋음" | "사용감 있음";
 
 export interface BatchAuctionPreview {
   rows: BatchAuctionPreviewRow[];
@@ -97,6 +105,8 @@ const HEADER_SCAN_LIMIT = 30;
 export const FIRST_PRODUCT_ROW = 6;
 const FIXED_TEMPLATE_COLUMNS = {
   title: 1,
+  size: 4,
+  conditionScore: 23,
   description: 24,
   startingPrice: 25,
   imageNames: 34,
@@ -267,6 +277,15 @@ function detectFixedTemplateForSheet(
     const hasTitle = Boolean(
       cellAsText(row.cells[FIXED_TEMPLATE_COLUMNS.title - 1]),
     );
+    const hasSize = Boolean(
+      normalizeBatchAuctionSize(
+        row.cells[FIXED_TEMPLATE_COLUMNS.size - 1],
+      ),
+    );
+    const hasValidConditionScore =
+      parseBatchAuctionConditionScore(
+        row.cells[FIXED_TEMPLATE_COLUMNS.conditionScore - 1],
+      ) !== null;
     const hasDescription = Boolean(
       cellAsText(row.cells[FIXED_TEMPLATE_COLUMNS.description - 1]),
     );
@@ -285,11 +304,15 @@ function detectFixedTemplateForSheet(
 
     evidenceScore +=
       (hasTitle ? 3 : 0) +
+      (hasSize ? 6 : 0) +
+      (hasValidConditionScore ? 6 : 0) +
       (hasDescription ? 4 : 0) +
       (hasStartingPrice ? 5 : 0) +
       (hasImageName ? 4 : 0);
     if (
-      (hasTitle || hasDescription) &&
+      hasTitle &&
+      hasSize &&
+      hasValidConditionScore &&
       hasStartingPrice &&
       hasImageName
     ) {
@@ -326,6 +349,16 @@ function detectFixedTemplateForSheet(
           headerRow,
           FIXED_TEMPLATE_COLUMNS.title,
           "A열 상품명",
+        ),
+        size: fixedTemplateColumn(
+          headerRow,
+          FIXED_TEMPLATE_COLUMNS.size,
+          "D열 사이즈",
+        ),
+        conditionScore: fixedTemplateColumn(
+          headerRow,
+          FIXED_TEMPLATE_COLUMNS.conditionScore,
+          "W열 상태점수",
         ),
         description: fixedTemplateColumn(
           headerRow,
@@ -404,6 +437,8 @@ function detectHeadersForRow(
       headerRowNumber: row.rowNumber,
       description: detectedByField.description[0] ?? null,
       title: detectedByField.title[0] ?? null,
+      size: null,
+      conditionScore: null,
       startingPrice: detectedByField.startingPrice[0] ?? null,
       imageNames: detectedByField.imageNames,
       duplicateFields,
@@ -840,6 +875,71 @@ function parseStartingPrice(value: ParsedWorkbookCell | undefined): number | nul
     : null;
 }
 
+/** A열 맨 앞의 사이즈 토큰 하나만 제거하고 실제 상품명을 반환합니다. */
+export function normalizeBatchAuctionProductName(value: string): string {
+  return value
+    .normalize("NFKC")
+    .replace(/^\s*\[[^\]\r\n]*\]\s*/u, "")
+    .trim();
+}
+
+/** D열의 줄바꿈과 연속 공백만 접어 추천 사이즈 문구 전체를 한 줄로 보존합니다. */
+export function normalizeBatchAuctionSize(
+  value: ParsedWorkbookCell | undefined,
+): string {
+  return cellAsText(value)
+    .normalize("NFKC")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+type BatchAuctionConditionScore = 1 | 2 | 3 | 4 | 5;
+
+function parseBatchAuctionConditionScore(
+  value: ParsedWorkbookCell | undefined,
+): BatchAuctionConditionScore | null {
+  if (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 5
+  ) {
+    return value as BatchAuctionConditionScore;
+  }
+
+  if (typeof value !== "string") return null;
+  const normalized = value.normalize("NFKC").trim();
+  return /^[1-5]$/.test(normalized)
+    ? (Number(normalized) as BatchAuctionConditionScore)
+    : null;
+}
+
+/** W열 상태점수를 공개용 한국어 상태로 변환합니다. 3과 5는 의도적으로 숨깁니다. */
+export function mapBatchAuctionConditionScore(
+  value: ParsedWorkbookCell | undefined,
+): BatchAuctionCondition | null {
+  const score = parseBatchAuctionConditionScore(value);
+
+  if (score === 1) return "새상품";
+  if (score === 2) return "상태 좋음";
+  if (score === 4) return "사용감 있음";
+  return null;
+}
+
+function buildFixedTemplateDescription(
+  title: string,
+  size: string,
+  condition: BatchAuctionCondition | null,
+): string {
+  if (!title) return "";
+
+  return [
+    `Name: ${title}`,
+    `Size : ${size}`,
+    ...(condition ? [`상품상태: ${condition}`] : []),
+  ].join("\n");
+}
+
 function valueAt(
   row: ParsedAuctionWorkbookRow,
   column: DetectedHeaderColumn | null,
@@ -929,14 +1029,35 @@ export function buildBatchAuctionPreview(
     const detected = workbook.detectedHeaders;
     const descriptionCell = cellAsText(valueAt(row, detected.description));
     const titleCell = cellAsText(valueAt(row, detected.title));
-    const description = descriptionCell || titleCell;
-    const title =
+    const isFixedTemplate = Boolean(
+      detected.title?.columnNumber === FIXED_TEMPLATE_COLUMNS.title &&
+        detected.size?.columnNumber === FIXED_TEMPLATE_COLUMNS.size &&
+        detected.conditionScore?.columnNumber ===
+          FIXED_TEMPLATE_COLUMNS.conditionScore,
+    );
+    const fallbackDescription = descriptionCell || titleCell;
+    const rawTitle =
       titleCell ||
-      description
+      fallbackDescription
         .split(/\r?\n/)
         .map((line) => line.trim())
         .find(Boolean) ||
       "";
+    const title = isFixedTemplate
+      ? normalizeBatchAuctionProductName(rawTitle)
+      : rawTitle;
+    const size = isFixedTemplate
+      ? normalizeBatchAuctionSize(valueAt(row, detected.size))
+      : "";
+    const conditionScore = isFixedTemplate
+      ? parseBatchAuctionConditionScore(valueAt(row, detected.conditionScore))
+      : null;
+    const condition = isFixedTemplate
+      ? mapBatchAuctionConditionScore(valueAt(row, detected.conditionScore))
+      : null;
+    const description = isFixedTemplate
+      ? buildFixedTemplateDescription(title, size, condition)
+      : fallbackDescription;
     const startingPrice = parseStartingPrice(
       valueAt(row, detected.startingPrice),
     );
@@ -944,10 +1065,30 @@ export function buildBatchAuctionPreview(
       splitImageNames(valueAt(row, column), imageIndex),
     );
 
-    if (!description) {
+    if (isFixedTemplate && !title) {
+      issues.push({
+        code: "missing_title",
+        message: "A열 상품명이 비어 있거나 사이즈 토큰만 입력되어 있습니다.",
+        severity: "error",
+      });
+    } else if (!description) {
       issues.push({
         code: "missing_description",
         message: "상품 설명 또는 상품명이 비어 있습니다.",
+        severity: "error",
+      });
+    }
+    if (isFixedTemplate && !size) {
+      issues.push({
+        code: "missing_size",
+        message: "D열 사이즈 및 추천 사이즈가 비어 있습니다.",
+        severity: "error",
+      });
+    }
+    if (isFixedTemplate && conditionScore === null) {
+      issues.push({
+        code: "invalid_condition_score",
+        message: "W열 상태점수는 숫자 또는 문자열 1, 2, 3, 4, 5 중 하나여야 합니다.",
         severity: "error",
       });
     }
@@ -989,6 +1130,9 @@ export function buildBatchAuctionPreview(
     return {
       rowNumber: row.rowNumber,
       title,
+      size,
+      condition,
+      sourceDescription: descriptionCell,
       description,
       startingPrice,
       imageNames,

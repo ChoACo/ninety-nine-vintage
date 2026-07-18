@@ -280,6 +280,10 @@ test("uploads and cleans up both Storage image variants", async () => {
     new URL("src/components/feed/PhotoGallery.tsx", rootUrl),
     "utf8",
   );
+  const galleryModal = await readFile(
+    new URL("src/components/feed/PhotoGalleryModal.tsx", rootUrl),
+    "utf8",
+  );
 
   assert.match(source, /compressProductImageVariantsForUpload\(file\)/);
   assert.match(source, /\.upload\(imagePath, imageFile,/);
@@ -292,4 +296,7 @@ test("uploads and cleans up both Storage image variants", async () => {
   );
   assert.match(gallery, /thumbnailImages\?\.\[index\] \|\| image/);
   assert.match(gallery, /images=\{cleanImages\}/);
+  assert.match(gallery, /thumbnailImages=\{cleanThumbnails\}/);
+  assert.match(galleryModal, /src=\{thumbnailImages\?\.\[index\] \|\| image\}/);
+  assert.match(galleryModal, /loading="lazy"[\s\S]*?decoding="async"/);
 });

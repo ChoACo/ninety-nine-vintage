@@ -129,7 +129,7 @@ function ParticipantChat({
           <div className="min-w-0 flex-1">
             <p className="text-xs font-black tracking-[0.16em] text-[#bd6f5e]">PRIVATE SUPPORT</p>
             <h2 className="mt-0.5 text-xl font-black text-[#493f38]">
-              {internal ? "담당 운영자 내부 대화" : "다미네 운영팀"}
+              {internal ? "담당 운영자 내부 대화" : "나인티 나인 빈티지 운영팀"}
             </h2>
             <p className="mt-0.5 text-sm font-bold text-[#81746b]">
               {internal

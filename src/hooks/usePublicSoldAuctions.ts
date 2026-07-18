@@ -9,6 +9,8 @@ import {
 import { getSupabaseBrowserClient } from "@/src/lib/supabase/client";
 import { createRealtimeChannelName } from "@/src/lib/supabase/realtime";
 
+const RECENT_SOLD_AUCTION_LIMIT = 9;
+
 export interface PublicSoldAuctionsState {
   auctions: PublicSoldAuction[];
   isLoading: boolean;
@@ -16,7 +18,13 @@ export interface PublicSoldAuctionsState {
   refresh: () => Promise<void>;
 }
 
-export function usePublicSoldAuctions(): PublicSoldAuctionsState {
+interface UsePublicSoldAuctionsOptions {
+  enabled?: boolean;
+}
+
+export function usePublicSoldAuctions({
+  enabled = true,
+}: UsePublicSoldAuctionsOptions = {}): PublicSoldAuctionsState {
   const [auctions, setAuctions] = useState<PublicSoldAuction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -24,7 +32,9 @@ export function usePublicSoldAuctions(): PublicSoldAuctionsState {
   const load = useCallback(async (showLoading: boolean) => {
     if (showLoading) setIsLoading(true);
     try {
-      setAuctions(await fetchPublicSoldAuctions({ limit: 30 }));
+      setAuctions(
+        await fetchPublicSoldAuctions({ limit: RECENT_SOLD_AUCTION_LIMIT }),
+      );
       setError("");
     } catch (loadError) {
       setError(
@@ -38,6 +48,8 @@ export function usePublicSoldAuctions(): PublicSoldAuctionsState {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return;
+
     let client;
     try {
       client = getSupabaseBrowserClient();
@@ -66,12 +78,17 @@ export function usePublicSoldAuctions(): PublicSoldAuctionsState {
     return () => {
       void client.removeChannel(channel);
     };
-  }, [load]);
+  }, [enabled, load]);
+
+  const refresh = useCallback(() => {
+    if (!enabled) return Promise.resolve();
+    return load(true);
+  }, [enabled, load]);
 
   return {
     auctions,
-    isLoading,
-    error,
-    refresh: useCallback(() => load(true), [load]),
+    isLoading: enabled ? isLoading : false,
+    error: enabled ? error : "",
+    refresh,
   };
 }

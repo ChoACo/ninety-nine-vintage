@@ -160,7 +160,7 @@ export default function TermsPage() {
     <main className="theme-app-shell min-h-dvh px-4 py-8 sm:px-6 sm:py-12">
       <article className="theme-panel mx-auto max-w-4xl rounded-[2rem] border px-5 py-7 shadow-sm sm:px-10 sm:py-10">
         <p className="text-xs font-black tracking-[0.18em] text-[var(--accent-text)]">
-          NINETY-NINE · DAMINE VINTAGE
+          NINETY-NINE VINTAGE
         </p>
         <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] text-[var(--text-strong)]">
           서비스 이용약관

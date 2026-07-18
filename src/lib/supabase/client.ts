@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import { createRealtimeChannelName } from "./realtime";
 
 let browserClient: SupabaseClient<Database> | undefined;
 
@@ -50,6 +51,12 @@ export function createSupabasePresenceClient(): SupabaseClient<Database> {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
+      // This client never authenticates. A unique, non-persistent storage key
+      // prevents it from sharing GoTrue coordination state with the real app
+      // session or with a Presence client that is still disconnecting.
+      storageKey: createRealtimeChannelName(
+        "ninety-nine-public-presence-auth",
+      ),
     },
   });
 }

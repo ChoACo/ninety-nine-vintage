@@ -264,7 +264,15 @@ export default function BulkAuctionImportModal({
               className="mt-3 block w-full text-sm font-semibold text-[#6e5b50] file:mr-3 file:rounded-full file:border-0 file:bg-[#e87462] file:px-4 file:py-2.5 file:text-sm file:font-black file:text-white disabled:opacity-60"
             />
             <p className="mt-2 text-xs font-semibold leading-5 text-[#89786d]">
-              .xlsx 파일의 A열 상품명, X열 상품 설명, Y열 시작가, AH열 이미지명을 읽으며 1~5행은 등록하지 않습니다.
+              .xlsx 파일의 A열 상품명, D열 사이즈·추천 사이즈, W열
+              상태점수, Y열 시작가, AH열 이미지명을 읽으며 1~5행은
+              등록하지 않습니다. X열의 기존 설명은 공개 상품 본문에
+              사용하지 않습니다.
+            </p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-[#927f74]">
+              W열에는 1~5 중 하나를 입력해야 합니다. 1=새상품, 2=상태
+              좋음, 4=사용감 있음으로 표시하고 3·5는 상품상태 문구를
+              표시하지 않습니다.
             </p>
             {isParsing ? (
               <p className="mt-3 flex items-center gap-2 text-sm font-black text-[#b55f50]" role="status">
@@ -329,9 +337,10 @@ export default function BulkAuctionImportModal({
                 양식 자동 인식
               </span>
             </div>
-            <dl className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <DetectedColumn label="상품 설명" value={detected.description?.header} fallback="미탐지" />
-              <DetectedColumn label="상품명" value={detected.title?.header} fallback="미탐지 · 설명 첫 줄 사용" />
+            <dl className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              <DetectedColumn label="상품명 (A열)" value={detected.title?.header} fallback="미탐지" />
+              <DetectedColumn label="사이즈 (D열)" value={detected.size?.header} fallback="미탐지" />
+              <DetectedColumn label="상태점수 (W열)" value={detected.conditionScore?.header} fallback="미탐지" />
               <DetectedColumn label="시작가" value={detected.startingPrice?.header} fallback="미탐지" />
               <DetectedColumn
                 label="이미지명"
@@ -423,7 +432,7 @@ export default function BulkAuctionImportModal({
                         <td className="whitespace-nowrap px-3 py-3 font-black text-[#8d776a]">{row.rowNumber}</td>
                         <td className="max-w-[300px] px-3 py-3 align-top">
                           <p className="truncate font-black text-[#4d4038]">{row.title || "상품명 없음"}</p>
-                          <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[#86756b]">{row.description || "설명 없음"}</p>
+                          <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs font-semibold leading-5 text-[#86756b]">{row.description || "설명 없음"}</p>
                         </td>
                         <td className="whitespace-nowrap px-3 py-3 align-top font-black text-[#5c4b42]">
                           {row.startingPrice === null ? "확인 필요" : formatKRW(row.startingPrice)}

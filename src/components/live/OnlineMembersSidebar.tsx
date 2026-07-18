@@ -20,6 +20,11 @@ export default function OnlineMembersSidebar({
   error,
   className = "",
 }: OnlineMembersSidebarProps) {
+  const operators = members.filter((member) => member.isOperator);
+  const signedInMembers = members.filter(
+    (member) => !member.isOperator && !member.isGuest,
+  );
+  const guests = members.filter((member) => member.isGuest);
   const isConnected = status === "connected";
   const statusLabel = isConnected
     ? `${totalCount}명`
@@ -36,18 +41,18 @@ export default function OnlineMembersSidebar({
   return (
     <aside
       aria-labelledby="online-members-title"
-      className={`theme-panel sticky top-24 max-h-[calc(100dvh-7rem)] self-start overflow-y-auto overscroll-contain rounded-[1.6rem] border p-4 shadow-[0_16px_40px_rgba(69,96,79,0.10)] backdrop-blur motion-safe:transition-[top,box-shadow] motion-safe:duration-300 motion-safe:ease-out ${className}`}
+      className={`theme-panel sticky top-4 max-h-[calc(100dvh-2rem)] self-start overflow-y-auto overscroll-contain rounded-[1.35rem] border p-3.5 shadow-[0_10px_30px_rgba(69,96,79,0.08)] ${className}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[13px] font-extrabold tracking-[0.12em] text-[#63806b]">
-            LIVE USERS
+          <p className="text-[11px] font-extrabold tracking-[0.14em] text-[#63806b]">
+            ONLINE NOW
           </p>
           <h2
             id="online-members-title"
-            className="mt-1 break-keep text-[17px] font-black leading-6 text-[#35483b]"
+            className="mt-1 break-keep text-[15px] font-black leading-5 text-[var(--text-strong)]"
           >
-            현재 접속 중인 사용자
+            현재 접속
           </h2>
         </div>
         <span
@@ -56,7 +61,7 @@ export default function OnlineMembersSidebar({
               ? `${totalCount}명 온라인`
               : `접속 상태 ${statusLabel}`
           }
-          className={`shrink-0 rounded-full px-2.5 py-1 text-[14px] font-black ${
+          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-black ${
             status === "error"
               ? "bg-[#f4e8e4] text-[#9a594e]"
               : "bg-[#e1f3e6] text-[#39704a]"
@@ -66,20 +71,19 @@ export default function OnlineMembersSidebar({
         </span>
       </div>
 
-      {members.some((member) => member.isOperator) ? (
+      {operators.length > 0 ? (
         <section className="mt-4" aria-labelledby="online-operators-title">
           <h3 id="online-operators-title" className="text-xs font-black tracking-[0.12em] text-[var(--accent-text)]">
             운영자
           </h3>
           <ul className="mt-2 space-y-1.5">
-            {members.filter((member) => member.isOperator).map((member) => (
+            {operators.map((member) => (
             <li
               key={member.id}
-              className="flex min-h-11 items-center gap-3 rounded-2xl bg-[var(--accent-surface)] px-3 py-2 text-[17px] font-extrabold text-[var(--text-strong)]"
+              className="flex min-h-10 items-center gap-2.5 rounded-xl bg-[var(--accent-surface)] px-2.5 py-2 text-sm font-extrabold text-[var(--text-strong)]"
             >
-              <span className="relative flex h-3 w-3 shrink-0" aria-hidden="true">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#63bd78] opacity-40" />
-                <span className="relative inline-flex h-3 w-3 rounded-full bg-[#4aaf63] ring-2 ring-[#dff2e4]" />
+              <span className="relative flex size-2.5 shrink-0" aria-hidden="true">
+                <span className="inline-flex size-2.5 rounded-full bg-[#4aaf63] ring-2 ring-[#dff2e4]" />
               </span>
               <span>{member.displayName}</span>
             </li>
@@ -93,15 +97,14 @@ export default function OnlineMembersSidebar({
           접속 회원
         </h3>
         <ul className="mt-2 space-y-1.5" aria-label="온라인 회원 목록">
-        {members.some((member) => !member.isOperator) ? (
-          members.filter((member) => !member.isOperator).map((member) => (
+        {signedInMembers.length > 0 ? (
+          signedInMembers.map((member) => (
             <li
               key={member.id}
-              className="flex min-h-11 items-center gap-3 rounded-2xl bg-[var(--surface-raised)] px-3 py-2 text-[17px] font-extrabold text-[var(--text-strong)]"
+              className="flex min-h-10 items-center gap-2.5 rounded-xl bg-[var(--surface-raised)] px-2.5 py-2 text-sm font-extrabold text-[var(--text-strong)]"
             >
-              <span className="relative flex h-3 w-3 shrink-0" aria-hidden="true">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#63bd78] opacity-40" />
-                <span className="relative inline-flex h-3 w-3 rounded-full bg-[#4aaf63] ring-2 ring-[#dff2e4]" />
+              <span className="relative flex size-2.5 shrink-0" aria-hidden="true">
+                <span className="inline-flex size-2.5 rounded-full bg-[#4aaf63] ring-2 ring-[#dff2e4]" />
               </span>
               <span>{member.displayName}</span>
             </li>
@@ -115,11 +118,36 @@ export default function OnlineMembersSidebar({
           </li>
         ) : (
           <li className="rounded-2xl border border-dashed border-[var(--border)] px-3 py-4 text-center text-sm font-bold text-[var(--text-muted)]">
-            현재 접속 중인 일반 회원이 없습니다.
+            현재 접속 중인 로그인 회원이 없습니다.
           </li>
         )}
         </ul>
       </section>
+
+      {guests.length > 0 ? (
+        <section className="mt-4" aria-labelledby="online-guests-list-title">
+          <h3
+            id="online-guests-list-title"
+            className="text-xs font-black tracking-[0.12em] text-[var(--text-muted)]"
+          >
+            게스트
+          </h3>
+          <ul className="mt-2 space-y-1.5" aria-label="온라인 게스트 목록">
+            {guests.map((guest) => (
+              <li
+                key={guest.id}
+                className="flex min-h-10 items-center gap-2.5 rounded-xl bg-[var(--info-surface)] px-2.5 py-2 text-sm font-extrabold text-[var(--text-strong)]"
+              >
+                <span
+                  aria-hidden="true"
+                  className="inline-flex size-2.5 shrink-0 rounded-full bg-[#55a970] ring-2 ring-[#dff2e4]"
+                />
+                <span>{guest.displayName}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {hasMore ? (
         <p className="mt-4 break-keep rounded-2xl bg-[var(--info-surface)] px-3 py-2.5 text-[14px] font-bold leading-5 text-[var(--info-text)]">

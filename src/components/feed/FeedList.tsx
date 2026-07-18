@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAuctionPolicyClock } from "@/src/hooks/useAuctionPolicyClock";
+import { useAuctionPolicyMinuteClock } from "@/src/hooks/useAuctionPolicyClock";
 import type { AuctionPost } from "@/src/types/auction";
 import { getAuctionBidDecision } from "@/src/utils/auctionBidPolicy";
 import DateFilterChips, { getKoreanDateKey } from "./DateFilterChips";
@@ -10,14 +10,20 @@ import PostCard, {
   type InquiryHandler,
 } from "./PostCard";
 
+const INITIAL_VISIBLE_POSTS = 8;
+const VISIBLE_POST_STEP = 8;
+
 export interface FeedListProps {
   posts: AuctionPost[];
   currentUserName: string;
   onBid?: BidHandler;
   onInquiry: InquiryHandler;
   isLoading?: boolean;
+  hasMoreProducts?: boolean;
+  isLoadingMore?: boolean;
   loadError?: string;
   onRetry?: () => void | Promise<void>;
+  onLoadMore?: () => void | Promise<void>;
   title?: string;
   description?: string;
 }
@@ -28,13 +34,17 @@ export default function FeedList({
   onBid,
   onInquiry,
   isLoading = false,
+  hasMoreProducts = false,
+  isLoadingMore = false,
   loadError = "",
   onRetry,
+  onLoadMore,
   title = "날짜별 구제 의류 경매",
   description = "날짜별 상품을 빠르게 보고, 오후 8시 56분 신규 참여 제한 전에 여유 있게 입찰하세요.",
 }: FeedListProps) {
   const [selectedDate, setSelectedDate] = useState("all");
-  const auctionNow = useAuctionPolicyClock();
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_POSTS);
+  const auctionNow = useAuctionPolicyMinuteClock();
   const publishedPosts = useMemo(
     () =>
       posts.filter((post) => {
@@ -76,6 +86,24 @@ export default function FeedList({
     (post) =>
       getAuctionBidDecision({ post, currentUserName, now: auctionNow }).allowed,
   ).length;
+  const visiblePosts = filteredPosts.slice(0, visibleCount);
+  const hiddenPostCount = Math.max(filteredPosts.length - visiblePosts.length, 0);
+
+  const selectDate = (dateKey: string) => {
+    setSelectedDate(dateKey);
+    setVisibleCount(INITIAL_VISIBLE_POSTS);
+  };
+
+  const showMorePosts = async () => {
+    if (
+      hasMoreProducts &&
+      hiddenPostCount <= VISIBLE_POST_STEP &&
+      onLoadMore
+    ) {
+      await onLoadMore();
+    }
+    setVisibleCount((current) => current + VISIBLE_POST_STEP);
+  };
 
   return (
     <section aria-labelledby="auction-feed-title">
@@ -86,11 +114,11 @@ export default function FeedList({
           </p>
           <h2
             id="auction-feed-title"
-            className="mt-1 text-3xl font-black tracking-[-0.04em] text-[#342c27] sm:text-4xl"
+            className="mt-1 text-2xl font-black tracking-[-0.04em] text-[var(--text-strong)] sm:text-3xl"
           >
             {title}
           </h2>
-          <p className="mt-2 max-w-2xl break-keep text-base font-medium leading-7 text-[#67584f] sm:text-[17px]">
+          <p className="mt-1.5 max-w-2xl break-keep text-sm font-semibold leading-6 text-[var(--text-muted)] sm:text-base sm:leading-7">
             {description}
           </p>
         </div>
@@ -108,7 +136,7 @@ export default function FeedList({
         <DateFilterChips
           dateKeys={dateKeys}
           selectedDate={effectiveSelectedDate}
-          onSelect={setSelectedDate}
+          onSelect={selectDate}
         />
       </div>
 
@@ -154,8 +182,12 @@ export default function FeedList({
           ) : null}
         </div>
       ) : filteredPosts.length > 0 ? (
-        <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredPosts.map((post) => (
+        <>
+        <div
+          id="auction-feed-items"
+          className="grid grid-cols-1 items-stretch gap-3 sm:gap-4 md:grid-cols-2 2xl:grid-cols-3"
+        >
+          {visiblePosts.map((post) => (
             <PostCard
               key={post.id}
               post={post}
@@ -166,6 +198,24 @@ export default function FeedList({
             />
           ))}
         </div>
+        {hiddenPostCount > 0 || hasMoreProducts ? (
+          <div className="mt-5 flex justify-center">
+            <button
+              type="button"
+              aria-controls="auction-feed-items"
+              disabled={isLoadingMore}
+              onClick={() => void showMorePosts()}
+              className="min-h-11 rounded-full border border-[var(--border-strong)] bg-[var(--surface-raised)] px-5 text-sm font-black text-[var(--text-strong)] shadow-sm transition hover:border-[var(--accent)] hover:text-[var(--accent-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:cursor-wait disabled:opacity-60"
+            >
+              {isLoadingMore
+                ? "추가 상품 불러오는 중…"
+                : hiddenPostCount > 0
+                  ? `상품 더 보기 · ${hiddenPostCount.toLocaleString("ko-KR")}${hasMoreProducts ? "+" : ""}개 남음`
+                  : "추가 상품 불러오기"}
+            </button>
+          </div>
+        ) : null}
+        </>
       ) : (
         <div className="rounded-[1.5rem] border border-dashed border-[#dfcdbc] bg-[#fff9f2] px-6 py-14 text-center">
           <span aria-hidden="true" className="text-4xl text-[#c8aa96]">

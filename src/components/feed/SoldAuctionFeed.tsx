@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- Supabase Storage의 공개 파생 이미지를 표시합니다. */
 
+import Link from "next/link";
 import { Button } from "@/src/components/common";
 import type { PublicSoldAuction } from "@/src/lib/supabase/auctionLifecycle";
 import { formatKRW, formatKoreanDate } from "@/src/utils/formatters";
@@ -13,12 +14,16 @@ export interface SoldAuctionFeedProps {
   onRetry: () => void | Promise<void>;
 }
 
+const RECENT_SOLD_ITEMS = 9;
+
 export function SoldAuctionFeed({
   auctions,
   isLoading,
   error,
   onRetry,
 }: SoldAuctionFeedProps) {
+  const visibleAuctions = auctions.slice(0, RECENT_SOLD_ITEMS);
+
   return (
     <section className="mt-8" aria-labelledby="sold-auction-feed-title">
       <header className="theme-panel rounded-[1.8rem] border p-5 sm:p-6">
@@ -34,13 +39,36 @@ export function SoldAuctionFeed({
               판매 완료 상품
             </h2>
             <p className="mt-2 break-keep font-bold leading-7 text-[var(--text-muted)]">
-              마감된 상품과 낙찰 금액을 공개합니다. 낙찰자 닉네임은 개인정보
-              보호를 위해 일부만 표시합니다.
+              마감된 상품과 낙찰 금액, 공개 닉네임을 투명하게 확인할 수 있습니다.
             </p>
           </div>
-          <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1.5 text-sm font-black text-[var(--text-muted)]">
-            최근 {auctions.length.toLocaleString("ko-KR")}건
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1.5 text-sm font-black text-[var(--text-muted)]">
+              최근 {auctions.length.toLocaleString("ko-KR")}건
+            </span>
+            <Link
+              href="/sold"
+              prefetch={false}
+              aria-label="판매 완료 상품 전체보기"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-[var(--info-border)] bg-[var(--info-surface)] px-4 py-2 text-sm font-black text-[var(--info-text)] transition hover:brightness-[1.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--info-border)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
+            >
+              전체보기
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="h-4 w-4"
+              >
+                <path
+                  d="m9 18 6-6-6-6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -65,11 +93,14 @@ export function SoldAuctionFeed({
           아직 판매 완료된 상품이 없습니다.
         </p>
       ) : (
-        <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {auctions.map((auction) => (
+        <div
+          id="sold-auction-items"
+          className="mt-3 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 2xl:grid-cols-3"
+        >
+          {visibleAuctions.map((auction) => (
             <article
               key={auction.productId}
-              className="theme-panel overflow-hidden rounded-[1.6rem] border"
+              className="theme-panel render-lazy overflow-hidden rounded-[1.6rem] border"
             >
               <div className="aspect-[4/3] overflow-hidden bg-[var(--surface-muted)]">
                 {auction.thumbnailUrls[0] || auction.imageUrls[0] ? (
@@ -78,6 +109,7 @@ export function SoldAuctionFeed({
                     alt={`${auction.title} 판매 완료 상품`}
                     className="h-full w-full object-cover"
                     loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <div className="grid h-full place-items-center text-sm font-bold text-[var(--text-muted)]">

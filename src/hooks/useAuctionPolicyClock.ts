@@ -8,6 +8,11 @@ const subscribers = new Set<ClockSubscriber>();
 const serverSnapshot = new Date(0);
 let currentSnapshot = new Date();
 let intervalId: number | null = null;
+let serverOffsetMs = 0;
+let lastServerSyncAttemptMs = 0;
+let serverSyncPromise: Promise<void> | null = null;
+let lifecycleListenersAttached = false;
+const SERVER_SYNC_INTERVAL_MS = 5 * 60_000;
 
 const minuteSubscribers = new Set<ClockSubscriber>();
 let currentMinuteSnapshot = new Date();
@@ -15,13 +20,96 @@ let minuteTimeoutId: number | null = null;
 const MINUTE_MS = 60_000;
 const MINUTE_BOUNDARY_GRACE_MS = 1;
 
-function tick() {
-  currentSnapshot = new Date();
+function auctionNowMs() {
+  return Date.now() + serverOffsetMs;
+}
+
+function publishClockSnapshots() {
+  currentSnapshot = new Date(auctionNowMs());
+  currentMinuteSnapshot = new Date(auctionNowMs());
   subscribers.forEach((subscriber) => subscriber());
+  minuteSubscribers.forEach((subscriber) => subscriber());
+}
+
+export function synchronizeAuctionServerClock(force = false): Promise<void> {
+  const localNow = Date.now();
+  if (
+    !force &&
+    (serverSyncPromise ||
+      localNow - lastServerSyncAttemptMs < SERVER_SYNC_INTERVAL_MS)
+  ) {
+    return serverSyncPromise ?? Promise.resolve();
+  }
+
+  lastServerSyncAttemptMs = localNow;
+  const requestedAt = Date.now();
+  serverSyncPromise = import("@/src/lib/supabase/client")
+    .then(({ getSupabaseBrowserClient }) =>
+      getSupabaseBrowserClient().rpc("get_auction_server_time"),
+    )
+    .then(({ data, error }) => {
+      const receivedAt = Date.now();
+      const serverTime = typeof data === "string" ? Date.parse(data) : Number.NaN;
+      if (error || !Number.isFinite(serverTime)) return;
+
+      serverOffsetMs = serverTime - (requestedAt + receivedAt) / 2;
+      publishClockSnapshots();
+    })
+    .catch(() => {
+      // A failed sample keeps the safe server-side RPC as final authority. The
+      // next focus or five-minute boundary retries without breaking the UI.
+    })
+    .finally(() => {
+      serverSyncPromise = null;
+    });
+  return serverSyncPromise;
+}
+
+function maybeSynchronizeServerClock() {
+  void synchronizeAuctionServerClock(false);
+}
+
+function handleClockVisibility() {
+  if (typeof document === "undefined" || document.visibilityState === "visible") {
+    void synchronizeAuctionServerClock(true);
+  }
+}
+
+function ensureClockLifecycle() {
+  if (lifecycleListenersAttached) return;
+  if (typeof window.addEventListener !== "function") return;
+  lifecycleListenersAttached = true;
+  window.addEventListener("focus", handleClockVisibility);
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", handleClockVisibility);
+  }
+}
+
+function releaseClockLifecycle() {
+  if (
+    !lifecycleListenersAttached ||
+    subscribers.size > 0 ||
+    minuteSubscribers.size > 0
+  ) {
+    return;
+  }
+  lifecycleListenersAttached = false;
+  window.removeEventListener("focus", handleClockVisibility);
+  if (typeof document !== "undefined") {
+    document.removeEventListener("visibilitychange", handleClockVisibility);
+  }
+}
+
+function tick() {
+  currentSnapshot = new Date(auctionNowMs());
+  subscribers.forEach((subscriber) => subscriber());
+  maybeSynchronizeServerClock();
 }
 
 function subscribe(subscriber: ClockSubscriber) {
   subscribers.add(subscriber);
+  ensureClockLifecycle();
+  maybeSynchronizeServerClock();
 
   if (intervalId === null) {
     intervalId = window.setInterval(tick, 1_000);
@@ -34,6 +122,7 @@ function subscribe(subscriber: ClockSubscriber) {
       window.clearInterval(intervalId);
       intervalId = null;
     }
+    releaseClockLifecycle();
   };
 }
 
@@ -54,22 +143,25 @@ export function getMillisecondsUntilNextMinute(nowMs: number): number {
 function scheduleMinuteTick() {
   minuteTimeoutId = window.setTimeout(
     tickMinute,
-    getMillisecondsUntilNextMinute(Date.now()),
+    getMillisecondsUntilNextMinute(auctionNowMs()),
   );
 }
 
 function tickMinute() {
   minuteTimeoutId = null;
-  currentMinuteSnapshot = new Date();
+  currentMinuteSnapshot = new Date(auctionNowMs());
   minuteSubscribers.forEach((subscriber) => subscriber());
+  maybeSynchronizeServerClock();
   if (minuteSubscribers.size > 0) scheduleMinuteTick();
 }
 
 function subscribeToMinuteClock(subscriber: ClockSubscriber) {
   minuteSubscribers.add(subscriber);
+  ensureClockLifecycle();
+  maybeSynchronizeServerClock();
 
   if (minuteTimeoutId === null) {
-    currentMinuteSnapshot = new Date();
+    currentMinuteSnapshot = new Date(auctionNowMs());
     scheduleMinuteTick();
   }
 
@@ -80,6 +172,7 @@ function subscribeToMinuteClock(subscriber: ClockSubscriber) {
       window.clearTimeout(minuteTimeoutId);
       minuteTimeoutId = null;
     }
+    releaseClockLifecycle();
   };
 }
 

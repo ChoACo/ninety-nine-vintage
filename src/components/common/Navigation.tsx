@@ -63,13 +63,21 @@ export default function Navigation({
   role,
   className = "",
 }: NavigationProps) {
+  const visibleNavigationItems = navigationItems.filter(
+    (item) => !item.staffOnly || canAccessOperationsWorkspace(role),
+  );
+
   return (
     <nav
       aria-label="주요 메뉴"
       className={`app-primary-navigation theme-surface-glass fixed inset-x-2 z-40 mx-auto max-w-[28rem] rounded-xl border p-1 md:static md:max-w-3xl md:rounded-xl md:shadow-sm ${className}`}
     >
-      <div className="grid grid-cols-4 gap-0.5 sm:gap-1">
-        {navigationItems.map((item) => {
+      <div
+        className={`grid gap-0.5 sm:gap-1 ${
+          visibleNavigationItems.length === 4 ? "grid-cols-4" : "grid-cols-3"
+        }`}
+      >
+        {visibleNavigationItems.map((item) => {
           const selected = activePage === item.value;
           const isOperationsWorkspace = canAccessOperationsWorkspace(role);
           const isChatAllowed =

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { Button } from "@/src/components/common";
+import { OwnerDangerConfirmModal } from "@/src/components/owner/OwnerDangerConfirmModal";
 import { useSupabaseProducts } from "@/src/hooks/useSupabaseProducts";
 import {
   ownerCloseAuctionNow,
@@ -25,13 +26,14 @@ export function OwnerAuctionControlPanel() {
   const [reason, setReason] = useState("서비스 전체 흐름 검증");
   const [isMutating, setIsMutating] = useState(false);
   const [message, setMessage] = useState("");
+  const [confirmation, setConfirmation] = useState<"override" | "close" | null>(null);
 
   const selected = useMemo(
     () => posts.find((post) => post.id === selectedId) ?? null,
     [posts, selectedId],
   );
 
-  const handleOverride = async () => {
+  const handleOverride = () => {
     if (!selected) return;
     const nextStartingPrice = parseOptionalPrice(startingPrice);
     const nextCurrentPrice = parseOptionalPrice(currentPrice);
@@ -43,6 +45,14 @@ export function OwnerAuctionControlPanel() {
       setMessage("시작가 또는 현재가를 원 단위 정수로 입력해 주세요.");
       return;
     }
+
+    setConfirmation("override");
+  };
+
+  const confirmOverride = async () => {
+    if (!selected) return;
+    const nextStartingPrice = parseOptionalPrice(startingPrice);
+    const nextCurrentPrice = parseOptionalPrice(currentPrice);
 
     setIsMutating(true);
     setMessage("");
@@ -56,6 +66,7 @@ export function OwnerAuctionControlPanel() {
       await refreshProducts();
       setStartingPrice("");
       setCurrentPrice("");
+      setConfirmation(null);
       setMessage("테스트 가격을 반영하고 감사 기록을 저장했습니다.");
     } catch (mutationError) {
       setMessage(
@@ -68,19 +79,20 @@ export function OwnerAuctionControlPanel() {
     }
   };
 
-  const handleClose = async () => {
+  const handleClose = () => {
     if (!selected || isMutating) return;
-    const confirmed = window.confirm(
-      `“${selected.title}” 경매를 지금 마감할까요? 최고 입찰자가 즉시 낙찰자로 확정됩니다.`,
-    );
-    if (!confirmed) return;
+    setConfirmation("close");
+  };
 
+  const confirmClose = async () => {
+    if (!selected || isMutating) return;
     setIsMutating(true);
     setMessage("");
     try {
       const result = await ownerCloseAuctionNow(selected.id, reason);
       await refreshProducts();
       setSelectedId("");
+      setConfirmation(null);
       setMessage(
         result.winnerDisplayName
           ? `${result.winnerDisplayName} 회원에게 ${formatKRW(result.winningAmount ?? 0)}으로 낙찰 처리했습니다.`
@@ -98,11 +110,11 @@ export function OwnerAuctionControlPanel() {
   };
 
   return (
-    <section className="theme-panel rounded-[1.8rem] border p-5 sm:p-6" aria-labelledby="auction-test-tools-title">
-      <p className="text-xs font-black tracking-[0.16em] text-[var(--accent-text)]">
+    <section className="rounded-xl border border-red-500/20 bg-[var(--surface)] p-4 sm:p-5" aria-labelledby="auction-test-tools-title">
+      <p className="font-mono text-[10px] font-black tracking-[0.18em] text-[var(--accent-text)]">
         AUCTION TEST CONTROLS
       </p>
-      <h2 id="auction-test-tools-title" className="mt-1 text-2xl font-black text-[var(--text-strong)]">
+      <h2 id="auction-test-tools-title" className="mt-1 text-xl font-black tracking-tight text-[var(--text-strong)] sm:text-2xl">
         경매 테스트 제어
       </h2>
       <p className="mt-2 break-keep font-bold leading-7 text-[var(--text-muted)]">
@@ -184,7 +196,7 @@ export function OwnerAuctionControlPanel() {
               variant="secondary"
               isLoading={isMutating}
               disabled={reason.trim().length < 2}
-              onClick={() => void handleOverride()}
+              onClick={handleOverride}
             >
               금액 조정
             </Button>
@@ -192,7 +204,7 @@ export function OwnerAuctionControlPanel() {
               variant="danger"
               isLoading={isMutating}
               disabled={reason.trim().length < 2}
-              onClick={() => void handleClose()}
+              onClick={handleClose}
             >
               즉시 입찰 종료
             </Button>
@@ -205,6 +217,24 @@ export function OwnerAuctionControlPanel() {
           {message}
         </p>
       ) : null}
+
+      <OwnerDangerConfirmModal
+        open={Boolean(confirmation && selected)}
+        tone="danger"
+        eyebrow="AUCTION LEDGER OVERRIDE"
+        title={confirmation === "close" ? "경매를 지금 마감할까요?" : "실시간 경매 금액을 조정할까요?"}
+        description={confirmation === "close" ? "현재 최고 입찰자가 즉시 낙찰자로 확정되고 상품은 판매 완료 흐름으로 이동합니다." : "시작가 또는 현재가가 실제 상품 피드에 즉시 반영됩니다. 변경 전후 값과 사유는 삭제할 수 없는 감사 기록에 남습니다."}
+        confirmLabel={confirmation === "close" ? "즉시 마감 확정" : "금액 조정 확정"}
+        isLoading={isMutating}
+        details={selected ? [
+          { label: "상품", value: selected.title },
+          { label: "현재가", value: formatKRW(selected.currentPrice) },
+          { label: "변경 현재가", value: confirmation === "override" && currentPrice.trim() ? formatKRW(Number(currentPrice.replaceAll(",", ""))) : "변경 없음" },
+          { label: "감사 사유", value: reason.trim() },
+        ] : []}
+        onCancel={() => setConfirmation(null)}
+        onConfirm={confirmation === "close" ? confirmClose : confirmOverride}
+      />
     </section>
   );
 }

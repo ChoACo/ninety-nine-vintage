@@ -24,6 +24,11 @@ interface ManualTransferRow {
   confirmed_at: string | null;
   updated_at: string;
   total_count: number;
+  due_at: string | null;
+  purchase_offer_kind: "original" | "second_chance" | null;
+  purchase_offer_status: string | null;
+  purchase_offer_round: number | null;
+  payment_deadline_exempt: boolean;
 }
 
 interface BegunManualTransferRow {
@@ -76,6 +81,11 @@ export interface PendingManualTransfer {
   confirmedAt: string | null;
   updatedAt: string;
   totalCount: number;
+  dueAt: string | null;
+  purchaseOfferKind: "original" | "second_chance" | null;
+  purchaseOfferStatus: string | null;
+  purchaseOfferRound: number | null;
+  paymentDeadlineExempt: boolean;
 }
 
 export class ManualPaymentError extends Error {
@@ -214,6 +224,22 @@ export async function getPendingManualTransfers(): Promise<PendingManualTransfer
     if (!Number.isSafeInteger(amount) || amount < 1) {
       throw new ManualPaymentError("입금 확인 금액이 올바르지 않습니다.");
     }
+    const dueAt = row.due_at ?? null;
+    if (dueAt !== null && !Number.isFinite(Date.parse(dueAt))) {
+      throw new ManualPaymentError("입금 확인 기한이 올바르지 않습니다.");
+    }
+    const purchaseOfferRound =
+      row.purchase_offer_round === null
+        ? null
+        : Number(row.purchase_offer_round);
+    if (
+      purchaseOfferRound !== null &&
+      (!Number.isInteger(purchaseOfferRound) ||
+        purchaseOfferRound < 1 ||
+        purchaseOfferRound > 2)
+    ) {
+      throw new ManualPaymentError("구매 기회 회차가 올바르지 않습니다.");
+    }
     return {
       orderId: row.order_id,
       productId: row.product_id,
@@ -231,6 +257,11 @@ export async function getPendingManualTransfers(): Promise<PendingManualTransfer
       confirmedAt: row.confirmed_at,
       updatedAt: row.updated_at,
       totalCount: Number(row.total_count),
+      dueAt,
+      purchaseOfferKind: row.purchase_offer_kind,
+      purchaseOfferStatus: row.purchase_offer_status,
+      purchaseOfferRound,
+      paymentDeadlineExempt: Boolean(row.payment_deadline_exempt),
     };
   });
 }

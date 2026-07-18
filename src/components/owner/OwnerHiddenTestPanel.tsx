@@ -310,15 +310,15 @@ export function OwnerHiddenTestPanel({ accessToken }: { accessToken: string }) {
     });
 
   if (isLoading) {
-    return <section className="theme-panel rounded-[1.8rem] border p-6 font-bold text-[var(--text-muted)]">숨김 서비스 테스터를 불러오는 중…</section>;
+    return <section className="rounded-xl border border-zinc-800/80 bg-[var(--surface)] p-5" role="status"><div className="space-y-2"><span className="commerce-skeleton block h-4 w-44 rounded" /><span className="commerce-skeleton block h-24 rounded-lg" /></div></section>;
   }
 
   return (
-    <section className="theme-panel rounded-[1.8rem] border p-5 sm:p-6" aria-labelledby="hidden-test-member-title">
-      <p className="text-xs font-black tracking-[0.16em] text-[var(--accent-text)]">ISOLATED SERVICE TESTER</p>
+    <section className="rounded-xl border border-zinc-800/80 bg-[var(--surface)] p-4 sm:p-5" aria-labelledby="hidden-test-member-title">
+      <p className="font-mono text-[10px] font-black tracking-[0.18em] text-[var(--accent-text)]">ISOLATED SERVICE TESTER</p>
       <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="hidden-test-member-title" className="text-2xl font-black text-[var(--text-strong)]">숨김 서비스 테스터</h2>
+          <h2 id="hidden-test-member-title" className="text-xl font-black tracking-tight text-[var(--text-strong)] sm:text-2xl">숨김 서비스 테스터</h2>
           <p className="mt-2 max-w-3xl break-keep font-bold leading-7 text-[var(--text-muted)]">
             실제 외래키를 가진 격리 계정으로 입찰·낙찰·결제·보관·배송 흐름을 검증합니다. 로그인 수단은 발급되지 않으며 다른 운영자·회원·온라인 목록에는 표시되지 않습니다.
           </p>
@@ -349,8 +349,8 @@ export function OwnerHiddenTestPanel({ accessToken }: { accessToken: string }) {
             <summary className="cursor-pointer text-lg font-black text-[var(--text-strong)]">테스트 배송지 {addresses.length}개</summary>
             <div className="mt-4 space-y-2">
               {addresses.map((address) => (
-                <div key={address.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[var(--surface-muted)] px-3 py-2">
-                  <p className="text-sm font-bold text-[var(--text-muted)]"><strong className="text-[var(--text-strong)]">{address.label}</strong>{address.isDefault ? " · 기본" : ""}<span className="block">{address.recipientName} · {address.phone} · {address.address}</span></p>
+                <div key={address.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl bg-[var(--surface-muted)] px-3 py-2">
+                  <p className="min-w-0 break-words text-sm font-bold text-[var(--text-muted)]"><strong className="text-[var(--text-strong)]">{address.label}</strong>{address.isDefault ? " · 기본" : ""}<span className="block">{address.recipientName} · {address.phone} · {address.address}</span></p>
                   <Button size="sm" variant="ghost" isLoading={busyKey === `address-delete-${address.id}`} onClick={() => deleteAddress(address)}>삭제</Button>
                 </div>
               ))}
@@ -402,7 +402,7 @@ export function OwnerHiddenTestPanel({ accessToken }: { accessToken: string }) {
                 const transfer = revealedManualTransfers[product.product_id];
                 return (
                   <article key={product.product_id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
-                    <div className="flex gap-3">{product.image_urls?.[0] ? <img src={product.image_urls[0]} alt="" className="size-16 rounded-xl object-cover" /* eslint-disable-line @next/next/no-img-element */ /> : null}<div><h3 className="font-black text-[var(--text-strong)]">{product.title}</h3><p className="mt-1 text-sm font-bold text-[var(--text-muted)]">{formatKRW(product.final_bid_amount)} · {dateTime(product.closed_at)}</p><p className="mt-1 text-sm font-black text-[var(--accent-text)]">{product.is_payment_settled ? "결제 완료" : product.manual_transfer_requested_at ? "입금 진행 중" : "결제 대기"} · {product.shipping_status === "ready" ? "보관 중" : product.shipping_status === "requested" ? "배송 접수" : "발송 완료"}</p></div></div>
+                    <div className="flex min-w-0 gap-3">{product.image_urls?.[0] ? <img src={product.image_urls[0]} alt="" className="size-16 shrink-0 rounded-xl object-cover" /* eslint-disable-line @next/next/no-img-element */ /> : null}<div className="min-w-0"><h3 className="line-clamp-2 font-black text-[var(--text-strong)]">{product.title}</h3><p className="mt-1 font-mono text-sm font-bold tabular-nums text-[var(--text-muted)]">{formatKRW(product.final_bid_amount)} · {dateTime(product.closed_at)}</p><p className="mt-1 text-sm font-black text-[var(--accent-text)]">{product.is_payment_settled ? "결제 완료" : product.manual_transfer_requested_at ? "입금 진행 중" : "결제 대기"} · {product.shipping_status === "ready" ? "보관 중" : product.shipping_status === "requested" ? "배송 접수" : "발송 완료"}</p></div></div>
                     {transfer ? (
                       <div className="mt-3 rounded-xl border border-[var(--accent)] bg-[var(--accent-surface)] px-3 py-3 text-sm font-black text-[var(--text-strong)]">
                         {transfer.bank_name} · <span className="select-all">{transfer.account_number}</span>
@@ -430,7 +430,7 @@ export function OwnerHiddenTestPanel({ accessToken }: { accessToken: string }) {
               {shippableProducts.map((product) => <label key={product.product_id} className="flex items-center gap-3 rounded-xl bg-[var(--surface-muted)] px-3 py-2 font-bold text-[var(--text-strong)]"><input type="checkbox" checked={selectedShippingIds.has(product.product_id)} onChange={() => setSelectedShippingIds((current) => { const next = new Set(current); if (next.has(product.product_id)) next.delete(product.product_id); else next.add(product.product_id); return next; })} />{product.title} · {formatKRW(product.final_bid_amount)}</label>)}
               {shippableProducts.length === 0 ? <p className="font-bold text-[var(--text-muted)]">결제 완료 후 보관 중인 상품이 없습니다.</p> : null}
             </div>
-            <div className="mt-3 flex flex-wrap items-end gap-2"><label className="min-w-64 flex-1 text-sm font-black text-[var(--text-strong)]">배송지<select value={selectedAddressId} onChange={(event) => setSelectedAddressId(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2.5 font-bold"><option value="">배송지 선택</option>{addresses.map((address) => <option key={address.id} value={address.id}>{address.label} · {address.recipientName}</option>)}</select></label><Button isLoading={busyKey === "shipping"} disabled={selectedShippingIds.size === 0 || !selectedAddressId} onClick={() => void requestShipping()}>선택 상품 택배 접수</Button></div>
+            <div className="mt-3 flex flex-col items-stretch gap-2 sm:flex-row sm:items-end"><label className="min-w-0 flex-1 text-sm font-black text-[var(--text-strong)]">배송지<select value={selectedAddressId} onChange={(event) => setSelectedAddressId(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2.5 font-bold"><option value="">배송지 선택</option>{addresses.map((address) => <option key={address.id} value={address.id}>{address.label} · {address.recipientName}</option>)}</select></label><Button isLoading={busyKey === "shipping"} disabled={selectedShippingIds.size === 0 || !selectedAddressId} onClick={() => void requestShipping()}>선택 상품 택배 접수</Button></div>
             {snapshot.shippingRequests.filter((request) => request.status !== "shipped").length > 0 ? <div className="mt-5 rounded-2xl bg-[var(--surface-muted)] p-4"><div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-black text-[var(--text-strong)]">택배사<input value={courier} onChange={(event) => setCourier(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 font-bold" /></label><label className="text-sm font-black text-[var(--text-strong)]">송장번호<input value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 font-bold" /></label></div>{snapshot.shippingRequests.filter((request) => request.status !== "shipped").map((request) => <div key={request.request_id} className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] pt-3"><p className="text-sm font-bold text-[var(--text-muted)]">접수 {dateTime(request.requested_at)} · 상품 {request.product_ids.length}개</p><Button size="sm" variant="secondary" isLoading={busyKey === `shipped-${request.request_id}`} onClick={() => void markShipped(request.request_id)}>발송 완료 처리</Button></div>)}</div> : null}
           </details>
 

@@ -14,6 +14,10 @@ import {
   type MemberWonProduct,
   type SaveShippingAddressInput,
 } from "@/src/lib/supabase/memberAccount";
+import {
+  MEMBER_ACCOUNT_CHANGED_EVENT,
+  type MemberAccountChangedDetail,
+} from "@/src/lib/memberAccountEvents";
 
 export interface MemberAccountState {
   account: MemberAccount | null;
@@ -94,11 +98,23 @@ export function useMemberAccount(memberId: string): MemberAccountState {
 
   useEffect(() => {
     const loadTimer = window.setTimeout(() => void loadData(true), 0);
+    const handleAccountChanged = (
+      event: Event,
+    ) => {
+      const detail = (event as CustomEvent<MemberAccountChangedDetail>).detail;
+      if (detail?.memberId !== memberId) return;
+      void loadData(false).catch(() => undefined);
+    };
+    window.addEventListener(MEMBER_ACCOUNT_CHANGED_EVENT, handleAccountChanged);
     return () => {
       window.clearTimeout(loadTimer);
+      window.removeEventListener(
+        MEMBER_ACCOUNT_CHANGED_EVENT,
+        handleAccountChanged,
+      );
       requestIdRef.current += 1;
     };
-  }, [loadData]);
+  }, [loadData, memberId]);
 
   const saveAddress = useCallback(
     async (input: SaveShippingAddressInput) => {

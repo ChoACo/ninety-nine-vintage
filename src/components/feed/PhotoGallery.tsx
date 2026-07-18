@@ -8,6 +8,7 @@ export interface PhotoGalleryProps {
   images: readonly string[];
   thumbnailImages?: readonly string[];
   title: string;
+  lotLabel?: string;
   compact?: boolean;
 }
 
@@ -48,6 +49,7 @@ export default function PhotoGallery({
   images,
   thumbnailImages,
   title,
+  lotLabel,
   compact = false,
 }: PhotoGalleryProps) {
   const galleryItems = images.flatMap((image, index) =>
@@ -107,7 +109,7 @@ export default function PhotoGallery({
 
         {thumbnails.length > 0 ? (
           <div
-            className={`grid grid-cols-3 ${compact ? "gap-px" : "gap-2.5"}`}
+            className={`grid grid-cols-3 ${compact ? "gap-px max-sm:hidden" : "gap-2.5"}`}
           >
             {thumbnails.map((item, thumbnailIndex) => {
               const actualIndex = thumbnailIndex + 1;
@@ -152,6 +154,7 @@ export default function PhotoGallery({
           images={cleanImages}
           thumbnailImages={cleanThumbnails}
           title={title}
+          lotLabel={lotLabel}
           initialIndex={selectedIndex}
         />
       ) : null}

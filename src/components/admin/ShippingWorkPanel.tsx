@@ -331,18 +331,27 @@ export function ShippingWorkPanel({
     : 0;
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-3">
+      <section className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3.5 shadow-[0_1px_0_rgba(255,255,255,0.3)] sm:p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-black text-[var(--text-strong)]">
+          <p className="text-[10px] font-bold tracking-[0.16em] text-[var(--accent-text)]">
+            SHIPPING OPERATIONS
+          </p>
+          <p className="mt-0.5 text-base font-black text-[var(--text-strong)]">
             택배 신청·운송장 업무
           </p>
           <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-muted)]">
             전체 {totalCount.toLocaleString("ko-KR")}건 중 {pageStart.toLocaleString("ko-KR")}~{pageEnd.toLocaleString("ko-KR")}건을 표시합니다. 운송장 파일은 브라우저에서만 읽고 고객 주소를 서버에 별도 업로드하지 않습니다.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2" aria-label="배송 내역 페이지 이동">
+        <div className="flex flex-wrap items-center justify-end gap-2" aria-label="배송 내역 페이지 이동">
+          <span className="inline-flex items-baseline gap-1 rounded-md border border-[var(--info-border)] bg-[var(--info-surface)] px-2.5 py-1 font-mono tabular-nums text-lg font-bold tracking-tight text-[var(--info-text)]">
+            {selectableItems.length.toLocaleString("ko-KR")}
+            <span className="text-[10px] font-semibold">현재 페이지 대기</span>
+          </span>
           <Button
+            className="active:scale-95 transition-all duration-200"
             size="sm"
             variant="ghost"
             disabled={!hasPreviousPage || isBusy}
@@ -351,6 +360,7 @@ export function ShippingWorkPanel({
             이전 100건
           </Button>
           <Button
+            className="active:scale-95 transition-all duration-200"
             size="sm"
             variant="ghost"
             disabled={!hasNextPage || isBusy}
@@ -358,11 +368,12 @@ export function ShippingWorkPanel({
           >
             다음 100건
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => void load()} isLoading={isLoading}>
+          <Button className="active:scale-95 transition-all duration-200" size="sm" variant="ghost" onClick={() => void load()} isLoading={isLoading}>
             새로고침
           </Button>
         </div>
       </div>
+      </section>
 
       {error ? (
         <p role="alert" className="mt-4 rounded-2xl border border-[var(--danger-text)]/25 bg-[var(--danger-surface)] px-4 py-3 text-sm font-bold text-[var(--danger-text)]">
@@ -375,7 +386,7 @@ export function ShippingWorkPanel({
         </p>
       ) : null}
 
-      <section className="mt-4 rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4" aria-label="배송 신청 Excel 내보내기">
+      <section className="rounded-xl border border-[var(--border)] bg-[var(--surface-muted)]/55 p-3.5 sm:p-4" aria-label="배송 신청 Excel 내보내기">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-black text-[var(--text-strong)]">
             <input
@@ -384,7 +395,7 @@ export function ShippingWorkPanel({
               checked={allSelected}
               onChange={toggleAll}
               disabled={selectableItems.length === 0 || isBusy}
-              className="h-5 w-5 rounded accent-[var(--accent)]"
+              className="size-4 rounded border-[var(--border-strong)] accent-[var(--accent)]"
             />
             현재 페이지 배송 대기 전체 선택 ({selectedIds.size.toLocaleString("ko-KR")}/{selectableItems.length.toLocaleString("ko-KR")})
           </label>
@@ -399,7 +410,7 @@ export function ShippingWorkPanel({
                   )
                 }
                 disabled={isBusy}
-                className="mt-1 block min-h-10 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3 text-sm font-bold text-[var(--foreground)]"
+                className="mt-1 block min-h-10 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none transition-all duration-200 hover:border-[var(--border-strong)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-surface)]"
               >
                 <option value="선불">선불</option>
                 <option value="착불">착불</option>
@@ -407,6 +418,7 @@ export function ShippingWorkPanel({
               </select>
             </label>
             <Button
+              className="active:scale-95 transition-all duration-200"
               size="sm"
               variant="secondary"
               isLoading={isExporting}
@@ -422,7 +434,7 @@ export function ShippingWorkPanel({
         </p>
       </section>
 
-      <section className="mt-4 rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface)] p-4" aria-label="송장 Excel 등록">
+      <section className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3.5 shadow-[0_1px_0_rgba(255,255,255,0.3)] sm:p-4" aria-label="송장 Excel 등록">
         <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-end">
           <label className="text-sm font-black text-[var(--text-strong)]">
             적용 택배사
@@ -431,7 +443,7 @@ export function ShippingWorkPanel({
               onChange={(event) => setBulkCourier(event.target.value)}
               maxLength={80}
               disabled={isBusy}
-              className="mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2.5 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+              className="mt-2 w-full rounded-md border border-[var(--border)] bg-[var(--input-surface)] px-3 py-2.5 text-sm font-semibold text-[var(--foreground)] outline-none transition-all duration-200 hover:border-[var(--border-strong)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-surface)]"
             />
           </label>
           <label className="text-sm font-black text-[var(--text-strong)]">
@@ -442,7 +454,7 @@ export function ShippingWorkPanel({
               accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               onChange={(event) => void selectTrackingWorkbook(event)}
               disabled={isBusy || items.length === 0}
-              className="mt-2 block w-full text-sm font-semibold text-[var(--text-muted)] file:mr-3 file:rounded-full file:border-0 file:bg-[var(--info-surface)] file:px-4 file:py-2.5 file:text-sm file:font-black file:text-[var(--info-text)] disabled:opacity-60"
+              className="mt-2 block w-full rounded-md border border-[var(--border)] bg-[var(--input-surface)] p-1.5 text-sm font-semibold text-[var(--text-muted)] transition-all duration-200 file:mr-3 file:rounded-md file:border file:border-[var(--info-border)] file:bg-[var(--info-surface)] file:px-3 file:py-2 file:text-xs file:font-bold file:text-[var(--info-text)] hover:border-[var(--border-strong)] disabled:opacity-60"
             />
           </label>
         </div>
@@ -457,7 +469,7 @@ export function ShippingWorkPanel({
         ) : null}
 
         {trackingPreview ? (
-          <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+          <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="break-all text-sm font-black text-[var(--text-strong)]">
@@ -467,13 +479,13 @@ export function ShippingWorkPanel({
                   연결 성공 {trackingPreview.matches.matched.length.toLocaleString("ko-KR")}건 · 확인 필요 {importProblemCount.toLocaleString("ko-KR")}건
                 </p>
               </div>
-              <Button size="sm" variant="ghost" onClick={clearTrackingPreview} disabled={isApplyingImport}>
+              <Button className="active:scale-95 transition-all duration-200" size="sm" variant="ghost" onClick={clearTrackingPreview} disabled={isApplyingImport}>
                 파일 취소
               </Button>
             </div>
 
-            <div className="mt-3 max-h-72 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface-raised)]">
-              <table className="min-w-[720px] w-full border-collapse text-left text-xs">
+            <div className="mt-3 max-h-72 overflow-auto rounded-lg border border-[var(--border)] bg-[var(--surface-raised)]">
+              <table className="w-full min-w-[720px] border-collapse text-left font-mono text-xs tabular-nums tracking-tight">
                 <thead className="sticky top-0 bg-[var(--surface-muted)] text-[var(--text-muted)]">
                   <tr>
                     <th className="px-3 py-2 font-black">행</th>
@@ -485,7 +497,7 @@ export function ShippingWorkPanel({
                 </thead>
                 <tbody className="divide-y divide-[var(--border)] text-[var(--foreground)]">
                   {trackingPreview.matches.matched.map((entry) => (
-                    <tr key={`matched-${entry.row.rowNumber}`}>
+                    <tr className="transition-colors duration-200 hover:bg-[var(--surface-muted)]/60" key={`matched-${entry.row.rowNumber}`}>
                       <td className="px-3 py-2 font-bold">{entry.row.rowNumber}</td>
                       <td className="px-3 py-2 font-bold">{entry.row.recipientName}</td>
                       <td className="px-3 py-2">{entry.row.phone || entry.row.mobile}</td>
@@ -494,7 +506,7 @@ export function ShippingWorkPanel({
                     </tr>
                   ))}
                   {trackingPreview.matches.ambiguous.map((entry) => (
-                    <tr key={`ambiguous-${entry.row.rowNumber}`}>
+                    <tr className="transition-colors duration-200 hover:bg-[var(--surface-muted)]/60" key={`ambiguous-${entry.row.rowNumber}`}>
                       <td className="px-3 py-2 font-bold">{entry.row.rowNumber}</td>
                       <td className="px-3 py-2 font-bold">{entry.row.recipientName}</td>
                       <td className="px-3 py-2">{entry.row.phone || entry.row.mobile}</td>
@@ -503,7 +515,7 @@ export function ShippingWorkPanel({
                     </tr>
                   ))}
                   {trackingPreview.matches.unmatched.map((entry) => (
-                    <tr key={`unmatched-${entry.row.rowNumber}`}>
+                    <tr className="transition-colors duration-200 hover:bg-[var(--surface-muted)]/60" key={`unmatched-${entry.row.rowNumber}`}>
                       <td className="px-3 py-2 font-bold">{entry.row.rowNumber}</td>
                       <td className="px-3 py-2 font-bold">{entry.row.recipientName}</td>
                       <td className="px-3 py-2">{entry.row.phone || entry.row.mobile}</td>
@@ -512,7 +524,7 @@ export function ShippingWorkPanel({
                     </tr>
                   ))}
                   {trackingPreview.parsed.skippedRows.map((entry) => (
-                    <tr key={`skipped-${entry.rowNumber}`}>
+                    <tr className="transition-colors duration-200 hover:bg-[var(--surface-muted)]/60" key={`skipped-${entry.rowNumber}`}>
                       <td className="px-3 py-2 font-bold">{entry.rowNumber}</td>
                       <td className="px-3 py-2" colSpan={3}>읽지 않음</td>
                       <td className="px-3 py-2 font-bold text-[var(--danger-text)]">{entry.reason}</td>
@@ -526,6 +538,7 @@ export function ShippingWorkPanel({
                 모호하거나 일치하지 않는 행은 저장하지 않으며 개별 입력으로 확인할 수 있습니다.
               </p>
               <Button
+                className="active:scale-95 transition-all duration-200"
                 size="sm"
                 isLoading={isApplyingImport}
                 disabled={trackingPreview.matches.matched.length === 0 || !bulkCourier.trim()}
@@ -539,20 +552,20 @@ export function ShippingWorkPanel({
       </section>
 
       {isLoading && items.length === 0 ? (
-        <div role="status" aria-label="배송 업무 목록을 불러오는 중" className="mt-4 space-y-2 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-3">
+        <div role="status" aria-label="배송 업무 목록을 불러오는 중" className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-3">
           <span className="sr-only">배송 업무 목록을 불러오는 중입니다…</span>
           {Array.from({ length: 4 }).map((_, index) => <div key={index} className="commerce-skeleton h-20 rounded-lg" />)}
         </div>
       ) : items.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface-raised)] px-4 py-8 text-center">
+        <div className="rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface-raised)] px-4 py-8 text-center">
           <span className="mx-auto grid size-9 place-items-center rounded-lg bg-[var(--surface-muted)] text-[var(--text-muted)]" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="size-4"><path d="M3.5 7.5h11v9h-11zM14.5 10h3l3 3v3.5h-6z" strokeLinejoin="round" /><circle cx="7" cy="18" r="1.5" /><circle cx="17.5" cy="18" r="1.5" /></svg></span>
           <p className="mt-3 text-sm font-black text-[var(--text-strong)]">현재 배송 신청 내역이 없습니다</p>
           <p className="mt-1 text-xs font-semibold text-[var(--text-muted)]">새 배송 접수가 들어오면 이 목록에 표시됩니다.</p>
         </div>
       ) : (
-        <ul className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] divide-y divide-[var(--border)]">
+        <ul className="divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-raised)]">
           {items.map((item) => (
-            <li key={item.requestId} className="p-3.5 transition-colors duration-200 hover:bg-[var(--surface-muted)]/35 sm:p-4">
+            <li key={item.requestId} className="p-3 transition-all duration-200 hover:bg-[var(--surface-muted)]/55 sm:p-3.5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-3">
                   <input
@@ -561,18 +574,22 @@ export function ShippingWorkPanel({
                     checked={selectedIds.has(item.requestId)}
                     onChange={() => toggleOne(item.requestId)}
                     disabled={isBusy || item.status === "shipped"}
-                    className="mt-1 h-5 w-5 shrink-0 rounded accent-[var(--accent)]"
+                    className="mt-1 size-4 shrink-0 rounded border-[var(--border-strong)] accent-[var(--accent)]"
                   />
                   <div className="min-w-0">
                     <p className="font-black text-[var(--text-strong)]">상품 {item.itemCount}건 배송 접수</p>
                     <p className="mt-1 font-mono text-[10px] font-bold tabular-nums text-[var(--text-muted)]">{formatDateTime(item.requestedAt)}</p>
                   </div>
                 </div>
-                <span className={`rounded-md border border-[var(--border)] px-2.5 py-1 text-[10px] font-black ${item.status === "shipped" ? "bg-[var(--success-surface)] text-[var(--success-text)]" : "bg-[var(--warning-surface)] text-[var(--warning-text)]"}`}>
+                <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-bold ${item.status === "shipped" ? "border-[var(--success-text)]/20 bg-[var(--success-surface)] text-[var(--success-text)]" : "border-[var(--warning-text)]/20 bg-[var(--warning-surface)] text-[var(--warning-text)]"}`}>
+                  <span
+                    aria-hidden="true"
+                    className={`size-1.5 rounded-full ${item.status === "shipped" ? "bg-[var(--success-text)]" : "bg-[var(--warning-text)] motion-safe:animate-pulse motion-reduce:animate-none"}`}
+                  />
                   {item.status === "shipped" ? "발송 완료" : "배송 대기"}
                 </span>
               </div>
-              <p className="mt-3 break-words rounded-xl bg-[var(--surface-muted)] px-3 py-2 text-sm font-bold leading-6 text-[var(--foreground)]">
+              <p className="mt-3 break-words rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-sm font-semibold leading-6 text-[var(--foreground)]">
                 {formatAddressSnapshot(item.addressSnapshot)}
               </p>
               <p className="mt-2 break-all text-xs font-semibold text-[var(--text-muted)]">
@@ -583,7 +600,7 @@ export function ShippingWorkPanel({
                   발송 처리 {formatDateTime(item.shippedAt)} · 등록 후에도 아래에서 수정할 수 있습니다.
                 </p>
               ) : null}
-              <div className="mt-4 grid gap-2 sm:grid-cols-[180px_minmax(0,1fr)_auto]">
+              <div className="mt-3 grid gap-2 sm:grid-cols-[180px_minmax(0,1fr)_auto]">
                 <input
                   aria-label={`택배사 · ${formatAddressSnapshot(item.addressSnapshot)}`}
                   value={courierById[item.requestId] ?? ""}
@@ -594,7 +611,7 @@ export function ShippingWorkPanel({
                   placeholder="택배사"
                   maxLength={80}
                   disabled={isBusy}
-                  className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                  className="rounded-md border border-[var(--border)] bg-[var(--input-surface)] px-3 py-2.5 text-sm font-semibold text-[var(--foreground)] outline-none transition-all duration-200 hover:border-[var(--border-strong)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-surface)]"
                 />
                 <input
                   aria-label={`운송장 번호 · ${formatAddressSnapshot(item.addressSnapshot)}`}
@@ -606,9 +623,10 @@ export function ShippingWorkPanel({
                   placeholder="운송장 번호"
                   maxLength={120}
                   disabled={isBusy}
-                  className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                  className="rounded-md border border-[var(--border)] bg-[var(--input-surface)] px-3 py-2.5 font-mono text-sm font-semibold tabular-nums tracking-tight text-[var(--foreground)] outline-none transition-all duration-200 hover:border-[var(--border-strong)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-surface)]"
                 />
                 <Button
+                  className="active:scale-95 transition-all duration-200"
                   size="sm"
                   variant={item.status === "shipped" ? "secondary" : "primary"}
                   isLoading={processingId === item.requestId}

@@ -11,6 +11,7 @@ import {
 import { Toast } from "@/src/components/common/Toast";
 import type { NewAuctionDraft } from "@/src/components/feed/NewAuctionModal";
 import { useAuthSession } from "@/src/hooks/useAuthSession";
+import { notifyMemberAccountChanged } from "@/src/lib/memberAccountEvents";
 import { useOnlineMembers } from "@/src/hooks/useOnlineMembers";
 import { usePublicSoldAuctions } from "@/src/hooks/usePublicSoldAuctions";
 import { useSupabaseProducts } from "@/src/hooks/useSupabaseProducts";
@@ -78,6 +79,9 @@ const AccountPage = lazy(() =>
   import("@/src/components/profile/AccountPage").then((module) => ({
     default: module.AccountPage,
   })),
+);
+const SecondChanceOfferGate = lazy(
+  () => import("@/src/components/payment/SecondChanceOfferGate"),
 );
 const NicknameOnboardingModal = lazy(() =>
   import("@/src/components/profile/NicknameOnboardingModal").then((module) => ({
@@ -374,7 +378,15 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
           ) : null}
 
           <div className="min-w-0">
-            <AuctionClock />
+            <AuctionClock
+              antiSnipingDeadlines={posts
+                .filter(
+                  (post) =>
+                    post.status === "active" &&
+                    (post.antiSnipingExtensionCount ?? 0) > 0,
+                )
+                .map((post) => post.closesAt)}
+            />
 
             {showOnlineMembers ? (
               <section
@@ -464,6 +476,7 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
             <FeedList
               posts={posts}
               currentUserName={publicDisplayName}
+              currentUserId={isMember ? auth.user?.id : null}
               onBid={handleBid}
               onInquiry={handleProductInquiry}
               isLoading={productsLoading}
@@ -598,6 +611,22 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
             userId={auth.user.id}
             onCompleted={auth.refreshProfile}
             onSignOut={handleSignOut}
+          />
+        </Suspense>
+      ) : null}
+
+      {auth.user && isMemberRole(auth.role) ? (
+        <Suspense fallback={null}>
+          <SecondChanceOfferGate
+            userId={auth.user.id}
+            paymentDeadlineExempt={auth.role === "band_member"}
+            onNotify={showToast}
+            onAccepted={(productId) => {
+              const memberId = auth.user?.id;
+              if (!memberId) return;
+              notifyMemberAccountChanged(memberId, productId);
+              navigateToPage("profile");
+            }}
           />
         </Suspense>
       ) : null}

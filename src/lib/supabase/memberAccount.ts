@@ -4,7 +4,20 @@ import { getSupabaseBrowserClient } from "./client";
 export type WonProductShippingStatus = "ready" | "requested" | "shipped";
 export type ProductPaymentStatus = "대기중" | "가상계좌발급" | "결제완료";
 export type ActivePaymentMode = "manual_transfer" | "portone";
-export type ManualTransferStatus = "awaiting_manual_transfer" | "confirmed";
+export type ManualTransferStatus =
+  | "awaiting_manual_transfer"
+  | "confirmed"
+  | "cancelled_unpaid";
+export type PurchaseOfferKind = "original" | "second_chance";
+export type PurchaseOfferStatus =
+  | "payment_due"
+  | "offered"
+  | "accepted"
+  | "settled"
+  | "expired_unpaid"
+  | "declined"
+  | "expired_offer"
+  | "no_successor";
 export type PortOnePaymentStatus =
   | "READY"
   | "PAY_PENDING"
@@ -54,6 +67,11 @@ export interface MemberWonProduct {
   manualTransferStatus: ManualTransferStatus | null;
   manualTransferRequestedAt: string | null;
   manualTransferConfirmedAt: string | null;
+  purchaseOfferId: string | null;
+  purchaseOfferKind: PurchaseOfferKind | null;
+  purchaseOfferStatus: PurchaseOfferStatus | null;
+  purchaseOfferRound: number | null;
+  paymentDueAt: string | null;
   isPaymentSettled: boolean;
   activePaymentMode: ActivePaymentMode;
   shippingStatus: WonProductShippingStatus;
@@ -110,6 +128,11 @@ interface WonProductRow {
   manual_transfer_status: ManualTransferStatus | null;
   manual_transfer_requested_at: string | null;
   manual_transfer_confirmed_at: string | null;
+  purchase_offer_id: string | null;
+  purchase_offer_kind: PurchaseOfferKind | null;
+  purchase_offer_status: PurchaseOfferStatus | null;
+  purchase_offer_round: number | null;
+  payment_due_at: string | null;
   is_payment_settled: boolean;
   active_payment_mode: ActivePaymentMode;
   shipping_status: WonProductShippingStatus;
@@ -232,11 +255,57 @@ function toWonProduct(row: WonProductRow): MemberWonProduct {
   const manualTransferStatus = row.manual_transfer_status ?? null;
   if (
     manualTransferStatus !== null &&
-    !(["awaiting_manual_transfer", "confirmed"] as const).includes(
+    !(["awaiting_manual_transfer", "confirmed", "cancelled_unpaid"] as const).includes(
       manualTransferStatus,
     )
   ) {
     throw new MemberAccountError("계좌이체 상태 데이터가 올바르지 않습니다.");
+  }
+  const purchaseOfferKind = row.purchase_offer_kind ?? null;
+  if (
+    purchaseOfferKind !== null &&
+    purchaseOfferKind !== "original" &&
+    purchaseOfferKind !== "second_chance"
+  ) {
+    throw new MemberAccountError("구매 기회 종류가 올바르지 않습니다.");
+  }
+  const purchaseOfferStatus = row.purchase_offer_status ?? null;
+  if (
+    purchaseOfferStatus !== null &&
+    !(
+      [
+        "payment_due",
+        "offered",
+        "accepted",
+        "settled",
+        "expired_unpaid",
+        "declined",
+        "expired_offer",
+        "no_successor",
+      ] as const
+    ).includes(purchaseOfferStatus)
+  ) {
+    throw new MemberAccountError("구매 기회 상태가 올바르지 않습니다.");
+  }
+  const purchaseOfferRound =
+    row.purchase_offer_round === null
+      ? null
+      : Number(row.purchase_offer_round);
+  if (
+    purchaseOfferRound !== null &&
+    (!Number.isInteger(purchaseOfferRound) || purchaseOfferRound < 1 || purchaseOfferRound > 2)
+  ) {
+    throw new MemberAccountError("구매 기회 회차가 올바르지 않습니다.");
+  }
+  if (
+    (purchaseOfferKind === "original" && purchaseOfferRound !== 1) ||
+    (purchaseOfferKind === "second_chance" && purchaseOfferRound !== 2)
+  ) {
+    throw new MemberAccountError("구매 기회 종류와 회차가 일치하지 않습니다.");
+  }
+  const paymentDueAt = row.payment_due_at ?? null;
+  if (paymentDueAt !== null && !Number.isFinite(Date.parse(paymentDueAt))) {
+    throw new MemberAccountError("계좌이체 마감 시각이 올바르지 않습니다.");
   }
   if (
     row.active_payment_mode !== "manual_transfer" &&
@@ -265,6 +334,11 @@ function toWonProduct(row: WonProductRow): MemberWonProduct {
     manualTransferStatus,
     manualTransferRequestedAt: row.manual_transfer_requested_at,
     manualTransferConfirmedAt: row.manual_transfer_confirmed_at,
+    purchaseOfferId: row.purchase_offer_id,
+    purchaseOfferKind,
+    purchaseOfferStatus,
+    purchaseOfferRound,
+    paymentDueAt,
     isPaymentSettled: Boolean(row.is_payment_settled),
     activePaymentMode: row.active_payment_mode,
     shippingStatus: row.shipping_status,

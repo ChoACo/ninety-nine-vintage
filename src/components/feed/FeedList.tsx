@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAuctionPolicyMinuteClock } from "@/src/hooks/useAuctionPolicyClock";
+import { useAuctionPolicyClock } from "@/src/hooks/useAuctionPolicyClock";
 import type { AuctionPost } from "@/src/types/auction";
 import { getAuctionBidDecision } from "@/src/utils/auctionBidPolicy";
 import DateFilterChips, { getKoreanDateKey } from "./DateFilterChips";
@@ -16,6 +16,7 @@ const VISIBLE_POST_STEP = 8;
 export interface FeedListProps {
   posts: AuctionPost[];
   currentUserName: string;
+  currentUserId?: string | null;
   onBid?: BidHandler;
   onInquiry: InquiryHandler;
   isLoading?: boolean;
@@ -68,6 +69,7 @@ function EmptyRackIcon() {
 export default function FeedList({
   posts,
   currentUserName,
+  currentUserId,
   onBid,
   onInquiry,
   isLoading = false,
@@ -81,7 +83,9 @@ export default function FeedList({
 }: FeedListProps) {
   const [selectedDate, setSelectedDate] = useState("all");
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_POSTS);
-  const auctionNow = useAuctionPolicyMinuteClock();
+  // A single shared one-second store keeps every anti-sniping deadline exact
+  // without creating one interval per product card.
+  const auctionNow = useAuctionPolicyClock();
   const publishedPosts = useMemo(
     () =>
       posts.filter((post) => {
@@ -189,7 +193,7 @@ export default function FeedList({
       {isLoading && publishedPosts.length === 0 ? (
         <div role="status">
           <span className="sr-only">Supabase에서 경매 상품을 불러오는 중이에요.</span>
-          <div className="grid grid-cols-1 gap-px overflow-hidden border border-[var(--border)] bg-[var(--border)] sm:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3.5 bg-transparent sm:gap-px sm:overflow-hidden sm:border sm:border-[var(--border)] sm:bg-[var(--border)] 2xl:grid-cols-3">
             {Array.from({ length: 6 }, (_, index) => (
               <FeedSkeleton key={index} />
             ))}
@@ -221,13 +225,14 @@ export default function FeedList({
         <>
         <div
           id="auction-feed-items"
-          className="grid grid-cols-1 items-stretch gap-px overflow-hidden border border-[var(--border)] bg-[var(--border)] sm:grid-cols-2 2xl:grid-cols-3"
+          className="grid grid-cols-2 items-stretch gap-3.5 bg-transparent sm:gap-px sm:overflow-hidden sm:border sm:border-[var(--border)] sm:bg-[var(--border)] 2xl:grid-cols-3"
         >
           {visiblePosts.map((post) => (
             <PostCard
               key={post.id}
               post={post}
               currentUserName={currentUserName}
+              currentUserId={currentUserId}
               auctionNow={auctionNow}
               onBid={onBid}
               onInquiry={onInquiry}

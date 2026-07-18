@@ -34,7 +34,7 @@ export default function SiteHeader({
 
   return (
     <header className="theme-surface-glass rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3">
-      <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between lg:gap-5">
+      <div className="flex items-center justify-between gap-2.5 lg:gap-5">
         <div className="flex min-w-0 items-center gap-3">
           <img
             src="/ninety-nine-vintage-brand.jpg"
@@ -55,19 +55,19 @@ export default function SiteHeader({
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5 lg:justify-end lg:gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 lg:justify-end lg:gap-2">
           <ThemeToggle />
 
           {isAuthenticated &&
           isOwnerRole(role) &&
           onOpenOwnerTools ? (
-            <Button className="px-3" size="sm" variant="secondary" onClick={onOpenOwnerTools}>
+            <Button className="hidden px-3 sm:inline-flex" size="sm" variant="secondary" onClick={onOpenOwnerTools}>
               관리자 메뉴
             </Button>
           ) : null}
 
           {isAuthenticated ? (
-            <span className="inline-flex min-h-10 max-w-[12rem] items-center gap-2 truncate rounded-md border border-[var(--border)] bg-[var(--success-surface)] px-3 py-2 text-xs font-bold text-[var(--success-text)] sm:max-w-[16rem]">
+            <span className="hidden min-h-10 max-w-[12rem] items-center gap-2 truncate rounded-md border border-[var(--border)] bg-[var(--success-surface)] px-3 py-2 text-xs font-bold text-[var(--success-text)] sm:inline-flex sm:max-w-[16rem]">
               <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />
               <span className="truncate">
                 {safeDisplayName ? `${safeDisplayName} · ` : ""}

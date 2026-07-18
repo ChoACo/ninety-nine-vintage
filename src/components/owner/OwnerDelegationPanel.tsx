@@ -125,13 +125,13 @@ export function OwnerDelegationPanel({ accessToken }: { accessToken: string }) {
   };
 
   return (
-    <section className="theme-panel rounded-[1.8rem] border p-5 sm:p-6" aria-labelledby="owner-delegation-title">
-      <p className="text-xs font-black tracking-[0.16em] text-[var(--accent-text)]">
+    <section className="rounded-xl border border-zinc-800/80 bg-[var(--surface)] p-4 sm:p-5" aria-labelledby="owner-delegation-title">
+      <p className="font-mono text-[10px] font-black tracking-[0.18em] text-[var(--accent-text)]">
         AUDITED OPERATOR CONTEXT
       </p>
       <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="owner-delegation-title" className="text-2xl font-black text-[var(--text-strong)]">
+          <h2 id="owner-delegation-title" className="text-xl font-black tracking-tight text-[var(--text-strong)] sm:text-2xl">
             운영자 컨텍스트
           </h2>
           <p className="mt-2 max-w-3xl break-keep font-bold leading-7 text-[var(--text-muted)]">

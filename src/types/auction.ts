@@ -54,6 +54,8 @@ export interface BidHistoryRecord {
   /** 회원이 설정한 공개 닉네임. 입찰 투명성을 위해 공개 UI에 그대로 표시합니다. */
   readonly bidderName: string;
   readonly amount: number;
+  /** 미입금·제재로 효력을 잃어도 투명성을 위해 공개 기록은 보존합니다. */
+  readonly outcome?: "active" | "cancelled" | "unpaid_cancelled";
 }
 
 export interface AuctionPost {
@@ -78,6 +80,12 @@ export interface AuctionPost {
   bidLockedAt?: ISODateString;
   /** 즉시 확정된 금액. 회원 UUID는 공개 피드에 노출하지 않습니다. */
   finalBidAmount?: number;
+  /** 최초 안티 스나이핑 연장 직전의 서버 마감 시각 */
+  antiSnipingBaseClosesAt?: ISODateString;
+  /** 마지막으로 서버가 마감을 3분으로 재설정한 시각 */
+  antiSnipingExtendedAt?: ISODateString;
+  /** 서버에서 확정된 누적 마감 연장 횟수 */
+  antiSnipingExtensionCount?: number;
   /** 최신 입찰이 첫 번째인 읽기 전용 공개 기록 */
   readonly bidHistory: readonly BidHistoryRecord[];
 }

@@ -87,6 +87,13 @@ export interface OwnerAuditEntry {
   occurred_at: string;
 }
 
+export interface OwnerPaymentRuntime {
+  activeMode: "manual_transfer" | "portone";
+  bankConfigured: boolean;
+  updatedAt: string | null;
+  portoneReady: boolean;
+}
+
 async function ownerRequest<T>(
   accessToken: string,
   path: string,
@@ -135,6 +142,24 @@ export function endOwnerDelegation(accessToken: string, sessionId?: string) {
     method: "DELETE",
     body: JSON.stringify({ sessionId }),
   });
+}
+
+export function fetchOwnerPaymentRuntime(accessToken: string) {
+  return ownerRequest<OwnerPaymentRuntime>(
+    accessToken,
+    "/api/owner/payment-mode",
+  );
+}
+
+export function setOwnerPaymentRuntimeMode(
+  accessToken: string,
+  mode: OwnerPaymentRuntime["activeMode"],
+) {
+  return ownerRequest<OwnerPaymentRuntime>(
+    accessToken,
+    "/api/owner/payment-mode",
+    { method: "PATCH", body: JSON.stringify({ mode }) },
+  );
 }
 
 export function fetchOwnerHiddenTestMember(accessToken: string) {

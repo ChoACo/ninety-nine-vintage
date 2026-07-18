@@ -699,7 +699,7 @@ test("keeps the owner publicly operator-only while providing audited private tes
   assert.match(testPanel, /requestOwnerHiddenTestShipping/);
   assert.match(auctionPanel, /ownerCloseAuctionNow/);
   assert.match(auctionPanel, /ownerOverrideAuctionPrice/);
-  assert.match(ownerPage, /<StaffChatInbox staffId=\{auth\.user\.id\} role="admin"/);
+  assert.match(ownerPage, /<StaffChatInbox staffId=\{ownerUserId\} role="admin"/);
 
   const response = await render("/owner");
   assert.equal(response.status, 200);

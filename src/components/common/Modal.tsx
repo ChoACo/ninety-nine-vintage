@@ -17,6 +17,9 @@ export interface ModalProps {
   children: ReactNode;
   onClose: () => void;
   description?: string;
+  headerPrefix?: string;
+  closeShortcutLabel?: string;
+  headerVariant?: "default" | "editorial";
   size?: ModalSize;
   tone?: ModalTone;
   showCloseButton?: boolean;
@@ -48,6 +51,9 @@ export default function Modal({
   children,
   onClose,
   description,
+  headerPrefix,
+  closeShortcutLabel,
+  headerVariant = "default",
   size = "md",
   tone = "light",
   showCloseButton = true,
@@ -150,7 +156,11 @@ export default function Modal({
           }`}
         />
         <div
-          className={`flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4 sm:px-6 sm:py-5 ${
+          className={`flex shrink-0 items-start justify-between gap-4 border-b ${
+            headerVariant === "editorial"
+              ? "px-4 py-3.5 sm:px-6 sm:py-4"
+              : "px-5 py-4 sm:px-6 sm:py-5"
+          } ${
             tone === "dark"
               ? "border-white/10 bg-white/[0.025]"
               : "border-[var(--border)] bg-[var(--surface)]"
@@ -159,17 +169,34 @@ export default function Modal({
           <div className="min-w-0">
             <h2
               id={titleId}
-              className={`text-lg font-extrabold tracking-[-0.025em] sm:text-xl ${
+              className={`${
+                headerVariant === "editorial"
+                  ? "text-base font-black tracking-[-0.025em] sm:text-lg"
+                  : "text-lg font-extrabold tracking-[-0.025em] sm:text-xl"
+              } ${
                 tone === "dark" ? "text-white" : "text-[var(--text-strong)]"
               }`}
             >
-              {title}
+              {headerPrefix ? (
+                <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span className="shrink-0 font-mono text-[10px] font-black tabular-nums tracking-[0.12em] text-zinc-500 sm:text-[11px]">
+                    [ {headerPrefix} ]
+                  </span>
+                  <span className="min-w-0 break-words">{title}</span>
+                </span>
+              ) : (
+                title
+              )}
             </h2>
             {description ? (
               <p
                 id={descriptionId}
-                className={`mt-1.5 max-w-2xl break-keep text-sm font-medium leading-6 ${
-                  tone === "dark" ? "text-white/60" : "text-[var(--text-muted)]"
+                className={`${
+                  headerVariant === "editorial"
+                    ? "mt-1 max-w-2xl break-keep text-xs font-medium leading-5 text-zinc-500"
+                    : `mt-1.5 max-w-2xl break-keep text-sm font-medium leading-6 ${
+                        tone === "dark" ? "text-white/60" : "text-[var(--text-muted)]"
+                      }`
                 }`}
               >
                 {description}
@@ -178,28 +205,42 @@ export default function Modal({
           </div>
 
           {showCloseButton ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className={`grid size-9 shrink-0 place-items-center rounded-md border transition-all duration-200 ease-out hover:scale-[1.04] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
-                tone === "dark"
-                  ? "border-white/15 bg-white/[0.04] text-white/70 hover:border-white/30 hover:bg-white/10 hover:text-white"
-                  : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-strong)]"
-              }`}
-              aria-label="닫기"
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                className="size-[18px]"
+            <div className="flex shrink-0 items-center gap-2">
+              {closeShortcutLabel ? (
+                <span
+                  aria-hidden="true"
+                  className={`hidden border px-2 py-1 font-mono text-[9px] font-black tabular-nums tracking-[0.14em] sm:inline-flex ${
+                    tone === "dark"
+                      ? "border-white/10 bg-black/25 text-zinc-500"
+                      : "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)]"
+                  }`}
+                >
+                  [ {closeShortcutLabel} ]
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={onClose}
+                className={`grid size-9 shrink-0 place-items-center rounded-md border transition-all duration-200 ease-out hover:scale-[1.04] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
+                  tone === "dark"
+                    ? "border-white/15 bg-white/[0.04] text-white/70 hover:border-white/30 hover:bg-white/10 hover:text-white"
+                    : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-strong)]"
+                }`}
+                aria-label="닫기"
               >
-                <path d="m6 6 12 12M18 6 6 18" />
-              </svg>
-            </button>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  className="size-[18px]"
+                >
+                  <path d="m6 6 12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </div>
           ) : null}
         </div>
 

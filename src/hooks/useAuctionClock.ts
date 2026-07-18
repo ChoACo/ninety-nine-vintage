@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
+import { useAuctionPolicyClock } from "@/src/hooks/useAuctionPolicyClock";
 import type { CountdownParts } from "@/src/types/auction";
 import {
   getCountdown,
@@ -23,16 +24,7 @@ export interface AuctionClockState {
 export function useAuctionClock({
   rollover = false,
 }: UseAuctionClockOptions = {}): AuctionClockState {
-  const [currentTime, setCurrentTime] = useState(() => new Date());
-
-  useEffect(() => {
-    const updateCurrentTime = () => setCurrentTime(new Date());
-    updateCurrentTime();
-
-    const intervalId = window.setInterval(updateCurrentTime, 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, []);
+  const currentTime = useAuctionPolicyClock();
 
   return useMemo(() => {
     const deadline = rollover

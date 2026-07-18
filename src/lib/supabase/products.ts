@@ -39,6 +39,9 @@ const PRODUCT_COLUMNS = [
   "bid_locked_at",
   "final_bid_amount",
   "final_bid_id",
+  "anti_sniping_base_closes_at",
+  "anti_sniping_extended_at",
+  "anti_sniping_extension_count",
 ].join(",");
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
@@ -64,6 +67,7 @@ function parseBidHistory(value: Json): readonly BidHistoryRecord[] {
     const bidAt = entry.bidAt;
     const bidderName = entry.bidderName;
     const amount = entry.amount;
+    const outcome = entry.outcome;
 
     if (
       typeof id !== "string" ||
@@ -74,7 +78,24 @@ function parseBidHistory(value: Json): readonly BidHistoryRecord[] {
       return [];
     }
 
-    return [Object.freeze({ id, bidAt, bidderName, amount })];
+    if (
+      outcome !== undefined &&
+      outcome !== "active" &&
+      outcome !== "cancelled" &&
+      outcome !== "unpaid_cancelled"
+    ) {
+      return [];
+    }
+
+    return [
+      Object.freeze({
+        id,
+        bidAt,
+        bidderName,
+        amount,
+        outcome: outcome ?? "active",
+      }),
+    ];
   });
 
   return Object.freeze(records);
@@ -104,6 +125,9 @@ export function mapProductRowToAuctionPost(row: ProductRow): AuctionPost {
     ),
     bidLockedAt: row.bid_locked_at ?? undefined,
     finalBidAmount: row.final_bid_amount ?? undefined,
+    antiSnipingBaseClosesAt: row.anti_sniping_base_closes_at ?? undefined,
+    antiSnipingExtendedAt: row.anti_sniping_extended_at ?? undefined,
+    antiSnipingExtensionCount: row.anti_sniping_extension_count,
     bidHistory: parseBidHistory(row.bid_history),
   };
 }

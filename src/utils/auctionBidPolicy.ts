@@ -14,6 +14,8 @@ export type AuctionBidDecisionReason =
   | "open-to-all"
   | "existing-participant"
   | "empty-item-first-bid"
+  | "anti-sniping-overtime"
+  | "anti-sniping-participants-only"
   | "late-first-bid-finalized"
   | "new-bid-cutoff"
   | "auction-closed"
@@ -39,7 +41,15 @@ export interface AuctionBidDecision {
 }
 
 export interface AuctionBidPolicyInput {
-  post: Pick<AuctionPost, "status" | "bidHistory" | "bidLockedAt">;
+  post: Pick<
+    AuctionPost,
+    | "status"
+    | "bidHistory"
+    | "bidLockedAt"
+    | "closesAt"
+    | "antiSnipingBaseClosesAt"
+    | "antiSnipingExtensionCount"
+  >;
   currentUserName: string;
   now?: Date | string | number;
 }
@@ -106,6 +116,30 @@ function normalizeIdentity(name: string): string {
 }
 
 /**
+ * 서버가 연장한 원래 마감 시각을 지난 뒤, 새 closes_at 전까지의 좁은
+ * 오버타임 구간입니다. DB와 동일하게 기존 참여자만 이 구간을 이용합니다.
+ */
+export function isAntiSnipingOvertime(
+  post: Pick<
+    AuctionPost,
+    "closesAt" | "antiSnipingBaseClosesAt" | "antiSnipingExtensionCount"
+  >,
+  now: Date | string | number = new Date(),
+): boolean {
+  if ((post.antiSnipingExtensionCount ?? 0) <= 0) return false;
+
+  const currentTime = toValidDate(now).getTime();
+  const baseCloseTime = Date.parse(post.antiSnipingBaseClosesAt ?? "");
+  const closeTime = Date.parse(post.closesAt);
+  return (
+    Number.isFinite(baseCloseTime) &&
+    Number.isFinite(closeTime) &&
+    currentTime >= baseCloseTime &&
+    currentTime < closeTime
+  );
+}
+
+/**
  * 20:56 규칙의 단일 판정 함수입니다.
  *
  * - 20:56 전: 누구나 입찰 가능
@@ -122,7 +156,10 @@ export function getAuctionBidDecision({
   currentUserName,
   now = new Date(),
 }: AuctionBidPolicyInput): AuctionBidDecision {
-  const phase = getDailyAuctionPhase(now);
+  const overtimeActive = isAntiSnipingOvertime(post, now);
+  const phase = overtimeActive
+    ? "existing-participants-only"
+    : getDailyAuctionPhase(now);
   const normalizedUserName = normalizeIdentity(currentUserName);
   const hasAnyBidHistory = post.bidHistory.length > 0;
   const userHasBidHistory =
@@ -162,6 +199,24 @@ export function getAuctionBidDecision({
       allowed: false,
       reason: "item-sold",
       message: "판매가 완료된 상품입니다.",
+    };
+  }
+
+  if (overtimeActive) {
+    if (userHasBidHistory) {
+      return {
+        ...base,
+        allowed: true,
+        reason: "anti-sniping-overtime",
+        message: "마감 연장 중입니다. 기존 참여자는 서버 마감 시각까지 입찰할 수 있습니다.",
+      };
+    }
+
+    return {
+      ...base,
+      allowed: false,
+      reason: "anti-sniping-participants-only",
+      message: "마감 연장 시간에는 기존 참여자만 입찰할 수 있습니다.",
     };
   }
 

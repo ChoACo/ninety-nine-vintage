@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/src/components/common";
+import { useAuctionPolicyClock } from "@/src/hooks/useAuctionPolicyClock";
 import {
   confirmManualBankTransfer,
   getManualBankAccountForStaff,
@@ -31,7 +32,17 @@ function dateTime(value: string | null): string {
   }).format(date);
 }
 
+function isTransferExpired(
+  transfer: PendingManualTransfer,
+  now: Date,
+): boolean {
+  return Boolean(
+    transfer.dueAt && Date.parse(transfer.dueAt) <= now.getTime(),
+  );
+}
+
 export function ManualBankTransferPanel() {
+  const auctionNow = useAuctionPolicyClock();
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [configured, setConfigured] = useState(false);
@@ -127,8 +138,9 @@ export function ManualBankTransferPanel() {
   };
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/55 p-3.5 sm:p-4">
+    <div className="space-y-3">
+      <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_1px_0_rgba(255,255,255,0.3)]">
+        <div className="border-b border-[var(--border)] bg-[var(--surface-muted)]/45 px-3.5 py-3 sm:px-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-[10px] font-black tracking-[0.16em] text-[var(--accent-text)]">
@@ -143,17 +155,26 @@ export function ManualBankTransferPanel() {
             </p>
           </div>
           <span
-            className={`rounded-md border border-[var(--border)] px-2.5 py-1.5 text-[10px] font-black ${
+            className={`inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] px-2 py-1 text-[10px] font-bold ${
               configured
                 ? "bg-[var(--success-surface)] text-[var(--success-text)]"
                 : "bg-[var(--warning-surface)] text-[var(--warning-text)]"
             }`}
           >
+            <span
+              aria-hidden="true"
+              className={`size-1.5 rounded-full ${
+                configured
+                  ? "bg-[var(--success-text)]"
+                  : "bg-[var(--warning-text)] motion-safe:animate-pulse motion-reduce:animate-none"
+              }`}
+            />
             {configured ? "계좌 설정 완료" : "계좌 설정 필요"}
           </span>
         </div>
+        </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(150px,0.45fr)_minmax(240px,1fr)_auto] sm:items-end">
+        <div className="grid gap-3 p-3.5 sm:grid-cols-[minmax(150px,0.45fr)_minmax(240px,1fr)_auto] sm:items-end sm:p-4">
           <label className="text-xs font-black text-[var(--text-strong)]">
             은행명
             <input
@@ -162,7 +183,7 @@ export function ManualBankTransferPanel() {
               maxLength={40}
               placeholder="예: 국민은행"
               disabled={isLoading || isSaving}
-              className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 text-sm font-bold text-[var(--text-strong)] outline-none transition-all duration-200 focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)]"
+              className="mt-1.5 min-h-10 w-full rounded-md border border-[var(--border)] bg-[var(--input-surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none transition-all duration-200 hover:border-[var(--border-strong)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-surface)]"
             />
           </label>
           <label className="text-xs font-black text-[var(--text-strong)]">
@@ -175,10 +196,11 @@ export function ManualBankTransferPanel() {
               autoComplete="off"
               placeholder="예: 123-456-789012"
               disabled={isLoading || isSaving}
-              className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 font-mono text-sm font-bold tabular-nums text-[var(--text-strong)] outline-none transition-all duration-200 focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)]"
+              className="mt-1.5 min-h-10 w-full rounded-md border border-[var(--border)] bg-[var(--input-surface)] px-3 font-mono text-sm font-semibold tabular-nums tracking-tight text-[var(--text-strong)] outline-none transition-all duration-200 hover:border-[var(--border-strong)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-surface)]"
             />
           </label>
           <Button
+            className="active:scale-95 transition-all duration-200"
             onClick={() => void saveAccount()}
             isLoading={isSaving}
             disabled={isLoading || !bankName.trim() || !accountNumber.trim()}
@@ -188,7 +210,8 @@ export function ManualBankTransferPanel() {
         </div>
       </section>
 
-      <section className="rounded-lg border border-[var(--info-border)] bg-[var(--info-surface)] p-3.5 sm:p-4">
+      <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_1px_0_rgba(255,255,255,0.3)]">
+        <div className="border-b border-[var(--border)] bg-[var(--surface-muted)]/45 px-3.5 py-3 sm:px-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-black tracking-[0.16em] text-[var(--info-text)]">
@@ -199,16 +222,19 @@ export function ManualBankTransferPanel() {
             </h3>
           </div>
           <div className="flex items-center gap-2">
-            <span className="rounded-md border border-[var(--info-border)] bg-[var(--surface-raised)] px-2 py-1 font-mono text-xs font-black tabular-nums text-[var(--info-text)]">
-              {pendingTotalCount.toLocaleString("ko-KR")}건
+            <span className="inline-flex items-baseline gap-1 rounded-md border border-[var(--info-border)] bg-[var(--info-surface)] px-2.5 py-1 font-mono tabular-nums text-lg font-bold tracking-tight text-[var(--info-text)]">
+              {pendingTotalCount.toLocaleString("ko-KR")}
+              <span className="text-[10px] font-semibold">건 대기</span>
             </span>
-            <Button size="sm" variant="ghost" onClick={() => void load()} isLoading={isLoading}>
+            <Button className="active:scale-95 transition-all duration-200" size="sm" variant="ghost" onClick={() => void load()} isLoading={isLoading}>
               새로고침
             </Button>
           </div>
         </div>
+        </div>
 
-        <p className="mt-3 rounded-lg border border-[var(--warning-text)]/25 bg-[var(--warning-surface)] px-3.5 py-2.5 text-xs font-bold leading-5 text-[var(--warning-text)]">
+        <div className="p-3.5 sm:p-4">
+        <p className="rounded-md border border-[var(--warning-text)]/25 bg-[var(--warning-surface)] px-3 py-2 text-xs font-semibold leading-5 text-[var(--warning-text)]">
           통장의 입금자명과 금액을 직접 대조한 후에만 확정해 주세요. 버튼을
           누르면 회원의 결제를 완료 처리하고 이력을 남깁니다.
         </p>
@@ -233,11 +259,11 @@ export function ManualBankTransferPanel() {
                 이어서 표시됩니다.
               </p>
             ) : null}
-            <ul className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] divide-y divide-[var(--border)]">
+            <ul className="mt-4 divide-y divide-[var(--border)] overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
               {transfers.map((transfer) => (
               <li
                 key={transfer.orderId}
-                className="p-3.5 transition-colors duration-200 hover:bg-[var(--surface-muted)]/35"
+                className="p-3 transition-all duration-200 hover:bg-[var(--surface-muted)]/55 sm:p-3.5"
               >
                 <div className="flex items-start gap-3">
                   {transfer.productImageUrl ? (
@@ -255,7 +281,8 @@ export function ManualBankTransferPanel() {
                       입금자 확인 대상 · {transfer.buyerDisplayName}
                     </p>
                   </div>
-                  <span className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--warning-surface)] px-2 py-1 text-[10px] font-black text-[var(--warning-text)]">
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--warning-text)]/20 bg-[var(--warning-surface)] px-2 py-1 text-[10px] font-bold text-[var(--warning-text)]">
+                    <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--warning-text)] motion-safe:animate-pulse motion-reduce:animate-none" />
                     입금 진행 중
                   </span>
                 </div>
@@ -265,23 +292,54 @@ export function ManualBankTransferPanel() {
                 <p className="mt-1 font-mono text-[10px] font-bold tabular-nums text-[var(--text-muted)]">
                   계좌 확인 {dateTime(transfer.requestedAt)}
                 </p>
-                <p className="mt-2 rounded-md bg-[var(--surface-muted)] px-3 py-2 text-xs font-bold text-[var(--text-muted)]">
-                  안내 계좌 · <strong className="text-[var(--text-strong)]">{transfer.bankName} {transfer.accountNumber}</strong>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {transfer.purchaseOfferKind ? (
+                    <span className="rounded-md border border-[var(--info-border)] bg-[var(--info-surface)] px-2 py-1 text-[10px] font-black text-[var(--info-text)]">
+                      {transfer.purchaseOfferKind === "second_chance"
+                        ? "차순위 구매권"
+                        : "원낙찰"}
+                      {transfer.purchaseOfferRound
+                        ? ` · ${transfer.purchaseOfferRound}회차`
+                        : ""}
+                    </span>
+                  ) : null}
+                  <span
+                    className={`rounded-md border px-2 py-1 font-mono text-[10px] font-black tabular-nums ${
+                      isTransferExpired(transfer, auctionNow)
+                        ? "border-[var(--danger-text)]/25 bg-[var(--danger-surface)] text-[var(--danger-text)]"
+                        : "border-[var(--warning-text)]/25 bg-[var(--warning-surface)] text-[var(--warning-text)]"
+                    }`}
+                  >
+                    {transfer.paymentDeadlineExempt || !transfer.dueAt
+                      ? "입금기한 특례"
+                      : isTransferExpired(transfer, auctionNow)
+                        ? "기한 만료 · 자동 처리 대기"
+                        : `입금 마감 ${dateTime(transfer.dueAt)}`}
+                  </span>
+                </div>
+                <p className="mt-2 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs font-semibold text-[var(--text-muted)]">
+                  안내 계좌 · <strong className="font-mono tabular-nums tracking-tight text-[var(--text-strong)]">{transfer.bankName} {transfer.accountNumber}</strong>
                 </p>
                 <Button
                   fullWidth
-                  className="mt-4"
+                  className="mt-3 active:scale-95 transition-all duration-200"
                   isLoading={confirmingId === transfer.orderId}
-                  disabled={Boolean(confirmingId)}
+                  disabled={
+                    Boolean(confirmingId) ||
+                    isTransferExpired(transfer, auctionNow)
+                  }
                   onClick={() => void confirmTransfer(transfer)}
                 >
-                  입금 확정하기
+                  {isTransferExpired(transfer, auctionNow)
+                    ? "기한 만료 처리 대기"
+                    : "입금 확정하기"}
                 </Button>
               </li>
               ))}
             </ul>
           </>
         )}
+        </div>
       </section>
 
       {feedback ? (

@@ -2,11 +2,13 @@
 
 /* eslint-disable @next/next/no-img-element -- Supabase Storage/Kakao 이미지 URL을 표시합니다. */
 import Link from "next/link";
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { Role } from "@/src/types/auction";
-import { Button, Modal } from "@/src/components/common";
+import { Button, Modal, Toast } from "@/src/components/common";
 import { MemberSecurityLogPanel } from "@/src/components/security/MemberSecurityLogPanel";
 import { useMemberAccount } from "@/src/hooks/useMemberAccount";
+import { useAuctionPolicyClock } from "@/src/hooks/useAuctionPolicyClock";
+import { clearGarmentSizeProfile } from "@/src/hooks/useGarmentSizeProfile";
 import type {
   MemberShippingAddress,
   MemberWonProduct,
@@ -18,7 +20,11 @@ import {
   fetchMyKakaoProfile,
   type KakaoMemberProfile,
 } from "@/src/lib/supabase/kakaoProfile";
-import { formatKRW } from "@/src/utils/formatters";
+import {
+  formatCountdown,
+  formatKRW,
+  getCountdown,
+} from "@/src/utils/formatters";
 import { deleteMyAccount } from "@/src/lib/supabase/account";
 import {
   createPortOnePaymentId,
@@ -314,6 +320,17 @@ const paymentDueFormatter = new Intl.DateTimeFormat("ko-KR", {
   hour: "numeric",
   minute: "2-digit",
 });
+
+const manualTransferRequestedFormatter = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  month: "long",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+const MANUAL_TRANSFER_COPY_TOAST =
+  "✓ 계좌번호가 복사되었습니다. 입금 확인후 확정 됩니다.";
 
 function formatClosedAt(value: string): string {
   const date = new Date(value);
@@ -636,6 +653,7 @@ function PortOnePaymentModal({
       title="낙찰 상품 결제"
       description="결제 금액은 서버의 최종 낙찰 원장으로 다시 확인합니다."
       size="sm"
+      className="max-sm:absolute max-sm:bottom-0 max-sm:max-h-[92dvh] max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 max-sm:overscroll-contain"
     >
       <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
         <div className="flex gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-3">
@@ -751,6 +769,52 @@ function PortOnePaymentModal({
   );
 }
 
+function formatManualTransferRequestedAt(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "접수 시각 확인 중"
+    : `${manualTransferRequestedFormatter.format(date)} 접수`;
+}
+
+function ManualPaymentDeadline({
+  dueAt,
+  secondChance = false,
+}: {
+  dueAt: string;
+  secondChance?: boolean;
+}) {
+  const now = useAuctionPolicyClock();
+  const countdown = getCountdown(dueAt, now);
+  return (
+    <div
+      role="timer"
+      className={`rounded-xl border px-4 py-3 ${
+        countdown.isExpired
+          ? "border-[var(--danger-text)]/25 bg-[var(--danger-surface)]"
+          : "border-[var(--warning-text)]/25 bg-[var(--warning-surface)]"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-bold text-[var(--text-muted)]">
+          {secondChance ? "차순위 계좌이체 기한" : "계좌이체 마감"}
+        </span>
+        <strong
+          className={`font-mono text-lg font-black tabular-nums tracking-tight ${
+            countdown.isExpired
+              ? "text-[var(--danger-text)]"
+              : "text-[var(--warning-text)]"
+          }`}
+        >
+          {countdown.isExpired ? "기한 만료" : formatCountdown(countdown)}
+        </strong>
+      </div>
+      <p className="mt-1 text-[11px] font-medium leading-5 text-[var(--text-muted)]">
+        서버 시각 기준 · 만료 처리는 Supabase 결제 원장에서 자동 확정됩니다.
+      </p>
+    </div>
+  );
+}
+
 function ManualTransferPaymentModal({
   product,
   onClose,
@@ -762,14 +826,37 @@ function ManualTransferPaymentModal({
 }) {
   const [transfer, setTransfer] = useState<BegunManualTransfer | null>(null);
   const [isRevealing, setIsRevealing] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState("");
+  const [copyToastVisible, setCopyToastVisible] = useState(false);
+  const [copyToastSequence, setCopyToastSequence] = useState(0);
+  const [copyError, setCopyError] = useState("");
   const [error, setError] = useState("");
+  const expiryRefreshStartedRef = useRef(false);
+  const paymentNow = useAuctionPolicyClock();
+  const paymentExpired = Boolean(
+    product.paymentDueAt && Date.parse(product.paymentDueAt) <= paymentNow.getTime(),
+  );
+
+  useEffect(() => {
+    if (!copyToastVisible) return;
+    const timeout = window.setTimeout(() => setCopyToastVisible(false), 4200);
+    return () => window.clearTimeout(timeout);
+  }, [copyToastSequence, copyToastVisible]);
+
+  useEffect(() => {
+    if (!paymentExpired || expiryRefreshStartedRef.current) return;
+    expiryRefreshStartedRef.current = true;
+    void onStarted().catch(() => undefined);
+  }, [onStarted, paymentExpired]);
 
   const revealAccount = async () => {
     if (isRevealing) return;
+    if (paymentExpired) {
+      setError("계좌이체 기한이 만료되어 계좌를 공개할 수 없습니다.");
+      return;
+    }
     setIsRevealing(true);
     setError("");
-    setCopyFeedback("");
+    setCopyError("");
     try {
       const result = await beginManualBankTransfer(product.productId);
       setTransfer(result);
@@ -790,37 +877,57 @@ function ManualTransferPaymentModal({
 
   const copyAccount = async () => {
     if (!transfer) return;
+    if (paymentExpired) {
+      setCopyError("계좌이체 기한이 만료되어 계좌번호 복사를 중단했습니다.");
+      return;
+    }
+    setCopyError("");
+    setCopyToastVisible(false);
     try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard API unavailable");
+      }
       await navigator.clipboard.writeText(transfer.accountNumber);
-      setCopyFeedback("계좌번호를 복사했습니다.");
+      setCopyToastSequence((sequence) => sequence + 1);
+      setCopyToastVisible(true);
     } catch {
-      setCopyFeedback("자동 복사가 어렵습니다. 계좌번호를 길게 눌러 복사해 주세요.");
+      setCopyError(
+        "자동 복사가 어렵습니다. 계좌번호를 길게 눌러 복사해 주세요.",
+      );
     }
   };
 
   const amount = transfer?.expectedAmount ?? product.finalBidAmount;
 
   return (
-    <Modal
-      open
-      onClose={() => {
-        if (!isRevealing) onClose();
-      }}
-      closeOnBackdrop={!isRevealing}
-      title="낙찰 상품 결제"
-      description="계좌를 확인한 후 입금하면 운영자가 실제 통장 내역을 대조합니다."
-      size="sm"
-    >
-      <div className="space-y-5 p-5 sm:p-6">
-        <div className="flex gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+    <>
+      <Toast
+        message={MANUAL_TRANSFER_COPY_TOAST}
+        visible={copyToastVisible}
+        onDismiss={() => setCopyToastVisible(false)}
+        dismissible={false}
+      />
+      <Modal
+        open
+        onClose={() => {
+          if (!isRevealing) onClose();
+        }}
+        closeOnBackdrop={!isRevealing}
+        title="낙찰 상품 결제"
+        description="계좌를 확인한 후 입금하면 운영자가 실제 통장 내역을 대조합니다."
+        size="sm"
+        className="max-sm:absolute max-sm:bottom-0 max-sm:max-h-[92dvh] max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 max-sm:overscroll-contain sm:max-w-[31rem]"
+      >
+        <div className="space-y-5 p-5 sm:p-6">
+          <div className="flex gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
           {product.imageUrls[0] ? (
             <img
               src={product.imageUrls[0]}
               alt=""
-              className="size-20 shrink-0 rounded-xl bg-[var(--surface-raised)] object-cover"
+              className="size-20 shrink-0 rounded-lg bg-[var(--surface-raised)] object-cover shadow-sm"
             />
           ) : (
-            <span className="grid size-20 shrink-0 place-items-center rounded-xl bg-[var(--surface-raised)] text-xs font-bold text-[var(--text-muted)]">
+            <span className="grid size-20 shrink-0 place-items-center rounded-lg bg-[var(--surface-raised)] text-xs font-bold text-[var(--text-muted)]">
               사진 없음
             </span>
           )}
@@ -835,61 +942,142 @@ function ManualTransferPaymentModal({
               입금할 최종 낙찰 금액
             </span>
           </div>
-        </div>
 
-        {!transfer ? (
-          <div className="rounded-2xl border border-[var(--info-border)] bg-[var(--info-surface)] px-4 py-4">
-            <p className="text-sm font-semibold text-[var(--info-text)]">
-              계좌번호는 아래 버튼을 누른 후에 표시됩니다.
-            </p>
-            <p className="mt-1 break-keep text-xs font-bold leading-5 text-[var(--text-muted)]">
-              버튼을 누르면 입금 진행 중으로 접수되고 운영자 확인 목록에
-              즉시 표시됩니다.
-            </p>
           </div>
-        ) : (
-          <section className="rounded-2xl border-2 border-[var(--accent)] bg-[var(--accent-surface)] p-5 text-center" aria-label="입금 계좌">
-            <p className="text-xs font-semibold tracking-wide text-[var(--accent-text)]">
-              {transfer.bankName}
-            </p>
-            <p className="mt-2 select-all break-all font-mono text-2xl font-semibold tabular-nums tracking-tight text-[var(--text-strong)] sm:text-3xl">
-              {transfer.accountNumber}
-            </p>
-            <Button size="sm" variant="ghost" className="mt-3" onClick={() => void copyAccount()}>
-              계좌번호 복사
-            </Button>
-            <p className="mt-3 font-mono text-sm font-semibold tabular-nums tracking-tight text-[var(--warning-text)]">
-              정확히 {formatKRW(transfer.expectedAmount)}을 입금해 주세요.
-            </p>
-            <p className="mt-1 text-xs font-bold leading-5 text-[var(--text-muted)]">
-              입금 후 운영자가 확정하면 결제 완료 보관함으로 자동 이동합니다.
-            </p>
-          </section>
-        )}
 
-        {copyFeedback ? (
-          <p role="status" className="rounded-xl bg-[var(--success-surface)] px-3 py-2 text-sm font-bold text-[var(--success-text)]">
-            {copyFeedback}
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" className="rounded-2xl border border-[var(--danger-text)]/25 bg-[var(--danger-surface)] px-4 py-3 text-sm font-bold leading-6 text-[var(--danger-text)]">
-            {error}
-          </p>
-        ) : null}
-
-        <div className="sticky bottom-0 -mx-5 flex flex-col-reverse gap-2 border-t border-[var(--border)] bg-[var(--surface)] px-5 pb-[max(0px,env(safe-area-inset-bottom))] pt-4 sm:static sm:mx-0 sm:flex-row sm:justify-end sm:bg-transparent sm:px-0 sm:pb-0">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={isRevealing}>
-            닫기
-          </Button>
-          {!transfer ? (
-            <Button onClick={() => void revealAccount()} isLoading={isRevealing}>
-              {isRevealing ? "입금 계좌 확인 중..." : "계좌번호 보기"}
-            </Button>
+          {product.paymentDueAt ? (
+            <ManualPaymentDeadline
+              dueAt={product.paymentDueAt}
+              secondChance={product.purchaseOfferKind === "second_chance"}
+            />
           ) : null}
+
+          {paymentExpired ? (
+            <div className="rounded-xl border border-[var(--danger-text)]/25 bg-[var(--danger-surface)] px-4 py-5 text-center">
+              <p className="text-sm font-black text-[var(--danger-text)]">
+                계좌이체 기한이 만료되었습니다
+              </p>
+              <p className="mt-1 break-keep text-xs font-medium leading-5 text-[var(--text-muted)]">
+                늦은 입금과 차순위 회원의 이중 입금을 막기 위해 계좌번호를 숨겼습니다. 최신 처리 상태는 자동으로 다시 확인합니다.
+              </p>
+            </div>
+          ) : !transfer ? (
+            <div className="rounded-xl border border-[var(--info-border)] bg-[var(--info-surface)] px-4 py-4">
+              <div className="flex items-start gap-3">
+                <span
+                  aria-hidden="true"
+                  className="grid size-9 shrink-0 place-items-center rounded-lg border border-[var(--info-border)] bg-[var(--surface)] text-[var(--info-text)]"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="size-[18px]">
+                    <path d="M4 10.5h16M6 10.5V19m4-8.5V19m4-8.5V19m4-8.5V19M3.5 19h17M4.5 7 12 3l7.5 4v3.5h-15V7Z" />
+                  </svg>
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-[var(--info-text)]">
+                    계좌번호는 본인 확인 후 안전하게 표시됩니다.
+                  </p>
+                  <p className="mt-1 break-keep text-xs font-medium leading-5 text-[var(--text-muted)]">
+                    계좌번호 보기를 누르는 순간 Supabase 결제 원장에 입금 확인
+                    요청이 기록되고 운영자 확인 목록에 표시됩니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <section
+              className="overflow-hidden rounded-xl border border-[var(--accent)]/45 bg-[var(--accent-surface)] shadow-[0_16px_44px_rgba(18,18,17,0.08)]"
+              aria-label="입금 계좌"
+            >
+              <div className="flex items-center justify-between gap-3 border-b border-[var(--accent)]/15 px-4 py-3">
+                <span className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--success-text)]">
+                  <span className="size-1.5 rounded-full bg-[var(--success-text)]" aria-hidden="true" />
+                  {transfer.isPaymentSettled
+                    ? "입금 확인 완료"
+                    : transfer.status === "awaiting_manual_transfer"
+                      ? "입금 확인 중"
+                      : "입금 상태 확인 중"}
+                </span>
+                <span className="font-mono text-[11px] font-medium tabular-nums tracking-tight text-[var(--text-muted)]">
+                  {formatManualTransferRequestedAt(transfer.requestedAt)}
+                </span>
+              </div>
+
+              <div className="p-4 sm:p-5">
+                <p className="text-[10px] font-bold tracking-[0.18em] text-[var(--accent-text)]">
+                  TRANSFER ACCOUNT
+                </p>
+                <div className="mt-3 flex flex-col gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[var(--text-muted)]">
+                      {transfer.bankName}
+                    </p>
+                    <p className="mt-1 select-all break-all font-mono text-xl font-semibold tabular-nums tracking-tight text-[var(--text-strong)] sm:text-2xl">
+                      {transfer.accountNumber}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="w-full shrink-0 active:scale-[0.98] sm:w-auto sm:self-center"
+                    onClick={() => void copyAccount()}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="size-4">
+                      <rect x="8" y="8" width="11" height="11" rx="2" />
+                      <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+                    </svg>
+                    계좌번호 복사
+                  </Button>
+                </div>
+                <div className="mt-3 flex items-end justify-between gap-3 rounded-lg bg-[var(--surface-muted)] px-3 py-3">
+                  <span className="text-xs font-medium text-[var(--text-muted)]">
+                    최종 입금 금액
+                  </span>
+                  <strong className="font-mono text-lg font-semibold tabular-nums tracking-tight text-[var(--warning-text)]">
+                    {formatKRW(transfer.expectedAmount)}
+                  </strong>
+                </div>
+                <p className="mt-3 break-keep text-xs font-medium leading-5 text-[var(--text-muted)]">
+                  요청은 이미 DB 결제 원장에{" "}
+                  <strong className="text-[var(--text-strong)]">
+                    {transfer.status === "awaiting_manual_transfer"
+                      ? "입금 확인 중"
+                      : "접수됨"}
+                  </strong>{" "}
+                  상태로 안전하게 기록되었습니다. 입금 후 운영자가 실제 통장 내역을
+                  확인하면 결제 완료 보관함에서 확인할 수 있습니다.
+                </p>
+              </div>
+            </section>
+          )}
+
+          {copyError ? (
+            <p role="alert" className="rounded-xl border border-[var(--warning-text)]/20 bg-[var(--warning-surface)] px-3 py-2 text-sm font-semibold text-[var(--warning-text)]">
+              {copyError}
+            </p>
+          ) : null}
+          {error ? (
+            <p role="alert" className="rounded-xl border border-[var(--danger-text)]/25 bg-[var(--danger-surface)] px-4 py-3 text-sm font-semibold leading-6 text-[var(--danger-text)]">
+              {error}
+            </p>
+          ) : null}
+
+          <div className="sticky bottom-0 -mx-5 flex flex-col-reverse gap-2 border-t border-[var(--border)] bg-[var(--surface)] px-5 pb-[max(0px,env(safe-area-inset-bottom))] pt-4 sm:static sm:mx-0 sm:flex-row sm:justify-end sm:bg-transparent sm:px-0 sm:pb-0">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isRevealing}>
+              닫기
+            </Button>
+            {!transfer && !paymentExpired ? (
+              <Button
+                onClick={() => void revealAccount()}
+                isLoading={isRevealing}
+                disabled={paymentExpired}
+              >
+                {isRevealing ? "입금 계좌 확인 중..." : "계좌번호 보기"}
+              </Button>
+            ) : null}
+          </div>
         </div>
-      </div>
-    </Modal>
+      </Modal>
+    </>
   );
 }
 
@@ -910,22 +1098,29 @@ function WonProductCard({
   onToggle: () => void;
   onPay: () => void;
 }) {
+  const cardNow = useAuctionPolicyClock();
   const paymentProjection = getRuntimePaymentProjection(product);
   const paid = paymentProjection.isPaymentSettled;
   const isManualMode = paymentProjection.activePaymentMode === "manual_transfer";
   const manualTransferStarted = Boolean(
     paymentProjection.manualTransferRequestedAt,
   );
+  const manualTransferAwaiting =
+    product.manualTransferStatus === "awaiting_manual_transfer" && !paid;
   const ready = section === "storage" && product.shippingStatus === "ready" && paid;
   const paymentMethod = isManualMode
     ? null
     : formatPaymentMethod(product.paymentMethod);
   const paymentLabel = paid
-    ? "결제 완료"
+    ? product.shippingStatus === "shipped"
+      ? "🏁 결제 완료 · 발송 완료"
+      : product.shippingStatus === "requested"
+        ? "🏁 결제 완료 · 배송 접수"
+        : "🏁 결제 완료 · 발송 준비"
     : isManualMode
-      ? manualTransferStarted
-        ? "입금 진행 중"
-        : "결제 대기"
+      ? manualTransferAwaiting
+        ? "⏳ 입금 확인 중"
+        : "⏳ 입찰 완료 · 입금 대기"
       : product.portoneStatus === "FAILED"
       ? "결제 실패"
       : product.portoneStatus === "CANCELLED"
@@ -939,6 +1134,9 @@ function WonProductCard({
     section === "payment" &&
     !paid &&
     (isManualMode || product.portoneStatus !== "CANCELLED");
+  const paymentExpired = Boolean(
+    product.paymentDueAt && Date.parse(product.paymentDueAt) <= cardNow.getTime(),
+  );
 
   return (
     <li>
@@ -988,12 +1186,13 @@ function WonProductCard({
             </span>
           ) : null}
           <span
+            aria-label={`결제 상태: ${paymentLabel}`}
             className={
-              "mt-2 inline-flex rounded-md border px-2 py-1 text-[10px] font-semibold tracking-wide " +
+              "mt-2 inline-flex items-center rounded-md border px-2 py-1 text-[10px] font-semibold tracking-wide transition-colors duration-200 " +
               (paid
                 ? "border-[var(--success-text)]/20 bg-[var(--success-surface)] text-[var(--success-text)]"
                 : (isManualMode
-                    ? manualTransferStarted
+                    ? manualTransferAwaiting
                     : product.paymentStatus === "가상계좌발급")
                   ? "border-[var(--info-text)]/20 bg-[var(--info-surface)] text-[var(--info-text)]"
                   : "border-[var(--warning-text)]/20 bg-[var(--warning-surface)] text-[var(--warning-text)]")
@@ -1006,8 +1205,29 @@ function WonProductCard({
               {paymentMethod}
             </span>
           ) : null}
+          {isManualMode && manualTransferStarted ? (
+            <span className="mt-1 block font-mono text-[10px] font-medium tabular-nums tracking-tight text-[var(--text-muted)]">
+              {formatManualTransferRequestedAt(
+                paymentProjection.manualTransferRequestedAt as string,
+              )}
+            </span>
+          ) : null}
+          {product.purchaseOfferKind === "second_chance" ? (
+            <span className="mt-1 inline-flex rounded-md border border-amber-400/25 bg-amber-400/10 px-2 py-1 text-[10px] font-black text-[var(--warning-text)]">
+              🎉 차순위 구매권 · {product.paymentDueAt ? "서버 기한 적용" : "입금기한 특례"}
+            </span>
+          ) : null}
         </span>
       </div>
+
+      {isManualMode && product.paymentDueAt && !paid ? (
+        <div className="mt-2">
+          <ManualPaymentDeadline
+            dueAt={product.paymentDueAt}
+            secondChance={product.purchaseOfferKind === "second_chance"}
+          />
+        </div>
+      ) : null}
 
       {paymentProjection.activePaymentMode === "portone" &&
       product.paymentStatus === "가상계좌발급" ? (
@@ -1027,9 +1247,9 @@ function WonProductCard({
         <Button
           size="sm"
           fullWidth
-          className="mt-2"
+          className="mt-2 min-h-12 active:scale-[0.98]"
           onClick={onPay}
-          disabled={!accountActive || isMutating}
+          disabled={!accountActive || isMutating || paymentExpired}
         >
           {isManualMode && manualTransferStarted ? "계좌번호 보기" : "결제하기"}
         </Button>
@@ -1237,7 +1457,7 @@ function MemberAccountPanel({ userId }: { userId: string }) {
     setFeedback({
       type: "success",
       message:
-        "입금 계좌를 확인했습니다. 입금 후 운영자가 확정하면 결제 완료 보관함으로 이동합니다.",
+        "입금 계좌를 확인했습니다. 입금 후 운영자가 확정하면 결제 완료 보관함에서 확인할 수 있습니다.",
     });
   };
 
@@ -1679,7 +1899,10 @@ export function AccountPage({
       <DeleteAccountModal
         open={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
-        onDeleted={() => window.location.replace("/")}
+        onDeleted={() => {
+          clearGarmentSizeProfile(userId);
+          window.location.replace("/");
+        }}
       />
     </main>
   );

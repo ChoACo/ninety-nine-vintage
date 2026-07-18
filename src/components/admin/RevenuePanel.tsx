@@ -111,7 +111,7 @@ export function RevenuePanel() {
 
   return (
     <div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="매출 요약">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4" aria-label="매출 요약">
         {[
           ["오늘", summary.day],
           ["이번 주", summary.week],
@@ -132,15 +132,15 @@ export function RevenuePanel() {
       <form onSubmit={save} className="mt-4 grid gap-3 rounded-lg border border-[var(--border)] bg-[var(--warning-surface)] p-3.5 sm:grid-cols-[160px_minmax(0,1fr)_160px_auto] sm:items-end">
         <label className="text-xs font-black text-[var(--text-strong)]">
           매출 날짜
-          <input type="date" max={today} value={revenueDate} onChange={(event) => setRevenueDate(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 font-mono text-sm font-semibold tabular-nums" required />
+          <input type="date" max={today} value={revenueDate} onChange={(event) => setRevenueDate(event.target.value)} className="mt-1.5 min-h-12 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 font-mono text-sm font-semibold tabular-nums sm:min-h-10" required />
         </label>
         <label className="text-xs font-black text-[var(--text-strong)]">
           확정 하루 매출
-          <input type="number" min="0" step="1" value={grossAmount} onChange={(event) => setGrossAmount(event.target.value)} placeholder="입금 확인 금액" className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 font-mono text-sm font-semibold tabular-nums" required />
+          <input type="number" min="0" step="1" value={grossAmount} onChange={(event) => setGrossAmount(event.target.value)} placeholder="입금 확인 금액" className="mt-1.5 min-h-12 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 font-mono text-sm font-semibold tabular-nums sm:min-h-10" required />
         </label>
         <label className="text-xs font-black text-[var(--text-strong)]">
           결제 건수
-          <input type="number" min="0" step="1" value={paidOrderCount} onChange={(event) => setPaidOrderCount(event.target.value)} placeholder="0" className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 font-mono text-sm font-semibold tabular-nums" required />
+          <input type="number" min="0" step="1" value={paidOrderCount} onChange={(event) => setPaidOrderCount(event.target.value)} placeholder="0" className="mt-1.5 min-h-12 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 font-mono text-sm font-semibold tabular-nums sm:min-h-10" required />
         </label>
         <Button type="submit" isLoading={isSaving}>일 매출 저장</Button>
       </form>
@@ -151,7 +151,7 @@ export function RevenuePanel() {
       {error ? <p role="alert" className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--danger-surface)] px-3.5 py-2.5 text-xs font-bold text-[var(--danger-text)]">{error}</p> : null}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-        <div className="overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] [scrollbar-gutter:stable]">
+        <div className="touch-pan-x overflow-x-auto overscroll-x-contain rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] [scrollbar-gutter:stable]">
           <table className="w-full min-w-[520px] text-left text-xs">
             <thead className="bg-[var(--surface-muted)] text-[var(--text-muted)]"><tr><th className="px-3 py-2.5 font-black">날짜</th><th className="px-3 py-2.5 font-black">하루 매출</th><th className="px-3 py-2.5 font-black">결제 건수</th><th className="px-3 py-2.5 font-black">수정 시각</th></tr></thead>
             <tbody>

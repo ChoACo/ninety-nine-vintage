@@ -128,7 +128,10 @@ test("defers closed operator section bodies until their first expansion", async 
 });
 
 test("loads heavyweight route screens and modals on demand", async () => {
-  const app = await source("src/components/AuctionApp.tsx");
+  const [app, admin] = await Promise.all([
+    source("src/components/AuctionApp.tsx"),
+    source("src/components/admin/AdminPage.tsx"),
+  ]);
 
   assert.match(app, /const AdminPage = lazy\(/);
   assert.match(app, /const ChatPage = lazy\(/);
@@ -137,6 +140,11 @@ test("loads heavyweight route screens and modals on demand", async () => {
   assert.match(app, /newAuctionOpen && canManageProducts\(auth\.role\)/);
   assert.match(app, /bulkAuctionOpen && canManageProducts\(auth\.role\)/);
   assert.match(app, /authOpen \? \(/);
+  assert.match(admin, /const ManualBankTransferPanel = lazy\(/);
+  assert.match(admin, /const RevenuePanel = lazy\(/);
+  assert.match(admin, /const ShippingWorkPanel = lazy\(/);
+  assert.match(admin, /const ProductEditModal = lazy\(/);
+  assert.match(admin, /<Suspense fallback=\{<DeferredPanelFallback/);
 });
 
 test("server-renders every split route without a Vercel-style 404", async () => {

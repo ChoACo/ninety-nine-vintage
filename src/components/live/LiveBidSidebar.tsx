@@ -3,7 +3,8 @@
 /* eslint-disable @next/next/no-img-element -- Supabase Storage의 공개 상품 이미지를 표시합니다. */
 import { useMemo, useState } from "react";
 import BidConfirmModal from "@/src/components/feed/BidConfirmModal";
-import { useAuctionPolicyMinuteClock } from "@/src/hooks/useAuctionPolicyClock";
+import BidParticipationBadge from "@/src/components/feed/BidParticipationBadge";
+import { useAuctionPolicyClock } from "@/src/hooks/useAuctionPolicyClock";
 import type { AuctionPost } from "@/src/types/auction";
 import {
   assertAuctionBidAllowed,
@@ -30,6 +31,7 @@ interface BidItemProps {
   urgent?: boolean;
   onQuickBid?: () => void;
   bidDecision?: AuctionBidDecision;
+  participationStatus?: "user-leading" | "user-outbid";
 }
 
 function BidItem({
@@ -37,6 +39,7 @@ function BidItem({
   urgent = false,
   onQuickBid,
   bidDecision,
+  participationStatus,
 }: BidItemProps) {
   const label = getItemLabel(post);
 
@@ -68,6 +71,12 @@ function BidItem({
         </div>
 
         <div className="min-w-0 flex-1">
+          {participationStatus ? (
+            <BidParticipationBadge
+              status={participationStatus}
+              className="mb-1.5"
+            />
+          ) : null}
           <p className="line-clamp-2 break-keep text-[13px] font-bold leading-5 text-[var(--text-strong)]">
             {label}
           </p>
@@ -118,7 +127,11 @@ export default function LiveBidSidebar({
   className = "",
 }: LiveBidSidebarProps) {
   const [confirmPostId, setConfirmPostId] = useState<string | null>(null);
-  const auctionNow = useAuctionPolicyMinuteClock();
+  const [confirmCurrentPrice, setConfirmCurrentPrice] = useState<number | null>(
+    null,
+  );
+  const [confirmAmount, setConfirmAmount] = useState<number | null>(null);
+  const auctionNow = useAuctionPolicyClock();
 
   const { outbidPosts, leadingPosts, confirmedPosts } = useMemo(() => {
     const availablePosts = posts.filter((post) => post.status === "active");
@@ -146,19 +159,37 @@ export default function LiveBidSidebar({
   const confirmPost = confirmPostId
     ? posts.find((post) => post.id === confirmPostId)
     : undefined;
-  const confirmAmount = confirmPost ? getQuickBidAmount(confirmPost) : 0;
+
+  const openBidConfirmation = (post: AuctionPost) => {
+    setConfirmPostId(post.id);
+    setConfirmCurrentPrice(post.currentPrice);
+    setConfirmAmount(getQuickBidAmount(post));
+  };
+
+  const closeBidConfirmation = () => {
+    setConfirmPostId(null);
+    setConfirmCurrentPrice(null);
+    setConfirmAmount(null);
+  };
 
   const handleConfirm = async () => {
-    if (!confirmPost) return;
+    if (!confirmPost || confirmAmount === null) return;
+
+    if (
+      confirmCurrentPrice !== null &&
+      confirmCurrentPrice !== confirmPost.currentPrice
+    ) {
+      throw new Error("현재가가 변경되었습니다. 입찰 금액을 다시 확인해 주세요.");
+    }
 
     assertAuctionBidAllowed({
       post: confirmPost,
       currentUserName,
-      now: new Date(),
+      now: auctionNow,
     });
 
-    await onBid(confirmPost.id, getQuickBidAmount(confirmPost));
-    setConfirmPostId(null);
+    await onBid(confirmPost.id, confirmAmount);
+    closeBidConfirmation();
   };
 
   return (
@@ -212,12 +243,13 @@ export default function LiveBidSidebar({
                   key={post.id}
                   post={post}
                   urgent
+                  participationStatus="user-outbid"
                   bidDecision={getAuctionBidDecision({
                     post,
                     currentUserName,
                     now: auctionNow,
                   })}
-                  onQuickBid={() => setConfirmPostId(post.id)}
+                  onQuickBid={() => openBidConfirmation(post)}
                 />
               ))}
             </ul>
@@ -273,7 +305,11 @@ export default function LiveBidSidebar({
           {leadingPosts.length > 0 ? (
             <ul className="space-y-2">
               {leadingPosts.map((post) => (
-                <BidItem key={post.id} post={post} />
+                <BidItem
+                  key={post.id}
+                  post={post}
+                  participationStatus="user-leading"
+                />
               ))}
             </ul>
           ) : (
@@ -286,9 +322,11 @@ export default function LiveBidSidebar({
         </p>
       </aside>
 
-      {confirmPost ? (
+      {confirmPost && confirmCurrentPrice !== null && confirmAmount !== null ? (
         <BidConfirmModal
           open
+          currentPrice={confirmCurrentPrice}
+          latestCurrentPrice={confirmPost.currentPrice}
           amount={confirmAmount}
           itemTitle={getItemLabel(confirmPost)}
           isFinalBid={
@@ -298,7 +336,7 @@ export default function LiveBidSidebar({
               now: auctionNow,
             }).finalOnAccept
           }
-          onClose={() => setConfirmPostId(null)}
+          onClose={closeBidConfirmation}
           onConfirm={handleConfirm}
         />
       ) : null}

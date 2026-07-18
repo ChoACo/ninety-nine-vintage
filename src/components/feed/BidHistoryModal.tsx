@@ -35,6 +35,9 @@ export default function BidHistoryModal({
       ),
     [history],
   );
+  const latestActiveBidId = latestFirstHistory.find(
+    (bid) => (bid.outcome ?? "active") === "active",
+  )?.id;
 
   return (
     <Modal
@@ -54,12 +57,13 @@ export default function BidHistoryModal({
           <p className="mt-1 break-keep text-xs font-medium leading-5 text-[var(--info-text)] opacity-80">
             조작 의혹 없이 확인할 수 있도록 입찰자 닉네임·입찰 시각·금액을 모두
             공개하며, 운영 센터에서도 이 기록을 수정하는 기능은 제공되지 않습니다.
+            미입금 취소나 제재로 효력이 사라진 입찰도 삭제하지 않고 상태를 함께 남깁니다.
           </p>
         </div>
 
         {latestFirstHistory.length > 0 ? (
           <ol className="mt-5 divide-y divide-[var(--border)] border-y border-[var(--border)]" aria-label="최신순 입찰 기록">
-            {latestFirstHistory.map((bid, index) => (
+            {latestFirstHistory.map((bid) => (
               <li
                 key={bid.id}
                 className="bg-[var(--surface-raised)] px-1 py-4 transition-colors duration-200 hover:bg-[var(--surface-muted)] sm:px-3"
@@ -70,9 +74,17 @@ export default function BidHistoryModal({
                       <strong className="break-all text-sm font-black text-[var(--text-strong)]">
                         {bid.bidderName.trim() || "닉네임 없음"}
                       </strong>
-                      {index === 0 ? (
+                      {bid.outcome === "unpaid_cancelled" ? (
+                        <span className="border border-[var(--danger-text)]/25 bg-[var(--danger-surface)] px-2 py-0.5 text-[10px] font-black tracking-[0.04em] text-[var(--danger-text)]">
+                          미입금 취소
+                        </span>
+                      ) : bid.outcome === "cancelled" ? (
+                        <span className="border border-[var(--warning-text)]/25 bg-[var(--warning-surface)] px-2 py-0.5 text-[10px] font-black tracking-[0.04em] text-[var(--warning-text)]">
+                          입찰 효력 취소
+                        </span>
+                      ) : bid.id === latestActiveBidId ? (
                         <span className="border border-[var(--accent-text)]/25 bg-[var(--accent-surface)] px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-[var(--accent-text)]">
-                          최신 입찰
+                          최신 유효 입찰
                         </span>
                       ) : null}
                     </div>

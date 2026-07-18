@@ -18,6 +18,14 @@ function functionBody(sql, name) {
   return sql.slice(start, end + 4);
 }
 
+function sourceSection(contents, startMarker, endMarker) {
+  const start = contents.indexOf(startMarker);
+  assert.notEqual(start, -1, `${startMarker} should exist`);
+  const end = contents.indexOf(endMarker, start + startMarker.length);
+  assert.notEqual(end, -1, `${endMarker} should follow ${startMarker}`);
+  return contents.slice(start, end);
+}
+
 test("manual transfer migration keeps one private global account and a separate ledger", async () => {
   const migration = await source(
     "supabase/migrations/20260718074000_manual_transfer_payment_mode.sql",
@@ -164,4 +172,98 @@ test("the UI reveals the account on a second explicit action and preserves dorma
   assert.match(ownerRoute, /owner_begin_hidden_test_manual_transfer/);
   assert.match(portoneRoutes, /requirePortOneRuntimeMode/);
   assert.match(portoneRoutes, /manual_transfer_active/);
+});
+
+test("manual transfer checkout records pending state before revealing the account and refreshes the member ledger", async () => {
+  const accountPage = await source("src/components/profile/AccountPage.tsx");
+  const checkout = sourceSection(
+    accountPage,
+    "function ManualTransferPaymentModal",
+    "function WonProductCard",
+  );
+
+  const beginIndex = checkout.indexOf(
+    "await beginManualBankTransfer(product.productId)",
+  );
+  const revealIndex = checkout.indexOf("setTransfer(result)");
+  const refreshIndex = checkout.indexOf("await onStarted()");
+
+  assert.ok(beginIndex >= 0, "account reveal must use the server RPC wrapper");
+  assert.ok(
+    beginIndex < revealIndex && revealIndex < refreshIndex,
+    "the server result must be revealed before the background member-ledger refresh",
+  );
+  assert.match(
+    checkout,
+    /transfer\.status === "awaiting_manual_transfer"[\s\S]*?"입금 확인 중"/,
+  );
+  assert.match(
+    checkout,
+    /요청은 이미 DB 결제 원장에[\s\S]*?상태로 안전하게 기록되었습니다/,
+  );
+});
+
+test("manual transfer account copy uses an accessible success toast and an actionable failure message", async () => {
+  const [accountPage, toast] = await Promise.all([
+    source("src/components/profile/AccountPage.tsx"),
+    source("src/components/common/Toast.tsx"),
+  ]);
+  const checkout = sourceSection(
+    accountPage,
+    "function ManualTransferPaymentModal",
+    "function WonProductCard",
+  );
+
+  assert.match(
+    accountPage,
+    /const MANUAL_TRANSFER_COPY_TOAST\s*=\s*\n?\s*"✓ 계좌번호가 복사되었습니다\. 입금 확인후 확정 됩니다\."/,
+  );
+  assert.match(checkout, /navigator\.clipboard\?\.writeText/);
+  assert.match(checkout, /await navigator\.clipboard\.writeText\(transfer\.accountNumber\)/);
+  assert.match(checkout, /setCopyToastVisible\(true\)/);
+  assert.match(checkout, /setCopyToastSequence\(\(sequence\) => sequence \+ 1\)/);
+  assert.match(
+    checkout,
+    /message=\{MANUAL_TRANSFER_COPY_TOAST\}[\s\S]*visible=\{copyToastVisible\}[\s\S]*dismissible=\{false\}/,
+  );
+  assert.match(
+    checkout,
+    /자동 복사가 어렵습니다\. 계좌번호를 길게 눌러 복사해 주세요\./,
+  );
+  assert.match(checkout, /\{copyError \? \([\s\S]*role="alert"/);
+  assert.match(toast, /role="status"/);
+  assert.match(toast, /aria-live="polite"/);
+  assert.match(toast, /aria-atomic="true"/);
+});
+
+test("manual transfer UI displays only the server-persisted purchase-offer deadline", async () => {
+  const [accountPage, migration] = await Promise.all([
+    source("src/components/profile/AccountPage.tsx"),
+    source("supabase/migrations/20260718102000_live_auction_revenue_defense.sql"),
+  ]);
+  const checkout = sourceSection(
+    accountPage,
+    "function ManualTransferPaymentModal",
+    "function WonProductCard",
+  );
+  assert.match(migration, /add column if not exists due_at\s+timestamptz/i);
+  assert.match(migration, /purchase_offer_id\s+uuid/i);
+  assert.match(migration, /app_private\.original_manual_payment_due_at/i);
+  assert.match(migration, /payment_due_at\s+timestamptz/i);
+  assert.match(checkout, /product\.paymentDueAt/);
+  assert.match(checkout, /<ManualPaymentDeadline/);
+  assert.match(checkout, /Date\.parse\(product\.paymentDueAt\)/);
+  assert.doesNotMatch(
+    checkout,
+    /Date\.parse\(transfer\.requestedAt\)|new Date\(transfer\.requestedAt\)\.getTime\(\)/,
+  );
+
+  assert.match(
+    accountPage,
+    /product\.manualTransferStatus === "awaiting_manual_transfer" && !paid/,
+  );
+  assert.match(accountPage, /"⏳ 입금 확인 중"/);
+  assert.match(accountPage, /"⏳ 입찰 완료 · 입금 대기"/);
+  assert.match(accountPage, /"🏁 결제 완료 · 발송 준비"/);
+  assert.match(accountPage, /transfer\.isPaymentSettled[\s\S]*?"입금 확인 완료"/);
 });

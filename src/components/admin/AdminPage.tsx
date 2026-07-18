@@ -1,7 +1,16 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- Supabase Storage 원격 상품 이미지를 표시합니다. */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 
 import Button from "@/src/components/common/Button";
 import Modal from "@/src/components/common/Modal";
@@ -32,10 +41,28 @@ import {
 } from "@/src/lib/supabase/nickname";
 
 import { CollapsibleSection } from "./CollapsibleSection";
-import { ManualBankTransferPanel } from "./ManualBankTransferPanel";
-import { RevenuePanel } from "./RevenuePanel";
-import { ShippingWorkPanel } from "./ShippingWorkPanel";
-import { ProductEditModal, type ProductEditValues } from "./ProductEditModal";
+import type { ProductEditValues } from "./ProductEditModal";
+
+const ManualBankTransferPanel = lazy(() =>
+  import("./ManualBankTransferPanel").then((module) => ({
+    default: module.ManualBankTransferPanel,
+  })),
+);
+const RevenuePanel = lazy(() =>
+  import("./RevenuePanel").then((module) => ({
+    default: module.RevenuePanel,
+  })),
+);
+const ShippingWorkPanel = lazy(() =>
+  import("./ShippingWorkPanel").then((module) => ({
+    default: module.ShippingWorkPanel,
+  })),
+);
+const ProductEditModal = lazy(() =>
+  import("./ProductEditModal").then((module) => ({
+    default: module.ProductEditModal,
+  })),
+);
 
 export interface AdminPageProps {
   role: "admin" | "operator";
@@ -53,6 +80,19 @@ type ProductStatusFilter = "all" | ManagedProduct["status"];
 const MEMBER_PAGE_SIZE = 12;
 const PRODUCT_PAGE_SIZE = 10;
 
+function DeferredPanelFallback({ label }: { label: string }) {
+  return (
+    <div
+      role="status"
+      className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4"
+    >
+      <span className="sr-only">{label} 불러오는 중</span>
+      <div className="commerce-skeleton h-4 w-32 rounded" />
+      <div className="commerce-skeleton h-20 rounded-lg" />
+    </div>
+  );
+}
+
 const productStatusLabel: Record<ManagedProduct["status"], string> = {
   pending: "공개 대기",
   active: "진행 중",
@@ -60,9 +100,12 @@ const productStatusLabel: Record<ManagedProduct["status"], string> = {
 };
 
 const productStatusClasses: Record<ManagedProduct["status"], string> = {
-  pending: "border-[#ead5a9] bg-[#fff7df] text-[#82673a]",
-  active: "border-[#b9d9c8] bg-[#e5f4eb] text-[#35684f]",
-  closed: "border-[#d8d0c9] bg-[#eee9e4] text-[#71675f]",
+  pending:
+    "border-[var(--warning-text)]/25 bg-[var(--warning-surface)] text-[var(--warning-text)]",
+  active:
+    "border-[var(--success-text)]/25 bg-[var(--success-surface)] text-[var(--success-text)]",
+  closed:
+    "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)]",
 };
 
 const memberRoleLabel: Record<ManagedAccessRole, string> = {
@@ -81,6 +124,35 @@ const operationSections = [
   ["operations-revenue", "매출 현황", "06"],
   ["operations-members", "회원 관리", "07"],
 ] as const;
+
+type OperationSectionId = (typeof operationSections)[number][0];
+
+function OperationSectionIcon({ section }: { section: OperationSectionId }) {
+  const common = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.7,
+    className: "size-4",
+  };
+
+  switch (section) {
+    case "operations-registration":
+      return <svg {...common}><path d="M12 3v12m0-12L7.5 7.5M12 3l4.5 4.5M4 14v5h16v-5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+    case "operations-products":
+      return <svg {...common}><path d="M4 7.5h16v12H4zM8 4.5h8l2 3H6l2-3Z" strokeLinejoin="round" /><path d="M9 12h6" strokeLinecap="round" /></svg>;
+    case "operations-shipping":
+      return <svg {...common}><path d="M3.5 7.5h11v9h-11zM14.5 10h3l3 3v3.5h-6z" strokeLinejoin="round" /><circle cx="7" cy="18" r="1.5" /><circle cx="17.5" cy="18" r="1.5" /></svg>;
+    case "operations-payments":
+      return <svg {...common}><rect x="3.5" y="6" width="17" height="12" rx="2" /><path d="M3.5 10h17M7 14h3" strokeLinecap="round" /></svg>;
+    case "operations-overview":
+      return <svg {...common}><path d="M4 19V9h4v10H4Zm6 0V4h4v15h-4Zm6 0v-7h4v7h-4Z" strokeLinejoin="round" /></svg>;
+    case "operations-revenue":
+      return <svg {...common}><path d="M4 17.5 9 12l3.5 3 7-8" strokeLinecap="round" strokeLinejoin="round" /><path d="M15.5 7h4v4" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+    case "operations-members":
+      return <svg {...common}><circle cx="9" cy="8" r="3" /><path d="M3.5 19c.4-3.5 2.2-5.5 5.5-5.5s5.1 2 5.5 5.5M15 6.5a3 3 0 0 1 0 5.5M16 14c2.5.3 4 2 4.5 5" strokeLinecap="round" /></svg>;
+  }
+}
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -201,6 +273,12 @@ export function AdminPage({
   onProductsChanged,
   onNotify,
 }: AdminPageProps) {
+  const [activeSection, setActiveSection] = useState<OperationSectionId>(
+    "operations-registration",
+  );
+  const [visitedSections, setVisitedSections] = useState<
+    Set<OperationSectionId>
+  >(() => new Set(["operations-registration"]));
   const [members, setMembers] = useState<StaffMemberDirectoryEntry[]>([]);
   const [memberLoadStatus, setMemberLoadStatus] = useState<LoadStatus>("idle");
   const [memberError, setMemberError] = useState("");
@@ -258,6 +336,45 @@ export function AdminPage({
   const selectAllPendingRef = useRef<HTMLInputElement>(null);
 
   const hasOwnerAccess = role === "admin";
+
+  const openOperationSection = (section: OperationSectionId) => {
+    setActiveSection(section);
+    setVisitedSections((current) => {
+      if (current.has(section)) return current;
+      const next = new Set(current);
+      next.add(section);
+      return next;
+    });
+  };
+
+  const handleOperationTabKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    section: OperationSectionId,
+  ) => {
+    const currentIndex = operationSections.findIndex(
+      ([sectionId]) => sectionId === section,
+    );
+    let nextIndex = currentIndex;
+
+    if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % operationSections.length;
+    } else if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+      nextIndex =
+        (currentIndex - 1 + operationSections.length) %
+        operationSections.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = operationSections.length - 1;
+    } else {
+      return;
+    }
+
+    event.preventDefault();
+    const nextSection = operationSections[nextIndex][0];
+    openOperationSection(nextSection);
+    document.getElementById(`${nextSection}-tab`)?.focus();
+  };
 
   const loadMembers = useCallback(async () => {
     setMemberLoadStatus("loading");
@@ -803,8 +920,8 @@ export function AdminPage({
   };
 
   return (
-    <main className="mx-auto w-full max-w-[1600px] px-3 pb-28 pt-5 sm:px-5 sm:pt-7 lg:px-7 lg:pb-12">
-      <header className="mb-5 flex flex-col gap-3 border-b border-[var(--border)] pb-5 sm:flex-row sm:items-end sm:justify-between">
+    <main className="mx-auto w-full max-w-[1600px] px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-5 sm:px-5 sm:pt-7 lg:px-7 lg:pb-12">
+      <header className="mb-5 flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-glass)] px-4 py-5 shadow-[var(--panel-shadow)] backdrop-blur-xl sm:flex-row sm:items-end sm:justify-between sm:px-6">
         <div>
           <p className="text-[10px] font-black tracking-[0.2em] text-[var(--accent-text)]">
             OPERATIONS CENTER
@@ -813,7 +930,7 @@ export function AdminPage({
             운영자 페이지
           </h1>
           <p className="mt-1.5 max-w-3xl text-sm font-semibold leading-6 text-[var(--text-muted)]">
-            회원과 경매 상품을 실제 서버 데이터로 조회하고, 필요한 업무만 펼쳐서
+            회원과 경매 상품을 실제 서버 데이터로 조회하고, 필요한 업무만 선택해서
             처리합니다.
           </p>
         </div>
@@ -823,28 +940,45 @@ export function AdminPage({
         </span>
       </header>
 
-      <div className="lg:grid lg:grid-cols-[210px_minmax(0,1fr)] lg:items-start lg:gap-5">
-        <aside className="sticky top-20 z-10 mb-4 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface-glass)] p-2 shadow-[0_8px_24px_rgba(35,28,23,0.06)] backdrop-blur-lg lg:mb-0 lg:overflow-visible">
-          <p className="hidden px-2 pb-2 pt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)] lg:block">
+      <div className="lg:grid lg:grid-cols-[224px_minmax(0,1fr)] lg:items-start lg:gap-5">
+        <aside className="sticky top-[calc(env(safe-area-inset-top)+.5rem)] z-30 mb-4 touch-pan-x overflow-x-auto overscroll-x-contain scroll-smooth rounded-xl border border-zinc-800 bg-zinc-950 p-2 text-zinc-400 shadow-[0_18px_44px_rgba(0,0,0,0.22)] lg:top-20 lg:z-10 lg:mb-0 lg:overflow-visible">
+          <p className="hidden px-3 pb-2 pt-2 font-mono text-[10px] font-black uppercase tabular-nums tracking-[0.18em] text-zinc-500 lg:block">
             Workspace
           </p>
-          <nav aria-label="운영 센터 업무 바로가기" className="flex min-w-max gap-1 lg:min-w-0 lg:flex-col">
+          <nav aria-label="운영 센터 업무 선택" role="tablist" className="flex min-w-max snap-x snap-mandatory gap-1 lg:min-w-0 lg:flex-col lg:snap-none">
             {operationSections.map(([href, label, index]) => (
-              <a
+              <button
                 key={href}
-                href={`#${href}`}
-                className="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-bold text-[var(--text-muted)] transition-all duration-200 ease-out hover:bg-[var(--surface-muted)] hover:text-[var(--text-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                id={`${href}-tab`}
+                type="button"
+                role="tab"
+                aria-selected={activeSection === href}
+                aria-current={activeSection === href ? "page" : undefined}
+                aria-controls={href}
+                tabIndex={activeSection === href ? 0 : -1}
+                onClick={() => openOperationSection(href)}
+                onKeyDown={(event) => handleOperationTabKeyDown(event, href)}
+                className={`group flex min-h-12 shrink-0 snap-start items-center gap-2.5 rounded-r-lg border-l-2 px-3 py-2 text-left text-xs font-bold transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 lg:min-h-10 ${
+                  activeSection === href
+                    ? "border-l-2 border-white bg-zinc-800/60 text-white shadow-sm"
+                    : "border-transparent text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
+                }`}
               >
-                <span className="font-mono text-[10px] tabular-nums text-[var(--accent-text)]">{index}</span>
-                <span>{label}</span>
-              </a>
+                <span className="text-zinc-500 transition-colors group-hover:text-zinc-200" aria-hidden="true">
+                  <OperationSectionIcon section={href} />
+                </span>
+                <span className="min-w-0 flex-1 whitespace-nowrap">{label}</span>
+                <span className="font-mono text-[9px] font-black tabular-nums text-zinc-600">{index}</span>
+              </button>
             ))}
           </nav>
         </aside>
 
-        <div className="flex min-w-0 flex-col gap-3">
+        <div className="min-w-0">
         <CollapsibleSection
           id="operations-overview"
+          active={activeSection === "operations-overview"}
+          visited={visitedSections.has("operations-overview")}
           eyebrow="OVERVIEW"
           title="운영 현황"
           summary="회원과 상품의 현재 상태를 서버 기준으로 빠르게 확인합니다."
@@ -852,11 +986,11 @@ export function AdminPage({
         >
           <div
             aria-label="운영 현황 요약"
-            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+            className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4"
           >
-            <article className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-md">
+            <article className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-md sm:p-4">
               <p className="text-xs font-black text-[var(--text-muted)]">전체 회원</p>
-              <p className="mt-1.5 font-mono text-2xl font-black tabular-nums tracking-tight text-[var(--text-strong)]">
+              <p className="mt-1.5 font-mono text-xl font-black tabular-nums tracking-tight text-[var(--text-strong)] sm:text-2xl">
                 {memberLoadStatus === "success" ? directoryMembers.length : "—"}
                 <span className="ml-1 font-sans text-xs">명</span>
               </p>
@@ -866,9 +1000,9 @@ export function AdminPage({
                   : "회원 데이터를 확인 중"}
               </p>
             </article>
-            <article className="rounded-lg border border-[var(--info-border)] bg-[var(--info-surface)] p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md">
+            <article className="rounded-lg border border-[var(--info-border)] bg-[var(--info-surface)] p-3 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md sm:p-4">
               <p className="text-xs font-black text-[var(--info-text)]">진행 중 경매</p>
-              <p className="mt-1.5 font-mono text-2xl font-black tabular-nums tracking-tight text-[var(--text-strong)]">
+              <p className="mt-1.5 font-mono text-xl font-black tabular-nums tracking-tight text-[var(--text-strong)] sm:text-2xl">
                 {productLoadStatus === "success" ? activeProductCount : "—"}
                 <span className="ml-1 font-sans text-xs">개</span>
               </p>
@@ -876,9 +1010,9 @@ export function AdminPage({
                 공개 피드에 노출 중인 상품
               </p>
             </article>
-            <article className="rounded-lg border border-[var(--border)] bg-[var(--warning-surface)] p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md">
+            <article className="rounded-lg border border-[var(--border)] bg-[var(--warning-surface)] p-3 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md sm:p-4">
               <p className="text-xs font-black text-[var(--warning-text)]">공개 대기</p>
-              <p className="mt-1.5 font-mono text-2xl font-black tabular-nums tracking-tight text-[var(--text-strong)]">
+              <p className="mt-1.5 font-mono text-xl font-black tabular-nums tracking-tight text-[var(--text-strong)] sm:text-2xl">
                 {productLoadStatus === "success" ? pendingProductCount : "—"}
                 <span className="ml-1 font-sans text-xs">개</span>
               </p>
@@ -886,7 +1020,7 @@ export function AdminPage({
                 예약 공개를 기다리는 상품
               </p>
             </article>
-            <article className="rounded-lg border border-[var(--border)] bg-[var(--accent-surface)] p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md">
+            <article className="rounded-lg border border-[var(--border)] bg-[var(--accent-surface)] p-3 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md sm:p-4">
               <p className="text-xs font-black text-[var(--accent-text)]">운영 권한</p>
               <p className="mt-1.5 text-base font-black text-[var(--text-strong)]">
                 회원·상품 관리
@@ -902,36 +1036,50 @@ export function AdminPage({
 
         <CollapsibleSection
           id="operations-revenue"
+          active={activeSection === "operations-revenue"}
+          visited={visitedSections.has("operations-revenue")}
           eyebrow="REVENUE"
           title="매출 현황"
           summary="실제 입금이 확인된 하루 매출만 저장하고 일·주·월·연 단위로 합산합니다."
           className="order-6"
         >
-          <RevenuePanel />
+          <Suspense fallback={<DeferredPanelFallback label="매출 현황" />}>
+            <RevenuePanel />
+          </Suspense>
         </CollapsibleSection>
 
         <CollapsibleSection
           id="operations-payments"
+          active={activeSection === "operations-payments"}
+          visited={visitedSections.has("operations-payments")}
           eyebrow="PAYMENTS"
           title="계좌이체·입금 확인"
           summary="사이트 공용 입금 계좌를 설정하고, 회원이 계좌를 확인한 건의 실제 입금을 직접 확정합니다."
           className="order-4"
         >
-          <ManualBankTransferPanel />
+          <Suspense fallback={<DeferredPanelFallback label="입금 확인" />}>
+            <ManualBankTransferPanel />
+          </Suspense>
         </CollapsibleSection>
 
         <CollapsibleSection
           id="operations-shipping"
+          active={activeSection === "operations-shipping"}
+          visited={visitedSections.has("operations-shipping")}
           eyebrow="SHIPPING"
           title="배송 대기 업무"
           summary="회원이 접수한 상품의 배송지와 운송장 처리 상태를 확인합니다."
           className="order-3"
         >
-          <ShippingWorkPanel canAccessCompleted />
+          <Suspense fallback={<DeferredPanelFallback label="배송 대기 업무" />}>
+            <ShippingWorkPanel canAccessCompleted />
+          </Suspense>
         </CollapsibleSection>
 
         <CollapsibleSection
           id="operations-members"
+          active={activeSection === "operations-members"}
+          visited={visitedSections.has("operations-members")}
           eyebrow="MEMBERS"
           title="회원 관리"
           summary="전체 회원의 계정 상태, 배송 이용권, 상담·입찰 현황을 확인합니다."
@@ -1051,7 +1199,7 @@ export function AdminPage({
                   setMemberPage(1);
                 }}
                 placeholder="닉네임, 이름, 출생연도, 연락처 또는 회원 ID"
-                className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none transition-all duration-200 focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)]"
+                className="mt-1.5 min-h-12 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none transition-all duration-200 focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)] sm:min-h-10"
               />
             </label>
             <label className="text-xs font-black text-[var(--text-strong)]">
@@ -1064,7 +1212,7 @@ export function AdminPage({
                   );
                   setMemberPage(1);
                 }}
-                className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none transition-all duration-200 focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)]"
+                className="mt-1.5 min-h-12 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none transition-all duration-200 focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)] sm:min-h-10"
               >
                 <option value="all">전체 상태</option>
                 <option value="active">활성</option>
@@ -1094,7 +1242,7 @@ export function AdminPage({
           {memberError ? (
             <div
               role="alert"
-              className="mt-4 flex flex-col gap-3 rounded-2xl border border-[#efc8bb] bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#a84c3f] sm:flex-row sm:items-center sm:justify-between"
+              className="mt-4 flex flex-col gap-3 rounded-xl border border-[var(--danger-text)]/25 bg-[var(--danger-surface)] px-4 py-3 text-sm font-bold text-[var(--danger-text)] sm:flex-row sm:items-center sm:justify-between"
             >
               <span>{memberError}</span>
               <Button
@@ -1115,133 +1263,107 @@ export function AdminPage({
               description="검색어나 계정 상태 필터를 바꾸면 다른 회원을 확인할 수 있습니다."
             />
           ) : (
-            <ul className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] divide-y divide-[var(--border)]">
+            <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] shadow-sm">
+              <div className="hidden grid-cols-[minmax(220px,1.35fr)_minmax(170px,1fr)_minmax(190px,1fr)_minmax(180px,.8fr)_auto] items-center gap-3 border-b border-[var(--border)] bg-[var(--surface-muted)]/70 px-3.5 py-2 font-mono text-[9px] font-black uppercase tabular-nums tracking-[0.12em] text-[var(--text-muted)] xl:grid">
+                <span>회원</span>
+                <span>프로필 / 접속</span>
+                <span>활동 데이터</span>
+                <span>권한 / 배송권</span>
+                <span className="text-right">작업</span>
+              </div>
+            <ul className="divide-y divide-[var(--border)]">
               {pagedMembers.map((member) => {
                 const isMutating = mutatingMemberId === member.id;
                 return (
                   <li
                     key={member.id}
-                    className="p-3.5 transition-colors duration-200 hover:bg-[var(--surface-muted)]/40 sm:p-4"
+                    className="grid gap-3 p-3 transition-all duration-200 ease-out hover:bg-[var(--surface-muted)]/50 sm:p-3.5 xl:grid-cols-[minmax(220px,1.35fr)_minmax(170px,1fr)_minmax(190px,1fr)_minmax(180px,.8fr)_auto] xl:items-center"
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
                       <MemberInitial member={member} />
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
                           <h3 className="truncate text-sm font-black text-[var(--text-strong)]">
                             {member.displayName || "이름 미설정"}
                           </h3>
                           <span
-                            className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${
+                            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[9px] font-black ${
                               member.accountStatus === "active"
-                                ? "border-[#b9d9c8] bg-[#e5f4eb] text-[#35684f]"
-                                : "border-[#e7bdb4] bg-[#fff0ea] text-[#9d493d]"
+                                ? "border-[var(--success-text)]/25 bg-[var(--success-surface)] text-[var(--success-text)]"
+                                : "border-[var(--danger-text)]/25 bg-[var(--danger-surface)] text-[var(--danger-text)]"
                             }`}
                           >
+                            <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
                             {member.accountStatus === "active"
                               ? "활성"
                               : "이용 정지"}
                           </span>
-                          <span className="rounded-full border border-[#d6d2e8] bg-[#f3f1fb] px-2.5 py-1 text-[11px] font-black text-[#635d82]">
-                            {memberRoleLabel[member.accessRole]}
-                          </span>
-                          {member.supportStatus ? (
-                            <span className="rounded-full border border-[#cbdde5] bg-[#edf7fa] px-2.5 py-1 text-[11px] font-black text-[#4f717b]">
-                              상담{" "}
-                              {member.supportStatus === "open"
-                                ? "진행"
-                                : "종료"}
-                            </span>
-                          ) : null}
-                          <span
-                            className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${member.kakaoProfileComplete ? "border-[#c7dbca] bg-[#edf7ef] text-[#467052]" : "border-[#ead5ae] bg-[#fff8e6] text-[#876a37]"}`}
-                          >
-                            {member.kakaoProfileComplete
-                              ? "카카오 정보 확인"
-                              : "카카오 정보 대기"}
-                          </span>
                         </div>
-                        <p className="mt-1 truncate text-xs font-semibold text-[var(--text-muted)]">
-                          실명 {member.legalName || "확인 대기"} · 성별{" "}
+                        <p className="mt-1 truncate text-[11px] font-semibold text-[var(--text-muted)]">
+                          {memberRoleLabel[member.accessRole]} · {member.legalName || "실명 확인 대기"} ·{" "}
                           {member.gender === "female"
                             ? "여성"
                             : member.gender === "male"
                               ? "남성"
-                              : "확인 대기"}{" "}
-                          · 출생연도{" "}
+                              : "성별 확인 대기"}{" "}
+                          ·{" "}
                           {member.birthYear
                             ? `${member.birthYear}년`
-                            : "확인 대기"}
+                            : "출생연도 확인 대기"}
                         </p>
-                        <p className="mt-1 truncate font-mono text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
-                          배송 연락처 {member.phone || "미등록"} · ID{" "}
-                          {member.id}
+                        <p className="mt-1 truncate font-mono text-[9px] font-semibold tabular-nums tracking-tight text-[var(--text-muted)]" title={member.id}>
+                          ID · {member.id}
                         </p>
                       </div>
                     </div>
 
-                    <dl className="mt-3 grid grid-cols-2 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] sm:grid-cols-3 xl:grid-cols-6">
-                      <div className="border-b border-r border-[var(--border)] px-3 py-2 sm:[&:nth-child(n+4)]:border-b-0 xl:border-b-0">
-                        <dt className="text-[10px] font-black text-[var(--text-muted)]">
-                          배송 이용권
-                        </dt>
-                        <dd className="mt-1 font-mono text-xs font-black tabular-nums text-[var(--text-strong)]">
-                          {member.shippingCreditCount}개
-                        </dd>
+                    <div className="min-w-0 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5">
+                      <div className="flex flex-wrap gap-1.5">
+                        {member.supportStatus ? (
+                          <span className="rounded-full border border-[var(--info-border)] bg-[var(--info-surface)] px-2 py-1 text-[9px] font-black text-[var(--info-text)]">
+                            상담 {member.supportStatus === "open" ? "진행" : "종료"}
+                          </span>
+                        ) : null}
+                        <span className={`rounded-full border px-2 py-1 text-[9px] font-black ${member.kakaoProfileComplete ? "border-[var(--success-text)]/25 bg-[var(--success-surface)] text-[var(--success-text)]" : "border-[var(--warning-text)]/25 bg-[var(--warning-surface)] text-[var(--warning-text)]"}`}>
+                          {member.kakaoProfileComplete ? "카카오 확인" : "카카오 대기"}
+                        </span>
                       </div>
-                      <div className="border-b border-[var(--border)] px-3 py-2 sm:border-r sm:[&:nth-child(n+4)]:border-b-0 xl:border-b-0">
-                        <dt className="text-[10px] font-black text-[var(--text-muted)]">
-                          배송지
-                        </dt>
-                        <dd className="mt-1 font-mono text-xs font-black tabular-nums text-[var(--text-strong)]">
-                          {member.addressCount}곳
-                        </dd>
+                      <p className="mt-2 truncate font-mono text-[10px] font-bold tabular-nums text-[var(--text-muted)]" title={member.phone || "미등록"}>
+                        TEL · {member.phone || "미등록"}
+                      </p>
+                      <p className="mt-1 truncate font-mono text-[9px] font-bold tabular-nums text-[var(--text-muted)]" title={formatDateTime(member.lastSeenAt)}>
+                        LAST · {formatDateTime(member.lastSeenAt)}
+                      </p>
+                    </div>
+
+                    <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--border)]">
+                      <div className="bg-[var(--surface)] px-2.5 py-2">
+                        <dt className="text-[9px] font-black text-[var(--text-muted)]">배송권</dt>
+                        <dd className="mt-0.5 font-mono text-xs font-black tabular-nums text-[var(--text-strong)]">{member.shippingCreditCount}</dd>
                       </div>
-                      <div className="border-b border-r border-[var(--border)] px-3 py-2 sm:border-r-0 xl:border-b-0 xl:border-r">
-                        <dt className="text-[10px] font-black text-[var(--text-muted)]">
-                          입찰
-                        </dt>
-                        <dd className="mt-1 font-mono text-xs font-black tabular-nums text-[var(--text-strong)]">
-                          {member.bidCount}회
-                        </dd>
+                      <div className="bg-[var(--surface)] px-2.5 py-2">
+                        <dt className="text-[9px] font-black text-[var(--text-muted)]">배송지</dt>
+                        <dd className="mt-0.5 font-mono text-xs font-black tabular-nums text-[var(--text-strong)]">{member.addressCount}</dd>
                       </div>
-                      <div className="border-b border-[var(--border)] px-3 py-2 sm:border-b-0 sm:border-r">
-                        <dt className="text-[10px] font-black text-[var(--text-muted)]">
-                          최근 접속
-                        </dt>
-                        <dd
-                          className="mt-1 truncate font-mono text-[10px] font-black tabular-nums text-[var(--text-strong)]"
-                          title={formatDateTime(member.lastSeenAt)}
-                        >
-                          {formatDateTime(member.lastSeenAt)}
-                        </dd>
+                      <div className="bg-[var(--surface)] px-2.5 py-2">
+                        <dt className="text-[9px] font-black text-[var(--text-muted)]">입찰</dt>
+                        <dd className="mt-0.5 font-mono text-xs font-black tabular-nums text-[var(--text-strong)]">{member.bidCount}</dd>
                       </div>
-                      <div className="border-r border-[var(--border)] px-3 py-2">
-                        <dt className="text-[10px] font-black text-[var(--text-muted)]">
-                          경고 / 제재
-                        </dt>
-                        <dd className="mt-1 font-mono text-xs font-black tabular-nums text-[var(--text-strong)]">
-                          {member.warningCount} / {member.sanctionCount}
-                        </dd>
+                      <div className="col-span-3 flex items-center justify-between gap-3 bg-[var(--surface)] px-2.5 py-2 text-[9px] font-black text-[var(--text-muted)]">
+                        <span>경고 / 제재</span>
+                        <span className="font-mono tabular-nums text-[var(--text-strong)]">{member.warningCount} / {member.sanctionCount}</span>
                       </div>
-                      <div className="px-3 py-2">
-                        <dt className="text-[10px] font-black text-[var(--text-muted)]">
-                          입찰 제한
-                        </dt>
-                        <dd
-                          className="mt-1 truncate font-mono text-[10px] font-black tabular-nums text-[var(--text-strong)]"
-                          title={formatDateTime(member.bidBlockedUntil)}
-                        >
-                          {member.bidBlockedUntil
-                            ? formatDateTime(member.bidBlockedUntil)
-                            : "없음"}
+                      <div className="col-span-3 min-w-0 bg-[var(--surface)] px-2.5 py-2">
+                        <dt className="text-[9px] font-black text-[var(--text-muted)]">입찰 제한</dt>
+                        <dd className="mt-0.5 truncate font-mono text-[9px] font-black tabular-nums text-[var(--text-strong)]" title={formatDateTime(member.bidBlockedUntil)}>
+                          {member.bidBlockedUntil ? formatDateTime(member.bidBlockedUntil) : "없음"}
                         </dd>
                       </div>
                     </dl>
 
-                    <div className="mt-3 space-y-3 border-t border-[var(--border)] pt-3">
-                      <div className="grid gap-2 sm:grid-cols-[170px_auto_1fr] sm:items-center">
-                        <label className="text-xs font-black text-[#77675c]">
-                          회원 권한
+                    <div className="space-y-2">
+                      <label className="block text-[9px] font-black uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                          Access
                           <select
                             aria-label={`${member.displayName || "회원"} 권한`}
                             value={member.accessRole}
@@ -1252,7 +1374,7 @@ export function AdminPage({
                                 event.target.value as ManagedAccessRole,
                               )
                             }
-                            className="mt-1 w-full rounded-xl border border-[#ddcfc3] bg-white px-3 py-2 text-sm font-bold"
+                            className="mt-1 min-h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-2.5 text-xs font-bold text-[var(--text-strong)] outline-none transition-all duration-200 focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)]"
                           >
                             {hasOwnerAccess ? (
                               <option value="operator">운영자</option>
@@ -1263,10 +1385,8 @@ export function AdminPage({
                           </select>
                         </label>
                         {member.accessRole !== "operator" ? (
-                          <div className="flex items-center gap-2 sm:pt-5">
-                            <span className="text-xs font-black text-[#77675c]">
-                              배송 이용권
-                            </span>
+                          <div className="flex items-center gap-2">
+                            <span className="mr-auto text-[10px] font-black text-[var(--text-muted)]">배송 이용권</span>
                             <button
                               type="button"
                               aria-label={`${member.displayName || "회원"} 배송 이용권 1개 차감`}
@@ -1276,7 +1396,7 @@ export function AdminPage({
                               onClick={() =>
                                 void handleShippingCreditChange(member, -1)
                               }
-                            className="grid size-9 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] font-mono text-base font-black text-[var(--text-strong)] transition-all duration-200 ease-out hover:scale-[1.02] hover:border-[var(--border-strong)] disabled:opacity-40"
+                            className="grid size-8 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] font-mono text-sm font-black text-[var(--text-strong)] transition-all duration-200 ease-out hover:border-[var(--border-strong)] active:scale-95 disabled:opacity-40"
                             >
                               −
                             </button>
@@ -1287,15 +1407,16 @@ export function AdminPage({
                               onClick={() =>
                                 void handleShippingCreditChange(member, 1)
                               }
-                              className="grid size-9 place-items-center rounded-lg border border-[var(--info-border)] bg-[var(--info-surface)] font-mono text-base font-black text-[var(--info-text)] transition-all duration-200 ease-out hover:scale-[1.02] disabled:opacity-40"
+                              className="grid size-8 place-items-center rounded-lg border border-[var(--info-border)] bg-[var(--info-surface)] font-mono text-sm font-black text-[var(--info-text)] transition-all duration-200 ease-out active:scale-95 disabled:opacity-40"
                             >
                               +
                             </button>
                           </div>
                         ) : null}
-                      </div>
-                      {member.accessRole !== "operator" ? (
-                        <div className="flex flex-wrap gap-2">
+                    </div>
+
+                    {member.accessRole !== "operator" ? (
+                        <div className="flex flex-wrap gap-1.5 xl:max-w-48 xl:justify-end">
                           <Button
                             size="sm"
                             variant="secondary"
@@ -1354,11 +1475,11 @@ export function AdminPage({
                           </Button>
                         </div>
                       ) : null}
-                    </div>
                   </li>
                 );
               })}
             </ul>
+            </div>
           )}
 
           <Pagination
@@ -1370,6 +1491,8 @@ export function AdminPage({
 
         <CollapsibleSection
           id="operations-products"
+          active={activeSection === "operations-products"}
+          visited={visitedSections.has("operations-products")}
           eyebrow="PRODUCTS"
           title="상품 대기열·관리"
           summary="일괄 등록된 공개 대기 상품을 먼저 검수하고, 잘못된 항목은 공개 전에 수정하거나 삭제합니다. 진행·마감 상품도 상태 필터로 확인할 수 있습니다."
@@ -1419,8 +1542,14 @@ export function AdminPage({
             </label>
           </div>
 
-          <div className="mt-4 flex flex-col gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/60 p-3 sm:flex-row sm:items-center sm:justify-between">
-            <label className="flex cursor-pointer items-center gap-3 text-sm font-black text-[#554b43]">
+          <div
+            className={`mt-4 flex flex-col gap-3 rounded-xl border p-3 transition-all duration-200 sm:flex-row sm:items-center sm:justify-between ${
+              selectedPendingProductIds.size > 0
+                ? "sticky bottom-4 z-20 border-zinc-700 bg-zinc-950 text-white shadow-[0_18px_48px_rgba(0,0,0,0.34)] max-sm:bottom-[calc(5.5rem+env(safe-area-inset-bottom))]"
+                : "border-[var(--border)] bg-[var(--surface-muted)]/60"
+            }`}
+          >
+            <label className={`flex cursor-pointer items-center gap-3 text-xs font-black ${selectedPendingProductIds.size > 0 ? "text-zinc-200" : "text-[var(--text-strong)]"}`}>
               <input
                 ref={selectAllPendingRef}
                 type="checkbox"
@@ -1430,14 +1559,23 @@ export function AdminPage({
                   selectablePendingProductIds.length === 0 ||
                   isPublishingProducts
                 }
-                className="h-5 w-5 rounded border-[#cbbdaf] accent-[#d96756]"
+                className="size-4 rounded border-[var(--border-strong)] accent-[var(--accent)]"
               />
               검색 결과의 공개 대기 상품 전체 선택
             </label>
             <div className="flex flex-wrap items-center gap-3">
-              <span className="font-mono text-xs font-black tabular-nums text-[var(--text-muted)]">
+              <span className={`font-mono text-xs font-black tabular-nums tracking-tight ${selectedPendingProductIds.size > 0 ? "text-white" : "text-[var(--text-muted)]"}`}>
                 {selectedPendingProductIds.size.toLocaleString("ko-KR")}개 선택
               </span>
+              {selectedPendingProductIds.size > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedPendingProductIds(new Set())}
+                  className="min-h-8 rounded-lg border border-zinc-700 px-3 text-[11px] font-black text-zinc-300 transition-all duration-200 hover:border-zinc-500 hover:text-white active:scale-95"
+                >
+                  선택 해제
+                </button>
+              ) : null}
               <Button
                 size="sm"
                 disabled={selectedPendingProductIds.size === 0}
@@ -1454,10 +1592,10 @@ export function AdminPage({
               role={publishFeedback.tone === "error" ? "alert" : "status"}
               className={`mt-3 rounded-2xl border px-4 py-3 text-sm font-bold leading-6 ${
                 publishFeedback.tone === "success"
-                  ? "border-[#b9d9c8] bg-[#e8f5ed] text-[#35684f]"
+                  ? "border-[var(--success-text)]/25 bg-[var(--success-surface)] text-[var(--success-text)]"
                   : publishFeedback.tone === "partial"
-                    ? "border-[#ead5a9] bg-[#fff7df] text-[#82673a]"
-                    : "border-[#efc8bb] bg-[#fff0ea] text-[#a84c3f]"
+                    ? "border-[var(--warning-text)]/25 bg-[var(--warning-surface)] text-[var(--warning-text)]"
+                    : "border-[var(--danger-text)]/25 bg-[var(--danger-surface)] text-[var(--danger-text)]"
               }`}
             >
               {publishFeedback.message}
@@ -1467,7 +1605,7 @@ export function AdminPage({
           {productError ? (
             <div
               role="alert"
-              className="mt-4 flex flex-col gap-3 rounded-2xl border border-[#efc8bb] bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#a84c3f] sm:flex-row sm:items-center sm:justify-between"
+              className="mt-4 flex flex-col gap-3 rounded-xl border border-[var(--danger-text)]/25 bg-[var(--danger-surface)] px-4 py-3 text-sm font-bold text-[var(--danger-text)] sm:flex-row sm:items-center sm:justify-between"
             >
               <span>{productError}</span>
               <Button
@@ -1488,14 +1626,23 @@ export function AdminPage({
               description="검색어나 공개 상태를 바꾸면 다른 상품을 확인할 수 있습니다."
             />
           ) : (
-            <ul className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] divide-y divide-[var(--border)]">
+            <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] shadow-sm">
+              <div className="hidden grid-cols-[20px_48px_minmax(180px,1fr)_140px_110px_112px] items-center gap-3 border-b border-[var(--border)] bg-[var(--surface-muted)]/70 px-3 py-2 font-mono text-[9px] font-black uppercase tabular-nums tracking-[0.12em] text-[var(--text-muted)] xl:grid">
+                <span>선택</span>
+                <span>사진</span>
+                <span>상품 / Lot</span>
+                <span>현재가</span>
+                <span>상태</span>
+                <span className="text-right">작업</span>
+              </div>
+            <ul className="divide-y divide-[var(--border)]">
               {pagedProducts.map((product) => (
                 <li
                   key={product.id}
-                  className="flex flex-col gap-3 p-3.5 transition-colors duration-200 hover:bg-[var(--surface-muted)]/40 sm:flex-row sm:items-center"
+                  className="grid grid-cols-[20px_48px_minmax(0,1fr)] items-center gap-3 p-3 transition-all duration-200 ease-out hover:bg-[var(--surface-muted)]/55 xl:grid-cols-[20px_48px_minmax(180px,1fr)_140px_110px_112px]"
                 >
                   {product.status === "pending" ? (
-                    <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm font-black text-[#66584f] sm:self-start sm:pt-1">
+                    <label className="grid size-5 cursor-pointer place-items-center">
                       <input
                         type="checkbox"
                         checked={selectedPendingProductIds.has(product.id)}
@@ -1504,55 +1651,60 @@ export function AdminPage({
                         }
                         disabled={isPublishingProducts}
                         aria-label={`${product.title} 즉시 공개 선택`}
-                        className="h-5 w-5 rounded border-[#cbbdaf] accent-[#d96756]"
+                        className="size-4 rounded border-[var(--border-strong)] accent-[var(--accent)]"
                       />
-                      <span className="sm:hidden">선택</span>
                     </label>
-                  ) : null}
+                  ) : <span aria-hidden="true" />}
                   {product.thumbnailUrls[0] || product.imageUrls[0] ? (
                     <img
                       src={product.thumbnailUrls[0] || product.imageUrls[0]}
                       alt=""
-                      className="h-28 w-full rounded-lg border border-[var(--border)] object-cover sm:size-20 sm:shrink-0"
+                      className="size-12 rounded-lg border border-[var(--border)] object-cover"
                     />
                   ) : (
-                    <div className="grid h-28 w-full place-items-center rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] text-xs font-black text-[var(--text-muted)] sm:size-20 sm:shrink-0">
-                      사진 없음
+                    <div className="grid size-12 place-items-center rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] text-[9px] font-black text-[var(--text-muted)]">
+                      NO IMG
                     </div>
                   )}
 
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${productStatusClasses[product.status]}`}
-                      >
-                        {productStatusLabel[product.status]}
-                      </span>
-                      {product.bidLockedAt ? (
-                        <span className="rounded-full border border-[#e7bdb4] bg-[#fff0ea] px-2.5 py-1 text-[11px] font-black text-[#9d493d]">
-                          첫 입찰 확정
-                        </span>
-                      ) : null}
-                    </div>
-                    <h3 className="mt-1.5 truncate text-sm font-black text-[var(--text-strong)]">
+                    <p className="truncate font-mono text-[9px] font-black uppercase tabular-nums tracking-[0.12em] text-[var(--text-muted)]" title={product.id}>
+                      LOT · {product.id.slice(0, 8)}
+                    </p>
+                    <h3 className="mt-0.5 truncate text-sm font-black text-[var(--text-strong)]">
                       {product.title}
                     </h3>
-                    <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[var(--text-muted)]">
+                    <p className="mt-0.5 truncate text-[11px] font-semibold text-[var(--text-muted)]">
                       {product.description}
                     </p>
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] font-bold tabular-nums text-[var(--text-muted)]">
-                      <span>현재가 {formatKRW(product.currentPrice)}</span>
-                      <span>입찰 {product.participantCount}명</span>
-                      <span>공개 {formatDateTime(product.publish_at)}</span>
-                      <span>수정 {formatDateTime(product.updatedAt)}</span>
-                    </div>
                   </div>
 
-                  <div className="flex shrink-0 gap-2 sm:flex-col">
+                  <div className="col-start-2 min-w-0 xl:col-start-auto">
+                    <p className="font-mono text-sm font-black tabular-nums tracking-tight text-[var(--text-strong)]">
+                      {formatKRW(product.currentPrice)}
+                    </p>
+                    <p className="mt-0.5 font-mono text-[9px] font-bold tabular-nums text-[var(--text-muted)]">
+                      입찰 {product.participantCount}명 · {formatDateTime(product.publish_at)}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-black ${productStatusClasses[product.status]}`}>
+                      <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+                      {productStatusLabel[product.status]}
+                    </span>
+                    {product.bidLockedAt ? (
+                      <span className="rounded-full border border-[var(--danger-text)]/25 bg-[var(--danger-surface)] px-2 py-1 text-[9px] font-black text-[var(--danger-text)]">
+                        첫 입찰 확정
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="col-span-2 col-start-2 flex shrink-0 gap-1.5 xl:col-span-1 xl:col-start-auto">
                     <Button
                       size="sm"
                       variant="secondary"
-                      className="flex-1"
+                      className="min-h-8 flex-1 px-2 active:scale-95"
                       onClick={() => setEditingProduct(product)}
                     >
                       수정
@@ -1560,7 +1712,7 @@ export function AdminPage({
                     <Button
                       size="sm"
                       variant="danger"
-                      className="flex-1"
+                      className="min-h-8 flex-1 px-2 active:scale-95"
                       onClick={() => {
                         setDeleteError("");
                         setDeletingProduct(product);
@@ -1572,6 +1724,7 @@ export function AdminPage({
                 </li>
               ))}
             </ul>
+            </div>
           )}
 
           <Pagination
@@ -1583,6 +1736,8 @@ export function AdminPage({
 
         <CollapsibleSection
           id="operations-registration"
+          active={activeSection === "operations-registration"}
+          visited={visitedSections.has("operations-registration")}
           eyebrow="REGISTRATION"
           title="상품 등록"
           summary="일괄 등록을 기본으로 사용하며, 예외 상품은 한 건씩 등록합니다. 일괄 상품은 공개 대기열로 이동합니다."
@@ -1590,34 +1745,36 @@ export function AdminPage({
           className="order-1"
         >
           <div className="grid gap-3 lg:grid-cols-2">
-            <article className="group rounded-lg border border-[var(--info-border)] bg-[var(--info-surface)] p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md sm:p-5">
-              <p className="text-[10px] font-black tracking-[0.16em] text-[var(--info-text)]">
+            <article className="group relative overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-900/80 p-5 text-white shadow-sm transition-all duration-200 ease-out hover:scale-[1.01] hover:border-zinc-700 hover:shadow-xl active:scale-[0.995] sm:p-6">
+              <span className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-white/[0.04] blur-2xl" aria-hidden="true" />
+              <p className="font-mono text-[10px] font-black uppercase tabular-nums tracking-[0.16em] text-zinc-500">
                 BULK IMPORT
               </p>
-              <h3 className="mt-1.5 text-lg font-black tracking-[-0.02em] text-[var(--text-strong)]">
+              <h3 className="mt-2 text-lg font-black tracking-[-0.02em] text-white">
                 상품 일괄 등록 · 기본
               </h3>
-              <p className="mt-1.5 text-xs font-semibold leading-5 text-[var(--info-text)]">
+              <p className="mt-2 max-w-xl text-xs font-semibold leading-5 text-zinc-400">
                 정해진 양식을 내려받는 단계 없이 Excel의 상품·이미지명 열을
                 자동으로 찾아 사진 폴더와 연결하고, 등록 전 오류를 검토합니다.
               </p>
-              <Button className="mt-5" onClick={onOpenBulkImport}>
+              <Button className="mt-6 active:scale-95" onClick={onOpenBulkImport}>
                 일괄 등록 열기
               </Button>
             </article>
-            <article className="group rounded-lg border border-[var(--border)] bg-[var(--accent-surface)] p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md sm:p-5">
-              <p className="text-[10px] font-black tracking-[0.16em] text-[var(--accent-text)]">
+            <article className="group relative overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-900/80 p-5 text-white shadow-sm transition-all duration-200 ease-out hover:scale-[1.01] hover:border-zinc-700 hover:shadow-xl active:scale-[0.995] sm:p-6">
+              <span className="pointer-events-none absolute -bottom-10 -right-10 size-32 rounded-full bg-white/[0.04] blur-2xl" aria-hidden="true" />
+              <p className="font-mono text-[10px] font-black uppercase tabular-nums tracking-[0.16em] text-zinc-500">
                 SINGLE PRODUCT
               </p>
-              <h3 className="mt-1.5 text-lg font-black tracking-[-0.02em] text-[var(--text-strong)]">
+              <h3 className="mt-2 text-lg font-black tracking-[-0.02em] text-white">
                 새 경매글 작성
               </h3>
-              <p className="mt-1.5 text-xs font-semibold leading-5 text-[var(--accent-text)]">
+              <p className="mt-2 max-w-xl text-xs font-semibold leading-5 text-zinc-400">
                 예외 상품은 설명과 사진을 확인하며 한 건씩 등록하고 공개 시각을
                 선택합니다.
               </p>
               <Button
-                className="mt-5"
+                className="mt-6 active:scale-95"
                 variant="secondary"
                 onClick={onCreateProduct}
               >
@@ -1640,20 +1797,20 @@ export function AdminPage({
         size="sm"
       >
         <div className="space-y-4 p-5 sm:p-6">
-          <label className="block text-sm font-black text-[#594a40]">
+          <label className="block text-sm font-black text-[var(--text-strong)]">
             연락처
             <input
               value={editPhone}
               onChange={(event) => setEditPhone(event.target.value)}
               maxLength={30}
-              className="mt-2 w-full rounded-xl border border-[#decdbf] bg-white px-4 py-3 font-semibold"
+              className="mt-2 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-4 py-3 font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)]"
               placeholder="미등록 가능"
             />
           </label>
           {memberActionError ? (
             <p
               role="alert"
-              className="rounded-xl bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#a84c3f]"
+              className="rounded-xl bg-[var(--danger-surface)] px-4 py-3 text-sm font-bold text-[var(--danger-text)]"
             >
               {memberActionError}
             </p>
@@ -1687,7 +1844,7 @@ export function AdminPage({
         size="sm"
       >
         <div className="space-y-4 p-5 sm:p-6">
-          <label className="block text-sm font-black text-[#594a40]">
+          <label className="block text-sm font-black text-[var(--text-strong)]">
             경고 종류
             <select
               value={warningCategory}
@@ -1696,7 +1853,7 @@ export function AdminPage({
                   event.target.value as "general" | "late_payment",
                 )
               }
-              className="mt-2 w-full rounded-xl border border-[#decdbf] bg-white px-4 py-3 font-semibold"
+              className="mt-2 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-4 py-3 font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)]"
             >
               <option value="general">일반 운영 경고</option>
               <option value="late_payment">결제 지연 경고</option>
@@ -1704,26 +1861,26 @@ export function AdminPage({
           </label>
           {warningMember?.paymentDeadlineExempt &&
           warningCategory === "late_payment" ? (
-            <p className="rounded-xl bg-[#edf7fa] px-4 py-3 text-sm font-bold leading-6 text-[#4f7179]">
+            <p className="rounded-xl bg-[var(--info-surface)] px-4 py-3 text-sm font-bold leading-6 text-[var(--info-text)]">
               밴드 기존 회원은 결제 기한과 결제 지연 경고·제재가 면제되어
               기록되지 않습니다.
             </p>
           ) : null}
-          <label className="block text-sm font-black text-[#594a40]">
+          <label className="block text-sm font-black text-[var(--text-strong)]">
             사유
             <textarea
               value={warningReason}
               onChange={(event) => setWarningReason(event.target.value)}
               maxLength={500}
               rows={4}
-              className="mt-2 w-full resize-none rounded-xl border border-[#decdbf] bg-white px-4 py-3 font-semibold"
+              className="mt-2 w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-4 py-3 font-semibold text-[var(--text-strong)] outline-none focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)]"
               placeholder="경고 사유를 구체적으로 입력해 주세요."
             />
           </label>
           {memberActionError ? (
             <p
               role="alert"
-              className="rounded-xl bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#a84c3f]"
+              className="rounded-xl bg-[var(--danger-surface)] px-4 py-3 text-sm font-bold text-[var(--danger-text)]"
             >
               {memberActionError}
             </p>
@@ -1759,7 +1916,7 @@ export function AdminPage({
         size="sm"
       >
         <div className="space-y-4 p-5 sm:p-6">
-          <p className="text-sm font-bold leading-6 text-[#66564c]">
+          <p className="text-sm font-bold leading-6 text-[var(--text-muted)]">
             <strong>{deletingMember?.displayName || "선택한 회원"}</strong>{" "}
             계정을 삭제할까요? 배송 기록은 개인정보를 제거한 업무 기록으로만
             보존됩니다.
@@ -1767,7 +1924,7 @@ export function AdminPage({
           {memberActionError ? (
             <p
               role="alert"
-              className="rounded-xl bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#a84c3f]"
+              className="rounded-xl bg-[var(--danger-surface)] px-4 py-3 text-sm font-bold text-[var(--danger-text)]"
             >
               {memberActionError}
             </p>
@@ -1791,12 +1948,16 @@ export function AdminPage({
         </div>
       </Modal>
 
-      <ProductEditModal
-        product={editingProduct}
-        open={Boolean(editingProduct)}
-        onClose={() => setEditingProduct(null)}
-        onSave={handleProductSave}
-      />
+      {editingProduct ? (
+        <Suspense fallback={null}>
+          <ProductEditModal
+            product={editingProduct}
+            open
+            onClose={() => setEditingProduct(null)}
+            onSave={handleProductSave}
+          />
+        </Suspense>
+      ) : null}
 
       <Modal
         open={Boolean(deletingProduct)}
@@ -1809,15 +1970,15 @@ export function AdminPage({
         size="sm"
       >
         <div className="space-y-4 p-5 sm:p-6">
-          <p className="text-sm font-bold leading-6 text-[#66564c]">
-            <strong className="text-[#493b31]">{deletingProduct?.title}</strong>
+          <p className="text-sm font-bold leading-6 text-[var(--text-muted)]">
+            <strong className="text-[var(--text-strong)]">{deletingProduct?.title}</strong>
             을(를) 정말 삭제할까요? 입찰 기록이 있는 상품은 서버 정책에 따라
             삭제가 거부될 수 있습니다.
           </p>
           {deleteError ? (
             <p
               role="alert"
-              className="rounded-2xl bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#b14c3f]"
+              className="rounded-xl bg-[var(--danger-surface)] px-4 py-3 text-sm font-bold text-[var(--danger-text)]"
             >
               {deleteError}
             </p>

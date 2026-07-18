@@ -20,7 +20,7 @@ function SoldFeedSkeleton() {
   return (
     <article aria-hidden="true" className="bg-[var(--surface-raised)]">
       <div className="commerce-skeleton aspect-[4/3] rounded-none" />
-      <div className="space-y-3 p-4">
+      <div className="space-y-2.5 p-2.5 sm:p-4">
         <div className="commerce-skeleton h-3 w-16 rounded-sm" />
         <div className="commerce-skeleton h-5 w-3/4 rounded-sm" />
         <div className="commerce-skeleton h-12 rounded-md" />
@@ -97,7 +97,7 @@ export function SoldAuctionFeed({
       {isLoading ? (
         <div role="status" className="mt-4">
           <span className="sr-only">판매 완료 상품을 불러오는 중…</span>
-          <div className="grid grid-cols-1 gap-px overflow-hidden border border-[var(--border)] bg-[var(--border)] md:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3.5 bg-transparent sm:gap-px sm:overflow-hidden sm:border sm:border-[var(--border)] sm:bg-[var(--border)] 2xl:grid-cols-3">
             {Array.from({ length: 3 }, (_, index) => <SoldFeedSkeleton key={index} />)}
           </div>
         </div>
@@ -122,7 +122,7 @@ export function SoldAuctionFeed({
       ) : (
         <div
           id="sold-auction-items"
-          className="mt-4 grid grid-cols-1 gap-px overflow-hidden border border-[var(--border)] bg-[var(--border)] md:grid-cols-2 2xl:grid-cols-3"
+          className="mt-4 grid grid-cols-2 gap-3.5 bg-transparent sm:gap-px sm:overflow-hidden sm:border sm:border-[var(--border)] sm:bg-[var(--border)] 2xl:grid-cols-3"
         >
           {visibleAuctions.map((auction) => (
             <article
@@ -144,38 +144,38 @@ export function SoldAuctionFeed({
                   </div>
                 )}
               </div>
-              <div className="p-4 sm:p-5">
+              <div className="p-2.5 sm:p-5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="border border-[var(--success-text)]/25 bg-[var(--success-surface)] px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--success-text)]">
                     판매 완료
                   </span>
                   <time
-                    className="font-mono text-[10px] font-medium tabular-nums tracking-tight text-[var(--text-muted)]"
+                    className="hidden font-mono text-[10px] font-medium tabular-nums tracking-tight text-[var(--text-muted)] sm:block"
                     dateTime={auction.soldAt}
                   >
                     {formatKoreanDate(new Date(auction.soldAt))}
                   </time>
                 </div>
-                <h3 className="mt-3 line-clamp-2 text-lg font-black tracking-[-0.025em] text-[var(--text-strong)]">
+                <h3 className="mt-2.5 line-clamp-2 text-sm font-black leading-5 tracking-[-0.025em] text-[var(--text-strong)] sm:mt-3 sm:text-lg sm:leading-6">
                   {auction.title}
                 </h3>
-                <p className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-[var(--text-muted)]">
+                <p className="mt-1.5 line-clamp-2 text-xs font-medium leading-5 text-[var(--text-muted)] sm:mt-2 sm:text-sm sm:leading-6">
                   {auction.description}
                 </p>
-                <dl className="mt-4 grid grid-cols-2 divide-x divide-[var(--border)] border-y border-[var(--border)] py-3">
-                  <div>
-                    <dt className="px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                <dl className="mt-3 grid grid-cols-1 divide-y divide-[var(--border)] border-y border-[var(--border)] py-1 sm:mt-4 sm:grid-cols-2 sm:divide-x sm:divide-y-0 sm:py-3">
+                  <div className="py-2 sm:py-0">
+                    <dt className="px-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)] sm:px-3 sm:text-[10px] sm:tracking-[0.12em]">
                       낙찰가
                     </dt>
-                    <dd className="mt-1 px-3 font-mono text-sm font-black tabular-nums tracking-tight text-[var(--accent-text)]">
+                    <dd className="mt-1 break-all px-1 font-mono text-xs font-black tabular-nums tracking-tight text-[var(--accent-text)] sm:px-3 sm:text-sm">
                       {formatKRW(auction.winningAmount)}
                     </dd>
                   </div>
-                  <div className="min-w-0">
-                    <dt className="px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  <div className="min-w-0 py-2 sm:py-0">
+                    <dt className="px-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)] sm:px-3 sm:text-[10px] sm:tracking-[0.12em]">
                       낙찰자
                     </dt>
-                    <dd className="mt-1 break-all px-3 text-sm font-black text-[var(--text-strong)]">
+                    <dd className="mt-1 break-all px-1 text-xs font-black text-[var(--text-strong)] sm:px-3 sm:text-sm">
                       {auction.winnerDisplayName}
                     </dd>
                   </div>

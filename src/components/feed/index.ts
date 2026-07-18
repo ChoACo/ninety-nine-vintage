@@ -1,6 +1,7 @@
 export { default as BidForm } from "./BidForm";
 export { default as BidFormModal } from "./BidFormModal";
 export { default as BidConfirmModal } from "./BidConfirmModal";
+export { default as BidParticipationBadge } from "./BidParticipationBadge";
 export { default as BidHistoryModal } from "./BidHistoryModal";
 export { default as DateFilterChips } from "./DateFilterChips";
 export { default as FeedList } from "./FeedList";

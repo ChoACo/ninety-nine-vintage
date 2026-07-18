@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, Fragment, useEffect, useRef, useState } from "react";
 import {
   useEmployeeSupportChat,
   useMemberSupportThreads,
@@ -10,8 +10,18 @@ import {
   isSupportStaffRole,
   type SupportViewerRole,
 } from "@/src/lib/supabase/supportChat";
-import { formatKoreanTime } from "@/src/utils/formatters";
+import {
+  formatKoreanDate,
+  formatKoreanTime,
+  getKoreanDateKey,
+} from "@/src/utils/formatters";
 import { StaffChatInbox } from "./StaffChatInbox";
+
+const MEMBER_QUICK_QUESTIONS = [
+  { icon: "📏", message: "실측 사이즈가 궁금해요" },
+  { icon: "🔎", message: "오염이나 하자가 있나요?" },
+  { icon: "🏦", message: "계좌이체 입금 완료했습니다" },
+] as const;
 
 export interface ChatPageProps {
   userId: string | null;
@@ -120,9 +130,17 @@ function ParticipantChat({
 
   const isClosed = chat.conversation?.status === "closed";
 
+  const handleQuickQuestion = (question: string) => {
+    if (internal || isClosed || chat.isSending) return;
+
+    void chat.sendMessage(question).catch(() => {
+      // The hook exposes the same user-facing error used by the standard composer.
+    });
+  };
+
   return (
-    <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] shadow-[var(--panel-shadow)]">
-      <div className="flex min-h-[620px] flex-col bg-[var(--surface)]">
+    <section className="overflow-hidden rounded-none border-y border-[var(--border)] bg-[var(--surface-raised)] shadow-[var(--panel-shadow)] sm:rounded-2xl sm:border">
+      <div className="flex h-[calc(100dvh-9.5rem)] min-h-0 flex-col bg-[var(--surface)] sm:h-auto sm:min-h-[620px]">
         <header className="flex flex-wrap items-center gap-3 border-b border-[var(--border)] bg-[var(--surface-raised)]/90 px-4 py-3.5 sm:flex-nowrap md:px-6">
           <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)] shadow-sm" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="size-5"><path d="M5 5.5h14v10H9l-4 3v-13Z" strokeLinejoin="round" /><path d="M9 10.5h6" strokeLinecap="round" /></svg>
@@ -165,7 +183,7 @@ function ParticipantChat({
         {!internal && "conversations" in chat && chat.conversations.length > 0 ? (
           <nav
             aria-label="내 상담 대화"
-            className="flex gap-1.5 overflow-x-auto border-b border-[var(--border)] bg-[var(--surface-raised)]/70 px-4 py-2.5 [scrollbar-gutter:stable] md:px-6"
+            className="flex touch-pan-x snap-x snap-mandatory gap-1.5 overflow-x-auto overscroll-x-contain scroll-smooth border-b border-[var(--border)] bg-[var(--surface-raised)]/70 px-4 py-2.5 [scrollbar-gutter:stable] md:px-6"
           >
             {chat.conversations.map((conversation) => (
               <button
@@ -230,71 +248,114 @@ function ParticipantChat({
           </div>
         ) : null}
 
-        <div ref={messagesRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-5 [scrollbar-gutter:stable] sm:px-6" aria-live="polite">
+        <div ref={messagesRef} className="min-h-0 flex-1 touch-pan-y space-y-3 overflow-y-auto overscroll-contain px-4 py-5 scroll-pb-28 [scrollbar-gutter:stable] sm:px-6" aria-live="polite">
           {"isMessagesLoading" in chat && chat.isMessagesLoading ? (
             <ParticipantMessageSkeleton />
           ) : chat.messages.length === 0 ? (
-            <div className="mx-auto mt-10 max-w-md rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface-raised)]/65 p-7 text-center">
-              <span className="mx-auto grid size-10 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)]" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="size-5"><path d="M5 5.5h14v10H9l-4 3v-13Z" strokeLinejoin="round" /><path d="M9 10.5h6" strokeLinecap="round" /></svg></span>
-              <p className="mt-3 text-sm font-black text-[var(--text-strong)]">
+            <div className="relative mx-auto mt-10 max-w-md overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)]/80 p-8 text-center shadow-sm backdrop-blur-xl">
+              <span className="pointer-events-none absolute -right-8 -top-12 select-none font-serif text-[8rem] font-black leading-none text-[var(--text-strong)]/[0.025]" aria-hidden="true">99</span>
+              <span className="relative mx-auto grid size-11 place-items-center rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)] shadow-sm" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="size-5"><path d="M5 5.5h14v10H9l-4 3v-13Z" strokeLinejoin="round" /><path d="M9 10.5h6" strokeLinecap="round" /></svg></span>
+              <p className="relative mt-4 text-sm font-black tracking-[-0.015em] text-[var(--text-strong)]">
                 {internal ? "담당 운영자에게 내부 메시지를 남겨주세요" : "운영팀에 궁금한 점을 남겨주세요"}
               </p>
-              <p className="mt-1.5 break-keep text-xs font-semibold leading-5 text-[var(--text-muted)]">
+              <p className="relative mt-1.5 break-keep text-xs font-semibold leading-5 text-[var(--text-muted)]">
                 {internal
                   ? "이 내용은 일반 회원 화면에 표시되지 않습니다."
                   : "주문, 입찰, 배송과 관련된 문의에 순서대로 답변드려요."}
               </p>
             </div>
           ) : (
-            chat.messages.map((message) => {
+            chat.messages.map((message, index) => {
               const isMine = message.senderId === userId;
+              const dateKey = getKoreanDateKey(message.createdAt);
+              const dateLabel = formatKoreanDate(message.createdAt, {
+                includeWeekday: false,
+              });
+              const previousDateKey =
+                index > 0
+                  ? getKoreanDateKey(chat.messages[index - 1].createdAt)
+                  : null;
 
               return (
-                <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                  <div className={`flex max-w-[82%] flex-col ${isMine ? "items-end" : "items-start"}`}>
-                    {!isMine && (
-                      <span className="mb-1 px-1 text-[10px] font-bold text-[var(--text-muted)]">
-                        {internal ? "담당 운영자" : "운영팀"}
-                      </span>
-                    )}
-                    <p className={`whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2.5 text-sm font-medium leading-6 shadow-sm ${
-                      isMine
-                        ? "rounded-br-sm bg-[var(--accent)] text-[var(--accent-contrast)]"
-                        : "rounded-bl-sm border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-strong)]"
-                    }`}>
-                      {message.body}
-                    </p>
-                    <time className="mt-1 px-1 font-mono text-[9px] font-medium tabular-nums text-[var(--text-muted)]" dateTime={message.createdAt}>
-                      {formatKoreanTime(message.createdAt)}
-                    </time>
+                <Fragment key={message.id}>
+                  {dateKey !== previousDateKey ? (
+                    <div className="flex items-center gap-3 py-3" role="separator" data-chat-date-divider>
+                      <span className="h-px flex-1 bg-[var(--border)]" />
+                      <time
+                        dateTime={message.createdAt}
+                        className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1 font-mono text-[9px] font-bold tabular-nums tracking-tight text-[var(--text-muted)] shadow-sm"
+                      >
+                        {dateLabel}
+                      </time>
+                      <span className="h-px flex-1 bg-[var(--border)]" />
+                    </div>
+                  ) : null}
+                  <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                    <div className={`flex max-w-[84%] flex-col sm:max-w-[76%] ${isMine ? "items-end" : "items-start"}`}>
+                      {!isMine && (
+                        <span className="mb-1.5 px-1 text-[10px] font-bold tracking-[-0.01em] text-[var(--text-muted)]">
+                          {internal ? "담당 운영자" : "운영팀"}
+                        </span>
+                      )}
+                      <p className={`whitespace-pre-wrap break-words rounded-[1.15rem] px-3.5 py-2.5 text-sm font-medium leading-[1.65] shadow-sm ${
+                        isMine
+                          ? "rounded-br-[0.3rem] bg-[var(--accent)] text-[var(--accent-contrast)]"
+                          : "rounded-bl-[0.3rem] border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-strong)]"
+                      }`}>
+                        {message.body}
+                      </p>
+                      <time className="mt-1.5 px-1 font-mono text-[9px] font-medium tabular-nums tracking-tight text-[var(--text-muted)]" dateTime={message.createdAt}>
+                        {formatKoreanTime(message.createdAt)}
+                      </time>
+                    </div>
                   </div>
-                </div>
+                </Fragment>
               );
             })
           )}
         </div>
 
-        <form onSubmit={handleSend} className="border-t border-[var(--border)] bg-[var(--surface-raised)] p-3.5 md:px-5">
-          <label htmlFor="support-message" className="sr-only">운영팀에 보낼 메시지</label>
-          <textarea
-            id="support-message"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            maxLength={MAX_SUPPORT_MESSAGE_LENGTH}
-            rows={2}
-            disabled={isClosed || chat.isSending}
-            placeholder={isClosed ? "종료된 상담입니다. 운영팀이 다시 열면 메시지를 보낼 수 있어요." : "문의 내용을 입력하세요"}
-            className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3.5 py-2.5 text-sm font-medium leading-6 text-[var(--text-strong)] outline-none transition-all duration-200 placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)]"
-          />
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <span className="font-mono text-[10px] font-bold tabular-nums text-[var(--text-muted)]">{draft.length.toLocaleString("ko-KR")} / {MAX_SUPPORT_MESSAGE_LENGTH.toLocaleString("ko-KR")}</span>
-            <button
-              type="submit"
-              disabled={!draft.trim() || chat.isSending || isClosed}
-              className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-black text-[var(--accent-contrast)] shadow-sm transition-all duration-200 ease-out hover:scale-[1.02] hover:bg-[var(--accent-hover)] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {chat.isSending ? "전송 중…" : "보내기"}
-            </button>
+        <form onSubmit={handleSend} className="shrink-0 border-t border-[var(--border)] bg-[var(--surface-raised)]/95 px-3.5 pb-[max(.875rem,env(safe-area-inset-bottom))] pt-3.5 backdrop-blur-xl md:px-5 md:py-4">
+          {!internal ? (
+            <div className="mb-3 flex touch-pan-x snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="빠른 질문">
+              {MEMBER_QUICK_QUESTIONS.map((question) => (
+                <button
+                  key={question.message}
+                  type="button"
+                  onClick={() => handleQuickQuestion(question.message)}
+                  disabled={isClosed || chat.isSending}
+                  data-support-quick-question
+                  className="inline-flex min-h-11 shrink-0 snap-start items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs font-bold text-[var(--text-muted)] shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-strong)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <span aria-hidden="true">{question.icon}</span>
+                  {question.message}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--input-surface)] shadow-sm transition-all duration-200 focus-within:border-[var(--border-strong)] focus-within:ring-2 focus-within:ring-[var(--accent-surface)]">
+            <label htmlFor="support-message" className="sr-only">운영팀에 보낼 메시지</label>
+            <textarea
+              id="support-message"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              maxLength={MAX_SUPPORT_MESSAGE_LENGTH}
+              rows={2}
+              disabled={isClosed || chat.isSending}
+              placeholder={isClosed ? "종료된 상담입니다. 운영팀이 다시 열면 메시지를 보낼 수 있어요." : "문의 내용을 입력하세요"}
+              className="block min-h-20 w-full resize-none bg-transparent px-4 pb-2 pt-3.5 text-sm font-medium leading-6 text-[var(--text-strong)] outline-none placeholder:text-[var(--text-muted)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)]"
+            />
+            <div className="flex items-center justify-between gap-3 border-t border-[var(--border)]/70 px-3 py-2.5">
+              <span className="font-mono text-[10px] font-bold tabular-nums tracking-tight text-[var(--text-muted)]">{draft.length.toLocaleString("ko-KR")} / {MAX_SUPPORT_MESSAGE_LENGTH.toLocaleString("ko-KR")}</span>
+              <button
+                type="submit"
+                disabled={!draft.trim() || chat.isSending || isClosed}
+                className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[var(--accent)] px-4 text-xs font-black text-[var(--accent-contrast)] shadow-sm transition-all duration-200 ease-out hover:scale-[1.02] hover:bg-[var(--accent-hover)] hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
+              >
+                {chat.isSending ? "전송 중…" : "보내기"}
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" className="size-3.5" aria-hidden="true"><path d="m3.5 3.5 13 6.5-13 6.5 2-6.5-2-6.5Z" strokeLinejoin="round" /><path d="M5.5 10h7" strokeLinecap="round" /></svg>
+              </button>
+            </div>
           </div>
         </form>
       </div>

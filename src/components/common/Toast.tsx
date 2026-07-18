@@ -4,9 +4,15 @@ interface ToastProps {
   message: string;
   visible: boolean;
   onDismiss: () => void;
+  dismissible?: boolean;
 }
 
-export function Toast({ message, visible, onDismiss }: ToastProps) {
+export function Toast({
+  message,
+  visible,
+  onDismiss,
+  dismissible = true,
+}: ToastProps) {
   if (!visible) return null;
 
   return (
@@ -31,24 +37,26 @@ export function Toast({ message, visible, onDismiss }: ToastProps) {
           </svg>
         </span>
         <p className="min-w-0 flex-1 break-keep leading-5">{message}</p>
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="ml-1 grid size-7 shrink-0 place-items-center rounded-md text-white/55 transition-all duration-200 ease-out hover:scale-105 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-          aria-label="알림 닫기"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            className="size-4"
+        {dismissible ? (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="ml-1 grid size-7 shrink-0 place-items-center rounded-md text-white/55 transition-all duration-200 ease-out hover:scale-105 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            aria-label="알림 닫기"
           >
-            <path d="m5 5 10 10M15 5 5 15" />
-          </svg>
-        </button>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              className="size-4"
+            >
+              <path d="m5 5 10 10M15 5 5 15" />
+            </svg>
+          </button>
+        ) : null}
       </div>
     </div>
   );

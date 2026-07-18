@@ -97,9 +97,10 @@ test("shares one minute timer and releases it after the final subscriber", async
   }
 });
 
-test("uses the minute clock only for feed policy trees", async () => {
-  const [clock, feed, postCard, sidebar, countdown] = await Promise.all([
+test("uses the shared server-adjusted second clock on every bid deadline surface", async () => {
+  const [clock, auctionClock, feed, postCard, sidebar, countdown] = await Promise.all([
     source("src/hooks/useAuctionPolicyClock.ts"),
+    source("src/hooks/useAuctionClock.ts"),
     source("src/components/feed/FeedList.tsx"),
     source("src/components/feed/PostCard.tsx"),
     source("src/components/live/LiveBidSidebar.tsx"),
@@ -108,12 +109,16 @@ test("uses the minute clock only for feed policy trees", async () => {
 
   assert.match(clock, /export function useAuctionPolicyClock\(\): Date/);
   assert.match(clock, /window\.setInterval\(tick, 1_000\)/);
+  assert.match(clock, /rpc\("get_auction_server_time"\)/);
+  assert.match(clock, /serverOffsetMs = serverTime - \(requestedAt \+ receivedAt\) \/ 2/);
   assert.match(clock, /export function useAuctionPolicyMinuteClock\(\): Date/);
-  assert.match(feed, /const auctionNow = useAuctionPolicyMinuteClock\(\)/);
-  assert.match(sidebar, /const auctionNow = useAuctionPolicyMinuteClock\(\)/);
-  assert.doesNotMatch(feed, /useAuctionPolicyClock\(\)/);
-  assert.doesNotMatch(sidebar, /useAuctionPolicyClock\(\)/);
+  assert.match(auctionClock, /const currentTime = useAuctionPolicyClock\(\)/);
+  assert.doesNotMatch(auctionClock, /window\.setInterval/);
+  assert.match(feed, /const auctionNow = useAuctionPolicyClock\(\)/);
+  assert.match(sidebar, /const auctionNow = useAuctionPolicyClock\(\)/);
+  assert.doesNotMatch(feed, /useAuctionPolicyMinuteClock\(\)/);
+  assert.doesNotMatch(sidebar, /useAuctionPolicyMinuteClock\(\)/);
   assert.match(countdown, /const currentTime = useAuctionPolicyClock\(\)/);
-  assert.match(postCard, /assertAuctionBidAllowed\(\{[\s\S]*now: new Date\(\)/);
-  assert.match(sidebar, /assertAuctionBidAllowed\(\{[\s\S]*now: new Date\(\)/);
+  assert.match(postCard, /assertAuctionBidAllowed\(\{[\s\S]*now: auctionNow/);
+  assert.match(sidebar, /assertAuctionBidAllowed\(\{[\s\S]*now: auctionNow/);
 });

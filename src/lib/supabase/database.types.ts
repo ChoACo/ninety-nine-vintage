@@ -13,7 +13,20 @@ export type ShippingRequestStatus = "requested" | "shipped";
 export type PortOnePayMethod = "CARD" | "EASY_PAY" | "VIRTUAL_ACCOUNT";
 export type ProductPaymentStatus = "대기중" | "가상계좌발급" | "결제완료";
 export type ActivePaymentMode = "manual_transfer" | "portone";
-export type ManualTransferStatus = "awaiting_manual_transfer" | "confirmed";
+export type ManualTransferStatus =
+  | "awaiting_manual_transfer"
+  | "confirmed"
+  | "cancelled_unpaid";
+export type AuctionPurchaseOfferKind = "original" | "second_chance";
+export type AuctionPurchaseOfferStatus =
+  | "payment_due"
+  | "offered"
+  | "accepted"
+  | "settled"
+  | "expired_unpaid"
+  | "declined"
+  | "expired_offer"
+  | "no_successor";
 export type PortOnePaymentStatus =
   | "READY"
   | "PAY_PENDING"
@@ -253,6 +266,10 @@ export type Database = {
           requested_at: string;
           confirmed_at: string | null;
           confirmed_by: string | null;
+          purchase_offer_id: string | null;
+          due_at: string | null;
+          cancelled_at: string | null;
+          cancellation_reason: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -270,6 +287,10 @@ export type Database = {
           requested_at?: string;
           confirmed_at?: string | null;
           confirmed_by?: string | null;
+          purchase_offer_id?: string | null;
+          due_at?: string | null;
+          cancelled_at?: string | null;
+          cancellation_reason?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -287,6 +308,10 @@ export type Database = {
           requested_at?: string;
           confirmed_at?: string | null;
           confirmed_by?: string | null;
+          purchase_offer_id?: string | null;
+          due_at?: string | null;
+          cancelled_at?: string | null;
+          cancellation_reason?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -306,13 +331,77 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "manual_transfer_orders_purchase_offer_id_fkey";
+            columns: ["purchase_offer_id"];
+            isOneToOne: true;
+            referencedRelation: "auction_purchase_offers";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "manual_transfer_orders_product_id_fkey";
             columns: ["product_id"];
-            isOneToOne: true;
+            isOneToOne: false;
             referencedRelation: "products";
             referencedColumns: ["id"];
           },
         ];
+      };
+      auction_purchase_offers: {
+        Row: {
+          id: string;
+          product_id: string;
+          offer_round: number;
+          offer_kind: AuctionPurchaseOfferKind;
+          bid_id: string | null;
+          bidder_id: string | null;
+          bidder_display_name_snapshot: string;
+          offered_amount: number;
+          status: AuctionPurchaseOfferStatus;
+          offered_at: string;
+          response_due_at: string | null;
+          payment_due_at: string | null;
+          accepted_at: string | null;
+          settled_at: string | null;
+          previous_offer_id: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          offer_round: number;
+          offer_kind: AuctionPurchaseOfferKind;
+          bid_id?: string | null;
+          bidder_id?: string | null;
+          bidder_display_name_snapshot: string;
+          offered_amount: number;
+          status: AuctionPurchaseOfferStatus;
+          offered_at?: string;
+          response_due_at?: string | null;
+          payment_due_at?: string | null;
+          accepted_at?: string | null;
+          settled_at?: string | null;
+          previous_offer_id?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          product_id?: string;
+          offer_round?: number;
+          offer_kind?: AuctionPurchaseOfferKind;
+          bid_id?: string | null;
+          bidder_id?: string | null;
+          bidder_display_name_snapshot?: string;
+          offered_amount?: number;
+          status?: AuctionPurchaseOfferStatus;
+          offered_at?: string;
+          response_due_at?: string | null;
+          payment_due_at?: string | null;
+          accepted_at?: string | null;
+          settled_at?: string | null;
+          previous_offer_id?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       payment_attempts: {
         Row: {
@@ -494,6 +583,9 @@ export type Database = {
           bid_locked_at: string | null;
           final_bid_id: string | null;
           final_bid_amount: number | null;
+          anti_sniping_base_closes_at: string | null;
+          anti_sniping_extended_at: string | null;
+          anti_sniping_extension_count: number;
           created_by: string | null;
           updated_by: string | null;
         };
@@ -517,6 +609,9 @@ export type Database = {
           bid_locked_at?: string | null;
           final_bid_id?: string | null;
           final_bid_amount?: number | null;
+          anti_sniping_base_closes_at?: string | null;
+          anti_sniping_extended_at?: string | null;
+          anti_sniping_extension_count?: number;
           created_by?: string | null;
           updated_by?: string | null;
         };
@@ -540,6 +635,9 @@ export type Database = {
           bid_locked_at?: string | null;
           final_bid_id?: string | null;
           final_bid_amount?: number | null;
+          anti_sniping_base_closes_at?: string | null;
+          anti_sniping_extended_at?: string | null;
+          anti_sniping_extension_count?: number;
           created_by?: string | null;
           updated_by?: string | null;
         };
@@ -914,6 +1012,36 @@ export type Database = {
           is_payment_settled: boolean;
         }[];
       };
+      get_my_second_chance_offers: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          offer_id: string;
+          product_id: string;
+          product_title: string;
+          image_urls: string[];
+          offered_amount: number;
+          offered_at: string;
+          expires_at: string;
+          status: AuctionPurchaseOfferStatus;
+        }[];
+      };
+      claim_my_second_chance_offer: {
+        Args: { p_offer_id: string };
+        Returns: {
+          offer_id: string;
+          product_id: string;
+          status: AuctionPurchaseOfferStatus;
+          payment_due_at: string | null;
+        }[];
+      };
+      decline_my_second_chance_offer: {
+        Args: { p_offer_id: string };
+        Returns: string;
+      };
+      get_auction_server_time: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
       get_manual_transfer_settings: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -949,6 +1077,11 @@ export type Database = {
           confirmed_at: string | null;
           updated_at: string;
           total_count: number;
+          due_at: string | null;
+          purchase_offer_kind: AuctionPurchaseOfferKind | null;
+          purchase_offer_status: AuctionPurchaseOfferStatus | null;
+          purchase_offer_round: number | null;
+          payment_deadline_exempt: boolean;
         }[];
       };
       get_my_won_products: {
@@ -975,6 +1108,11 @@ export type Database = {
           manual_transfer_confirmed_at: string | null;
           is_payment_settled: boolean;
           active_payment_mode: ActivePaymentMode;
+          purchase_offer_id: string | null;
+          purchase_offer_kind: AuctionPurchaseOfferKind | null;
+          purchase_offer_status: AuctionPurchaseOfferStatus | null;
+          purchase_offer_round: number | null;
+          payment_due_at: string | null;
         }[];
       };
       get_owner_hidden_test_won_products: {

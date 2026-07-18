@@ -604,12 +604,28 @@ video {
   }
 }
 
+@keyframes anti-sniping-pulse {
+  0%,
+  100% {
+    opacity: 0.9;
+    box-shadow: 0 0 14px rgba(249, 115, 22, 0.34);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.56);
+  }
+}
+
 .animate-fade-in-up {
   animation: fade-in-up 0.45s ease both;
 }
 
 .animate-soft-pulse {
   animation: soft-pulse 2.4s ease-in-out infinite;
+}
+
+.anti-sniping-pulse {
+  animation: anti-sniping-pulse 1.35s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -112,7 +112,7 @@ export function NicknameOnboardingModal({
 
         <p className="rounded-2xl bg-[var(--info-surface)] px-4 py-3 text-sm font-bold leading-6 text-[var(--info-text)]">
           다른 회원의 온라인 목록과 입찰 화면에는 코드형 식별자 대신 이 닉네임이 표시됩니다.
-          관리자·운영자·직원처럼 직책과 혼동되는 이름은 사용할 수 없습니다.
+          운영자·직원처럼 직책과 혼동되는 이름은 사용할 수 없습니다.
         </p>
 
         {error ? (

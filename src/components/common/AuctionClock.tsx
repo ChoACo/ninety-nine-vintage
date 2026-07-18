@@ -13,7 +13,7 @@ export interface AuctionClockProps {
 }
 
 export default function AuctionClock({ className = "" }: AuctionClockProps) {
-  const { currentTime, deadline, countdown } = useAuctionClock({ rollover: false });
+  const { currentTime, deadline, countdown } = useAuctionClock({ rollover: true });
   const auctionPhase = getDailyAuctionPhase(currentTime);
   const isClosed = auctionPhase === "closed";
   const isRestricted = auctionPhase === "existing-participants-only";
@@ -49,13 +49,13 @@ export default function AuctionClock({ className = "" }: AuctionClockProps) {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-black tracking-[0.1em] text-[#ad6557]">
                 {isClosed
-                  ? "TODAY'S AUCTION CLOSED"
+                  ? "AUCTION SETTLEMENT PAUSE"
                   : isRestricted
                     ? "EXISTING BIDDERS ONLY"
                     : "UNTIL 9:00 PM"}
               </p>
               <span className="rounded-full border border-[var(--border-strong)] bg-[var(--surface-raised)]/70 px-3 py-1.5 text-sm font-bold text-[var(--text-muted)]">
-                오후 8:56 신규 제한 · 9:00 마감
+                오후 8:56 신규 제한 · 오후 9:00 정산 · 오후 10:00 재개
               </span>
             </div>
             <p
@@ -63,11 +63,11 @@ export default function AuctionClock({ className = "" }: AuctionClockProps) {
               suppressHydrationWarning
               className="mt-3 text-4xl font-black tabular-nums tracking-[-0.04em] text-[var(--accent-text)] sm:text-5xl"
             >
-              {isClosed ? "오늘 경매 마감" : formatCountdown(countdown)}
+              {isClosed ? "오후 10시 재개" : formatCountdown(countdown)}
             </p>
             <p suppressHydrationWarning className="mt-2 break-keep text-[17px] font-bold leading-7 text-[var(--text-muted)]">
               {isClosed
-                ? "오늘 입찰은 종료되었습니다. 미판매 상품은 다음 경매에서 다시 참여할 수 있습니다."
+                ? "낙찰 상품을 판매 완료로 옮기는 정산 시간입니다. 미판매 상품은 오후 10시부터 다시 입찰할 수 있습니다."
                 : isRestricted
                   ? "기존 참여자는 오후 9시까지 입찰할 수 있습니다. 입찰 0건 상품의 첫 입찰은 즉시 낙찰 확정됩니다."
                   : `오후 8시 56분부터 신규 참여가 제한되며 ${formatKoreanTime(deadline)}에 마감됩니다.`}

@@ -225,6 +225,8 @@ export async function requestProductPayment(input: {
   productId: string;
   payMethod: ProductPaymentMethod;
   paymentId?: string | null;
+  /** Owner-only hidden member used by the isolated service test console. */
+  testMemberId?: string | null;
 }): Promise<ProductPaymentResult> {
   const accessToken = await getAccessToken();
   const paymentId = input.paymentId || createPortOnePaymentId(input.productId);
@@ -239,6 +241,7 @@ export async function requestProductPayment(input: {
         productId: input.productId,
         paymentId,
         payMethod: input.payMethod,
+        ...(input.testMemberId ? { testMemberId: input.testMemberId } : {}),
       },
       "결제를 준비하지 못했습니다.",
     ),

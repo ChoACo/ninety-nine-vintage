@@ -18,7 +18,7 @@ import {
 } from "@/src/lib/supabase/productImagePolicy";
 import {
   formatKRW,
-  getRelativeKoreanDateTime,
+  getNextAuctionPublishAt,
 } from "@/src/utils/formatters";
 
 type PublishMode = "scheduled" | "immediate";
@@ -187,7 +187,7 @@ export default function NewAuctionModal({
         imageFiles: selectedImages.map((image) => image.file),
         status: isScheduled ? "pending" : "active",
         publish_at: isScheduled
-          ? getRelativeKoreanDateTime(1, "10:00:00", now)
+          ? getNextAuctionPublishAt(now).toISOString()
           : now.toISOString(),
       });
       resetAndClose();
@@ -210,7 +210,7 @@ export default function NewAuctionModal({
       open={open}
       onClose={isSubmitting ? () => undefined : resetAndClose}
       title="새 경매글 작성"
-      description="상품 설명과 사진을 등록한 뒤, 내일 오전 10시 예약 또는 즉시 공개를 선택해 주세요."
+      description="상품 설명과 사진을 등록한 뒤, 오전 10시 예약 또는 즉시 공개를 선택해 주세요."
       size="lg"
       closeOnBackdrop={!isSubmitting}
     >
@@ -366,10 +366,10 @@ export default function NewAuctionModal({
                 />
                 <span>
                   <strong className="block text-sm font-black text-[#493b34]">
-                    다음날 오전 10시 예약 등록
+                    가장 가까운 오전 10시 예약 등록
                   </strong>
                   <span className="mt-1 block text-xs font-semibold leading-5 text-[#8a7468]">
-                    내일 오전 10시에 피드에 자동 공개돼요.
+                    오전 10시 전에는 당일, 이후에는 다음 날 10시에 자동 공개돼요.
                   </span>
                 </span>
               </label>

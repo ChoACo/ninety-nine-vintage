@@ -376,6 +376,7 @@ export type Database = {
           current_price: number;
           bid_increment: number;
           image_urls: string[];
+          thumbnail_urls: string[];
           bid_history: Json;
           bid_locked_at: string | null;
           final_bid_id: string | null;
@@ -398,6 +399,7 @@ export type Database = {
           current_price: number;
           bid_increment?: number;
           image_urls: string[];
+          thumbnail_urls?: string[];
           bid_history?: Json;
           bid_locked_at?: string | null;
           final_bid_id?: string | null;
@@ -420,6 +422,7 @@ export type Database = {
           current_price?: number;
           bid_increment?: number;
           image_urls?: string[];
+          thumbnail_urls?: string[];
           bid_history?: Json;
           bid_locked_at?: string | null;
           final_bid_id?: string | null;
@@ -869,6 +872,18 @@ export type Database = {
           order_name: string;
           expected_amount: number;
           payment_status: ProductPaymentStatus;
+        }[];
+      };
+      publish_pending_products_now: {
+        Args: { p_product_ids: string[] };
+        Returns: {
+          requested_count: number;
+          published_count: number;
+          skipped_count: number;
+          published_ids: string[];
+          skipped_ids: string[];
+          published_at: string;
+          closes_at: string;
         }[];
       };
       reopen_my_support_conversation: {

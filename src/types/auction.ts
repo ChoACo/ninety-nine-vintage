@@ -8,11 +8,7 @@ export type PublicRoleGrade = 1 | 2 | 2.5 | 3;
  * 권한 정책에서 사용하는 공개 역할 이름입니다. 기존 `admin` 값은 서버 내부의
  * 소유자 식별자로만 유지하고 공개 역할에 포함하지 않습니다.
  */
-export type PublicRoleName =
-  | "operator"
-  | "employee"
-  | "band_member"
-  | "member";
+export type PublicRoleName = "operator" | "employee" | "band_member" | "member";
 
 export type AuctionStatus = "pending" | "active" | "closed";
 
@@ -25,10 +21,7 @@ export type PaymentStatus = "paid" | "pending";
 export type ShippingStatus = "preparing" | "ready" | "shipped";
 
 export type WonAuctionStage =
-  | "payment-pending"
-  | "keep"
-  | "shipping-requested"
-  | "shipped";
+  "payment-pending" | "keep" | "shipping-requested" | "shipped";
 
 export interface ShippingAddress {
   id: string;
@@ -77,6 +70,9 @@ export interface AuctionPost {
   startingPrice: number;
   currentPrice: number;
   bidIncrement: number;
+  /** 피드와 작은 카드에 사용하는 최대 640x360 파생 이미지 */
+  thumbnailUrls: string[];
+  /** 사진 확대 화면에 사용하는 최대 1280x720 이미지 */
   imageUrls: string[];
   /** 20:56 이후 무입찰 상품의 첫 입찰이 즉시 확정된 시각 */
   bidLockedAt?: ISODateString;

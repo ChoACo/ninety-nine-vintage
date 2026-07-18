@@ -38,7 +38,7 @@ test("server-renders the Supabase-backed auction application", async () => {
     /<title>다미네 구제 \| 믿고 참여하는 구제 의류 경매<\/title>/i,
   );
   assert.match(html, /매일 만나는 믿을 수 있는 구제 옷, 다미네 구제/);
-  assert.match(html, /무입찰 첫 건 즉시 확정/);
+  assert.match(html, /무입찰 첫 건은 즉시 확정/);
   assert.match(html, /Supabase에서 경매 상품을 불러오는 중이에요/);
   assert.match(html, /카카오로 시작하기/);
   assert.doesNotMatch(html, /버버리 체크 안감|카멜 핸드메이드|Mock Data/i);
@@ -504,10 +504,10 @@ test("provides a collapsible Supabase operator center with constrained product m
   assert.match(navigation, /canAccessOperationsWorkspace\(role\)/);
   assert.match(navigation, /role === "employee"/);
   assert.match(auctionApp, /canAccessOperationsCenter\(auth\.role\)/);
-  assert.match(auctionApp, /ownerMode === "admin" \? "admin" : "operator"/);
-  assert.match(siteHeader, /isOwnerRole\(role\) && onRequestOwnerModeChange/);
-  assert.match(siteHeader, /운영자 모드/);
-  assert.match(siteHeader, /관리자 모드/);
+  assert.match(auctionApp, /isOwnerRole\(auth\.role\) \? "admin" : "operator"/);
+  assert.match(siteHeader, /isOwnerRole\(role\)[\s\S]*onOpenOwnerTools/);
+  assert.match(siteHeader, /테스트 도구/);
+  assert.doesNotMatch(siteHeader, /관리자 모드|운영자 모드|PIN/);
   assert.match(auctionApp, /onOpenBulkImport=\{\(\) => setBulkAuctionOpen\(true\)\}/);
   assert.doesNotMatch(auctionApp, /emptyAdminSales|shipments=\{\[\]\}/);
   assert.ok((adminPage.match(/<CollapsibleSection/g) ?? []).length >= 6);
@@ -539,45 +539,52 @@ test("provides a collapsible Supabase operator center with constrained product m
   assert.doesNotMatch(accessMigration, /auction_settlements/);
 });
 
-test("gates the private owner console with a short-lived server session", async () => {
+test("keeps the owner publicly operator-only while providing audited private test controls", async () => {
   const [
     auctionApp,
     siteHeader,
     ownerServer,
     ownerClient,
-    unlockRoute,
-    statusRoute,
-    lockRoute,
+    delegationRoute,
+    testMemberRoute,
     ownerPage,
     ownerMigration,
+    delegationPanel,
+    testPanel,
+    auctionPanel,
   ] = await Promise.all([
     source("src/components/AuctionApp.tsx"),
     source("src/components/common/SiteHeader.tsx"),
-    source("src/lib/ownerMode/server.ts"),
-    source("src/lib/ownerMode/client.ts"),
-    source("app/api/owner-mode/unlock/route.ts"),
-    source("app/api/owner-mode/status/route.ts"),
-    source("app/api/owner-mode/lock/route.ts"),
+    source("src/lib/ownerAccess/server.ts"),
+    source("src/lib/ownerAccess/client.ts"),
+    source("app/api/owner/delegation/route.ts"),
+    source("app/api/owner/test-member/route.ts"),
     source("src/components/owner/OwnerPrivatePage.tsx"),
-    source("supabase/migrations/20260718053000_owner_mode_sessions.sql"),
+    source("supabase/migrations/20260718060000_hidden_owner_delegation_and_test_member.sql"),
+    source("src/components/owner/OwnerDelegationPanel.tsx"),
+    source("src/components/owner/OwnerHiddenTestPanel.tsx"),
+    source("src/components/owner/OwnerAuctionControlPanel.tsx"),
   ]);
 
-  assert.match(ownerServer, /process\.env\.OWNER_MODE_PIN/);
-  assert.match(ownerServer, /timingSafeStringEqual/);
-  assert.match(ownerServer, /HttpOnly/);
-  assert.match(ownerServer, /Secure/);
-  assert.match(ownerServer, /SameSite=Strict/);
-  assert.match(ownerServer, /hashTokenSha256\(context\.accessToken\)/);
-  assert.match(ownerMigration, /revoke all on public\.owner_mode_sessions from public, anon, authenticated/);
-  assert.match(ownerMigration, /owner_mode_unlock_limits/);
-  assert.match(ownerMigration, /process_owner_mode_pin_attempt/);
-  assert.match(ownerMigration, /for update;/);
-  assert.match(unlockRoute, /authenticateOwnerRequest/);
-  assert.match(statusRoute, /validateOwnerModeSession/);
-  assert.match(lockRoute, /revokeOwnerModeSession/);
+  assert.match(ownerServer, /Authorization/);
+  assert.match(ownerServer, /auth\.getUser\(accessToken\)/);
+  assert.match(ownerMigration, /drop table if exists public\.owner_mode_sessions/);
+  assert.match(ownerMigration, /owner_operator_delegation_audit/);
+  assert.match(ownerMigration, /owner_hidden_test_members/);
+  assert.match(ownerMigration, /current_owner_delegated_operator/);
+  assert.match(ownerMigration, /not public\.is_owner_hidden_test_member/);
+  assert.match(delegationRoute, /begin_owner_operator_delegation/);
+  assert.match(testMemberRoute, /get_owner_hidden_test_member/);
   assert.match(ownerClient, /Authorization: `Bearer \$\{accessToken\}`/);
   assert.match(auctionApp, /if \(role === "admin"\) return "operator"/);
-  assert.match(siteHeader, /onRequestOwnerModeChange/);
+  assert.match(siteHeader, /테스트 도구/);
+  assert.doesNotMatch(siteHeader, /관리자 모드|PIN/);
+  assert.match(delegationPanel, /감사 기록 활성/);
+  assert.match(testPanel, /ownerPlaceTestBid/);
+  assert.match(testPanel, /requestProductPayment/);
+  assert.match(testPanel, /requestOwnerHiddenTestShipping/);
+  assert.match(auctionPanel, /ownerCloseAuctionNow/);
+  assert.match(auctionPanel, /ownerOverrideAuctionPrice/);
   assert.match(ownerPage, /<StaffChatInbox staffId=\{auth\.user\.id\} role="admin"/);
 
   const response = await render("/owner");

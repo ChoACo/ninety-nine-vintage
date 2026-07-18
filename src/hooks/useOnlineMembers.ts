@@ -2,11 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import {
-  isOwnerRole,
-  shouldTrackPresence,
-  type AppRole,
-} from "@/src/lib/supabase/auth";
+import { shouldTrackPresence, type AppRole } from "@/src/lib/supabase/auth";
 import { getSupabaseBrowserClient } from "@/src/lib/supabase/client";
 
 const MAX_VISIBLE_ONLINE_MEMBERS = 50;
@@ -71,12 +67,12 @@ export function useOnlineMembers({
   const [hasMore, setHasMore] = useState(false);
   const [status, setStatus] = useState<OnlinePresenceStatus>("connecting");
   const [error, setError] = useState<string | null>(null);
+  const shouldPublishPresence = Boolean(role && shouldTrackPresence(role));
   const isDisabled =
     !enabled ||
     !userId ||
     !role ||
-    isOwnerRole(role) ||
-    !shouldTrackPresence(role);
+    role === "unauthorized";
 
   useEffect(() => {
     if (isDisabled) return;
@@ -91,8 +87,14 @@ export function useOnlineMembers({
       requestInFlight = true;
 
       try {
-        const { error: heartbeatError } = await client.rpc("touch_my_last_seen");
-        if (heartbeatError) throw heartbeatError;
+        // Owners and employees may view the directory, but remain invisible:
+        // only public presence roles publish a heartbeat.
+        if (shouldPublishPresence) {
+          const { error: heartbeatError } = await client.rpc(
+            "touch_my_last_seen",
+          );
+          if (heartbeatError) throw heartbeatError;
+        }
 
         const { data, error: directoryError } = await client.rpc(
           "get_online_member_directory",
@@ -151,7 +153,7 @@ export function useOnlineMembers({
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isDisabled]);
+  }, [isDisabled, shouldPublishPresence]);
 
   return isDisabled
     ? {

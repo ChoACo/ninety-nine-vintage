@@ -50,9 +50,9 @@ function BidItem({
     >
       <div className="flex gap-2.5">
         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[#eadfd4]">
-          {post.imageUrls[0] ? (
+          {post.thumbnailUrls[0] || post.imageUrls[0] ? (
             <img
-              src={post.imageUrls[0]}
+              src={post.thumbnailUrls[0] || post.imageUrls[0]}
               alt=""
               className="h-full w-full object-cover"
               loading="lazy"
@@ -93,9 +93,9 @@ function BidItem({
             ? "⛔ 오늘 경매 마감"
             : bidDecision?.reason === "late-first-bid-finalized"
               ? "✅ 확정 입찰 완료"
-            : bidDecision?.reason === "new-bid-cutoff"
-              ? "⛔ 신규 입찰 마감"
-              : "+1,000원 즉시 재입찰"}
+              : bidDecision?.reason === "new-bid-cutoff"
+                ? "⛔ 신규 입찰 마감"
+                : "+1,000원 즉시 재입찰"}
         </button>
       ) : null}
     </li>
@@ -290,11 +290,13 @@ export default function LiveBidSidebar({
           open
           amount={confirmAmount}
           itemTitle={getItemLabel(confirmPost)}
-          isFinalBid={getAuctionBidDecision({
-            post: confirmPost,
-            currentUserName,
-            now: auctionNow,
-          }).finalOnAccept}
+          isFinalBid={
+            getAuctionBidDecision({
+              post: confirmPost,
+              currentUserName,
+              now: auctionNow,
+            }).finalOnAccept
+          }
           onClose={() => setConfirmPostId(null)}
           onConfirm={handleConfirm}
         />

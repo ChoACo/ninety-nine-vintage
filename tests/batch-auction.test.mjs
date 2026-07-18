@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ExcelJS from "exceljs";
 import ts from "typescript";
+import { getNextAuctionPublishAt } from "../src/utils/formatters.ts";
 
 const rootUrl = new URL("../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
@@ -339,7 +340,46 @@ test("keeps workbook model limits, header tie-breaking, and picker reset guards"
     /source === "directory"[\s\S]*multipleInputRef\.current[\s\S]*directoryInputRef\.current/,
   );
   assert.match(parser, /status: "pending"/);
-  assert.match(modal, /getRelativeKoreanDateTime\(1, "10:00:00", now\)/);
+  assert.match(modal, /getNextAuctionPublishAt\(now\)\.toISOString\(\)/);
   assert.match(modal, /1~5행은 양식 안내로 제외하고 6행부터/);
   assert.doesNotMatch(modal, /즉시 공개|status: "active"|publishMode/);
+});
+
+test("schedules pending products for the nearest KST 10:00 boundary", () => {
+  assert.equal(
+    getNextAuctionPublishAt("2026-07-18T00:59:59.999Z").toISOString(),
+    "2026-07-18T01:00:00.000Z",
+    "KST 오전 10시 전에는 당일 오전 10시여야 합니다.",
+  );
+  assert.equal(
+    getNextAuctionPublishAt("2026-07-18T01:00:00.000Z").toISOString(),
+    "2026-07-19T01:00:00.000Z",
+    "KST 오전 10시부터는 다음 날 오전 10시여야 합니다.",
+  );
+  assert.equal(
+    getNextAuctionPublishAt("2026-07-31T14:59:59.000Z").toISOString(),
+    "2026-08-01T01:00:00.000Z",
+    "한국 달력의 월 경계를 올바르게 넘어야 합니다.",
+  );
+});
+
+test("publishes selected pending queue rows through one bounded operator RPC", async () => {
+  const [migration, repository, adminPage] = await Promise.all([
+    source("supabase/migrations/20260718063000_publish_pending_products_now.sql"),
+    source("src/lib/supabase/products.ts"),
+    source("src/components/admin/AdminPage.tsx"),
+  ]);
+
+  assert.match(migration, /cardinality\(p_product_ids\) > 200/);
+  assert.match(migration, /group by input_values\.product_id/);
+  assert.match(migration, /not in \('owner', 'operator'\)/);
+  assert.match(migration, /products\.status = 'pending'/);
+  assert.match(migration, /status = 'active'/);
+  assert.match(migration, /time '21:00:00'/);
+  assert.match(migration, /published_ids uuid\[\]/);
+  assert.match(migration, /skipped_ids uuid\[\]/);
+  assert.match(repository, /rpc\("publish_pending_products_now"/);
+  assert.match(adminPage, /지금 즉시 올리기/);
+  assert.match(adminPage, /selectedPendingProductIds/);
+  assert.match(adminPage, /이미 상태가 바뀌었거나 찾을 수 없는/);
 });

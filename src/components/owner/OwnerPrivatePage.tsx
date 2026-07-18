@@ -1,105 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import { StaffChatInbox } from "@/src/components/chat/StaffChatInbox";
 import { Button, ThemeToggle } from "@/src/components/common";
+import { OwnerAuctionControlPanel } from "@/src/components/owner/OwnerAuctionControlPanel";
+import { OwnerDelegationPanel } from "@/src/components/owner/OwnerDelegationPanel";
+import { OwnerHiddenTestPanel } from "@/src/components/owner/OwnerHiddenTestPanel";
 import { useAuthSession } from "@/src/hooks/useAuthSession";
-import {
-  getOwnerModeStatus,
-  lockOwnerMode,
-} from "@/src/lib/ownerMode/client";
 import { isOwnerRole } from "@/src/lib/supabase/auth";
-
-type GateStatus = "loading" | "unlocked" | "denied" | "error";
-
-function formatExpiry(value: string | null): string {
-  if (!value) return "확인 필요";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "확인 필요";
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(date);
-}
 
 export function OwnerPrivatePage() {
   const auth = useAuthSession();
-  const [gateStatus, setGateStatus] = useState<GateStatus>("loading");
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
-  const [isLocking, setIsLocking] = useState(false);
 
-  useEffect(() => {
-    if (auth.isLoading) return;
-    let active = true;
-    let expiryTimer: number | undefined;
-
-    if (!auth.user || !isOwnerRole(auth.role)) {
-      const deniedTimer = window.setTimeout(() => {
-        if (active) setGateStatus("denied");
-      }, 0);
-      return () => {
-        active = false;
-        window.clearTimeout(deniedTimer);
-      };
-    }
-
-    void getOwnerModeStatus()
-      .then((status) => {
-        if (!active) return;
-        if (!status.unlocked || !status.expiresAt) {
-          setGateStatus("denied");
-          return;
-        }
-
-        setExpiresAt(status.expiresAt);
-        setGateStatus("unlocked");
-        const remaining = new Date(status.expiresAt).getTime() - Date.now();
-        expiryTimer = window.setTimeout(
-          () => {
-            if (active) setGateStatus("denied");
-          },
-          Math.max(0, Math.min(remaining, 2_147_000_000)),
-        );
-      })
-      .catch(() => {
-        if (active) setGateStatus("error");
-      });
-
-    return () => {
-      active = false;
-      if (expiryTimer !== undefined) window.clearTimeout(expiryTimer);
-    };
-  }, [auth.isLoading, auth.role, auth.user]);
-
-  const handleLock = async () => {
-    if (isLocking) return;
-    setIsLocking(true);
-    try {
-      await lockOwnerMode();
-    } finally {
-      window.location.replace("/");
-    }
-  };
-
-  if (gateStatus === "loading" || auth.isLoading) {
-    return <OwnerGateState message="전용 관리 세션을 확인하고 있습니다…" />;
+  if (auth.isLoading) {
+    return <OwnerGateState message="운영 권한을 확인하고 있습니다…" />;
   }
 
-  if (
-    gateStatus !== "unlocked" ||
-    !auth.user ||
-    !isOwnerRole(auth.role)
-  ) {
+  if (!auth.user || !auth.session || !isOwnerRole(auth.role)) {
     return (
       <OwnerGateState
-        message={
-          gateStatus === "error"
-            ? "전용 페이지를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요."
-            : "이 페이지를 열 수 없습니다. 메인 화면에서 전용 모드를 먼저 확인해 주세요."
-        }
+        message="이 도구는 등록된 운영 총책임자 계정에서만 열 수 있습니다."
         showHome
       />
     );
@@ -112,14 +31,13 @@ export function OwnerPrivatePage() {
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-black tracking-[0.18em] text-[var(--accent-text)]">
-                PRIVATE OPERATIONS CONSOLE
+                PRIVATE TEST OPERATIONS
               </p>
               <h1 className="mt-2 text-3xl font-black tracking-tight text-[var(--text-strong)]">
-                전용 운영 페이지
+                운영 테스트 도구
               </h1>
               <p className="mt-2 max-w-2xl break-keep font-bold leading-7 text-[var(--text-muted)]">
-                일반 화면에서는 언제나 운영자로 표시됩니다. 이 페이지의 전용 기능은
-                짧게 만료되는 서버 세션이 확인된 동안에만 열립니다.
+                일반 화면에서는 언제나 운영자로 표시됩니다. 테스트 조작은 모두 실제 실행자와 대상, 사유가 감사 기록으로 남습니다.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -127,17 +45,26 @@ export function OwnerPrivatePage() {
               <Button variant="secondary" onClick={() => window.location.assign("/") }>
                 일반 운영 화면
               </Button>
-              <Button variant="ghost" isLoading={isLocking} onClick={() => void handleLock()}>
-                전용 모드 잠그기
-              </Button>
             </div>
           </div>
         </header>
 
-        <section className="mt-5 grid gap-4 sm:grid-cols-3" aria-label="전용 세션 안내">
+        <section className="mt-5 grid gap-4 sm:grid-cols-3" aria-label="테스트 운영 안내">
           <OwnerSummaryCard title="공개 표시" value="운영자" />
-          <OwnerSummaryCard title="전용 세션 만료" value={formatExpiry(expiresAt)} />
-          <OwnerSummaryCard title="접근 방식" value="PIN · 서버 검증" />
+          <OwnerSummaryCard title="내부 권한" value="전체 운영 권한" />
+          <OwnerSummaryCard title="조작 기록" value="감사 로그 영구 보존" />
+        </section>
+
+        <section className="mt-6">
+          <OwnerDelegationPanel accessToken={auth.session.access_token} />
+        </section>
+
+        <section className="mt-6">
+          <OwnerHiddenTestPanel accessToken={auth.session.access_token} />
+        </section>
+
+        <section className="mt-6">
+          <OwnerAuctionControlPanel />
         </section>
 
         <section className="mt-6">

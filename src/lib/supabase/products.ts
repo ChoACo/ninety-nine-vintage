@@ -6,11 +6,7 @@ import type {
   BidHistoryRecord,
 } from "@/src/types/auction";
 import { getNextAuctionDeadline } from "@/src/utils/formatters";
-import {
-  canManageProducts,
-  getUserRole,
-  mapAccessRoleToAppRole,
-} from "./auth";
+import { canManageProducts, getUserRole, mapAccessRoleToAppRole } from "./auth";
 import { getSupabaseBrowserClient } from "./client";
 import type { Database, Json } from "./database.types";
 import {
@@ -18,6 +14,7 @@ import {
   isSupportedProductImageMimeType,
   PRODUCT_IMAGE_FORMAT_LABEL,
 } from "./productImagePolicy";
+import { compressProductImageVariantsForUpload } from "../images/productImageCompression";
 
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -36,6 +33,7 @@ const PRODUCT_COLUMNS = [
   "current_price",
   "bid_increment",
   "image_urls",
+  "thumbnail_urls",
   "bid_history",
   "bid_locked_at",
   "final_bid_amount",
@@ -100,6 +98,9 @@ export function mapProductRowToAuctionPost(row: ProductRow): AuctionPost {
     currentPrice: row.current_price,
     bidIncrement: row.bid_increment,
     imageUrls: row.image_urls,
+    thumbnailUrls: row.image_urls.map(
+      (imageUrl, index) => row.thumbnail_urls[index] || imageUrl,
+    ),
     bidLockedAt: row.bid_locked_at ?? undefined,
     finalBidAmount: row.final_bid_amount ?? undefined,
     bidHistory: parseBidHistory(row.bid_history),
@@ -137,9 +138,7 @@ function assertUploadableImage(file: File) {
     );
   }
   if (file.size <= 0 || file.size > MAX_IMAGE_BYTES) {
-    throw new ProductRepositoryError(
-      "사진 한 장의 크기는 10MB 이하여야 해요.",
-    );
+    throw new ProductRepositoryError("사진 한 장의 크기는 10MB 이하여야 해요.");
   }
 }
 
@@ -158,6 +157,7 @@ async function removeUploadedImages(paths: readonly string[]) {
 
 export interface UploadedProductImages {
   imageUrls: string[];
+  thumbnailUrls: string[];
   paths: string[];
 }
 
@@ -172,6 +172,7 @@ export async function uploadProductImages(
 
   const client = getSupabaseBrowserClient();
   const imageUrls: string[] = [];
+  const thumbnailUrls: string[] = [];
   const paths: string[] = [];
 
   try {
@@ -182,32 +183,55 @@ export async function uploadProductImages(
           "사진 파일의 실제 형식과 확장자 또는 MIME 정보가 일치하지 않아요.",
         );
       }
-      const extension = getImageExtension(file);
-      const path = `products/${productId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
-      const { data, error } = await client.storage
+      const { imageFile, thumbnailFile } =
+        await compressProductImageVariantsForUpload(file);
+      const uniqueName = `${Date.now()}-${crypto.randomUUID()}`;
+      const imagePath = `products/${productId}/images/${uniqueName}.${getImageExtension(imageFile)}`;
+      const thumbnailPath = `products/${productId}/thumbnails/${uniqueName}.${getImageExtension(thumbnailFile)}`;
+      const { data: imageData, error: imageError } = await client.storage
         .from(PRODUCT_IMAGES_BUCKET)
-        .upload(path, file, {
+        .upload(imagePath, imageFile, {
           cacheControl: "31536000",
-          contentType: file.type,
+          contentType: imageFile.type,
           upsert: false,
         });
 
-      if (error) {
+      if (imageError) {
         throw new ProductRepositoryError(
           "사진 업로드에 실패했어요. Storage 버킷과 운영자 권한을 확인해 주세요.",
-          { cause: error },
+          { cause: imageError },
         );
       }
 
-      paths.push(data.path);
-      const { data: publicUrlData } = client.storage
+      paths.push(imageData.path);
+      const { data: thumbnailData, error: thumbnailError } =
+        await client.storage
+          .from(PRODUCT_IMAGES_BUCKET)
+          .upload(thumbnailPath, thumbnailFile, {
+            cacheControl: "31536000",
+            contentType: thumbnailFile.type,
+            upsert: false,
+          });
+      if (thumbnailError) {
+        throw new ProductRepositoryError(
+          "미리보기 사진 업로드에 실패했어요. Storage 버킷과 운영자 권한을 확인해 주세요.",
+          { cause: thumbnailError },
+        );
+      }
+
+      paths.push(thumbnailData.path);
+      const { data: imagePublicUrlData } = client.storage
         .from(PRODUCT_IMAGES_BUCKET)
-        .getPublicUrl(data.path);
-      imageUrls.push(publicUrlData.publicUrl);
+        .getPublicUrl(imageData.path);
+      const { data: thumbnailPublicUrlData } = client.storage
+        .from(PRODUCT_IMAGES_BUCKET)
+        .getPublicUrl(thumbnailData.path);
+      imageUrls.push(imagePublicUrlData.publicUrl);
+      thumbnailUrls.push(thumbnailPublicUrlData.publicUrl);
       onUploaded?.(imageUrls.length, files.length);
     }
 
-    return { imageUrls, paths };
+    return { imageUrls, thumbnailUrls, paths };
   } catch (error) {
     await removeUploadedImages(paths);
     throw error;
@@ -217,10 +241,13 @@ export async function uploadProductImages(
 export interface CreatedProduct {
   id: string;
   imageUrls: string[];
+  thumbnailUrls: string[];
 }
 
 interface ProductAccessRpcClient {
-  rpc(functionName: "current_access_role" | "can_manage_products"): PromiseLike<{
+  rpc(
+    functionName: "current_access_role" | "can_manage_products",
+  ): PromiseLike<{
     data: unknown;
     error: { message: string } | null;
   }>;
@@ -279,7 +306,9 @@ function prepareProductDraft(draft: NewAuctionDraft): PreparedProductDraft {
     throw new ProductRepositoryError("상품명은 160자 이내로 입력해 주세요.");
   }
   if (!description || description.length > 10_000) {
-    throw new ProductRepositoryError("상품 설명은 10,000자 이내로 입력해 주세요.");
+    throw new ProductRepositoryError(
+      "상품 설명은 10,000자 이내로 입력해 주세요.",
+    );
   }
   if (
     !Number.isSafeInteger(draft.startingPrice) ||
@@ -318,6 +347,7 @@ function prepareProductDraft(draft: NewAuctionDraft): PreparedProductDraft {
 function createProductInsert(
   prepared: PreparedProductDraft,
   imageUrls: string[],
+  thumbnailUrls: string[],
 ): ProductInsert {
   const { draft, id, publishAt } = prepared;
   return {
@@ -333,6 +363,7 @@ function createProductInsert(
     current_price: draft.startingPrice,
     bid_increment: draft.bidIncrement,
     image_urls: imageUrls,
+    thumbnail_urls: thumbnailUrls,
     bid_history: [],
   };
 }
@@ -346,7 +377,11 @@ export async function createProduct(
     prepared.draft.imageFiles,
     prepared.id,
   );
-  const row = createProductInsert(prepared, uploaded.imageUrls);
+  const row = createProductInsert(
+    prepared,
+    uploaded.imageUrls,
+    uploaded.thumbnailUrls,
+  );
 
   const { error } = await client.from("products").insert(row);
   if (error) {
@@ -357,7 +392,11 @@ export async function createProduct(
     );
   }
 
-  return { id: prepared.id, imageUrls: uploaded.imageUrls };
+  return {
+    id: prepared.id,
+    imageUrls: uploaded.imageUrls,
+    thumbnailUrls: uploaded.thumbnailUrls,
+  };
 }
 
 export async function createProductsBatch(
@@ -400,10 +439,17 @@ export async function createProductsBatch(
       );
       completedImages += prepared.draft.imageFiles.length;
       uploadedPaths.push(...uploaded.paths);
-      rows.push(createProductInsert(prepared, uploaded.imageUrls));
+      rows.push(
+        createProductInsert(
+          prepared,
+          uploaded.imageUrls,
+          uploaded.thumbnailUrls,
+        ),
+      );
       createdProducts.push({
         id: prepared.id,
         imageUrls: uploaded.imageUrls,
+        thumbnailUrls: uploaded.thumbnailUrls,
       });
     }
 
@@ -439,6 +485,56 @@ export async function fetchManagedProducts(): Promise<ManagedProduct[]> {
   return ((data ?? []) as unknown as ProductRow[]).map(
     mapProductRowToManagedProduct,
   );
+}
+
+export interface PublishPendingProductsResult {
+  requestedCount: number;
+  publishedCount: number;
+  skippedCount: number;
+  publishedIds: string[];
+  skippedIds: string[];
+  publishedAt: string;
+  closesAt: string;
+}
+
+export async function publishPendingProductsNow(
+  productIds: readonly string[],
+): Promise<PublishPendingProductsResult> {
+  const uniqueProductIds = [...new Set(productIds.filter(Boolean))];
+  if (uniqueProductIds.length === 0) {
+    throw new ProductRepositoryError(
+      "즉시 공개할 대기 상품을 하나 이상 선택해 주세요.",
+    );
+  }
+  if (uniqueProductIds.length > 200) {
+    throw new ProductRepositoryError(
+      "한 번에 최대 200개 상품까지 즉시 공개할 수 있어요.",
+    );
+  }
+
+  const client = await requireStaffSession();
+  const { data, error } = await client
+    .rpc("publish_pending_products_now", {
+      p_product_ids: uniqueProductIds,
+    })
+    .single();
+
+  if (error || !data) {
+    throw new ProductRepositoryError(
+      error?.message || "선택한 대기 상품을 즉시 공개하지 못했어요.",
+      error ? { cause: error } : undefined,
+    );
+  }
+
+  return {
+    requestedCount: data.requested_count,
+    publishedCount: data.published_count,
+    skippedCount: data.skipped_count,
+    publishedIds: data.published_ids,
+    skippedIds: data.skipped_ids,
+    publishedAt: data.published_at,
+    closesAt: data.closes_at,
+  };
 }
 
 export interface ManagedProductUpdate {
@@ -485,7 +581,9 @@ function getStoragePathFromPublicUrl(publicUrl: string): string | null {
     const marker = `/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/`;
     const markerIndex = pathname.indexOf(marker);
     if (markerIndex < 0) return null;
-    const path = decodeURIComponent(pathname.slice(markerIndex + marker.length));
+    const path = decodeURIComponent(
+      pathname.slice(markerIndex + marker.length),
+    );
     return path.startsWith("products/") ? path : null;
   } catch {
     return null;

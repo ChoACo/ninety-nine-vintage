@@ -3,6 +3,7 @@ import type { AuctionPost } from "@/src/types/auction";
 export const AUCTION_TIME_ZONE = "Asia/Seoul";
 export const NEW_BID_CUTOFF_SECONDS = 20 * 60 * 60 + 56 * 60;
 export const AUCTION_CLOSE_SECONDS = 21 * 60 * 60;
+export const AUCTION_REOPEN_SECONDS = 22 * 60 * 60;
 
 export type DailyAuctionPhase =
   | "open"
@@ -83,12 +84,16 @@ export function getKoreanAuctionTime(
   };
 }
 
-/** 매일 한국시간 20:56:00부터 신규 참여를 제한하고 21:00:00에 마감합니다. */
+/**
+ * 매일 한국시간 20:56부터 신규 참여를 제한하고 21:00~22:00에는
+ * 정산을 위해 모든 입찰을 멈춥니다. 22:00부터 미판매 상품 입찰을 재개합니다.
+ */
 export function getDailyAuctionPhase(
   now: Date | string | number = new Date(),
 ): DailyAuctionPhase {
   const { secondsSinceMidnight } = getKoreanAuctionTime(now);
 
+  if (secondsSinceMidnight >= AUCTION_REOPEN_SECONDS) return "open";
   if (secondsSinceMidnight >= AUCTION_CLOSE_SECONDS) return "closed";
   if (secondsSinceMidnight >= NEW_BID_CUTOFF_SECONDS) {
     return "existing-participants-only";
@@ -106,7 +111,8 @@ function normalizeIdentity(name: string): string {
  * - 20:56 전: 누구나 입찰 가능
  * - 20:56~21:00: 입찰 원장이 있는 기존 참여자만 가능
  * - 단, 원장이 0건인 상품은 첫 입찰까지 누구나 가능하며 그 입찰이 즉시 확정·잠김
- * - 21:00 이후: 전원 마감
+ * - 21:00~22:00: 정산 시간으로 전원 중단
+ * - 22:00 이후: 미판매 상품의 입찰 재개
  *
  * 실제 DB 연동 시에도 반드시 서버 트랜잭션 안에서 최신 bidHistory를 다시 읽은 뒤
  * 이 판정을 실행해야 0건 상품에 대한 동시 첫 입찰 경쟁을 안전하게 차단할 수 있습니다.
@@ -164,7 +170,7 @@ export function getAuctionBidDecision({
       ...base,
       allowed: false,
       reason: "auction-closed",
-      message: "오늘 오후 9시 경매가 마감되었습니다.",
+      message: "오후 9시 정산 중입니다. 미판매 상품은 오후 10시부터 다시 입찰할 수 있습니다.",
     };
   }
 

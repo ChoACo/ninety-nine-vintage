@@ -218,7 +218,10 @@ function firstRpcRow<T>(data: unknown): T | null {
 export async function verifyAndSyncPortOnePayment(
   admin: SupabaseClient,
   paymentId: string,
-  options: { expectedBuyerId?: string } = {},
+  options: {
+    expectedBuyerId?: string;
+    allowedBuyerIds?: readonly string[];
+  } = {},
 ): Promise<SyncedPaymentRow> {
   if (!isValidPaymentId(paymentId)) {
     throw new PortOneIntegrationError(
@@ -264,9 +267,11 @@ export async function verifyAndSyncPortOnePayment(
       404,
     );
   }
+  const allowedBuyerIds = options.allowedBuyerIds ??
+    (options.expectedBuyerId ? [options.expectedBuyerId] : []);
   if (
-    options.expectedBuyerId &&
-    order.buyer_id !== options.expectedBuyerId
+    allowedBuyerIds.length > 0 &&
+    (!order.buyer_id || !allowedBuyerIds.includes(order.buyer_id))
   ) {
     throw new PortOneIntegrationError(
       "payment_order_forbidden",

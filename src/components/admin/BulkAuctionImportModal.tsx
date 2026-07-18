@@ -22,7 +22,7 @@ import {
   type ParsedAuctionWorkbook,
 } from "@/src/lib/import/batchAuction";
 import { PRODUCT_IMAGE_FORMAT_LABEL } from "@/src/lib/supabase/productImagePolicy";
-import { formatKRW, getRelativeKoreanDateTime } from "@/src/utils/formatters";
+import { formatKRW, getNextAuctionPublishAt } from "@/src/utils/formatters";
 
 interface BatchAuctionSubmitProgress {
   completed: number;
@@ -181,7 +181,7 @@ export default function BulkAuctionImportModal({
     if (!parsedWorkbook) return null;
     const now = new Date();
     return buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
-      publishAt: getRelativeKoreanDateTime(1, "10:00:00", now),
+      publishAt: getNextAuctionPublishAt(now).toISOString(),
       bidIncrement: Number(bidIncrement),
     });
   };
@@ -351,9 +351,9 @@ export default function BulkAuctionImportModal({
           <h3 className="text-base font-black text-[#493f38]">3. 대기열 등록 옵션</h3>
           <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_260px]">
             <div className="rounded-2xl border border-[#ead5a9] bg-[#fff7df] px-4 py-3">
-              <p className="text-sm font-black text-[#735b31]">공개 대기 · 다음날 오전 10시 예약</p>
+              <p className="text-sm font-black text-[#735b31]">공개 대기 · 가장 가까운 오전 10시 예약</p>
               <p className="mt-1 text-xs font-semibold leading-5 text-[#8a7040]">
-                모든 상품은 pending 상태로 대기열에 등록됩니다. 공개 전에 대기열에서 내용을 확인하고 수정하거나 삭제할 수 있습니다.
+                오전 10시 전 등록분은 당일 10시, 이후 등록분은 다음 날 10시로 예약됩니다. 공개 전에 대기열에서 수정하거나 삭제할 수 있습니다.
               </p>
             </div>
             <label htmlFor={bidIncrementId} className="text-sm font-black text-[#5a4c44]">

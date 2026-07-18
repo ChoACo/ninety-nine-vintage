@@ -8,17 +8,12 @@ import {
 import Button from "./Button";
 import ThemeToggle from "./ThemeToggle";
 
-export type OwnerMode = "operator" | "admin";
-
 export interface SiteHeaderProps {
   role: AppRole;
   isAuthenticated: boolean;
   displayName?: string;
   onOpenAuth: () => void;
-  ownerMode?: OwnerMode;
-  onRequestOwnerModeChange?: (mode: OwnerMode) => void | Promise<void>;
-  isOwnerModeChanging?: boolean;
-  onOpenOwnerPage?: () => void;
+  onOpenOwnerTools?: () => void;
   isSigningOut?: boolean;
   onSignOut?: () => void | Promise<void>;
 }
@@ -28,10 +23,7 @@ export default function SiteHeader({
   isAuthenticated,
   displayName,
   onOpenAuth,
-  ownerMode = "operator",
-  onRequestOwnerModeChange,
-  isOwnerModeChanging = false,
-  onOpenOwnerPage,
+  onOpenOwnerTools,
   isSigningOut = false,
   onSignOut,
 }: SiteHeaderProps) {
@@ -61,47 +53,11 @@ export default function SiteHeader({
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           <ThemeToggle />
 
-          {isAuthenticated && isOwnerRole(role) && onRequestOwnerModeChange ? (
-            <div
-              role="group"
-              aria-label="비공개 운영 권한 모드"
-              className="flex rounded-full border border-[var(--border)] bg-[var(--surface-muted)] p-1"
-            >
-              <button
-                type="button"
-                aria-pressed={ownerMode === "operator"}
-                disabled={isOwnerModeChanging}
-                onClick={() => void onRequestOwnerModeChange("operator")}
-                className={`min-h-9 rounded-full px-3 text-xs font-black transition ${
-                  ownerMode === "operator"
-                    ? "bg-[var(--surface)] text-[var(--accent-text)] shadow-sm"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-strong)]"
-                }`}
-              >
-                운영자 모드
-              </button>
-              <button
-                type="button"
-                aria-pressed={ownerMode === "admin"}
-                disabled={isOwnerModeChanging}
-                onClick={() => void onRequestOwnerModeChange("admin")}
-                className={`min-h-9 rounded-full px-3 text-xs font-black transition ${
-                  ownerMode === "admin"
-                    ? "bg-[var(--surface)] text-[var(--accent-text)] shadow-sm"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-strong)]"
-                }`}
-              >
-                관리자 모드
-              </button>
-            </div>
-          ) : null}
-
           {isAuthenticated &&
           isOwnerRole(role) &&
-          ownerMode === "admin" &&
-          onOpenOwnerPage ? (
-            <Button size="sm" variant="secondary" onClick={onOpenOwnerPage}>
-              전용 페이지
+          onOpenOwnerTools ? (
+            <Button size="sm" variant="secondary" onClick={onOpenOwnerTools}>
+              테스트 도구
             </Button>
           ) : null}
 

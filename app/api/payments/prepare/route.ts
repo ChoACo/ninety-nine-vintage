@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   authenticatePaymentRequest,
+  resolveRequestedPaymentBuyerId,
   paymentJsonResponse,
 } from "@/src/lib/portone/http";
 import {
@@ -46,22 +47,38 @@ export async function POST(request: Request) {
       return paymentJsonResponse({ error: "invalid_request" }, 400);
     }
 
-    const { productId, paymentId, payMethod } = body as Record<string, unknown>;
+    const { productId, paymentId, payMethod, testMemberId } = body as Record<
+      string,
+      unknown
+    >;
     if (
       typeof productId !== "string" ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
         productId,
       ) ||
       !isValidPaymentId(paymentId) ||
-      !isPortOnePayMethod(payMethod)
+      !isPortOnePayMethod(payMethod) ||
+      (testMemberId !== undefined &&
+        (typeof testMemberId !== "string" ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+            testMemberId,
+          )))
     ) {
       return paymentJsonResponse({ error: "invalid_request" }, 400);
     }
 
     const { storeId, channelKey } = getPortOnePublicConfiguration(payMethod);
     const rpcClient = authentication.admin as unknown as SupabaseClient;
+    const paymentBuyerId = await resolveRequestedPaymentBuyerId(
+      rpcClient,
+      authentication.userId,
+      typeof testMemberId === "string" ? testMemberId : null,
+    );
+    if (!paymentBuyerId) {
+      return paymentJsonResponse({ error: "forbidden" }, 403);
+    }
     const { data, error } = await rpcClient.rpc("prepare_portone_payment", {
-      p_member_id: authentication.userId,
+      p_member_id: paymentBuyerId,
       p_payment_id: paymentId,
       p_product_id: productId,
       p_requested_method: payMethod,

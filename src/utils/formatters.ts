@@ -120,6 +120,26 @@ export function getRelativeKoreanDateTime(
   return `${getRelativeKoreanDateKey(dayOffset, now)}T${time}+09:00`;
 }
 
+/**
+ * 상품 예약 등록 시각을 한국 표준시 기준으로 계산합니다.
+ * 오전 10시 전이면 당일 10시, 정확히 10시부터는 다음 날 10시입니다.
+ */
+export function getNextAuctionPublishAt(now: DateInput = new Date()): Date {
+  const current = toDate(now);
+  const { year, month, day } = getKoreanCalendarParts(current);
+  const todayAtTen = new Date(
+    Date.UTC(year, month - 1, day, 10 - KOREA_UTC_OFFSET_HOURS),
+  );
+
+  if (current.getTime() < todayAtTen.getTime()) {
+    return todayAtTen;
+  }
+
+  return new Date(
+    Date.UTC(year, month - 1, day + 1, 10 - KOREA_UTC_OFFSET_HOURS),
+  );
+}
+
 /** 날짜 필터 칩에 표시할 '오늘/어제/7월 14일' 형식의 레이블입니다. */
 export function formatKoreanDateChipLabel(
   value: DateInput,

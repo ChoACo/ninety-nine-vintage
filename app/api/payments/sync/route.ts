@@ -1,5 +1,6 @@
 import {
   authenticatePaymentRequest,
+  getAuthorizedPaymentBuyerIds,
   paymentJsonResponse,
 } from "@/src/lib/portone/http";
 import {
@@ -28,10 +29,14 @@ export async function POST(request: Request) {
       return paymentJsonResponse({ error: "invalid_payment_id" }, 400);
     }
 
+    const allowedBuyerIds = await getAuthorizedPaymentBuyerIds(
+      authentication.admin,
+      authentication.userId,
+    );
     const synced = await verifyAndSyncPortOnePayment(
       authentication.admin,
       paymentId,
-      { expectedBuyerId: authentication.userId },
+      { allowedBuyerIds },
     );
     return paymentJsonResponse(
       {

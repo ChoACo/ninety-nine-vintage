@@ -12,14 +12,8 @@ import {
   formatKoreanDate,
   getKoreanWeekday,
 } from "@/src/utils/formatters";
-import {
-  getMinimumBidAmount,
-  getQuickBidAmount,
-} from "@/src/utils/bidding";
-import {
-  getUserBidState,
-  type UserBidStatus,
-} from "@/src/utils/bidStatus";
+import { getMinimumBidAmount, getQuickBidAmount } from "@/src/utils/bidding";
+import { getUserBidState, type UserBidStatus } from "@/src/utils/bidStatus";
 import BidConfirmModal from "./BidConfirmModal";
 import BidFormModal from "./BidFormModal";
 import BidHistoryModal from "./BidHistoryModal";
@@ -196,7 +190,12 @@ export default function PostCard({
       </header>
 
       <div className="flex flex-1 flex-col gap-3 p-3 sm:p-3.5">
-        <PhotoGallery images={post.imageUrls} title={productLabel} compact />
+        <PhotoGallery
+          images={post.imageUrls}
+          thumbnailImages={post.thumbnailUrls}
+          title={productLabel}
+          compact
+        />
 
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="break-keep text-[#332a25]">
@@ -266,9 +265,9 @@ export default function PostCard({
                   ? "⛔ 신규 입찰 마감 (기존 참여자 전용)"
                   : bidDecision.reason === "late-first-bid-finalized"
                     ? "✅ 확정 입찰 완료"
-                  : bidDecision.reason === "auction-closed"
-                    ? "⛔ 오늘 경매 마감"
-                    : "판매 완료"}
+                    : bidDecision.reason === "auction-closed"
+                      ? "⏸ 정산 중 · 오후 10시 재개"
+                      : "판매 완료"}
               </Button>
             ) : (
               <div className="grid grid-cols-2 gap-2">

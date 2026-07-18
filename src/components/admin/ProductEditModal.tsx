@@ -1,11 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- Supabase Storage 원격 상품 이미지를 표시합니다. */
-import {
-  type FormEvent,
-  useId,
-  useState,
-} from "react";
+import { type FormEvent, useId, useState } from "react";
 
 import Button from "@/src/components/common/Button";
 import Modal from "@/src/components/common/Modal";
@@ -107,9 +103,11 @@ function ProductEditDialog({
 
   const hasBidActivity = Boolean(
     product.participantCount > 0 ||
-      product.bidHistory.length > 0 ||
-      product.bidLockedAt,
+    product.bidHistory.length > 0 ||
+    product.bidLockedAt,
   );
+  const isActive = product.status === "active";
+  const isClosed = product.status === "closed";
 
   const updateField = <Key extends keyof ProductEditForm>(
     key: Key,
@@ -174,139 +172,179 @@ function ProductEditDialog({
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
-          {product.imageUrls.length > 0 ? (
-            <div className="flex gap-2 overflow-x-auto pb-1" aria-label="현재 상품 사진">
-              {product.imageUrls.slice(0, 6).map((imageUrl, index) => (
-                <img
-                  key={`${imageUrl}-${index}`}
-                  src={imageUrl}
-                  alt={`${product.title} ${index + 1}번째 사진`}
-                  className="h-24 w-24 shrink-0 rounded-2xl border border-[#e6d8cd] object-cover"
-                />
-              ))}
-            </div>
-          ) : null}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label htmlFor={titleId} className="text-sm font-black text-[#4c4039]">
-              상품명
-              <input
-                id={titleId}
-                value={form.title}
-                onChange={(event) => updateField("title", event.target.value)}
-                className={inputClasses}
-                disabled={isSaving || hasBidActivity}
-                autoFocus
+        {product.imageUrls.length > 0 ? (
+          <div
+            className="flex gap-2 overflow-x-auto pb-1"
+            aria-label="현재 상품 사진"
+          >
+            {product.imageUrls.slice(0, 6).map((imageUrl, index) => (
+              <img
+                key={`${imageUrl}-${index}`}
+                src={product.thumbnailUrls[index] || imageUrl}
+                alt={`${product.title} ${index + 1}번째 사진`}
+                className="h-24 w-24 shrink-0 rounded-2xl border border-[#e6d8cd] object-cover"
               />
-            </label>
-            <label htmlFor={statusId} className="text-sm font-black text-[#4c4039]">
-              공개 상태
-              <select
-                id={statusId}
-                value={form.status}
-                onChange={(event) =>
-                  updateField("status", event.target.value as AuctionStatus)
-                }
-                className={inputClasses}
-                disabled={isSaving}
-              >
-                <option value="pending" disabled={hasBidActivity}>공개 대기</option>
-                <option
-                  value="active"
-                  disabled={hasBidActivity && product.status === "closed"}
-                >
-                  진행 중
-                </option>
-                <option value="closed">마감</option>
-              </select>
-            </label>
+            ))}
           </div>
+        ) : null}
 
-          <label htmlFor={descriptionId} className="block text-sm font-black text-[#4c4039]">
-            상품 설명
-            <textarea
-              id={descriptionId}
-              value={form.description}
-              onChange={(event) => updateField("description", event.target.value)}
-              rows={6}
-              className={`${inputClasses} resize-y`}
-              disabled={isSaving || hasBidActivity}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label
+            htmlFor={titleId}
+            className="text-sm font-black text-[#4c4039]"
+          >
+            상품명
+            <input
+              id={titleId}
+              value={form.title}
+              onChange={(event) => updateField("title", event.target.value)}
+              className={inputClasses}
+              disabled={isSaving || hasBidActivity || isClosed}
+              autoFocus
             />
           </label>
+          <label
+            htmlFor={statusId}
+            className="text-sm font-black text-[#4c4039]"
+          >
+            공개 상태
+            <select
+              id={statusId}
+              value={form.status}
+              onChange={(event) =>
+                updateField("status", event.target.value as AuctionStatus)
+              }
+              className={inputClasses}
+              disabled={isSaving || isActive || isClosed}
+            >
+              <option value="pending" disabled={hasBidActivity}>
+                공개 대기
+              </option>
+              <option
+                value="active"
+                disabled={hasBidActivity && product.status === "closed"}
+              >
+                진행 중
+              </option>
+              {isClosed ? <option value="closed">판매 완료</option> : null}
+            </select>
+          </label>
+        </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label htmlFor={publishAtId} className="text-sm font-black text-[#4c4039]">
-              공개 시각
-              <input
-                id={publishAtId}
-                type="datetime-local"
-                value={form.publishAt}
-                onChange={(event) => updateField("publishAt", event.target.value)}
-                className={inputClasses}
-                disabled={isSaving || hasBidActivity}
-              />
-            </label>
-            <div className="rounded-2xl border border-[#d7e3e5] bg-[#edf6f7] px-4 py-3">
-              <p className="text-sm font-black text-[#496b72]">마감 시각</p>
-              <p className="mt-2 text-sm font-bold text-[#38565d]">
-                {formatKoreanDate(product.closesAt)} {formatKoreanTime(product.closesAt)}
-              </p>
-              <p className="mt-1 text-xs font-semibold text-[#6c858a]">
-                마감 시각은 경매 규칙에 따라 서버에서 관리합니다.
-              </p>
-            </div>
-          </div>
+        <label
+          htmlFor={descriptionId}
+          className="block text-sm font-black text-[#4c4039]"
+        >
+          상품 설명
+          <textarea
+            id={descriptionId}
+            value={form.description}
+            onChange={(event) => updateField("description", event.target.value)}
+            rows={6}
+            className={`${inputClasses} resize-y`}
+            disabled={isSaving || hasBidActivity || isClosed}
+          />
+        </label>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label htmlFor={startingPriceId} className="text-sm font-black text-[#4c4039]">
-              시작가
-              <input
-                id={startingPriceId}
-                type="number"
-                min="1"
-                step="1"
-                value={form.startingPrice}
-                onChange={(event) => updateField("startingPrice", event.target.value)}
-                className={inputClasses}
-                disabled={isSaving || hasBidActivity}
-              />
-              <span className="mt-1.5 block text-xs font-semibold text-[#8a786c]">
-                {formatKRW(Number(form.startingPrice) || 0)}
-              </span>
-            </label>
-            <div className="rounded-2xl border border-[#d7e3e5] bg-[#edf6f7] px-4 py-3">
-              <p className="text-sm font-black text-[#496b72]">
-              입찰 단위
-              </p>
-              <p className="mt-2 text-xl font-black text-[#38565d]">
-                {formatKRW(product.bidIncrement)}
-              </p>
-              <p className="mt-1 text-xs font-semibold text-[#6c858a]">
-                입찰 단위는 경매 중 변경할 수 없습니다.
-              </p>
-            </div>
-          </div>
-
-          {hasBidActivity ? (
-            <p className="rounded-2xl border border-[#ecd6ae] bg-[#fff8e8] px-4 py-3 text-sm font-bold leading-6 text-[#80643a]">
-              이미 입찰이 시작된 상품은 입찰 신뢰 보호를 위해 제목·설명·공개 시각·시작가를 변경할 수 없습니다. 진행 상태는 마감으로만 전환할 수 있습니다.
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label
+            htmlFor={publishAtId}
+            className="text-sm font-black text-[#4c4039]"
+          >
+            공개 시각
+            <input
+              id={publishAtId}
+              type="datetime-local"
+              value={form.publishAt}
+              onChange={(event) => updateField("publishAt", event.target.value)}
+              className={inputClasses}
+              disabled={isSaving || hasBidActivity || isActive || isClosed}
+            />
+          </label>
+          <div className="rounded-2xl border border-[#d7e3e5] bg-[#edf6f7] px-4 py-3">
+            <p className="text-sm font-black text-[#496b72]">마감 시각</p>
+            <p className="mt-2 text-sm font-bold text-[#38565d]">
+              {formatKoreanDate(product.closesAt)}{" "}
+              {formatKoreanTime(product.closesAt)}
             </p>
-          ) : null}
-
-          {error ? (
-            <p role="alert" className="rounded-2xl bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#b14c3f]">
-              {error}
+            <p className="mt-1 text-xs font-semibold text-[#6c858a]">
+              마감 시각은 경매 규칙에 따라 서버에서 관리합니다.
             </p>
-          ) : null}
-
-          <div className="flex flex-col-reverse gap-2 border-t border-[#eee0d5] pt-5 sm:flex-row sm:justify-end">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving}>
-              취소
-            </Button>
-            <Button type="submit" isLoading={isSaving}>
-              {isSaving ? "저장 중..." : "변경사항 저장"}
-            </Button>
           </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label
+            htmlFor={startingPriceId}
+            className="text-sm font-black text-[#4c4039]"
+          >
+            시작가
+            <input
+              id={startingPriceId}
+              type="number"
+              min="1"
+              step="1"
+              value={form.startingPrice}
+              onChange={(event) =>
+                updateField("startingPrice", event.target.value)
+              }
+              className={inputClasses}
+              disabled={isSaving || hasBidActivity || isActive || isClosed}
+            />
+            <span className="mt-1.5 block text-xs font-semibold text-[#8a786c]">
+              {formatKRW(Number(form.startingPrice) || 0)}
+            </span>
+          </label>
+          <div className="rounded-2xl border border-[#d7e3e5] bg-[#edf6f7] px-4 py-3">
+            <p className="text-sm font-black text-[#496b72]">입찰 단위</p>
+            <p className="mt-2 text-xl font-black text-[#38565d]">
+              {formatKRW(product.bidIncrement)}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-[#6c858a]">
+              입찰 단위는 경매 중 변경할 수 없습니다.
+            </p>
+          </div>
+        </div>
+
+        {isClosed ? (
+          <p className="rounded-2xl border border-[#d7e3e5] bg-[#edf6f7] px-4 py-3 text-sm font-bold leading-6 text-[#496b72]">
+            판매 완료 상품의 낙찰 원장과 마감 시각은 수정할 수 없습니다.
+          </p>
+        ) : hasBidActivity ? (
+          <p className="rounded-2xl border border-[#ecd6ae] bg-[#fff8e8] px-4 py-3 text-sm font-bold leading-6 text-[#80643a]">
+            이미 입찰이 시작된 상품은 입찰 신뢰 보호를 위해 제목·설명·공개
+            시각·가격·진행 상태를 변경할 수 없습니다. 마감은 자동 정산 또는
+            총책임자 테스트 도구에서만 처리됩니다.
+          </p>
+        ) : isActive ? (
+          <p className="rounded-2xl border border-[#ecd6ae] bg-[#fff8e8] px-4 py-3 text-sm font-bold leading-6 text-[#80643a]">
+            진행 중인 경매는 상품명과 설명만 수정할 수 있습니다. 시작가는 감사
+            기록이 남는 총책임자 전용 가격 조정 도구를 사용해 주세요.
+          </p>
+        ) : null}
+
+        {error ? (
+          <p
+            role="alert"
+            className="rounded-2xl bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#b14c3f]"
+          >
+            {error}
+          </p>
+        ) : null}
+
+        <div className="flex flex-col-reverse gap-2 border-t border-[#eee0d5] pt-5 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            disabled={isSaving}
+          >
+            취소
+          </Button>
+          <Button type="submit" isLoading={isSaving} disabled={isClosed}>
+            {isSaving ? "저장 중..." : "변경사항 저장"}
+          </Button>
+        </div>
       </form>
     </Modal>
   );

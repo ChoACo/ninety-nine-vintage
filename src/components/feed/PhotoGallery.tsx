@@ -5,7 +5,8 @@ import { useState } from "react";
 import PhotoGalleryModal from "./PhotoGalleryModal";
 
 export interface PhotoGalleryProps {
-  images: string[];
+  images: readonly string[];
+  thumbnailImages?: readonly string[];
   title: string;
   compact?: boolean;
 }
@@ -44,13 +45,24 @@ function GalleryImage({ src, alt, className }: GalleryImageProps) {
 
 export default function PhotoGallery({
   images,
+  thumbnailImages,
   title,
   compact = false,
 }: PhotoGalleryProps) {
-  const cleanImages = images.filter(Boolean);
+  const galleryItems = images.flatMap((image, index) =>
+    image
+      ? [
+          {
+            image,
+            thumbnail: thumbnailImages?.[index] || image,
+          },
+        ]
+      : [],
+  );
+  const cleanImages = galleryItems.map((item) => item.image);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const thumbnails = cleanImages.slice(1, 4);
+  const thumbnails = galleryItems.slice(1, 4);
   const hiddenCount = Math.max(cleanImages.length - 4, 0);
 
   const openAt = (index: number) => {
@@ -83,8 +95,8 @@ export default function PhotoGallery({
           }`}
         >
           <GalleryImage
-            key={cleanImages[0]}
-            src={cleanImages[0]}
+            key={galleryItems[0].thumbnail}
+            src={galleryItems[0].thumbnail}
             alt={`${title} 메인 사진`}
             className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
           />
@@ -97,14 +109,14 @@ export default function PhotoGallery({
           <div
             className={`grid grid-cols-3 ${compact ? "gap-1.5" : "gap-2.5"}`}
           >
-            {thumbnails.map((image, thumbnailIndex) => {
+            {thumbnails.map((item, thumbnailIndex) => {
               const actualIndex = thumbnailIndex + 1;
               const showMore =
                 hiddenCount > 0 && thumbnailIndex === thumbnails.length - 1;
 
               return (
                 <button
-                  key={`${image}-${actualIndex}`}
+                  key={`${item.image}-${actualIndex}`}
                   type="button"
                   onClick={() => openAt(actualIndex)}
                   aria-label={`${title} ${actualIndex + 1}번째 사진 크게 보기${
@@ -117,7 +129,7 @@ export default function PhotoGallery({
                   }`}
                 >
                   <GalleryImage
-                    src={image}
+                    src={item.thumbnail}
                     alt=""
                     className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                   />

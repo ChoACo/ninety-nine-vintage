@@ -4,6 +4,7 @@ export { default as BidConfirmModal } from "./BidConfirmModal";
 export { default as BidHistoryModal } from "./BidHistoryModal";
 export { default as DateFilterChips } from "./DateFilterChips";
 export { default as FeedList } from "./FeedList";
+export { SoldAuctionFeed } from "./SoldAuctionFeed";
 export { default as NewAuctionModal } from "./NewAuctionModal";
 export type { NewAuctionDraft } from "./NewAuctionModal";
 export { default as PhotoGallery } from "./PhotoGallery";

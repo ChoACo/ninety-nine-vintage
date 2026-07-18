@@ -3,6 +3,8 @@ import { getSupabaseBrowserClient } from "./client";
 
 export type WonProductShippingStatus = "ready" | "requested" | "shipped";
 export type ProductPaymentStatus = "대기중" | "가상계좌발급" | "결제완료";
+export type ActivePaymentMode = "manual_transfer" | "portone";
+export type ManualTransferStatus = "awaiting_manual_transfer" | "confirmed";
 export type PortOnePaymentStatus =
   | "READY"
   | "PAY_PENDING"
@@ -48,6 +50,12 @@ export interface MemberWonProduct {
   paymentStatus: ProductPaymentStatus;
   requestedPaymentMethod: string | null;
   portoneStatus: PortOnePaymentStatus | null;
+  manualTransferOrderId: string | null;
+  manualTransferStatus: ManualTransferStatus | null;
+  manualTransferRequestedAt: string | null;
+  manualTransferConfirmedAt: string | null;
+  isPaymentSettled: boolean;
+  activePaymentMode: ActivePaymentMode;
   shippingStatus: WonProductShippingStatus;
   shipmentRequestId: string | null;
 }
@@ -98,6 +106,12 @@ interface WonProductRow {
   payment_status: ProductPaymentStatus | null;
   requested_method: string | null;
   portone_status: PortOnePaymentStatus | null;
+  manual_transfer_order_id: string | null;
+  manual_transfer_status: ManualTransferStatus | null;
+  manual_transfer_requested_at: string | null;
+  manual_transfer_confirmed_at: string | null;
+  is_payment_settled: boolean;
+  active_payment_mode: ActivePaymentMode;
   shipping_status: WonProductShippingStatus;
   shipment_request_id: string | null;
 }
@@ -215,6 +229,21 @@ function toWonProduct(row: WonProductRow): MemberWonProduct {
   ) {
     throw new MemberAccountError("결제사 상태 데이터가 올바르지 않습니다.");
   }
+  const manualTransferStatus = row.manual_transfer_status ?? null;
+  if (
+    manualTransferStatus !== null &&
+    !(["awaiting_manual_transfer", "confirmed"] as const).includes(
+      manualTransferStatus,
+    )
+  ) {
+    throw new MemberAccountError("계좌이체 상태 데이터가 올바르지 않습니다.");
+  }
+  if (
+    row.active_payment_mode !== "manual_transfer" &&
+    row.active_payment_mode !== "portone"
+  ) {
+    throw new MemberAccountError("결제 운영 모드가 올바르지 않습니다.");
+  }
 
   return {
     productId: row.product_id,
@@ -232,6 +261,12 @@ function toWonProduct(row: WonProductRow): MemberWonProduct {
     paymentStatus,
     requestedPaymentMethod: row.requested_method,
     portoneStatus,
+    manualTransferOrderId: row.manual_transfer_order_id,
+    manualTransferStatus,
+    manualTransferRequestedAt: row.manual_transfer_requested_at,
+    manualTransferConfirmedAt: row.manual_transfer_confirmed_at,
+    isPaymentSettled: Boolean(row.is_payment_settled),
+    activePaymentMode: row.active_payment_mode,
     shippingStatus: row.shipping_status,
     shipmentRequestId: row.shipment_request_id,
   };

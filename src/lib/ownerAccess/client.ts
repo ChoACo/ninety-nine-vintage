@@ -47,6 +47,26 @@ export interface OwnerHiddenTestWonProduct {
   payment_status: "대기중" | "가상계좌발급" | "결제완료";
   requested_method: string | null;
   portone_status: string | null;
+  manual_transfer_order_id: string | null;
+  manual_transfer_status: "awaiting_manual_transfer" | "confirmed" | null;
+  manual_transfer_requested_at: string | null;
+  manual_transfer_confirmed_at: string | null;
+  is_payment_settled: boolean;
+  active_payment_mode: "manual_transfer" | "portone";
+}
+
+export interface OwnerHiddenTestManualTransfer {
+  order_id: string;
+  product_id: string;
+  order_name: string;
+  expected_amount: number;
+  status: "awaiting_manual_transfer" | "confirmed";
+  bank_name: string;
+  account_number: string;
+  requested_at: string;
+  confirmed_at: string | null;
+  updated_at: string;
+  is_payment_settled: boolean;
 }
 
 export interface OwnerHiddenTestShippingRequest {
@@ -124,6 +144,20 @@ export function fetchOwnerHiddenTestMember(accessToken: string) {
     shippingRequests: OwnerHiddenTestShippingRequest[];
     audit: OwnerAuditEntry[];
   }>(accessToken, "/api/owner/test-member");
+}
+
+export function beginOwnerHiddenTestManualTransfer(
+  accessToken: string,
+  productId: string,
+) {
+  return ownerRequest<{ transfer: OwnerHiddenTestManualTransfer }>(
+    accessToken,
+    "/api/owner/test-member",
+    {
+      method: "POST",
+      body: JSON.stringify({ action: "beginManualTransfer", productId }),
+    },
+  );
 }
 
 export function updateOwnerHiddenTestProfile(

@@ -42,6 +42,34 @@ export async function GET(request: Request) {
   }
 }
 
+export async function POST(request: Request) {
+  try {
+    const context = await authenticateOwnerAccessRequest(request);
+    const body = await readSmallJsonBody(request);
+    const productId =
+      typeof body.productId === "string" ? body.productId.trim() : "";
+    if (
+      body.action !== "beginManualTransfer" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        productId,
+      )
+    ) {
+      return ownerAccessJsonResponse({ error: "invalid_request" }, 400);
+    }
+    const result = await ownerRpc<unknown[]>(
+      context,
+      "owner_begin_hidden_test_manual_transfer",
+      { p_product_id: productId },
+    );
+    if (!result?.[0]) {
+      return ownerAccessJsonResponse({ error: "owner_rpc_invalid_response" }, 500);
+    }
+    return ownerAccessJsonResponse({ transfer: result[0] });
+  } catch (error) {
+    return ownerAccessErrorResponse(error);
+  }
+}
+
 export async function PATCH(request: Request) {
   try {
     const context = await authenticateOwnerAccessRequest(request);

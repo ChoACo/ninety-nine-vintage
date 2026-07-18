@@ -12,8 +12,10 @@ import {
   isValidPaymentId,
   logPortOneServerError,
   PortOneIntegrationError,
+  requireProductAvailableForPortOne,
   truncateUtf8Bytes,
 } from "@/src/lib/portone/server";
+import { requirePortOneRuntimeMode } from "@/src/lib/portone/runtimeMode";
 
 interface PreparePaymentRow {
   expected_amount: number;
@@ -36,6 +38,9 @@ export async function POST(request: Request) {
   try {
     const authentication = await authenticatePaymentRequest(request);
     if (!authentication.ok) return authentication.response;
+    await requirePortOneRuntimeMode(
+      authentication.admin as unknown as SupabaseClient,
+    );
 
     let body: unknown;
     try {
@@ -77,6 +82,7 @@ export async function POST(request: Request) {
     if (!paymentBuyerId) {
       return paymentJsonResponse({ error: "forbidden" }, 403);
     }
+    await requireProductAvailableForPortOne(rpcClient, productId);
     const { data, error } = await rpcClient.rpc("prepare_portone_payment", {
       p_member_id: paymentBuyerId,
       p_payment_id: paymentId,

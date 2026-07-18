@@ -215,6 +215,37 @@ function firstRpcRow<T>(data: unknown): T | null {
   return data && typeof data === "object" ? (data as T) : null;
 }
 
+/**
+ * A product already started through manual transfer must never enter PortOne
+ * preparation or reconciliation. The DB trigger applies the same invariant
+ * inside the transaction to close races.
+ */
+export async function requireProductAvailableForPortOne(
+  admin: SupabaseClient,
+  productId: string,
+): Promise<void> {
+  const { data, error } = await admin.rpc(
+    "get_manual_transfer_status_for_service",
+    { p_product_id: productId },
+  );
+
+  if (error) {
+    throw new PortOneIntegrationError(
+      "manual_settlement_lookup_failed",
+      "The manual settlement state could not be verified.",
+      503,
+      error,
+    );
+  }
+  if (data === "awaiting_manual_transfer" || data === "confirmed") {
+    throw new PortOneIntegrationError(
+      "payment_already_in_manual_transfer",
+      "This product is already being settled by manual bank transfer.",
+      409,
+    );
+  }
+}
+
 export async function verifyAndSyncPortOnePayment(
   admin: SupabaseClient,
   paymentId: string,
@@ -279,6 +310,8 @@ export async function verifyAndSyncPortOnePayment(
       403,
     );
   }
+
+  await requireProductAvailableForPortOne(admin, order.product_id);
 
   let payment: PortOne.Payment.Payment;
   try {

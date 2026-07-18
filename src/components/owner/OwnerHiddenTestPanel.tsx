@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/src/components/common";
 import { useSupabaseProducts } from "@/src/hooks/useSupabaseProducts";
 import {
+  beginOwnerHiddenTestManualTransfer,
   deleteOwnerHiddenTestAddress,
   fetchOwnerHiddenTestMember,
   markOwnerHiddenTestShippingShipped,
@@ -12,6 +13,7 @@ import {
   setOwnerHiddenTestShippingCredits,
   updateOwnerHiddenTestProfile,
   upsertOwnerHiddenTestAddress,
+  type OwnerHiddenTestManualTransfer,
   type OwnerHiddenTestMember,
 } from "@/src/lib/ownerAccess/client";
 import {
@@ -42,6 +44,12 @@ interface HiddenTestWonProduct {
   payment_status: "대기중" | "가상계좌발급" | "결제완료";
   requested_method: ProductPaymentMethod | null;
   portone_status: string | null;
+  manual_transfer_order_id: string | null;
+  manual_transfer_status: "awaiting_manual_transfer" | "confirmed" | null;
+  manual_transfer_requested_at: string | null;
+  manual_transfer_confirmed_at: string | null;
+  is_payment_settled: boolean;
+  active_payment_mode: "manual_transfer" | "portone";
 }
 
 interface HiddenTestShippingRequest {
@@ -112,6 +120,9 @@ export function OwnerHiddenTestPanel({ accessToken }: { accessToken: string }) {
   const [selectedShippingIds, setSelectedShippingIds] = useState<Set<string>>(new Set());
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<ProductPaymentMethod>("CARD");
+  const [revealedManualTransfers, setRevealedManualTransfers] = useState<
+    Record<string, OwnerHiddenTestManualTransfer>
+  >({});
   const [courier, setCourier] = useState("테스트 택배");
   const [trackingNumber, setTrackingNumber] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -162,8 +173,7 @@ export function OwnerHiddenTestPanel({ accessToken }: { accessToken: string }) {
     () =>
       (snapshot?.wonProducts ?? []).filter(
         (product) =>
-          product.payment_status === "결제완료" &&
-          product.portone_status === "PAID" &&
+          product.is_payment_settled &&
           product.shipping_status === "ready",
       ),
     [snapshot?.wonProducts],
@@ -256,6 +266,20 @@ export function OwnerHiddenTestPanel({ accessToken }: { accessToken: string }) {
         : result.paymentStatus === "가상계좌발급"
           ? "테스터용 가상계좌가 발급되었습니다."
           : "테스터 결제 상태를 동기화했습니다.";
+    });
+
+  const beginManualTransfer = (product: HiddenTestWonProduct) =>
+    run(`payment-${product.product_id}`, async () => {
+      const result = await beginOwnerHiddenTestManualTransfer(
+        accessToken,
+        product.product_id,
+      );
+      setRevealedManualTransfers((current) => ({
+        ...current,
+        [product.product_id]: result.transfer,
+      }));
+      await load();
+      return "테스터 계좌이체를 입금 진행 중으로 등록했습니다. 운영자 페이지의 입금 확인 목록에서 확정할 수 있습니다.";
     });
 
   const requestShipping = () =>
@@ -352,18 +376,51 @@ export function OwnerHiddenTestPanel({ accessToken }: { accessToken: string }) {
 
           <details className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4" open>
             <summary className="cursor-pointer text-lg font-black text-[var(--text-strong)]">낙찰·결제·보관 테스트 {snapshot.wonProducts.length}건</summary>
-            <fieldset className="mt-4 flex flex-wrap gap-2">
-              <legend className="mb-2 text-sm font-black text-[var(--text-muted)]">결제 수단</legend>
-              {paymentMethods.map((method) => <label key={method.value} className="flex cursor-pointer items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-sm font-black text-[var(--text-strong)]"><input type="radio" name="hidden-test-payment" value={method.value} checked={paymentMethod === method.value} onChange={() => setPaymentMethod(method.value)} />{method.label}</label>)}
-            </fieldset>
+            {snapshot.wonProducts.some(
+              (product) => product.active_payment_mode === "portone",
+            ) ? (
+              <fieldset className="mt-4 flex flex-wrap gap-2">
+                <legend className="mb-2 text-sm font-black text-[var(--text-muted)]">
+                  PG 복원 모드 결제 수단
+                </legend>
+                {paymentMethods.map((method) => (
+                  <label key={method.value} className="flex cursor-pointer items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-sm font-black text-[var(--text-strong)]">
+                    <input type="radio" name="hidden-test-payment" value={method.value} checked={paymentMethod === method.value} onChange={() => setPaymentMethod(method.value)} />
+                    {method.label}
+                  </label>
+                ))}
+              </fieldset>
+            ) : (
+              <p className="mt-4 rounded-xl bg-[var(--info-surface)] px-4 py-3 text-sm font-bold text-[var(--info-text)]">
+                현재 수동 계좌이체 모드입니다. 계좌를 확인하면 입금 진행 중으로
+                등록되고, 운영자 페이지에서 입금 확정까지 테스트할 수 있습니다.
+              </p>
+            )}
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
               {snapshot.wonProducts.length === 0 ? <p className="font-bold text-[var(--text-muted)]">테스터가 낙찰받은 상품이 없습니다. 위 입찰 후 즉시 입찰 종료를 사용해 주세요.</p> : null}
-              {snapshot.wonProducts.map((product) => (
-                <article key={product.product_id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
-                  <div className="flex gap-3">{product.image_urls?.[0] ? <img src={product.image_urls[0]} alt="" className="size-16 rounded-xl object-cover" /* eslint-disable-line @next/next/no-img-element */ /> : null}<div><h3 className="font-black text-[var(--text-strong)]">{product.title}</h3><p className="mt-1 text-sm font-bold text-[var(--text-muted)]">{formatKRW(product.final_bid_amount)} · {dateTime(product.closed_at)}</p><p className="mt-1 text-sm font-black text-[var(--accent-text)]">{product.payment_status} · {product.shipping_status === "ready" ? "보관 중" : product.shipping_status === "requested" ? "배송 접수" : "발송 완료"}</p></div></div>
-                  {product.payment_status !== "결제완료" || product.portone_status !== "PAID" ? <Button className="mt-3" size="sm" isLoading={busyKey === `payment-${product.product_id}`} onClick={() => void pay(product)}>테스트 결제창 열기</Button> : <p className="mt-3 text-sm font-black text-[var(--info-text)]">결제 완료 · 보관함 이동 확인 가능</p>}
-                </article>
-              ))}
+              {snapshot.wonProducts.map((product) => {
+                const transfer = revealedManualTransfers[product.product_id];
+                return (
+                  <article key={product.product_id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+                    <div className="flex gap-3">{product.image_urls?.[0] ? <img src={product.image_urls[0]} alt="" className="size-16 rounded-xl object-cover" /* eslint-disable-line @next/next/no-img-element */ /> : null}<div><h3 className="font-black text-[var(--text-strong)]">{product.title}</h3><p className="mt-1 text-sm font-bold text-[var(--text-muted)]">{formatKRW(product.final_bid_amount)} · {dateTime(product.closed_at)}</p><p className="mt-1 text-sm font-black text-[var(--accent-text)]">{product.is_payment_settled ? "결제 완료" : product.manual_transfer_requested_at ? "입금 진행 중" : "결제 대기"} · {product.shipping_status === "ready" ? "보관 중" : product.shipping_status === "requested" ? "배송 접수" : "발송 완료"}</p></div></div>
+                    {transfer ? (
+                      <div className="mt-3 rounded-xl border border-[var(--accent)] bg-[var(--accent-surface)] px-3 py-3 text-sm font-black text-[var(--text-strong)]">
+                        {transfer.bank_name} · <span className="select-all">{transfer.account_number}</span>
+                        <span className="mt-1 block text-[var(--warning-text)]">{formatKRW(transfer.expected_amount)} 입금 테스트</span>
+                      </div>
+                    ) : null}
+                    {product.is_payment_settled ? (
+                      <p className="mt-3 text-sm font-black text-[var(--info-text)]">결제 완료 · 보관함 이동 확인 가능</p>
+                    ) : product.active_payment_mode === "manual_transfer" ? (
+                      <Button className="mt-3" size="sm" isLoading={busyKey === `payment-${product.product_id}`} onClick={() => void beginManualTransfer(product)}>
+                        {product.manual_transfer_requested_at ? "테스트 계좌번호 다시 보기" : "테스트 계좌번호 보기"}
+                      </Button>
+                    ) : (
+                      <Button className="mt-3" size="sm" isLoading={busyKey === `payment-${product.product_id}`} onClick={() => void pay(product)}>테스트 결제창 열기</Button>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           </details>
 

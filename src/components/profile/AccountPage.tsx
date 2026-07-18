@@ -26,6 +26,10 @@ import {
   type ProductPaymentMethod,
   type ProductPaymentResult,
 } from "@/src/lib/portone/payment";
+import {
+  beginManualBankTransfer,
+  type BegunManualTransfer,
+} from "@/src/lib/supabase/manualPayments";
 import { NicknameSettingsPanel } from "./NicknameSettingsPanel";
 
 interface AccountPageProps {
@@ -47,6 +51,31 @@ interface AddressEditorModalProps {
 }
 
 type Feedback = { type: "success" | "error"; message: string } | null;
+
+interface RuntimePaymentProjection {
+  activePaymentMode: "manual_transfer" | "portone";
+  manualTransferRequestedAt: string | null;
+  isPaymentSettled: boolean;
+}
+
+function getRuntimePaymentProjection(
+  product: MemberWonProduct,
+): RuntimePaymentProjection {
+  const projected = product as MemberWonProduct &
+    Partial<RuntimePaymentProjection>;
+  return {
+    // The production migration supplies all three fields. Defaults keep an
+    // in-flight client fail-closed on the manual screen during rolling deploys.
+    activePaymentMode: projected.activePaymentMode ?? "manual_transfer",
+    manualTransferRequestedAt:
+      projected.manualTransferRequestedAt ?? null,
+    isPaymentSettled:
+      typeof projected.isPaymentSettled === "boolean"
+        ? projected.isPaymentSettled
+        : product.paymentStatus === "결제완료" &&
+          product.portoneStatus === "PAID",
+  };
+}
 
 const roleLabel: Record<Role, string> = {
   user: "일반 회원",
@@ -503,7 +532,12 @@ function AddressEditorModal({
   );
 }
 
-function ProductPaymentModal({
+/**
+ * PG 계약 후 active_payment_mode를 portone으로 변경하면 다시 사용할
+ * 기존 PortOne V2 결제창입니다. manual_transfer 모드에서는 절대 호출하지
+ * 않고 서버 라우트도 동일한 전역 스위치로 차단됩니다.
+ */
+function PortOnePaymentModal({
   product,
   onClose,
   onCompleted,
@@ -690,6 +724,148 @@ function ProductPaymentModal({
   );
 }
 
+function ManualTransferPaymentModal({
+  product,
+  onClose,
+  onStarted,
+}: {
+  product: MemberWonProduct;
+  onClose: () => void;
+  onStarted: () => Promise<void>;
+}) {
+  const [transfer, setTransfer] = useState<BegunManualTransfer | null>(null);
+  const [isRevealing, setIsRevealing] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState("");
+  const [error, setError] = useState("");
+
+  const revealAccount = async () => {
+    if (isRevealing) return;
+    setIsRevealing(true);
+    setError("");
+    setCopyFeedback("");
+    try {
+      const result = await beginManualBankTransfer(product.productId);
+      setTransfer(result);
+      try {
+        await onStarted();
+      } catch {
+        // The server already created the transfer and returned the account.
+        // Keep it visible even if the background account refresh is delayed.
+      }
+    } catch (transferError) {
+      setError(
+        getErrorMessage(transferError, "입금 계좌를 확인하지 못했습니다."),
+      );
+    } finally {
+      setIsRevealing(false);
+    }
+  };
+
+  const copyAccount = async () => {
+    if (!transfer) return;
+    try {
+      await navigator.clipboard.writeText(transfer.accountNumber);
+      setCopyFeedback("계좌번호를 복사했습니다.");
+    } catch {
+      setCopyFeedback("자동 복사가 어렵습니다. 계좌번호를 길게 눌러 복사해 주세요.");
+    }
+  };
+
+  const amount = transfer?.expectedAmount ?? product.finalBidAmount;
+
+  return (
+    <Modal
+      open
+      onClose={() => {
+        if (!isRevealing) onClose();
+      }}
+      closeOnBackdrop={!isRevealing}
+      title="낙찰 상품 결제"
+      description="계좌를 확인한 후 입금하면 운영자가 실제 통장 내역을 대조합니다."
+      size="sm"
+    >
+      <div className="space-y-5 p-5 sm:p-6">
+        <div className="flex gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+          {product.imageUrls[0] ? (
+            <img
+              src={product.imageUrls[0]}
+              alt=""
+              className="size-20 shrink-0 rounded-xl bg-[var(--surface-raised)] object-cover"
+            />
+          ) : (
+            <span className="grid size-20 shrink-0 place-items-center rounded-xl bg-[var(--surface-raised)] text-xs font-bold text-[var(--text-muted)]">
+              사진 없음
+            </span>
+          )}
+          <div className="min-w-0">
+            <strong className="line-clamp-2 block font-black leading-6 text-[var(--text-strong)]">
+              {product.title}
+            </strong>
+            <span className="mt-2 block text-2xl font-black text-[var(--accent-text)]">
+              {formatKRW(amount)}
+            </span>
+            <span className="mt-1 block text-xs font-bold text-[var(--text-muted)]">
+              입금할 최종 낙찰 금액
+            </span>
+          </div>
+        </div>
+
+        {!transfer ? (
+          <div className="rounded-2xl border border-[var(--info-border)] bg-[var(--info-surface)] px-4 py-4">
+            <p className="text-sm font-black text-[var(--info-text)]">
+              계좌번호는 아래 버튼을 누른 후에 표시됩니다.
+            </p>
+            <p className="mt-1 break-keep text-xs font-bold leading-5 text-[var(--text-muted)]">
+              버튼을 누르면 입금 진행 중으로 접수되고 운영자 확인 목록에
+              즉시 표시됩니다.
+            </p>
+          </div>
+        ) : (
+          <section className="rounded-2xl border-2 border-[var(--accent)] bg-[var(--accent-surface)] p-5 text-center" aria-label="입금 계좌">
+            <p className="text-sm font-black text-[var(--accent-text)]">
+              {transfer.bankName}
+            </p>
+            <p className="mt-2 select-all break-all text-2xl font-black tracking-wide text-[var(--text-strong)] sm:text-3xl">
+              {transfer.accountNumber}
+            </p>
+            <Button size="sm" variant="ghost" className="mt-3" onClick={() => void copyAccount()}>
+              계좌번호 복사
+            </Button>
+            <p className="mt-3 text-sm font-black text-[var(--warning-text)]">
+              정확히 {formatKRW(transfer.expectedAmount)}을 입금해 주세요.
+            </p>
+            <p className="mt-1 text-xs font-bold leading-5 text-[var(--text-muted)]">
+              입금 후 운영자가 확정하면 결제 완료 보관함으로 자동 이동합니다.
+            </p>
+          </section>
+        )}
+
+        {copyFeedback ? (
+          <p role="status" className="rounded-xl bg-[var(--success-surface)] px-3 py-2 text-sm font-bold text-[var(--success-text)]">
+            {copyFeedback}
+          </p>
+        ) : null}
+        {error ? (
+          <p role="alert" className="rounded-2xl border border-[var(--danger-text)]/25 bg-[var(--danger-surface)] px-4 py-3 text-sm font-bold leading-6 text-[var(--danger-text)]">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="flex flex-col-reverse gap-2 border-t border-[var(--border)] pt-4 sm:flex-row sm:justify-end">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={isRevealing}>
+            닫기
+          </Button>
+          {!transfer ? (
+            <Button onClick={() => void revealAccount()} isLoading={isRevealing}>
+              {isRevealing ? "입금 계좌 확인 중..." : "계좌번호 보기"}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function WonProductCard({
   product,
   section,
@@ -707,12 +883,23 @@ function WonProductCard({
   onToggle: () => void;
   onPay: () => void;
 }) {
-  const paid =
-    product.paymentStatus === "결제완료" && product.portoneStatus === "PAID";
+  const paymentProjection = getRuntimePaymentProjection(product);
+  const paid = paymentProjection.isPaymentSettled;
+  const isManualMode = paymentProjection.activePaymentMode === "manual_transfer";
+  const manualTransferStarted = Boolean(
+    paymentProjection.manualTransferRequestedAt,
+  );
   const ready = section === "storage" && product.shippingStatus === "ready" && paid;
-  const paymentMethod = formatPaymentMethod(product.paymentMethod);
-  const paymentLabel =
-    product.portoneStatus === "FAILED"
+  const paymentMethod = isManualMode
+    ? null
+    : formatPaymentMethod(product.paymentMethod);
+  const paymentLabel = paid
+    ? "결제 완료"
+    : isManualMode
+      ? manualTransferStarted
+        ? "입금 진행 중"
+        : "결제 대기"
+      : product.portoneStatus === "FAILED"
       ? "결제 실패"
       : product.portoneStatus === "CANCELLED"
         ? "결제 취소"
@@ -723,8 +910,8 @@ function WonProductCard({
             : paymentStatusLabel[product.paymentStatus];
   const canOpenPayment =
     section === "payment" &&
-    product.paymentStatus === "대기중" &&
-    product.portoneStatus !== "CANCELLED";
+    !paid &&
+    (isManualMode || product.portoneStatus !== "CANCELLED");
 
   return (
     <li>
@@ -778,7 +965,9 @@ function WonProductCard({
               "mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-black " +
               (paid
                 ? "bg-[#dff1e6] text-[#376a50]"
-                : product.paymentStatus === "가상계좌발급"
+                : (isManualMode
+                    ? manualTransferStarted
+                    : product.paymentStatus === "가상계좌발급")
                   ? "bg-[#e3f0f4] text-[#376676]"
                   : "bg-[#fff0e5] text-[#9a5c43]")
             }
@@ -793,7 +982,8 @@ function WonProductCard({
         </span>
       </div>
 
-      {product.paymentStatus === "가상계좌발급" ? (
+      {paymentProjection.activePaymentMode === "portone" &&
+      product.paymentStatus === "가상계좌발급" ? (
         <div className="mt-2 rounded-2xl border border-[#c9dce2] bg-[#eff7f8] px-4 py-3 text-sm font-bold leading-6 text-[#496b74]">
           <p className="font-black">
             {formatVbankBank(product.vbankBank)} {product.vbankNum || "계좌번호 확인 중"}
@@ -814,12 +1004,13 @@ function WonProductCard({
           onClick={onPay}
           disabled={!accountActive || isMutating}
         >
-          결제하기
+          {isManualMode && manualTransferStarted ? "계좌번호 보기" : "결제하기"}
         </Button>
       ) : null}
 
-      {product.portoneStatus === "CANCELLED" ||
-      product.portoneStatus === "PARTIAL_CANCELLED" ? (
+      {paymentProjection.activePaymentMode === "portone" &&
+      (product.portoneStatus === "CANCELLED" ||
+        product.portoneStatus === "PARTIAL_CANCELLED") ? (
         <p className="mt-2 rounded-xl bg-[#fff0ea] px-3 py-2 text-xs font-bold leading-5 text-[#9a4f43]">
           취소 상태 확인이 필요합니다. 추가 결제나 배송 전에 운영팀에 문의해 주세요.
         </p>
@@ -894,18 +1085,15 @@ function MemberAccountPanel({ userId }: { userId: string }) {
       .filter(
         (product) =>
           product.shippingStatus === "ready" &&
-          product.paymentStatus === "결제완료" &&
-          product.portoneStatus === "PAID",
+          getRuntimePaymentProjection(product).isPaymentSettled,
       )
       .map((product) => product.productId),
   );
   const storedProducts = member.wonProducts.filter(
-    (product) =>
-      product.paymentStatus === "결제완료" && product.portoneStatus === "PAID",
+    (product) => getRuntimePaymentProjection(product).isPaymentSettled,
   );
   const paymentPendingProducts = member.wonProducts.filter(
-    (product) =>
-      product.paymentStatus !== "결제완료" || product.portoneStatus !== "PAID",
+    (product) => !getRuntimePaymentProjection(product).isPaymentSettled,
   );
   const effectiveSelectedIds = [...selectedProductIds].filter((id) =>
     readyProductIds.has(id),
@@ -1014,6 +1202,15 @@ function MemberAccountPanel({ userId }: { userId: string }) {
           : result.paymentStatus === "가상계좌발급"
             ? "가상계좌가 발급되었습니다. 기한 안에 입금해 주세요."
             : "결제 요청을 접수했습니다. 결제 상태를 다시 확인해 주세요.",
+    });
+  };
+
+  const markManualTransferStarted = async () => {
+    await member.refresh();
+    setFeedback({
+      type: "success",
+      message:
+        "입금 계좌를 확인했습니다. 입금 후 운영자가 확정하면 결제 완료 보관함으로 이동합니다.",
     });
   };
 
@@ -1201,7 +1398,8 @@ function MemberAccountPanel({ userId }: { userId: string }) {
             </ul>
           )}
           <p className="mt-4 text-sm font-bold leading-6 text-[#776456]">
-            가상계좌 입금은 웹훅 확인 뒤 자동으로 결제 완료 처리되어 보관함으로 이동합니다.
+            계좌이체 입금은 운영자가 실제 통장 내역을 확인한 뒤 결제 완료로
+            처리되어 보관함으로 이동합니다.
           </p>
         </section>
 
@@ -1313,13 +1511,23 @@ function MemberAccountPanel({ userId }: { userId: string }) {
         />
       ) : null}
       {currentPaymentProduct ? (
-        <ProductPaymentModal
-          key={`${currentPaymentProduct.productId}:${currentPaymentProduct.paymentId ?? "new"}:${currentPaymentProduct.portoneStatus ?? "none"}`}
-          product={currentPaymentProduct}
-          onClose={() => setPaymentProduct(null)}
-          onCompleted={completePayment}
-          onRefresh={member.refresh}
-        />
+        getRuntimePaymentProjection(currentPaymentProduct).activePaymentMode ===
+        "portone" ? (
+          <PortOnePaymentModal
+            key={`${currentPaymentProduct.productId}:${currentPaymentProduct.paymentId ?? "new"}:${currentPaymentProduct.portoneStatus ?? "none"}`}
+            product={currentPaymentProduct}
+            onClose={() => setPaymentProduct(null)}
+            onCompleted={completePayment}
+            onRefresh={member.refresh}
+          />
+        ) : (
+          <ManualTransferPaymentModal
+            key={currentPaymentProduct.productId}
+            product={currentPaymentProduct}
+            onClose={() => setPaymentProduct(null)}
+            onStarted={markManualTransferStarted}
+          />
+        )
       ) : null}
     </div>
   );

@@ -12,6 +12,8 @@ export type MemberAccountStatus = "active" | "suspended";
 export type ShippingRequestStatus = "requested" | "shipped";
 export type PortOnePayMethod = "CARD" | "EASY_PAY" | "VIRTUAL_ACCOUNT";
 export type ProductPaymentStatus = "대기중" | "가상계좌발급" | "결제완료";
+export type ActivePaymentMode = "manual_transfer" | "portone";
+export type ManualTransferStatus = "awaiting_manual_transfer" | "confirmed";
 export type PortOnePaymentStatus =
   | "READY"
   | "PAY_PENDING"
@@ -200,6 +202,117 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [];
+      };
+      payment_runtime_settings: {
+        Row: {
+          singleton: boolean;
+          active_mode: ActivePaymentMode;
+          bank_name: string | null;
+          account_number: string | null;
+          updated_by: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          singleton?: boolean;
+          active_mode?: ActivePaymentMode;
+          bank_name?: string | null;
+          account_number?: string | null;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          singleton?: boolean;
+          active_mode?: ActivePaymentMode;
+          bank_name?: string | null;
+          account_number?: string | null;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payment_runtime_settings_updated_by_fkey";
+            columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      manual_transfer_orders: {
+        Row: {
+          id: string;
+          product_id: string;
+          buyer_id: string | null;
+          buyer_deleted_at: string | null;
+          order_name: string;
+          expected_amount: number;
+          currency: string;
+          bank_name_snapshot: string;
+          account_number_snapshot: string;
+          status: ManualTransferStatus;
+          requested_at: string;
+          confirmed_at: string | null;
+          confirmed_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          buyer_id?: string | null;
+          buyer_deleted_at?: string | null;
+          order_name: string;
+          expected_amount: number;
+          currency?: string;
+          bank_name_snapshot: string;
+          account_number_snapshot: string;
+          status?: ManualTransferStatus;
+          requested_at?: string;
+          confirmed_at?: string | null;
+          confirmed_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          product_id?: string;
+          buyer_id?: string | null;
+          buyer_deleted_at?: string | null;
+          order_name?: string;
+          expected_amount?: number;
+          currency?: string;
+          bank_name_snapshot?: string;
+          account_number_snapshot?: string;
+          status?: ManualTransferStatus;
+          requested_at?: string;
+          confirmed_at?: string | null;
+          confirmed_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "manual_transfer_orders_buyer_id_fkey";
+            columns: ["buyer_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "manual_transfer_orders_confirmed_by_fkey";
+            columns: ["confirmed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "manual_transfer_orders_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: true;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       payment_attempts: {
         Row: {
@@ -774,6 +887,70 @@ export type Database = {
         Args: { p_address_id: string };
         Returns: undefined;
       };
+      begin_manual_transfer: {
+        Args: { p_product_id: string };
+        Returns: {
+          order_id: string;
+          product_id: string;
+          order_name: string;
+          expected_amount: number;
+          status: ManualTransferStatus;
+          bank_name: string;
+          account_number: string;
+          requested_at: string;
+          confirmed_at: string | null;
+          updated_at: string;
+          is_payment_settled: boolean;
+        }[];
+      };
+      confirm_manual_transfer: {
+        Args: { p_order_id: string; p_expected_updated_at: string };
+        Returns: {
+          order_id: string;
+          product_id: string;
+          status: ManualTransferStatus;
+          confirmed_at: string;
+          updated_at: string;
+          is_payment_settled: boolean;
+        }[];
+      };
+      get_manual_transfer_settings: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          active_mode: ActivePaymentMode;
+          bank_name: string | null;
+          account_number: string | null;
+          configured: boolean;
+          updated_at: string;
+        }[];
+      };
+      get_payment_runtime_mode_for_service: {
+        Args: Record<PropertyKey, never>;
+        Returns: ActivePaymentMode;
+      };
+      get_manual_transfer_status_for_service: {
+        Args: { p_product_id: string };
+        Returns: ManualTransferStatus | null;
+      };
+      get_pending_manual_transfers: {
+        Args: { p_limit?: number; p_offset?: number };
+        Returns: {
+          order_id: string;
+          product_id: string;
+          buyer_id: string | null;
+          buyer_display_name: string;
+          product_title: string;
+          image_urls: string[];
+          bank_name: string;
+          account_number: string;
+          expected_amount: number;
+          status: ManualTransferStatus;
+          requested_at: string;
+          confirmed_at: string | null;
+          updated_at: string;
+          total_count: number;
+        }[];
+      };
       get_my_won_products: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -792,6 +969,38 @@ export type Database = {
           payment_status: ProductPaymentStatus;
           requested_method: PortOnePayMethod | null;
           portone_status: PortOnePaymentStatus | null;
+          manual_transfer_order_id: string | null;
+          manual_transfer_status: ManualTransferStatus | null;
+          manual_transfer_requested_at: string | null;
+          manual_transfer_confirmed_at: string | null;
+          is_payment_settled: boolean;
+          active_payment_mode: ActivePaymentMode;
+        }[];
+      };
+      get_owner_hidden_test_won_products: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          product_id: string;
+          title: string;
+          image_urls: string[];
+          closed_at: string;
+          final_bid_amount: number;
+          shipping_status: "ready" | "requested" | "shipped";
+          shipment_request_id: string | null;
+          payment_id: string | null;
+          payment_method: string | null;
+          vbank_num: string | null;
+          vbank_bank: string | null;
+          vbank_due: string | null;
+          payment_status: ProductPaymentStatus;
+          requested_method: PortOnePayMethod | null;
+          portone_status: PortOnePaymentStatus | null;
+          manual_transfer_order_id: string | null;
+          manual_transfer_status: ManualTransferStatus | null;
+          manual_transfer_requested_at: string | null;
+          manual_transfer_confirmed_at: string | null;
+          is_payment_settled: boolean;
+          active_payment_mode: ActivePaymentMode;
         }[];
       };
       get_online_member_directory: {
@@ -940,6 +1149,26 @@ export type Database = {
         Args: { p_product_ids: string[]; p_address_id: string };
         Returns: string;
       };
+      owner_begin_hidden_test_manual_transfer: {
+        Args: { p_product_id: string };
+        Returns: {
+          order_id: string;
+          product_id: string;
+          order_name: string;
+          expected_amount: number;
+          status: ManualTransferStatus;
+          bank_name: string;
+          account_number: string;
+          requested_at: string;
+          confirmed_at: string | null;
+          updated_at: string;
+          is_payment_settled: boolean;
+        }[];
+      };
+      set_payment_runtime_mode: {
+        Args: { p_active_mode: ActivePaymentMode };
+        Returns: ActivePaymentMode;
+      };
       set_member_account_status: {
         Args: { p_member_id: string; p_status: MemberAccountStatus };
         Returns: MemberAccountStatus;
@@ -966,6 +1195,16 @@ export type Database = {
       touch_my_last_seen: {
         Args: Record<PropertyKey, never>;
         Returns: string;
+      };
+      update_manual_transfer_settings: {
+        Args: { p_bank_name: string; p_account_number: string };
+        Returns: {
+          active_mode: ActivePaymentMode;
+          bank_name: string;
+          account_number: string;
+          configured: boolean;
+          updated_at: string;
+        }[];
       };
       update_managed_product: {
         Args: {

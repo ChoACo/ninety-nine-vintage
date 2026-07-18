@@ -32,6 +32,7 @@ import {
 } from "@/src/lib/supabase/nickname";
 
 import { CollapsibleSection } from "./CollapsibleSection";
+import { ManualBankTransferPanel } from "./ManualBankTransferPanel";
 import { RevenuePanel } from "./RevenuePanel";
 import { ShippingWorkPanel } from "./ShippingWorkPanel";
 import { ProductEditModal, type ProductEditValues } from "./ProductEditModal";
@@ -774,7 +775,7 @@ export function AdminPage({
           eyebrow="OVERVIEW"
           title="운영 현황"
           summary="회원과 상품의 현재 상태를 서버 기준으로 빠르게 확인합니다."
-          className="order-4"
+          className="order-5"
         >
           <div
             aria-label="운영 현황 요약"
@@ -830,9 +831,18 @@ export function AdminPage({
           eyebrow="REVENUE"
           title="매출 현황"
           summary="실제 입금이 확인된 하루 매출만 저장하고 일·주·월·연 단위로 합산합니다."
-          className="order-5"
+          className="order-6"
         >
           <RevenuePanel />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          eyebrow="PAYMENTS"
+          title="계좌이체·입금 확인"
+          summary="사이트 공용 입금 계좌를 설정하고, 회원이 계좌를 확인한 건의 실제 입금을 직접 확정합니다."
+          className="order-4"
+        >
+          <ManualBankTransferPanel />
         </CollapsibleSection>
 
         <CollapsibleSection
@@ -848,7 +858,7 @@ export function AdminPage({
           eyebrow="MEMBERS"
           title="회원 관리"
           summary="전체 회원의 계정 상태, 배송 이용권, 상담·입찰 현황을 확인합니다."
-          className="order-6"
+          className="order-7"
           actions={
             <Button
               size="sm"

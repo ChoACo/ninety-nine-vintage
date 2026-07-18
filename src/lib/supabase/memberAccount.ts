@@ -27,6 +27,7 @@ export interface MemberShippingAddress {
   label: string;
   recipientName: string;
   phone: string;
+  postalCode: string | null;
   address: string;
   isDefault: boolean;
   createdAt: string;
@@ -56,6 +57,7 @@ export interface SaveShippingAddressInput {
   label: string;
   recipientName: string;
   phone: string;
+  postalCode: string;
   address: string;
   isDefault: boolean;
 }
@@ -75,6 +77,7 @@ interface ShippingAddressRow {
   label: string;
   recipient_name: string;
   phone: string;
+  postal_code: string | null;
   address: string;
   is_default: boolean;
   created_at: string;
@@ -155,13 +158,22 @@ function toMemberAccount(row: MemberAccountRow): MemberAccount {
 }
 
 function toShippingAddress(row: ShippingAddressRow): MemberShippingAddress {
+  const address = row.postal_code
+    ? row.address.replace(
+        new RegExp(
+          `^\\s*(?:\\[${row.postal_code}\\]|\\(${row.postal_code}\\)|${row.postal_code}(?=\\s|,|-))\\s*[-,]?\\s*`,
+        ),
+        "",
+      ).trim() || row.address
+    : row.address;
   return {
     id: row.id,
     memberId: row.member_id,
     label: row.label,
     recipientName: row.recipient_name,
     phone: row.phone,
-    address: row.address,
+    postalCode: row.postal_code,
+    address,
     isDefault: row.is_default,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -246,7 +258,7 @@ export async function fetchMyShippingAddresses(
   const { data, error } = await getMemberAccountClient()
     .from("shipping_addresses")
     .select(
-      "id, member_id, label, recipient_name, phone, address, is_default, created_at, updated_at",
+      "id, member_id, label, recipient_name, phone, postal_code, address, is_default, created_at, updated_at",
     )
     .eq("member_id", memberId)
     .order("is_default", { ascending: false })
@@ -274,12 +286,16 @@ export async function saveMyShippingAddress(
   const label = requireNonEmpty(input.label, "배송지 이름", 40);
   const recipientName = requireNonEmpty(input.recipientName, "받는 분", 80);
   const phone = requireNonEmpty(input.phone, "연락처", 30);
+  const postalCode = requireNonEmpty(input.postalCode, "우편번호", 5);
   const address = requireNonEmpty(input.address, "주소", 500);
   if (phone.length < 7) {
     throw new MemberAccountError("연락처는 7자 이상 입력해 주세요.");
   }
   if (address.length < 5) {
     throw new MemberAccountError("주소는 5자 이상 입력해 주세요.");
+  }
+  if (!/^\d{5}$/.test(postalCode)) {
+    throw new MemberAccountError("우편번호는 숫자 5자리로 입력해 주세요.");
   }
 
   const { error } = await getMemberAccountClient().rpc(
@@ -291,6 +307,7 @@ export async function saveMyShippingAddress(
       p_phone: phone,
       p_address: address,
       p_is_default: input.isDefault,
+      p_postal_code: postalCode,
     },
   );
 

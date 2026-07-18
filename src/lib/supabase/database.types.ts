@@ -471,6 +471,7 @@ export type Database = {
           label: string;
           recipient_name: string;
           phone: string;
+          postal_code: string | null;
           address: string;
           is_default: boolean;
           created_at: string;
@@ -482,6 +483,7 @@ export type Database = {
           label: string;
           recipient_name: string;
           phone: string;
+          postal_code?: string | null;
           address: string;
           is_default?: boolean;
           created_at?: string;
@@ -493,6 +495,7 @@ export type Database = {
           label?: string;
           recipient_name?: string;
           phone?: string;
+          postal_code?: string | null;
           address?: string;
           is_default?: boolean;
           created_at?: string;
@@ -741,6 +744,10 @@ export type Database = {
         Args: { p_conversation_id: string };
         Returns: boolean;
       };
+      count_shipping_work: {
+        Args: { p_include_shipped?: boolean };
+        Returns: number;
+      };
       get_or_create_support_conversation: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -794,6 +801,27 @@ export type Database = {
           display_name: string;
         }[];
       };
+      get_shipping_work: {
+        Args: {
+          p_include_shipped?: boolean;
+          p_limit?: number;
+          p_offset?: number;
+        };
+        Returns: {
+          request_id: string;
+          member_id: string | null;
+          address_snapshot: Json;
+          status: ShippingRequestStatus;
+          courier: string | null;
+          tracking_number: string | null;
+          requested_at: string;
+          shipped_at: string | null;
+          product_ids: string[];
+          item_count: number;
+          updated_at: string;
+          total_count: number;
+        }[];
+      };
       get_staff_member_directory: {
         Args: { p_limit?: number; p_offset?: number };
         Returns: {
@@ -838,6 +866,14 @@ export type Database = {
           user_id: string;
           last_read_at: string;
         }[];
+      };
+      mark_shipping_request_shipped: {
+        Args: {
+          p_request_id: string;
+          p_courier: string;
+          p_tracking_number: string;
+        };
+        Returns: string;
       };
       place_bid: {
         Args: {
@@ -944,6 +980,17 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["products"]["Row"][];
       };
+      upsert_shipping_tracking_batch: {
+        Args: { p_updates: Json };
+        Returns: {
+          request_id: string;
+          status: ShippingRequestStatus;
+          courier: string;
+          tracking_number: string;
+          shipped_at: string;
+          updated_at: string;
+        }[];
+      };
       upsert_my_shipping_address: {
         Args: {
           p_id: string | null;
@@ -952,6 +999,7 @@ export type Database = {
           p_phone: string;
           p_address: string;
           p_is_default?: boolean;
+          p_postal_code?: string | null;
         };
         Returns: Database["public"]["Tables"]["shipping_addresses"]["Row"][];
       };

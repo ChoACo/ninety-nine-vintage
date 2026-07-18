@@ -532,8 +532,10 @@ test("provides a collapsible Supabase operator center with constrained product m
   assert.match(adminPage, /<ShippingWorkPanel/);
   assert.match(revenuePanel, /getDailyRevenue/);
   assert.match(revenuePanel, /upsertDailyRevenue/);
-  assert.match(shippingPanel, /getPendingShippingWork/);
-  assert.match(shippingPanel, /markShippingRequestShipped/);
+  assert.match(shippingPanel, /getShippingWork/);
+  assert.match(shippingPanel, /saveShippingTrackingBatch/);
+  assert.match(shippingPanel, /downloadShippingRequestsWorkbook/);
+  assert.match(shippingPanel, /parseTrackingWorkbook/);
   assert.match(adminPage, /updateManagedProduct/);
   assert.match(adminPage, /deleteManagedProduct/);
   assert.match(operations, /"get_staff_member_directory"/);

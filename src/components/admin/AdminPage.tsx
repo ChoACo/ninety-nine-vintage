@@ -841,7 +841,7 @@ export function AdminPage({
           summary="회원이 접수한 상품의 배송지와 운송장 처리 상태를 확인합니다."
           className="order-3"
         >
-          <ShippingWorkPanel />
+          <ShippingWorkPanel canAccessCompleted />
         </CollapsibleSection>
 
         <CollapsibleSection

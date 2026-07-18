@@ -344,6 +344,7 @@ function AddressEditorModal({
     address?.recipientName ?? "",
   );
   const [phone, setPhone] = useState(address?.phone ?? "");
+  const [postalCode, setPostalCode] = useState(address?.postalCode ?? "");
   const [streetAddress, setStreetAddress] = useState(address?.address ?? "");
   const [isDefault, setIsDefault] = useState(
     forceDefault || Boolean(address?.isDefault),
@@ -362,6 +363,7 @@ function AddressEditorModal({
         label,
         recipientName,
         phone,
+        postalCode,
         address: streetAddress,
         isDefault: forceDefault || isDefault,
       });
@@ -425,6 +427,25 @@ function AddressEditorModal({
             autoComplete="tel"
             minLength={7}
             maxLength={30}
+            required
+            disabled={isSubmitting}
+            className={inputClasses}
+          />
+        </label>
+        <label className="block text-sm font-black text-[#4c4039]">
+          우편번호
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]{5}"
+            value={postalCode}
+            onChange={(event) =>
+              setPostalCode(event.target.value.replace(/\D/g, "").slice(0, 5))
+            }
+            autoComplete="postal-code"
+            minLength={5}
+            maxLength={5}
+            placeholder="5자리 우편번호"
             required
             disabled={isSubmitting}
             className={inputClasses}
@@ -866,6 +887,8 @@ function MemberAccountPanel({ userId }: { userId: string }) {
   )
     ? selectedAddressId
     : (defaultAddress?.id ?? "");
+  const effectiveAddress =
+    member.addresses.find((address) => address.id === effectiveAddressId) ?? null;
   const readyProductIds = new Set(
     member.wonProducts
       .filter(
@@ -893,6 +916,7 @@ function MemberAccountPanel({ userId }: { userId: string }) {
     member.account.shippingCreditCount > 0 &&
     effectiveSelectedIds.length > 0 &&
     Boolean(effectiveAddressId) &&
+    Boolean(effectiveAddress?.postalCode) &&
     !member.isMutating;
 
   const openNewAddress = () => {
@@ -921,6 +945,7 @@ function MemberAccountPanel({ userId }: { userId: string }) {
         label: address.label,
         recipientName: address.recipientName,
         phone: address.phone,
+        postalCode: address.postalCode ?? "",
         address: address.address,
         isDefault: true,
       });
@@ -1077,8 +1102,14 @@ function MemberAccountPanel({ userId }: { userId: string }) {
                       {address.recipientName} · {address.phone}
                     </p>
                     <p className="mt-1 break-words font-medium leading-7 text-[#76685d]">
+                      {address.postalCode ? `[${address.postalCode}] ` : ""}
                       {address.address}
                     </p>
+                    {!address.postalCode ? (
+                      <p className="mt-2 text-xs font-black text-[#a64e42]">
+                        택배 접수 전에 수정 버튼에서 5자리 우편번호를 입력해 주세요.
+                      </p>
+                    ) : null}
                     <div className="mt-4 flex flex-wrap gap-2 border-t border-[#eadfd5] pt-3">
                       <Button
                         size="sm"
@@ -1227,6 +1258,12 @@ function MemberAccountPanel({ userId }: { userId: string }) {
             ))}
           </select>
         </label>
+
+        {effectiveAddressId && !effectiveAddress?.postalCode ? (
+          <p role="alert" className="mt-3 rounded-2xl border border-[#efc4bb] bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#a64e42]">
+            선택한 기존 배송지에 우편번호가 없습니다. 배송지를 수정한 뒤 택배를 접수해 주세요.
+          </p>
+        ) : null}
 
         <div className="mt-5 rounded-2xl border-2 border-[#b7d7e1] bg-[#eaf6fa] px-5 py-4 shadow-sm">
           <p className="text-lg font-black text-[#315f6d]">

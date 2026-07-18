@@ -56,6 +56,30 @@ interface PendingShippingRow {
   item_count: number;
 }
 
+interface ShippingWorkRow {
+  request_id: string;
+  member_id: string | null;
+  address_snapshot: unknown;
+  status: "requested" | "shipped";
+  courier: string | null;
+  tracking_number: string | null;
+  requested_at: string;
+  shipped_at: string | null;
+  product_ids: string[];
+  item_count: number;
+  updated_at: string;
+  total_count: number;
+}
+
+interface ShippingTrackingResultRow {
+  request_id: string;
+  status: "shipped";
+  courier: string;
+  tracking_number: string;
+  shipped_at: string;
+  updated_at: string;
+}
+
 interface WarningResultRow {
   warning_count: number;
   sanction_count: number;
@@ -107,6 +131,49 @@ export interface PendingShippingWork {
   requestedAt: string;
   productIds: string[];
   itemCount: number;
+}
+
+export interface ShippingWork {
+  requestId: string;
+  memberId: string | null;
+  addressSnapshot: unknown;
+  status: "requested" | "shipped";
+  courier: string | null;
+  trackingNumber: string | null;
+  requestedAt: string;
+  shippedAt: string | null;
+  productIds: string[];
+  itemCount: number;
+  updatedAt: string;
+}
+
+export interface ShippingTrackingUpdate {
+  requestId: string;
+  courier: string;
+  trackingNumber: string;
+  expectedUpdatedAt: string;
+}
+
+export interface ShippingWorkPage {
+  items: ShippingWork[];
+  totalCount: number;
+  limit: number;
+  offset: number;
+}
+
+export interface ShippingWorkPageInput {
+  includeShipped?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface SavedShippingTracking {
+  requestId: string;
+  status: "shipped";
+  courier: string;
+  trackingNumber: string;
+  shippedAt: string;
+  updatedAt: string;
 }
 
 export interface WarningResult {
@@ -401,6 +468,152 @@ export async function getPendingShippingWork(): Promise<PendingShippingWork[]> {
     requestedAt: row.requested_at,
     productIds: row.product_ids,
     itemCount: row.item_count,
+  }));
+}
+
+function mapShippingWorkRow(row: ShippingWorkRow): ShippingWork {
+  return {
+    requestId: row.request_id,
+    memberId: row.member_id,
+    addressSnapshot: row.address_snapshot,
+    status: row.status,
+    courier: row.courier,
+    trackingNumber: row.tracking_number,
+    requestedAt: row.requested_at,
+    shippedAt: row.shipped_at,
+    productIds: row.product_ids,
+    itemCount: Number(row.item_count),
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function getShippingWorkPage(
+  input: ShippingWorkPageInput = {},
+): Promise<ShippingWorkPage> {
+  const limit = input.limit ?? 100;
+  const offset = input.offset ?? 0;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+    throw new OperationsRepositoryError(
+      "배송 업무 조회 건수는 1건 이상 500건 이하여야 합니다.",
+    );
+  }
+  if (!Number.isInteger(offset) || offset < 0 || offset > 1_000_000) {
+    throw new OperationsRepositoryError(
+      "배송 업무 조회 시작 위치가 올바르지 않습니다.",
+    );
+  }
+
+  const { data, error } = await getOperationsClient().rpc(
+    "get_shipping_work",
+    {
+      p_include_shipped: input.includeShipped ?? true,
+      p_limit: limit,
+      p_offset: offset,
+    },
+  );
+  if (error) {
+    throw toRepositoryError(error, "배송 업무 목록을 불러오지 못했습니다.");
+  }
+
+  const rows = (data ?? []) as ShippingWorkRow[];
+  let totalCount = rows.length > 0 ? Number(rows[0].total_count) : 0;
+  if (rows.length === 0 && offset > 0) {
+    const { data: count, error: countError } = await getOperationsClient().rpc(
+      "count_shipping_work",
+      { p_include_shipped: input.includeShipped ?? true },
+    );
+    if (countError) {
+      throw toRepositoryError(countError, "배송 업무 전체 건수를 불러오지 못했습니다.");
+    }
+    totalCount = Number(count);
+  }
+  if (!Number.isSafeInteger(totalCount) || totalCount < 0) {
+    throw new OperationsRepositoryError("배송 업무 전체 건수를 확인하지 못했습니다.");
+  }
+  return {
+    items: rows.map(mapShippingWorkRow),
+    totalCount,
+    limit,
+    offset,
+  };
+}
+
+// Compatibility helper for callers that only need one page of rows.
+export async function getShippingWork(
+  input: ShippingWorkPageInput = {},
+): Promise<ShippingWork[]> {
+  return (await getShippingWorkPage(input)).items;
+}
+
+export async function saveShippingTrackingBatch(
+  updates: readonly ShippingTrackingUpdate[],
+): Promise<SavedShippingTracking[]> {
+  if (updates.length < 1 || updates.length > 500) {
+    throw new OperationsRepositoryError(
+      "운송장 등록 내역은 1건 이상 500건 이하여야 합니다.",
+    );
+  }
+
+  const requestIds = new Set<string>();
+  const trackingKeys = new Set<string>();
+  const payload = updates.map((update) => {
+    assertUuid(update.requestId, "배송 요청 식별자");
+    const courier = update.courier.trim();
+    const trackingNumber = update.trackingNumber.trim();
+    const expectedUpdatedAt = update.expectedUpdatedAt.trim();
+    if (requestIds.has(update.requestId)) {
+      throw new OperationsRepositoryError("중복된 배송 요청이 포함되어 있습니다.");
+    }
+    if (
+      courier.length < 1 ||
+      courier.length > 80 ||
+      trackingNumber.length < 1 ||
+      trackingNumber.length > 120 ||
+      /[\u0000-\u001f\u007f]/u.test(courier) ||
+      /[\u0000-\u001f\u007f]/u.test(trackingNumber)
+    ) {
+      throw new OperationsRepositoryError("택배사와 운송장 번호를 확인해 주세요.");
+    }
+    if (!expectedUpdatedAt || !Number.isFinite(Date.parse(expectedUpdatedAt))) {
+      throw new OperationsRepositoryError("배송 요청 수정 시각을 확인해 주세요.");
+    }
+    const trackingKey = `${courier.toLocaleLowerCase("ko-KR")}\u001f${trackingNumber}`;
+    if (trackingKeys.has(trackingKey)) {
+      throw new OperationsRepositoryError(
+        "동일한 택배사와 운송장 번호가 중복되어 있습니다.",
+      );
+    }
+    requestIds.add(update.requestId);
+    trackingKeys.add(trackingKey);
+    return {
+      request_id: update.requestId,
+      courier,
+      tracking_number: trackingNumber,
+      expected_updated_at: expectedUpdatedAt,
+    };
+  });
+
+  const { data, error } = await getOperationsClient().rpc(
+    "upsert_shipping_tracking_batch",
+    { p_updates: payload },
+  );
+  if (error) {
+    throw toRepositoryError(error, "운송장 등록 내역을 저장하지 못했습니다.");
+  }
+
+  const rows = (data ?? []) as ShippingTrackingResultRow[];
+  if (rows.length !== updates.length) {
+    throw new OperationsRepositoryError(
+      "저장된 운송장 내역 수를 확인하지 못했습니다.",
+    );
+  }
+  return rows.map((row) => ({
+    requestId: row.request_id,
+    status: row.status,
+    courier: row.courier,
+    trackingNumber: row.tracking_number,
+    shippedAt: row.shipped_at,
+    updatedAt: row.updated_at,
   }));
 }
 

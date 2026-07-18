@@ -80,7 +80,7 @@ test("publishes PG review business, terms, privacy, refund, and price informatio
   ]);
 
   for (const html of [home, terms, privacy, refund]) {
-    assert.match(html, /나인 티나인 빈티지/);
+    assert.match(html, /나인티 나인 빈티지/);
     assert.match(html, /875-07-03297/);
     assert.match(html, /이영준/);
     assert.match(html, /0507-1494-3519/);
@@ -93,12 +93,25 @@ test("publishes PG review business, terms, privacy, refund, and price informatio
   assert.match(footer, /부산광역시 수영구 수미로50번길 37-1/);
   assert.match(footer, /통신판매업 신고 면제 사유/);
   assert.match(footer, /간이과세자/);
+  assert.match(footer, /<details className=/);
+  assert.match(footer, /<summary className=/);
+  assert.match(footer, /사업자 정보 열기 또는 닫기/);
+  assert.doesNotMatch(footer, /<details[^>]*\sopen(?:\s|=|>)/);
   assert.doesNotMatch(footer, /1973|생년월일|개업 연월일|발급 사유/);
   assert.match(terms, /서비스 이용약관/);
   assert.match(termsSource, /최고 유효 입찰가가 낙찰가/);
+  assert.match(termsSource, /공개 닉네임, 입찰 시각과 입찰 금액을 마스킹 없이/);
   assert.match(termsSource, /중고품, 단일 재고 또는 경매 상품이라는 이유만으로/);
   assert.match(privacy, /개인정보처리방침/);
   assert.match(privacySource, /개인정보 보호 담당/);
+  assert.match(privacySource, /접속 IP, 세션·요청 식별자/);
+  assert.match(privacySource, /운영 총책임자만/);
+  assert.match(privacySource, /IP 일부를 가리거나 통계 형태/);
+  assert.match(privacySource, /필수 동의와 선택 동의를/);
+  assert.match(privacySource, /접속·활동 기록의 열람/);
+  assert.match(privacySource, /최대 24시간/);
+  assert.match(privacySource, /최소 1년/);
+  assert.match(privacySource, /90일/);
   assert.match(refund, /취소·반품·환불 및 청약철회 정책/);
   assert.match(refundSource, /7일 이내/);
   assert.match(refundSource, /3개월 이내/);
@@ -506,7 +519,7 @@ test("provides a collapsible Supabase operator center with constrained product m
   assert.match(auctionApp, /canAccessOperationsCenter\(auth\.role\)/);
   assert.match(auctionApp, /isOwnerRole\(auth\.role\) \? "admin" : "operator"/);
   assert.match(siteHeader, /isOwnerRole\(role\)[\s\S]*onOpenOwnerTools/);
-  assert.match(siteHeader, /테스트 도구/);
+  assert.match(siteHeader, /관리자 메뉴/);
   assert.doesNotMatch(siteHeader, /관리자 모드|운영자 모드|PIN/);
   assert.match(auctionApp, /onOpenBulkImport=\{\(\) => setBulkAuctionOpen\(true\)\}/);
   assert.doesNotMatch(auctionApp, /emptyAdminSales|shipments=\{\[\]\}/);
@@ -577,7 +590,7 @@ test("keeps the owner publicly operator-only while providing audited private tes
   assert.match(testMemberRoute, /get_owner_hidden_test_member/);
   assert.match(ownerClient, /Authorization: `Bearer \$\{accessToken\}`/);
   assert.match(auctionApp, /if \(role === "admin"\) return "operator"/);
-  assert.match(siteHeader, /테스트 도구/);
+  assert.match(siteHeader, /관리자 메뉴/);
   assert.doesNotMatch(siteHeader, /관리자 모드|PIN/);
   assert.match(delegationPanel, /감사 기록 활성/);
   assert.match(testPanel, /ownerPlaceTestBid/);

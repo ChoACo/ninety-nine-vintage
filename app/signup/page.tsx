@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "카카오 회원가입 안내 | 나인티나인 빈티지 · 다미네 구제",
+  title: "카카오 회원가입 안내 | 나인티 나인 빈티지 · 다미네 구제",
   description: "카카오 회원가입 필수 수집 항목과 이용 목적 안내",
 };
 

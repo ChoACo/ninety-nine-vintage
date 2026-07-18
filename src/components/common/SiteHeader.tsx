@@ -57,7 +57,7 @@ export default function SiteHeader({
           isOwnerRole(role) &&
           onOpenOwnerTools ? (
             <Button size="sm" variant="secondary" onClick={onOpenOwnerTools}>
-              테스트 도구
+              관리자 메뉴
             </Button>
           ) : null}
 

@@ -4,6 +4,7 @@ import {
   canAccessOperationsCenter,
   canAccessOperationsWorkspace,
   isMemberRole,
+  isOwnerRole,
   type AppRole,
 } from "@/src/lib/supabase/auth";
 
@@ -52,7 +53,9 @@ export default function Navigation({
             (item.staffOnly && !isOperationsWorkspace) ||
             (item.value === "chat" && !isChatAllowed);
           const visibleLabel =
-            item.value === "admin" && role === "employee"
+            item.value === "profile" && isOwnerRole(role)
+              ? "관리자 메뉴"
+              : item.value === "admin" && role === "employee"
               ? "업무 도구"
               : item.value === "chat" && canAccessOperationsCenter(role)
               ? "상담 대화함"

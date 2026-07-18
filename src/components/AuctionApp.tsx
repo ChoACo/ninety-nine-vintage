@@ -22,7 +22,11 @@ import {
   type NewAuctionDraft,
 } from "@/src/components/feed";
 import { SoldAuctionFeed } from "@/src/components/feed/SoldAuctionFeed";
-import { LiveBidSidebar, OnlineMembersSidebar } from "@/src/components/live";
+import {
+  AuctionOverviewSidebar,
+  LiveBidSidebar,
+  OnlineMembersSidebar,
+} from "@/src/components/live";
 import { AccountPage } from "@/src/components/profile";
 import { NicknameOnboardingModal } from "@/src/components/profile/NicknameOnboardingModal";
 import { useAuthSession } from "@/src/hooks/useAuthSession";
@@ -334,6 +338,11 @@ export function AuctionApp() {
               onBid={handleBid}
               className="hidden lg:block"
             />
+          ) : auth.user && isStaffRole(auth.role) ? (
+            <AuctionOverviewSidebar
+              posts={posts}
+              className="hidden lg:block"
+            />
           ) : (
             <aside className="theme-panel sticky top-24 hidden rounded-[1.6rem] border p-5 text-center lg:block">
               <p className="text-[17px] font-black text-[var(--text-strong)]">내 입찰 현황</p>
@@ -356,6 +365,10 @@ export function AuctionApp() {
     );
   };
 
+  if (auth.isNetworkBlocked) {
+    return <NetworkBlockedPage />;
+  }
+
   return (
     <div className="theme-app-shell relative min-h-screen overflow-x-clip">
       <div aria-hidden="true" className="theme-coral-glow pointer-events-none fixed -left-20 top-36 h-72 w-72 rounded-full blur-3xl" />
@@ -377,7 +390,13 @@ export function AuctionApp() {
         />
         <Navigation
           activePage={activePage}
-          onNavigate={setActivePage}
+          onNavigate={(page) => {
+            if (page === "profile" && isOwnerRole(auth.role)) {
+              window.location.assign("/owner");
+              return;
+            }
+            setActivePage(page);
+          }}
           role={auth.role}
           className="mt-3"
         />
@@ -424,6 +443,34 @@ export function AuctionApp() {
         onDismiss={() => setToastMessage("")}
       />
     </div>
+  );
+}
+
+function NetworkBlockedPage() {
+  return (
+    <main className="theme-app-shell grid min-h-[75dvh] place-items-center px-4 py-12">
+      <section className="theme-panel w-full max-w-xl rounded-[2rem] border p-7 text-center shadow-[0_22px_60px_rgba(92,67,51,0.09)] sm:p-9">
+        <span
+          aria-hidden="true"
+          className="mx-auto grid size-16 place-items-center rounded-2xl bg-[var(--danger-surface)] text-2xl font-black text-[var(--danger-text)]"
+        >
+          !
+        </span>
+        <h1 className="mt-5 text-2xl font-black text-[var(--text-strong)]">
+          보안 정책에 따라 접속이 제한되었습니다
+        </h1>
+        <p className="mt-3 break-keep font-bold leading-7 text-[var(--text-muted)]">
+          비정상 접속이나 오남용 방지를 위해 현재 네트워크 세션이 차단되었습니다.
+          잘못 차단되었다면 고객센터에 차단 시각과 함께 해제를 요청해 주세요.
+        </p>
+        <a
+          href="/privacy"
+          className="mt-6 inline-flex min-h-12 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-5 font-black text-[var(--text-strong)]"
+        >
+          개인정보처리방침 확인
+        </a>
+      </section>
+    </main>
   );
 }
 

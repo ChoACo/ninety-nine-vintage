@@ -51,7 +51,7 @@ export interface UserProfile {
 export interface BidHistoryRecord {
   readonly id: string;
   readonly bidAt: ISODateString;
-  /** 원본 이름. 공개 UI에서 반드시 마스킹해서 표시합니다. */
+  /** 회원이 설정한 공개 닉네임. 입찰 투명성을 위해 공개 UI에 그대로 표시합니다. */
   readonly bidderName: string;
   readonly amount: number;
 }

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "취소·반품·환불 정책 | 나인 티나인 빈티지",
-  description: "나인 티나인 빈티지의 청약철회, 반품 및 환불 기준",
+  title: "취소·반품·환불 정책 | 나인티 나인 빈티지",
+  description: "나인티 나인 빈티지의 청약철회, 반품 및 환불 기준",
 };
 
 export default function RefundPolicyPage() {

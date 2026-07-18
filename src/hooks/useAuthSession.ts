@@ -9,6 +9,11 @@ import {
   signOut as signOutFromSupabase,
   type AppRole,
 } from "@/src/lib/supabase/auth";
+import {
+  getOrCreateSecurityClientSessionId,
+  recordSecuritySession as recordSecuritySessionRequest,
+  SecurityAuditError,
+} from "@/src/lib/securityAudit/client";
 
 interface OwnProfileRow {
   id: string;
@@ -60,9 +65,35 @@ export interface AuthSessionState {
   profile: AuthProfile | null;
   role: AppRole;
   isLoading: boolean;
+  isNetworkBlocked: boolean;
   error: string | null;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
+}
+
+type SecuritySessionEvent =
+  | "session_started"
+  | "heartbeat"
+  | "session_resumed";
+
+async function recordSecuritySession(
+  currentSession: Session,
+  event: SecuritySessionEvent,
+): Promise<"allowed" | "blocked" | "unavailable"> {
+  try {
+    await recordSecuritySessionRequest(currentSession.access_token, {
+      clientSessionId: getOrCreateSecurityClientSessionId(),
+      event,
+    });
+    return "allowed";
+  } catch (error) {
+    if (error instanceof SecurityAuditError && error.status === 403) {
+      return "blocked";
+    }
+    // Telemetry retries on the next heartbeat. Supabase RLS remains the
+    // authorization boundary during a temporary API outage.
+    return "unavailable";
+  }
 }
 
 function readMetadataString(user: User, keys: string[]): string | null {
@@ -119,6 +150,7 @@ export function useAuthSession(): AuthSessionState {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [role, setRole] = useState<AppRole>("unauthorized");
   const [isLoading, setIsLoading] = useState(true);
+  const [isNetworkBlocked, setIsNetworkBlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
 
@@ -156,7 +188,21 @@ export function useAuthSession(): AuthSessionState {
     setSession(null);
     setProfile(null);
     setRole("unauthorized");
+    setIsNetworkBlocked(false);
     setError(null);
+  }, []);
+
+  const rejectBlockedSession = useCallback(async () => {
+    setIsNetworkBlocked(true);
+    setSession(null);
+    setProfile(null);
+    setRole("unauthorized");
+    setError("보안 정책에 따라 현재 네트워크의 접속이 차단되었습니다.");
+    try {
+      await getSupabaseBrowserClient().auth.signOut();
+    } catch {
+      // The local blocked state remains authoritative until the page reloads.
+    }
   }, []);
 
   useEffect(() => {
@@ -202,6 +248,7 @@ export function useAuthSession(): AuthSessionState {
       setSession(null);
       setProfile(null);
       setRole("unauthorized");
+      setIsNetworkBlocked(false);
       setError("카카오 회원 또는 등록된 스태프 계정으로 로그인해 주세요.");
     };
 
@@ -217,7 +264,16 @@ export function useAuthSession(): AuthSessionState {
             await rejectSession();
             return;
           }
+          const securityState = await recordSecuritySession(
+            data.session,
+            "session_started",
+          );
+          if (securityState === "blocked") {
+            if (mounted) await rejectBlockedSession();
+            return;
+          }
           if (!mounted) return;
+          setIsNetworkBlocked(false);
           setSession(data.session);
           setRole(nextRole);
           await loadProfile(data.session.user, nextRole);
@@ -253,7 +309,17 @@ export function useAuthSession(): AuthSessionState {
               if (mounted) setIsLoading(false);
               return;
             }
+            const securityState = await recordSecuritySession(
+              nextSession,
+              "session_resumed",
+            );
+            if (securityState === "blocked") {
+              if (mounted) await rejectBlockedSession();
+              if (mounted) setIsLoading(false);
+              return;
+            }
             if (!mounted) return;
+            setIsNetworkBlocked(false);
             setSession(nextSession);
             setRole(nextRole);
             setIsLoading(false);
@@ -278,7 +344,38 @@ export function useAuthSession(): AuthSessionState {
       requestIdRef.current += 1;
       subscription.unsubscribe();
     };
-  }, [loadProfile]);
+  }, [loadProfile, rejectBlockedSession]);
+
+  useEffect(() => {
+    if (!session || isNetworkBlocked) return;
+
+    let active = true;
+    let inFlight = false;
+    const send = async (event: SecuritySessionEvent) => {
+      if (!active || inFlight) return;
+      inFlight = true;
+      const securityState = await recordSecuritySession(session, event);
+      inFlight = false;
+      if (active && securityState === "blocked") {
+        await rejectBlockedSession();
+      }
+    };
+    const intervalId = window.setInterval(() => {
+      void send("heartbeat");
+    }, 60_000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void send("session_resumed");
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isNetworkBlocked, rejectBlockedSession, session]);
 
   const user = session?.user ?? null;
 
@@ -288,6 +385,7 @@ export function useAuthSession(): AuthSessionState {
     profile,
     role,
     isLoading,
+    isNetworkBlocked,
     error,
     refreshProfile,
     signOut: handleSignOut,

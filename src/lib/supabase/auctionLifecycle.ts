@@ -36,7 +36,7 @@ export interface PublicSoldAuction {
   thumbnailUrls: readonly string[];
   soldAt: string;
   winningAmount: number;
-  /** 공개 입찰 기록과 동일하게 DB에서 마스킹된 닉네임입니다. */
+  /** 공개 입찰 기록과 동일한 회원 공개 닉네임입니다. */
   winnerDisplayName: string;
   participantCount: number;
 }

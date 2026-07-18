@@ -71,9 +71,9 @@ test("keeps owner test controls private and append-only audited", async () => {
   assert.equal((migration.match(/insert into public\.owner_auction_action_audit/g) ?? []).length, 3);
 });
 
-test("publishes only sold snapshots and masked winner nicknames", async () => {
+test("publishes sold snapshots with full public winner nicknames", async () => {
   const [migration, repository] = await Promise.all([
-    source("supabase/migrations/20260718061000_add_auction_lifecycle_controls.sql"),
+    source("supabase/migrations/20260718071000_public_bidder_transparency.sql"),
     source("src/lib/supabase/auctionLifecycle.ts"),
   ]);
 
@@ -82,7 +82,8 @@ test("publishes only sold snapshots and masked winner nicknames", async () => {
   );
   assert.match(soldFunction, /products\.status = 'closed'/);
   assert.match(soldFunction, /products\.final_bid_id is not null/);
-  assert.match(soldFunction, /public\.mask_public_auction_name/);
+  assert.match(soldFunction, /btrim\(winner\.bidder_display_name\)/);
+  assert.doesNotMatch(soldFunction, /mask_public_auction_name\(winner/);
   assert.match(soldFunction, /is_owner_hidden_test_member\(winner\.bidder_id\) then '\*\*\*'/);
   assert.doesNotMatch(soldFunction, /winner_id uuid/);
   assert.match(soldFunction, /to anon, authenticated/);

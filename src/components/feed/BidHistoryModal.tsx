@@ -12,15 +12,6 @@ export interface BidHistoryModalProps {
   onClose: () => void;
 }
 
-function maskBidderName(name: string) {
-  const trimmedName = name.trim();
-  if (!trimmedName) return "***";
-  if (trimmedName.includes("*")) return trimmedName;
-  if (trimmedName.length === 1) return `${trimmedName}*`;
-  if (trimmedName.length === 2) return `${trimmedName[0]}*`;
-  return `${trimmedName[0]}*${trimmedName.at(-1)}`;
-}
-
 function formatBidTime(value: string) {
   return new Intl.DateTimeFormat("ko-KR", {
     month: "long",
@@ -60,7 +51,8 @@ export default function BidHistoryModal({
             <span>읽기 전용 입찰 기록</span>
           </p>
           <p className="mt-1 break-keep text-sm font-semibold leading-6 text-[#58777e]">
-            운영 센터에서도 이 기록을 수정하는 기능은 제공되지 않습니다.
+            조작 의혹 없이 확인할 수 있도록 입찰자 닉네임·입찰 시각·금액을 모두
+            공개하며, 운영 센터에서도 이 기록을 수정하는 기능은 제공되지 않습니다.
           </p>
         </div>
 
@@ -75,7 +67,7 @@ export default function BidHistoryModal({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <strong className="text-lg font-black text-[#3f342e]">
-                        {maskBidderName(bid.bidderName)}
+                        {bid.bidderName.trim() || "닉네임 없음"}
                       </strong>
                       {index === 0 ? (
                         <span className="rounded-full bg-[#ffe2d7] px-2.5 py-1 text-xs font-black text-[#a54336]">

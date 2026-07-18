@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useId, useState, type FormEvent } from "react";
 import type { Role } from "@/src/types/auction";
 import { Button, Modal } from "@/src/components/common";
+import { MemberSecurityLogPanel } from "@/src/components/security/MemberSecurityLogPanel";
 import { useMemberAccount } from "@/src/hooks/useMemberAccount";
 import type {
   MemberShippingAddress,
@@ -1384,6 +1385,7 @@ export function AccountPage({
             onChanged={onProfileRefresh ?? (() => undefined)}
           />
           <VerifiedKakaoProfilePanel key={`kakao-${userId}`} userId={userId} />
+          <MemberSecurityLogPanel />
           <MemberAccountPanel key={userId} userId={userId} />
         </>
       ) : null}

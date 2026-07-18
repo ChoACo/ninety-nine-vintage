@@ -3,6 +3,7 @@
 import { type ReactNode, useId, useState } from "react";
 
 export interface CollapsibleSectionProps {
+  id?: string;
   title: string;
   eyebrow: string;
   summary: string;
@@ -18,6 +19,7 @@ export interface CollapsibleSectionProps {
  * 다시 접어도 DOM에 남겨 두어 입력값과 스크롤 문맥을 잃지 않습니다.
  */
 export function CollapsibleSection({
+  id,
   title,
   eyebrow,
   summary,
@@ -38,34 +40,51 @@ export function CollapsibleSection({
   };
 
   return (
-    <section className={`overflow-hidden rounded-[1.75rem] border-2 border-[#eadfce] bg-[#fffaf4] shadow-[0_14px_40px_rgba(84,63,48,0.08)] ${className}`}>
-      <div className="flex items-start gap-3 px-4 py-4 sm:px-6 sm:py-5">
+    <section
+      id={id}
+      className={`scroll-mt-24 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_8px_30px_rgba(35,28,23,0.06)] transition-all duration-200 ease-out hover:border-[var(--border-strong)] ${className}`}
+    >
+      <div className="relative flex items-start gap-3 px-4 py-3.5 sm:px-5 sm:py-4">
+        <span
+          aria-hidden="true"
+          className={`absolute inset-y-3 left-0 w-0.5 rounded-r-full bg-[var(--accent)] transition-opacity duration-200 ${
+            isOpen ? "opacity-100" : "opacity-0"
+          }`}
+        />
         <button
           id={buttonId}
           type="button"
           aria-expanded={isOpen}
           aria-controls={contentId}
           onClick={toggleSection}
-          className="group flex min-w-0 flex-1 items-start justify-between gap-4 rounded-2xl text-left outline-none focus-visible:ring-2 focus-visible:ring-[#dc7563] focus-visible:ring-offset-4 focus-visible:ring-offset-[#fffaf4]"
+          className="group flex min-w-0 flex-1 items-center justify-between gap-4 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-raised)]"
         >
           <span className="min-w-0">
-            <span className="block text-xs font-black tracking-[0.16em] text-[#8b7668]">
+            <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-[var(--accent-text)]">
               {eyebrow}
             </span>
-            <span className="mt-1 block text-xl font-black text-[#493b31] sm:text-2xl">
+            <span className="mt-0.5 block text-[17px] font-black tracking-[-0.02em] text-[var(--text-strong)] sm:text-lg">
               {title}
             </span>
-            <span className="mt-1.5 block text-sm font-semibold leading-6 text-[#7d6d62] sm:text-[15px]">
+            <span className="mt-1 block max-w-4xl text-xs font-semibold leading-5 text-[var(--text-muted)] sm:text-sm">
               {summary}
             </span>
           </span>
           <span
             aria-hidden="true"
-            className={`mt-1 grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#dfd0c3] bg-white text-xl font-black text-[#7d6455] shadow-sm transition duration-200 group-hover:border-[#d8a38f] group-hover:bg-[#fff3e8] ${
+            className={`grid size-8 shrink-0 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)] transition-all duration-200 ease-out group-hover:border-[var(--border-strong)] group-hover:text-[var(--text-strong)] ${
               isOpen ? "rotate-180" : ""
             }`}
           >
-            ⌄
+            <svg
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              className="size-4"
+            >
+              <path d="m5 7.5 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </span>
         </button>
 
@@ -87,7 +106,7 @@ export function CollapsibleSection({
         {hasBeenOpened ? (
           <div className="min-h-0 overflow-hidden">
             <div
-              className={`border-t border-[#eadfd5] px-4 py-5 transition-opacity duration-200 sm:px-6 sm:py-6 ${
+              className={`border-t border-[var(--border)] px-4 py-4 transition-opacity duration-200 sm:px-5 sm:py-5 ${
                 isOpen ? "opacity-100" : "pointer-events-none opacity-0"
               }`}
             >

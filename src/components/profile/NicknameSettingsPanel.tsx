@@ -87,22 +87,23 @@ export function NicknameSettingsPanel({
   };
 
   return (
-    <section className="theme-panel mt-6 rounded-[2rem] border px-6 py-6 shadow-sm sm:px-9">
-      <p className="text-xs font-black tracking-[0.16em] text-[var(--accent-text)]">
+    <section className="theme-panel mt-5 rounded-2xl border px-5 py-5 shadow-sm sm:px-7 sm:py-6">
+      <p className="text-[10px] font-bold tracking-[0.2em] text-[var(--accent-text)]">
         DISPLAY NAME
       </p>
-      <h3 className="mt-2 text-xl font-black text-[var(--text-strong)]">닉네임 변경</h3>
-      <p className="mt-2 text-sm font-bold leading-6 text-[var(--text-muted)]">
+      <h3 className="mt-1.5 text-lg font-semibold tracking-tight text-[var(--text-strong)]">닉네임 변경</h3>
+      <p className="mt-1.5 text-sm font-medium leading-6 text-[var(--text-muted)]">
         최초 설정 뒤 한 번은 바로 변경할 수 있고, 그 다음부터는 운영자 확인 후 적용됩니다.
       </p>
 
       {isLoading ? (
-        <p role="status" className="mt-4 font-bold text-[var(--text-muted)]">
-          닉네임 정보를 확인하고 있어요.
-        </p>
+        <div role="status" aria-label="닉네임 정보를 확인하고 있어요" className="mt-5 space-y-3">
+          <div className="commerce-skeleton h-12 rounded-lg" />
+          <div className="commerce-skeleton h-10 w-36 rounded-lg" />
+        </div>
       ) : state ? (
         <form onSubmit={handleSubmit} className="mt-5 space-y-3">
-          <label className="block text-sm font-black text-[var(--text-strong)]">
+          <label className="block text-xs font-semibold tracking-wide text-[var(--text-strong)]">
             사용할 닉네임
             <input
               value={nickname}
@@ -110,11 +111,11 @@ export function NicknameSettingsPanel({
               minLength={2}
               maxLength={20}
               disabled={isSaving}
-              className="mt-2 min-h-12 w-full rounded-2xl border-2 border-[var(--border)] bg-[var(--surface-raised)] px-4 text-[17px] font-bold text-[var(--text-strong)] outline-none focus:border-[var(--accent)]"
+              className="mt-2 min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--input-surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none transition-all duration-200 ease-out focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--focus-ring)]/20 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </label>
           {state.pendingNickname ? (
-            <p className="rounded-2xl bg-[var(--warning-surface)] px-4 py-3 text-sm font-bold text-[var(--warning-text)]">
+            <p className="rounded-xl border border-[var(--warning-text)]/20 bg-[var(--warning-surface)] px-4 py-3 text-xs font-medium leading-5 text-[var(--warning-text)]">
               승인 대기 중: {state.pendingNickname} · 새 이름을 제출하면 요청 내용이 교체됩니다.
             </p>
           ) : null}
@@ -131,13 +132,16 @@ export function NicknameSettingsPanel({
       {feedback ? (
         <p
           role={feedback.type === "error" ? "alert" : "status"}
-          className={`mt-4 rounded-2xl px-4 py-3 text-sm font-bold ${
+          className={`mt-4 flex items-start gap-2 rounded-xl border px-4 py-3 text-sm font-semibold leading-6 ${
             feedback.type === "error"
-              ? "bg-[var(--danger-surface)] text-[var(--danger-text)]"
-              : "bg-[var(--success-surface)] text-[var(--success-text)]"
+              ? "border-[var(--danger-text)]/20 bg-[var(--danger-surface)] text-[var(--danger-text)]"
+              : "border-[var(--success-text)]/20 bg-[var(--success-surface)] text-[var(--success-text)]"
           }`}
         >
-          {feedback.message}
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="mt-0.5 size-4 shrink-0">
+            {feedback.type === "error" ? <path d="M12 8v4m0 4h.01M10.3 4.4 2.8 17.2A1.2 1.2 0 0 0 3.84 19h16.32a1.2 1.2 0 0 0 1.04-1.8L13.7 4.4a1.98 1.98 0 0 0-3.4 0Z" /> : <path d="m5 12 4 4L19 6" />}
+          </svg>
+          <span>{feedback.message}</span>
         </p>
       ) : null}
     </section>

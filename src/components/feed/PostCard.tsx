@@ -51,37 +51,70 @@ const bidStatusStyles: Record<
 > = {
   "no-bids": {
     label: "시작 가격",
-    frame: "border-[#d8cbbb] bg-[#f3eee6]",
-    labelColor: "text-[#6c6157]",
-    priceColor: "text-[#443c36]",
+    frame: "border-[var(--border)] bg-[var(--surface-muted)]",
+    labelColor: "text-[var(--text-muted)]",
+    priceColor: "text-[var(--text-strong)]",
     historyButton:
-      "border-[#d8cbbb] bg-white/55 text-[#65594f] hover:bg-white/85 focus-visible:ring-[#8a796b]",
+      "border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-muted)] hover:border-[var(--text-strong)] hover:text-[var(--text-strong)] focus-visible:ring-[var(--border-strong)]",
   },
   "other-leading": {
     label: "현재 입찰가",
-    frame: "border-[#acd1df] bg-[#e6f3f7]",
-    labelColor: "text-[#3b7183]",
-    priceColor: "text-[#24596c]",
+    frame: "border-[var(--info-border)] bg-[var(--info-surface)]",
+    labelColor: "text-[var(--info-text)]",
+    priceColor: "text-[var(--info-text)]",
     historyButton:
-      "border-[#acd1df] bg-white/55 text-[#31687b] hover:bg-white/85 focus-visible:ring-[#4f91a8]",
+      "border-[var(--info-border)] bg-[var(--surface-raised)] text-[var(--info-text)] hover:brightness-[.98] focus-visible:ring-[var(--info-border)]",
   },
   "user-leading": {
     label: "내 입찰 최고가",
-    frame: "border-[#9dd7bd] bg-[#e3f6ed]",
-    labelColor: "text-[#28705a]",
-    priceColor: "text-[#1e654f]",
+    frame: "border-[var(--success-text)]/35 bg-[var(--success-surface)]",
+    labelColor: "text-[var(--success-text)]",
+    priceColor: "text-[var(--success-text)]",
     historyButton:
-      "border-[#9dd7bd] bg-white/55 text-[#286a56] hover:bg-white/85 focus-visible:ring-[#3d8e72]",
+      "border-[var(--success-text)]/35 bg-[var(--surface-raised)] text-[var(--success-text)] hover:brightness-[.98] focus-visible:ring-[var(--success-text)]",
   },
   "user-outbid": {
     label: "재입찰 필요!",
-    frame: "border-[#eea094] bg-[#ffe5df]",
-    labelColor: "text-[#ad3b30]",
-    priceColor: "text-[#9f2d25]",
+    frame: "border-[var(--danger-text)]/35 bg-[var(--danger-surface)]",
+    labelColor: "text-[var(--danger-text)]",
+    priceColor: "text-[var(--danger-text)]",
     historyButton:
-      "border-[#eea094] bg-white/55 text-[#a2342b] hover:bg-white/85 focus-visible:ring-[#d94f43]",
+      "border-[var(--danger-text)]/35 bg-[var(--surface-raised)] text-[var(--danger-text)] hover:brightness-[.98] focus-visible:ring-[var(--danger-text)]",
   },
 };
+
+function getClosingPresentation(closesAt: string, now: Date) {
+  const remaining = Math.max(Date.parse(closesAt) - now.getTime(), 0);
+  const totalMinutes = Math.floor(remaining / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (remaining <= 0) {
+    return {
+      label: "마감",
+      classes: "border-white/20 bg-black/72 text-white",
+    };
+  }
+
+  const timeLabel = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  if (totalMinutes < 10) {
+    return {
+      label: `마감 ${timeLabel}`,
+      classes:
+        "border-red-400/60 bg-red-600/90 text-white shadow-[0_0_0_3px_rgba(239,68,68,0.15)]",
+    };
+  }
+  if (totalMinutes < 60) {
+    return {
+      label: `마감 ${timeLabel}`,
+      classes: "border-orange-300/60 bg-orange-500/90 text-white",
+    };
+  }
+  return {
+    label: `마감 ${timeLabel}`,
+    classes: "border-white/20 bg-black/72 text-white",
+  };
+}
 
 export default function PostCard({
   post,
@@ -109,6 +142,7 @@ export default function PostCard({
   const productDetails = getProductFeedDetails(post);
   const productLabel = productDetails.name;
   const publishedAt = post.publish_at ?? post.createdAt;
+  const closingPresentation = getClosingPresentation(post.closesAt, auctionNow);
 
   useEffect(() => {
     if (bidDecision.allowed) return;
@@ -159,79 +193,85 @@ export default function PostCard({
   };
 
   return (
-    <article className="render-lazy flex h-full min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[#eadacd] bg-[#fffaf4] shadow-[0_12px_36px_rgba(91,67,50,0.09)]">
-      <header className="flex items-center justify-between gap-2 border-b border-[#eee0d5] bg-white/45 px-4 py-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <time
-            dateTime={publishedAt}
-            className="text-[15px] font-black text-[#4b3f38]"
-          >
-            {formatKoreanDate(publishedAt, { includeWeekday: false })}
-          </time>
-          <span className="rounded-full bg-[#e7f3f5] px-2 py-1 text-sm font-bold text-[#4c7781]">
-            {getKoreanWeekday(publishedAt)}요일
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setInquiryModalOpen(true)}
-          className="min-h-11 shrink-0 rounded-full border border-[#efb9aa] bg-[#fff0e9] px-3 text-[15px] font-black text-[#9d4639] transition hover:bg-[#ffe3d8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ec7866] focus-visible:ring-offset-2"
-        >
-          상품 문의하기
-        </button>
-      </header>
-
-      <div className="flex flex-1 flex-col gap-3 p-3 sm:p-3.5">
+    <article className="render-lazy group/card flex h-full min-w-0 flex-col overflow-hidden bg-[var(--surface-raised)] transition-all duration-200 ease-out hover:relative hover:z-[1] hover:shadow-[var(--shadow-hover)]">
+      <div className="relative overflow-hidden">
         <PhotoGallery
           images={post.imageUrls}
           thumbnailImages={post.thumbnailUrls}
           title={productLabel}
           compact
         />
+        <span
+          className={`pointer-events-none absolute left-3 top-3 border px-2.5 py-1.5 font-mono text-[11px] font-black tabular-nums tracking-tight shadow-sm backdrop-blur-md ${closingPresentation.classes}`}
+        >
+          {closingPresentation.label}
+        </span>
+      </div>
+
+      <div className="flex flex-1 flex-col p-4 sm:p-5">
+        <header className="mb-4 flex items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+          <div className="min-w-0 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+            <time dateTime={publishedAt}>
+              {formatKoreanDate(publishedAt, { includeWeekday: false })}
+            </time>
+            <span aria-hidden="true" className="mx-1.5 text-[var(--border-strong)]">/</span>
+            <span>{getKoreanWeekday(publishedAt)}요일</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setInquiryModalOpen(true)}
+            className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-transparent px-2.5 text-xs font-bold text-[var(--text-muted)] transition-all duration-200 ease-out hover:scale-[1.02] hover:border-[var(--text-strong)] hover:text-[var(--text-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5"><path d="M7 18.5 3.5 21v-5.2A8.5 8.5 0 1 1 7 18.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>
+            상품 문의하기
+          </button>
+        </header>
 
         <div className="flex min-w-0 flex-1 flex-col">
           {productDetails.isCanonical ? (
             <dl
               aria-label="상품 정보"
-              className="space-y-1.5 break-keep rounded-2xl border border-[#eadfd5] bg-white/45 px-3.5 py-3 text-[16px] font-extrabold leading-[1.55] tracking-[-0.015em] text-[#332a25] sm:text-[17px]"
+              className="break-keep text-sm leading-6 tracking-[-0.015em] text-[var(--text-strong)]"
             >
-              <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-                <dt className="font-black text-[#765f51]">Name:</dt>
-                <dd className="min-w-0 break-words">{productDetails.name}</dd>
+              <div>
+                <dt className="sr-only">Name:</dt>
+                <dd className="line-clamp-2 min-w-0 break-words text-lg font-black tracking-[-0.025em]">
+                  {productDetails.name}
+                </dd>
               </div>
-              <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-                <dt className="font-black text-[#765f51]">Size :</dt>
-                <dd className="min-w-0 break-words">{productDetails.size}</dd>
+              <div className="mt-2 flex min-w-0 items-start gap-2 text-[13px] font-medium text-[var(--text-muted)]">
+                <dt className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.12em]">Size :</dt>
+                <dd className="line-clamp-2 min-w-0 break-words">{productDetails.size}</dd>
               </div>
               {productDetails.condition ? (
-                <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-                  <dt className="font-black text-[#765f51]">상품상태:</dt>
-                  <dd className="min-w-0 break-words">
+                <div className="mt-1 flex min-w-0 items-start gap-2 text-[13px] font-medium text-[var(--text-muted)]">
+                  <dt className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.12em]">상품상태:</dt>
+                  <dd className="line-clamp-2 min-w-0 break-words">
                     {productDetails.condition}
                   </dd>
                 </div>
               ) : null}
             </dl>
           ) : (
-            <div className="break-keep text-[#332a25]">
-              <p className="line-clamp-5 whitespace-pre-line text-[17px] font-extrabold leading-[1.6] tracking-[-0.015em] sm:text-[18px]">
+            <div className="break-keep text-[var(--text-strong)]">
+              <p className="line-clamp-4 whitespace-pre-line text-base font-bold leading-6 tracking-[-0.02em]">
                 {productDetails.legacyDescription}
               </p>
             </div>
           )}
 
           <div
-            className={`mt-3 grid grid-cols-2 overflow-hidden rounded-2xl border-2 transition-colors ${bidPresentation.frame}`}
+            className={`mt-5 grid grid-cols-[minmax(0,1fr)_auto] overflow-hidden rounded-lg border transition-colors duration-200 ${bidPresentation.frame}`}
             data-bid-status={bidState.status}
           >
-            <div className="flex min-w-0 flex-col justify-center px-3.5 py-3 sm:px-4">
+            <div className="flex min-w-0 flex-col justify-center px-3.5 py-3.5 sm:px-4">
               <p
-                className={`text-[15px] font-black tracking-[0.04em] ${bidPresentation.labelColor}`}
+                className={`text-[10px] font-bold uppercase tracking-[0.14em] ${bidPresentation.labelColor}`}
               >
                 {bidPresentation.label}
               </p>
               <p
-                className={`mt-0.5 break-keep text-[1.55rem] font-black tabular-nums tracking-[-0.04em] sm:text-[1.7rem] ${bidPresentation.priceColor}`}
+                className={`mt-1 break-keep font-mono text-xl font-black tabular-nums tracking-tight sm:text-[1.4rem] ${bidPresentation.priceColor}`}
               >
                 {formatKRW(displayedPrice)}
               </p>
@@ -240,13 +280,13 @@ export default function PostCard({
             <button
               type="button"
               onClick={() => setHistoryModalOpen(true)}
-              className={`flex min-h-[5.25rem] items-center justify-center gap-1.5 border-l-2 px-2 text-center text-[15px] font-black leading-snug transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset sm:text-base ${bidPresentation.historyButton}`}
+              className={`flex min-h-[4.75rem] min-w-[6.75rem] items-center justify-center gap-2 border-l px-3 text-left text-xs font-bold leading-snug transition-all duration-200 ease-out hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${bidPresentation.historyButton}`}
               aria-label={`입찰 현황 보기, ${post.bidHistory.length}건`}
             >
-              <span aria-hidden="true">▤</span>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4"><path d="M8 7h11M8 12h11M8 17h7M4 7h.01M4 12h.01M4 17h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
               <span>
                 입찰 현황 보기
-                <span className="mt-0.5 block tabular-nums">
+                <span className="mt-0.5 block font-mono tabular-nums tracking-tight">
                   ({post.bidHistory.length.toLocaleString("ko-KR")}건)
                 </span>
               </span>
@@ -258,15 +298,15 @@ export default function PostCard({
             bidDecision.allowed ? (
               <p
                 role="status"
-                className={`mb-2 rounded-xl border px-3 py-2 text-center text-[15px] font-black leading-6 sm:text-[16px] ${
+                className={`mb-2 border-l-2 px-3 py-2 text-[13px] font-bold leading-5 ${
                   bidDecision.reason === "existing-participant"
-                    ? "border-[#a9d9bf] bg-[#e9f8ef] text-[#286a50]"
-                    : "border-[#dfcdbb] bg-[#f6efe6] text-[#725d4f]"
+                    ? "border-[var(--success-text)] bg-[var(--success-surface)] text-[var(--success-text)]"
+                    : "border-[var(--warning-text)] bg-[var(--warning-surface)] text-[var(--warning-text)]"
                 }`}
               >
                 {bidDecision.reason === "existing-participant"
-                  ? "✅ 기존 참여자 입찰 가능 · 오후 9시까지"
-                  : "⚠️ 무입찰 상품 · 첫 입찰 즉시 확정"}
+                  ? "기존 참여자 입찰 가능 · 오후 9시까지"
+                  : "무입찰 상품 · 첫 입찰 즉시 확정"}
               </p>
             ) : null}
 
@@ -275,14 +315,14 @@ export default function PostCard({
                 fullWidth
                 size="lg"
                 disabled
-                className="min-h-16 break-keep px-3 py-2 text-[17px] font-black leading-6 shadow-none"
+                className="min-h-12 rounded-lg break-keep px-3 py-2 text-sm font-bold leading-5 shadow-none"
               >
                 {bidDecision.reason === "new-bid-cutoff"
-                  ? "⛔ 신규 입찰 마감 (기존 참여자 전용)"
+                  ? "신규 입찰 마감 (기존 참여자 전용)"
                   : bidDecision.reason === "late-first-bid-finalized"
-                    ? "✅ 확정 입찰 완료"
+                    ? "확정 입찰 완료"
                     : bidDecision.reason === "auction-closed"
-                      ? "⏸ 정산 중 · 오후 10시 재개"
+                      ? "정산 중 · 오후 10시 재개"
                       : "판매 완료"}
               </Button>
             ) : (
@@ -291,7 +331,7 @@ export default function PostCard({
                   fullWidth
                   size="lg"
                   onClick={() => setBidModalOpen(true)}
-                  className="min-h-14 px-2 py-2 text-[17px] font-black"
+                  className="min-h-12 rounded-lg px-2 py-2 text-sm font-black transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-lg"
                 >
                   경매하기
                 </Button>
@@ -300,7 +340,7 @@ export default function PostCard({
                   size="lg"
                   variant="secondary"
                   onClick={requestQuickBid}
-                  className="min-h-14 break-keep px-2 py-2 text-[17px] font-black"
+                  className="min-h-12 rounded-lg break-keep px-2 py-2 text-sm font-black transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-md"
                 >
                   {isFirstBid ? "입찰하기" : "+1,000원 입찰하기"}
                 </Button>

@@ -66,9 +66,9 @@ export default function Navigation({
   return (
     <nav
       aria-label="주요 메뉴"
-      className={`app-primary-navigation theme-surface-glass fixed inset-x-2 z-40 mx-auto max-w-[28rem] rounded-[1.35rem] border p-1.5 md:static md:max-w-3xl md:rounded-[1.5rem] md:shadow-sm ${className}`}
+      className={`app-primary-navigation theme-surface-glass fixed inset-x-2 z-40 mx-auto max-w-[28rem] rounded-xl border p-1 md:static md:max-w-3xl md:rounded-xl md:shadow-sm ${className}`}
     >
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-4 gap-0.5 sm:gap-1">
         {navigationItems.map((item) => {
           const selected = activePage === item.value;
           const isOperationsWorkspace = canAccessOperationsWorkspace(role);
@@ -94,6 +94,7 @@ export default function Navigation({
               key={item.value}
               type="button"
               aria-current={selected ? "page" : undefined}
+              aria-disabled={isLocked || undefined}
               aria-label={
                 isLocked
                   ? `${visibleLabel}, 허용된 운영 역할에서 이용 가능`
@@ -102,17 +103,19 @@ export default function Navigation({
               onClick={() => {
                 if (!isLocked) onNavigate(item.value);
               }}
-              className={`group relative flex min-h-[3.25rem] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1rem] px-1 py-1.5 text-[11px] font-extrabold leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] sm:min-h-14 sm:flex-row sm:gap-2 sm:px-3 sm:text-[15px] ${
+              className={`group relative flex min-h-[3.25rem] min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border px-1 py-1.5 text-[10px] font-bold leading-tight tracking-[-0.015em] transition-all duration-200 ease-out focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] sm:min-h-13 sm:flex-row sm:gap-2 sm:px-3 sm:text-sm ${
                 selected
-                  ? "bg-[var(--accent-surface)] text-[var(--accent-text)] shadow-[0_4px_12px_rgba(131,75,61,0.10)]"
-                  : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-strong)]"
+                  ? "border-transparent bg-[var(--accent)] text-[var(--accent-contrast)] shadow-[0_6px_16px_rgba(18,18,17,0.16)]"
+                  : isLocked
+                    ? "border-transparent text-[var(--text-muted)] opacity-55"
+                    : "border-transparent text-[var(--text-muted)] hover:-translate-y-0.5 hover:border-[var(--border)] hover:bg-[var(--surface-raised)] hover:text-[var(--text-strong)] hover:shadow-[0_5px_14px_rgba(18,18,17,0.08)] active:translate-y-0"
               }`}
             >
               <NavigationIcon name={item.icon} />
               <span className="max-w-full truncate whitespace-nowrap">{visibleLabel}</span>
               {isLocked ? (
                 <span
-                  className="absolute right-1.5 top-1.5 grid size-3.5 place-items-center rounded-full bg-[var(--surface-muted)] text-[8px] text-[var(--text-muted)] sm:static sm:size-auto sm:px-1.5 sm:py-0.5 sm:text-[9px]"
+                  className="absolute right-1.5 top-1.5 grid size-3.5 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface-muted)] text-[8px] text-[var(--text-muted)] sm:static sm:size-auto sm:rounded-sm sm:px-1.5 sm:py-0.5 sm:text-[9px]"
                   aria-label="잠금"
                 >
                   <span aria-hidden="true">●</span>

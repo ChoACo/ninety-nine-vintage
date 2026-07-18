@@ -64,16 +64,16 @@ export default function BidForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
-      <div className="grid grid-cols-2 gap-3 rounded-2xl bg-[#eef7f8] p-4">
+      <div className="grid grid-cols-2 divide-x divide-[var(--info-border)] border-y border-[var(--info-border)] bg-[var(--info-surface)] py-3">
         <div>
-          <p className="text-sm font-bold text-[#5b7980]">현재 가격</p>
-          <p className="mt-1 text-lg font-black text-[#274f59]">
+          <p className="px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--info-text)]">현재 가격</p>
+          <p className="mt-1 px-3 font-mono text-base font-black tabular-nums tracking-tight text-[var(--info-text)]">
             {formatKRW(currentPrice)}
           </p>
         </div>
-        <div className="border-l border-[#cfe2e6] pl-3">
-          <p className="text-sm font-bold text-[#5b7980]">최소 입찰가</p>
-          <p className="mt-1 text-lg font-black text-[#274f59]">
+        <div>
+          <p className="px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--info-text)]">최소 입찰가</p>
+          <p className="mt-1 px-3 font-mono text-base font-black tabular-nums tracking-tight text-[var(--info-text)]">
             {formatKRW(minimumBid)}
           </p>
         </div>
@@ -82,7 +82,7 @@ export default function BidForm({
       <div>
         <label
           htmlFor={amountId}
-          className="mb-2 block text-base font-black text-[#40352f]"
+          className="mb-2 block text-sm font-black text-[var(--text-strong)]"
         >
           희망 경매 가격
         </label>
@@ -100,11 +100,11 @@ export default function BidForm({
             }}
             aria-invalid={Boolean(error)}
             aria-describedby={error ? errorId : undefined}
-            className="h-16 w-full rounded-2xl border-2 border-[#decdbf] bg-white px-4 pr-14 text-right text-2xl font-black tabular-nums text-[#332a25] outline-none transition placeholder:text-[#b5a69c] focus:border-[#ec7866] focus:ring-4 focus:ring-[#ec7866]/10"
+            className="h-14 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--input-surface)] px-4 pr-12 text-right font-mono text-xl font-black tabular-nums tracking-tight text-[var(--text-strong)] outline-none transition-all duration-200 placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
             autoComplete="off"
             autoFocus
           />
-          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-base font-black text-[#6d5d53]">
+          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-[var(--text-muted)]">
             원
           </span>
         </div>
@@ -112,12 +112,12 @@ export default function BidForm({
           <p
             id={errorId}
             role="alert"
-            className="mt-2 text-base font-bold text-[#a73f34]"
+            className="mt-2 border-l-2 border-[var(--danger-text)] pl-2 text-sm font-bold text-[var(--danger-text)]"
           >
             {error}
           </p>
         ) : (
-          <p className="mt-2 text-sm font-semibold leading-6 text-[#75655b]">
+          <p className="mt-2 text-xs font-medium leading-5 text-[var(--text-muted)]">
             {minimumBid === currentPrice
               ? `첫 입찰은 시작가 ${formatKRW(minimumBid)}부터 참여할 수 있어요.`
               : `최소 ${formatKRW(minimumBid)}부터 ${formatKRW(bidIncrement)} 단위로 입찰할 수 있어요.`}
@@ -126,7 +126,7 @@ export default function BidForm({
       </div>
 
       <fieldset>
-        <legend className="mb-2 text-sm font-black text-[#6c5c52]">
+        <legend className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-muted)]">
           빠른 금액 선택
         </legend>
         <div className="grid grid-cols-3 gap-2">
@@ -137,7 +137,7 @@ export default function BidForm({
                 key={multiplier}
                 type="button"
                 onClick={() => selectQuickBid(multiplier)}
-                className="min-h-12 rounded-xl border border-[#ead9cb] bg-[#fff8f0] px-2 text-sm font-black text-[#735245] transition hover:border-[#ecab97] hover:bg-[#ffecdf] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ec7866]"
+                className="min-h-10 rounded-md border border-[var(--border)] bg-[var(--surface-raised)] px-2 font-mono text-xs font-black tabular-nums tracking-tight text-[var(--text-strong)] transition-all duration-200 ease-out hover:scale-[1.02] hover:border-[var(--text-strong)] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               >
                 +{formatKRW(bidIncrement * multiplier)}
                 <span className="sr-only">를 더한 {formatKRW(quickAmount)}</span>
@@ -153,14 +153,14 @@ export default function BidForm({
           variant="ghost"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="min-h-14 text-lg font-black"
+          className="min-h-12 rounded-lg text-sm font-bold transition-all duration-200 ease-out hover:scale-[1.02]"
         >
           취소
         </Button>
         <Button
           type="submit"
           isLoading={isSubmitting}
-          className="min-h-14 text-lg font-black"
+          className="min-h-12 rounded-lg text-sm font-black transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-lg"
         >
           {isSubmitting
             ? "확인 중…"

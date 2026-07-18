@@ -61,7 +61,7 @@ export default function DateFilterChips({
 
   return (
     <nav aria-label="상품 등록 날짜 선택" className="relative">
-      <div className="flex snap-x gap-2 overflow-x-auto pb-2 [scrollbar-width:thin]">
+      <div className="flex snap-x gap-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
         {options.map((option) => {
           const isSelected = selectedDate === option.value;
 
@@ -71,10 +71,10 @@ export default function DateFilterChips({
               type="button"
               aria-pressed={isSelected}
               onClick={() => onSelect(option.value)}
-              className={`min-h-12 shrink-0 snap-start rounded-full border-2 px-5 py-2 text-[17px] font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ec7866] focus-visible:ring-offset-2 ${
+              className={`min-h-10 shrink-0 snap-start rounded-md border px-4 py-2 text-sm font-bold tracking-[-0.01em] transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${
                 isSelected
-                  ? "border-[#d96352] bg-[#e87160] text-white shadow-[0_7px_18px_rgba(211,101,83,0.2)]"
-                  : "border-[#e4d2c3] bg-[#fffaf4] text-[#655248] hover:border-[#e89c8d] hover:bg-[#fff0e8]"
+                  ? "border-[var(--text-strong)] bg-[var(--text-strong)] text-[var(--surface)] shadow-sm"
+                  : "border-transparent bg-transparent text-[var(--text-muted)] hover:scale-[1.02] hover:border-[var(--border-strong)] hover:bg-[var(--surface-raised)] hover:text-[var(--text-strong)]"
               }`}
             >
               {option.label}

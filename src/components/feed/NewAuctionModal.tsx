@@ -203,7 +203,7 @@ export default function NewAuctionModal({
   };
 
   const inputClasses =
-    "mt-2 w-full rounded-2xl border border-[#decdbf] bg-white px-4 py-3 text-sm text-[#463a34] outline-none transition placeholder:text-[#b7aaa1] focus:border-[#ec7866] focus:ring-4 focus:ring-[#ec7866]/10";
+    "mt-2 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--input-surface)] px-4 py-3 text-sm text-[var(--text-strong)] outline-none transition-all duration-200 placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15";
 
   return (
     <Modal
@@ -213,11 +213,12 @@ export default function NewAuctionModal({
       description="상품 설명과 사진을 등록한 뒤, 오전 10시 예약 또는 즉시 공개를 선택해 주세요."
       size="lg"
       closeOnBackdrop={!isSubmitting}
+      className="max-sm:absolute max-sm:bottom-0 max-sm:max-h-[94dvh] max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0"
     >
       <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
         <label
           htmlFor={descriptionId}
-          className="block text-sm font-bold text-[#4c4039]"
+          className="block text-sm font-bold text-[var(--text-strong)]"
         >
           상품 설명
           <textarea
@@ -238,7 +239,7 @@ export default function NewAuctionModal({
         <div className="grid gap-4 sm:grid-cols-2">
           <label
             htmlFor={startingPriceId}
-            className="text-sm font-bold text-[#4c4039]"
+            className="text-sm font-bold text-[var(--text-strong)]"
           >
             시작 가격
             <input
@@ -253,16 +254,16 @@ export default function NewAuctionModal({
               }
               className={inputClasses}
             />
-            <span className="mt-1.5 block text-xs font-medium text-[#8a786c]">
+            <span className="mt-1.5 block font-mono text-xs font-medium tabular-nums tracking-tight text-[var(--text-muted)]">
               {formatKRW(Number(form.startingPrice) || 0)}
             </span>
           </label>
-          <div className="rounded-2xl border border-[#cfe1e5] bg-[#edf7f9] px-4 py-3">
-            <p className="text-sm font-black text-[#466c75]">1회 입찰 단위</p>
-            <p className="mt-1 text-xl font-black text-[#294f58]">
+          <div className="border-y border-[var(--info-border)] bg-[var(--info-surface)] px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--info-text)]">1회 입찰 단위</p>
+            <p className="mt-1 font-mono text-lg font-black tabular-nums tracking-tight text-[var(--info-text)]">
               1,000원 고정
             </p>
-            <p className="mt-1 text-sm font-semibold leading-5 text-[#617c82]">
+            <p className="mt-1 text-xs font-medium leading-5 text-[var(--info-text)] opacity-80">
               모든 상품에 같은 입찰 단위가 적용됩니다.
             </p>
           </div>
@@ -271,11 +272,11 @@ export default function NewAuctionModal({
         <div>
           <label
             htmlFor={imagesId}
-            className="block text-sm font-bold text-[#4c4039]"
+            className="block text-sm font-bold text-[var(--text-strong)]"
           >
             상품 사진
           </label>
-          <div className="mt-2 rounded-[1.4rem] border border-dashed border-[#d8bda9] bg-[#fffaf4] p-4 transition focus-within:border-[#ec7866] focus-within:ring-4 focus-within:ring-[#ec7866]/10">
+          <div className="mt-2 border border-dashed border-[var(--border-strong)] bg-[var(--surface-raised)] p-4 transition-all duration-200 focus-within:border-[var(--accent)] focus-within:ring-2 focus-within:ring-[var(--accent)]/15">
             <input
               ref={fileInputRef}
               id={imagesId}
@@ -285,11 +286,11 @@ export default function NewAuctionModal({
               aria-describedby={imagesHelpId}
               onChange={handleImageSelection}
               disabled={isSubmitting}
-              className="block w-full text-sm font-semibold text-[#6e5b50] file:mr-3 file:rounded-full file:border-0 file:bg-[#e87462] file:px-4 file:py-2.5 file:text-sm file:font-black file:text-white hover:file:bg-[#d96352] disabled:opacity-60"
+              className="block w-full text-sm font-medium text-[var(--text-muted)] file:mr-3 file:rounded-md file:border file:border-[var(--border-strong)] file:bg-[var(--surface-raised)] file:px-4 file:py-2.5 file:text-sm file:font-black file:text-[var(--text-strong)] hover:file:border-[var(--text-strong)] hover:file:shadow-sm disabled:opacity-60"
             />
             <p
               id={imagesHelpId}
-              className="mt-2 text-xs font-medium leading-5 text-[#8a786c]"
+              className="mt-2 text-xs font-medium leading-5 text-[var(--text-muted)]"
             >
               여러 장을 한 번에 선택할 수 있어요. 첫 번째 사진이 대표
               사진으로 표시됩니다. 지원 형식: {PRODUCT_IMAGE_FORMAT_LABEL}.
@@ -301,17 +302,17 @@ export default function NewAuctionModal({
               {selectedImages.map((image, index) => (
                 <li
                   key={image.id}
-                  className="group relative overflow-hidden rounded-2xl border border-[#ead9cc] bg-white shadow-[0_8px_22px_rgba(89,65,49,0.08)]"
+                  className="group relative overflow-hidden border border-[var(--border)] bg-[var(--surface-raised)] transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-md"
                 >
-                  <div className="aspect-square overflow-hidden bg-[#f1e7de]">
+                  <div className="aspect-square overflow-hidden bg-[var(--surface-muted)]">
                     <img
                       src={image.previewUrl}
                       alt={`${index + 1}번째 선택 사진 미리보기`}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.035]"
                     />
                   </div>
                   {index === 0 ? (
-                    <span className="absolute left-2 top-2 rounded-full bg-[#4f4038]/85 px-2.5 py-1 text-[11px] font-black text-white backdrop-blur">
+                    <span className="absolute left-2 top-2 border border-white/20 bg-black/75 px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white backdrop-blur">
                       대표 사진
                     </span>
                   ) : null}
@@ -320,11 +321,11 @@ export default function NewAuctionModal({
                     onClick={() => removeImage(image.id)}
                     disabled={isSubmitting}
                     aria-label={`${image.file.name} 사진 삭제`}
-                    className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full border border-white/80 bg-[#fffaf4]/95 text-lg font-black text-[#a04438] shadow-md transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ec7866] disabled:opacity-50"
+                    className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-md border border-white/30 bg-black/70 text-base font-black text-white shadow-md backdrop-blur transition-all duration-200 ease-out hover:scale-105 hover:bg-black/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-50"
                   >
                     ×
                   </button>
-                  <p className="truncate px-3 py-2 text-xs font-bold text-[#756359]">
+                  <p className="truncate px-3 py-2 text-xs font-medium text-[var(--text-muted)]">
                     {image.file.name}
                   </p>
                 </li>
@@ -336,23 +337,23 @@ export default function NewAuctionModal({
         {error ? (
           <p
             role="alert"
-            className="rounded-2xl bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#b14c3f]"
+            className="border-l-2 border-[var(--danger-text)] bg-[var(--danger-surface)] px-4 py-3 text-sm font-bold text-[var(--danger-text)]"
           >
             {error}
           </p>
         ) : null}
 
-        <div className="space-y-4 border-t border-[#eee0d5] pt-5">
+        <div className="space-y-4 border-t border-[var(--border)] pt-5">
           <fieldset>
-            <legend className="text-sm font-black text-[#4c4039]">
+            <legend className="text-sm font-black text-[var(--text-strong)]">
               오픈 시간
             </legend>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               <label
-                className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3.5 transition ${
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3.5 transition-all duration-200 ease-out hover:scale-[1.01] ${
                   publishMode === "scheduled"
-                    ? "border-[#df7462] bg-[#fff0e9] ring-2 ring-[#df7462]/15"
-                    : "border-[#dfd0c4] bg-white hover:border-[#d8a18f]"
+                    ? "border-[var(--accent-text)] bg-[var(--accent-surface)] ring-2 ring-[var(--accent-text)]/10"
+                    : "border-[var(--border)] bg-[var(--surface-raised)] hover:border-[var(--border-strong)]"
                 }`}
               >
                 <input
@@ -362,22 +363,22 @@ export default function NewAuctionModal({
                   checked={publishMode === "scheduled"}
                   onChange={() => setPublishMode("scheduled")}
                   disabled={isSubmitting}
-                  className="mt-1 h-4 w-4 accent-[#df6254]"
+                  className="mt-1 h-4 w-4 accent-[var(--accent)]"
                 />
                 <span>
-                  <strong className="block text-sm font-black text-[#493b34]">
+                  <strong className="block text-sm font-black text-[var(--text-strong)]">
                     가장 가까운 오전 10시 예약 등록
                   </strong>
-                  <span className="mt-1 block text-xs font-semibold leading-5 text-[#8a7468]">
+                  <span className="mt-1 block text-xs font-medium leading-5 text-[var(--text-muted)]">
                     오전 10시 전에는 당일, 이후에는 다음 날 10시에 자동 공개돼요.
                   </span>
                 </span>
               </label>
               <label
-                className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3.5 transition ${
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3.5 transition-all duration-200 ease-out hover:scale-[1.01] ${
                   publishMode === "immediate"
-                    ? "border-[#5d8790] bg-[#edf7f9] ring-2 ring-[#5d8790]/15"
-                    : "border-[#dfd0c4] bg-white hover:border-[#a9c8ce]"
+                    ? "border-[var(--info-text)] bg-[var(--info-surface)] ring-2 ring-[var(--info-text)]/10"
+                    : "border-[var(--border)] bg-[var(--surface-raised)] hover:border-[var(--border-strong)]"
                 }`}
               >
                 <input
@@ -387,13 +388,13 @@ export default function NewAuctionModal({
                   checked={publishMode === "immediate"}
                   onChange={() => setPublishMode("immediate")}
                   disabled={isSubmitting}
-                  className="mt-1 h-4 w-4 accent-[#4e7b84]"
+                  className="mt-1 h-4 w-4 accent-[var(--info-text)]"
                 />
                 <span>
-                  <strong className="block text-sm font-black text-[#493b34]">
+                  <strong className="block text-sm font-black text-[var(--text-strong)]">
                     즉시 올리기
                   </strong>
-                  <span className="mt-1 block text-xs font-semibold leading-5 text-[#8a7468]">
+                  <span className="mt-1 block text-xs font-medium leading-5 text-[var(--text-muted)]">
                     등록과 동시에 피드에서 경매를 시작해요.
                   </span>
                 </span>
@@ -407,10 +408,15 @@ export default function NewAuctionModal({
               variant="ghost"
               onClick={resetAndClose}
               disabled={isSubmitting}
+              className="rounded-lg transition-all duration-200 ease-out hover:scale-[1.02]"
             >
               취소
             </Button>
-            <Button type="submit" isLoading={isSubmitting}>
+            <Button
+              type="submit"
+              isLoading={isSubmitting}
+              className="rounded-lg transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-lg"
+            >
               {isSubmitting
                 ? "사진 업로드 중..."
                 : publishMode === "scheduled"

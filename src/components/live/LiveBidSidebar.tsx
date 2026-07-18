@@ -42,38 +42,38 @@ function BidItem({
 
   return (
     <li
-      className={`rounded-2xl border p-2.5 ${
+      className={`border-y p-2.5 transition-all duration-200 ease-out hover:shadow-sm ${
         urgent
-          ? "border-[#f1aaa0] bg-[#fff3f0]"
-          : "border-[#cce4d3] bg-[#f3faf5]"
+          ? "border-[var(--danger-text)]/30 bg-[var(--danger-surface)]"
+          : "border-[var(--border)] bg-[var(--surface-raised)]"
       }`}
     >
       <div className="flex gap-2.5">
-        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[#eadfd4]">
+        <div className="h-14 w-14 shrink-0 overflow-hidden bg-[var(--surface-muted)]">
           {post.thumbnailUrls[0] || post.imageUrls[0] ? (
             <img
               src={post.thumbnailUrls[0] || post.imageUrls[0]}
               alt=""
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover transition-transform duration-300 ease-out hover:scale-[1.04]"
               loading="lazy"
             />
           ) : (
             <span
-              className="grid h-full w-full place-items-center text-xl text-[#8a776a]"
+              className="grid h-full w-full place-items-center text-[var(--text-muted)]"
               aria-hidden="true"
             >
-              ◇
+            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5"><path d="m4 16 4.5-4.5 3 3 2-2L20 19M7.5 8.5h.01M4 4h16v16H4V4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </span>
           )}
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 break-keep text-[15px] font-extrabold leading-5 text-[#4c4039]">
+          <p className="line-clamp-2 break-keep text-[13px] font-bold leading-5 text-[var(--text-strong)]">
             {label}
           </p>
           <p
-            className={`mt-1 text-[17px] font-black ${
-              urgent ? "text-[#bd4d40]" : "text-[#37704b]"
+            className={`mt-1 font-mono text-sm font-black tabular-nums tracking-tight ${
+              urgent ? "text-[var(--danger-text)]" : "text-[var(--success-text)]"
             }`}
           >
             {formatKRW(post.currentPrice)}
@@ -86,15 +86,15 @@ function BidItem({
           type="button"
           onClick={onQuickBid}
           disabled={bidDecision ? !bidDecision.allowed : false}
-          className="mt-2.5 min-h-12 w-full rounded-xl bg-[#df6254] px-3 py-2 text-[17px] font-black text-white shadow-[0_7px_16px_rgba(186,70,58,0.18)] transition hover:bg-[#cf5144] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#df6254] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-[#c8bcb5] disabled:text-[#6f625c] disabled:shadow-none"
+          className="mt-2.5 min-h-10 w-full rounded-md bg-[var(--accent)] px-3 py-2 text-xs font-black text-[var(--accent-contrast)] shadow-sm transition-all duration-200 ease-out hover:scale-[1.02] hover:bg-[var(--accent-hover)] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] disabled:text-[var(--text-muted)] disabled:shadow-none"
           aria-label={`${label}, 1,000원 높여 다시 입찰`}
         >
           {bidDecision?.reason === "auction-closed"
-            ? "⛔ 오늘 경매 마감"
+            ? "오늘 경매 마감"
             : bidDecision?.reason === "late-first-bid-finalized"
-              ? "✅ 확정 입찰 완료"
+              ? "확정 입찰 완료"
               : bidDecision?.reason === "new-bid-cutoff"
-                ? "⛔ 신규 입찰 마감"
+                ? "신규 입찰 마감"
                 : "+1,000원 즉시 재입찰"}
         </button>
       ) : null}
@@ -104,9 +104,10 @@ function BidItem({
 
 function EmptyState({ children }: { children: string }) {
   return (
-    <p className="rounded-2xl border border-dashed border-[#dfd4cb] bg-white/65 px-3 py-4 text-center text-[15px] font-bold leading-6 text-[#837268]">
-      {children}
-    </p>
+    <div className="border border-dashed border-[var(--border)] bg-[var(--surface-raised)] px-3 py-5 text-center text-[var(--text-muted)]">
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="mx-auto h-6 w-6"><path d="M5 7h14v12H5V7Zm3-3h8v3" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /></svg>
+      <p className="mt-2 text-xs font-medium leading-5">{children}</p>
+    </div>
   );
 }
 
@@ -164,22 +165,22 @@ export default function LiveBidSidebar({
     <>
       <aside
         aria-labelledby="my-live-bids-title"
-        className={`theme-panel sticky top-24 max-h-[calc(100dvh-7rem)] self-start overflow-y-auto overscroll-contain rounded-[1.6rem] border p-4 shadow-[0_16px_40px_rgba(93,69,54,0.12)] backdrop-blur motion-safe:transition-[top,box-shadow] motion-safe:duration-300 motion-safe:ease-out ${className}`}
+        className={`theme-panel sticky top-24 max-h-[calc(100dvh-7rem)] self-start overflow-y-auto overscroll-contain border p-4 shadow-[var(--panel-shadow)] backdrop-blur motion-safe:transition-[top,box-shadow] motion-safe:duration-300 motion-safe:ease-out ${className}`}
       >
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="text-[13px] font-extrabold tracking-[0.12em] text-[#aa715d]">
-              MY LIVE AUCTION
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent-text)]">
+              My live auction
             </p>
             <h2
               id="my-live-bids-title"
-              className="mt-1 break-keep text-[17px] font-black leading-6 text-[#493b34]"
+              className="mt-1 break-keep text-base font-black leading-6 tracking-[-0.025em] text-[var(--text-strong)]"
             >
               내 실시간 경매 현황
             </h2>
           </div>
           <span
-            className="shrink-0 rounded-full bg-[#f2e9df] px-2.5 py-1 text-[14px] font-black text-[#795f51]"
+            className="shrink-0 border-y border-[var(--border)] px-2.5 py-1 font-mono text-xs font-black tabular-nums tracking-tight text-[var(--text-strong)]"
             aria-label={`내가 참여한 상품 ${outbidPosts.length + leadingPosts.length + confirmedPosts.length}개`}
           >
             {outbidPosts.length + leadingPosts.length + confirmedPosts.length}개
@@ -188,17 +189,17 @@ export default function LiveBidSidebar({
 
         <section
           aria-labelledby="outbid-products-title"
-          className="mt-4 rounded-[1.25rem] border border-[#f0aaa0] bg-[#ffe7e3] p-2.5"
+          className="mt-4 border-l-2 border-[var(--danger-text)] bg-[var(--danger-surface)] p-2.5"
         >
           <div className="mb-2.5 flex items-center justify-between gap-2 px-1">
             <h3
               id="outbid-products-title"
-              className="break-keep text-[17px] font-black text-[#a53d35]"
+              className="break-keep text-sm font-black text-[var(--danger-text)]"
             >
-              <span aria-hidden="true">🔥</span> 재입찰 필요 상품
+              재입찰 필요 상품
             </h3>
             <span
-              className="rounded-full bg-white/80 px-2 py-0.5 text-[14px] font-black text-[#b7473d]"
+              className="font-mono text-xs font-black tabular-nums tracking-tight text-[var(--danger-text)]"
               aria-live="polite"
             >
               {outbidPosts.length}
@@ -227,16 +228,16 @@ export default function LiveBidSidebar({
 
         <section
           aria-labelledby="confirmed-products-title"
-          className="mt-3 rounded-[1.25rem] border border-[#e8c99e] bg-[#fff6df] p-2.5"
+          className="mt-3 border-l-2 border-[var(--warning-text)] bg-[var(--warning-surface)] p-2.5"
         >
           <div className="mb-2.5 flex items-center justify-between gap-2 px-1">
             <h3
               id="confirmed-products-title"
-              className="break-keep text-[17px] font-black text-[#815d2f]"
+              className="break-keep text-sm font-black text-[var(--warning-text)]"
             >
-              <span aria-hidden="true">✓</span> 확정 입찰 상품
+              확정 입찰 상품
             </h3>
-            <span className="rounded-full bg-white/80 px-2 py-0.5 text-[14px] font-black text-[#815d2f]">
+            <span className="font-mono text-xs font-black tabular-nums tracking-tight text-[var(--warning-text)]">
               {confirmedPosts.length}
             </span>
           </div>
@@ -253,17 +254,17 @@ export default function LiveBidSidebar({
 
         <section
           aria-labelledby="leading-products-title"
-          className="mt-3 rounded-[1.25rem] border border-[#b9dcc4] bg-[#e7f5eb] p-2.5"
+          className="mt-3 border-l-2 border-[var(--success-text)] bg-[var(--success-surface)] p-2.5"
         >
           <div className="mb-2.5 flex items-center justify-between gap-2 px-1">
             <h3
               id="leading-products-title"
-              className="break-keep text-[17px] font-black text-[#356849]"
+              className="break-keep text-sm font-black text-[var(--success-text)]"
             >
-              <span aria-hidden="true">🟢</span> 내가 입찰 중인 상품
+              내가 입찰 중인 상품
             </h3>
             <span
-              className="rounded-full bg-white/80 px-2 py-0.5 text-[14px] font-black text-[#39724e]"
+              className="font-mono text-xs font-black tabular-nums tracking-tight text-[var(--success-text)]"
               aria-live="polite"
             >
               {leadingPosts.length}
@@ -280,7 +281,7 @@ export default function LiveBidSidebar({
           )}
         </section>
 
-        <p className="mt-3 break-keep text-center text-[13px] font-bold leading-5 text-[#8c786b]">
+        <p className="mt-3 break-keep text-center text-[11px] font-medium leading-5 text-[var(--text-muted)]">
           입찰 변화가 생기면 목록이 자동으로 이동합니다.
         </p>
       </aside>

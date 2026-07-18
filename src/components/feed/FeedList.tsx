@@ -28,6 +28,43 @@ export interface FeedListProps {
   description?: string;
 }
 
+function FeedSkeleton() {
+  return (
+    <article
+      aria-hidden="true"
+      className="overflow-hidden border border-[var(--border)] bg-[var(--surface-raised)]"
+    >
+      <div className="commerce-skeleton aspect-[4/3] rounded-none" />
+      <div className="space-y-3 p-4">
+        <div className="commerce-skeleton h-3 w-20 rounded-sm" />
+        <div className="commerce-skeleton h-5 w-4/5 rounded-sm" />
+        <div className="commerce-skeleton h-4 w-3/5 rounded-sm" />
+        <div className="commerce-skeleton mt-5 h-12 rounded-lg" />
+      </div>
+    </article>
+  );
+}
+
+function EmptyRackIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 48 48"
+      fill="none"
+      className="mx-auto h-11 w-11 text-[var(--text-muted)]"
+    >
+      <path
+        d="M24 9a5 5 0 0 1 5 5c0 3.5-5 4-5 7M8 34l16-10 16 10"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M12 35h24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function FeedList({
   posts,
   currentUserName,
@@ -106,33 +143,33 @@ export default function FeedList({
   };
 
   return (
-    <section aria-labelledby="auction-feed-title">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <section aria-labelledby="auction-feed-title" className="min-w-0">
+      <div className="mb-5 flex flex-col gap-4 border-b border-[var(--border)] pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-black tracking-[0.16em] text-[#b65343]">
-            DAILY CURATION
+          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--accent-text)]">
+            Daily auction edit
           </p>
           <h2
             id="auction-feed-title"
-            className="mt-1 text-2xl font-black tracking-[-0.04em] text-[var(--text-strong)] sm:text-3xl"
+            className="mt-1.5 text-[1.65rem] font-black tracking-[-0.045em] text-[var(--text-strong)] sm:text-[2rem]"
           >
             {title}
           </h2>
-          <p className="mt-1.5 max-w-2xl break-keep text-sm font-semibold leading-6 text-[var(--text-muted)] sm:text-base sm:leading-7">
+          <p className="mt-2 max-w-2xl break-keep text-sm font-medium leading-6 text-[var(--text-muted)] sm:text-[15px]">
             {description}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="rounded-full bg-[#e7f3f5] px-3.5 py-2 text-sm font-black text-[#416b76]">
-            상품 {filteredPosts.length}건
+        <div className="flex shrink-0 divide-x divide-[var(--border)] border-y border-[var(--border)] py-2">
+          <span className="px-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+            LOTS <strong className="ml-1 font-mono text-sm font-black tabular-nums tracking-tight text-[var(--text-strong)]">{filteredPosts.length}</strong>
           </span>
-          <span className="rounded-full bg-[#ffe3d9] px-3.5 py-2 text-sm font-black text-[#a24033]">
-            입찰 가능 {availableCount}건
+          <span className="px-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+            OPEN <strong className="ml-1 font-mono text-sm font-black tabular-nums tracking-tight text-[var(--accent-text)]">{availableCount}</strong>
           </span>
         </div>
       </div>
 
-      <div className="mb-4 rounded-2xl border border-[#ead9cb] bg-white/55 p-2.5 sm:p-3">
+      <div className="mb-5 border-b border-[var(--border)] pb-3">
         <DateFilterChips
           dateKeys={dateKeys}
           selectedDate={effectiveSelectedDate}
@@ -143,39 +180,38 @@ export default function FeedList({
       {loadError && publishedPosts.length > 0 ? (
         <p
           role="status"
-          className="mb-4 rounded-2xl border border-[#edc2b5] bg-[#fff3ed] px-4 py-3 text-sm font-bold text-[#805044]"
+          className="mb-5 border-l-2 border-[var(--danger-text)] bg-[var(--danger-surface)] px-4 py-3 text-sm font-semibold text-[var(--danger-text)]"
         >
           {loadError} 기존에 불러온 상품을 표시하고 있어요.
         </p>
       ) : null}
 
       {isLoading && publishedPosts.length === 0 ? (
-        <div
-          role="status"
-          className="flex min-h-44 items-center justify-center gap-3 rounded-[1.5rem] border border-[#ead9cb] bg-[#fffaf4] px-6 py-12 text-center text-base font-black text-[#68564c]"
-        >
-          <span
-            aria-hidden="true"
-            className="h-6 w-6 animate-spin rounded-full border-2 border-[#e6cfc0] border-t-[#df6f5d]"
-          />
-          Supabase에서 경매 상품을 불러오는 중이에요.
+        <div role="status">
+          <span className="sr-only">Supabase에서 경매 상품을 불러오는 중이에요.</span>
+          <div className="grid grid-cols-1 gap-px overflow-hidden border border-[var(--border)] bg-[var(--border)] sm:grid-cols-2 2xl:grid-cols-3">
+            {Array.from({ length: 6 }, (_, index) => (
+              <FeedSkeleton key={index} />
+            ))}
+          </div>
         </div>
       ) : loadError && publishedPosts.length === 0 ? (
         <div
           role="alert"
-          className="rounded-[1.5rem] border border-[#edc2b5] bg-[#fff3ed] px-6 py-10 text-center"
+          className="border border-[var(--danger-text)]/35 bg-[var(--danger-surface)] px-6 py-12 text-center"
         >
-          <h3 className="text-lg font-black text-[#8f4035]">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="mx-auto h-9 w-9 text-[var(--danger-text)]"><path d="M12 8v5m0 3.5v.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
+          <h3 className="mt-3 text-lg font-black tracking-[-0.02em] text-[var(--danger-text)]">
             상품 목록을 연결하지 못했어요
           </h3>
-          <p className="mx-auto mt-2 max-w-xl break-keep text-sm font-semibold leading-6 text-[#805f54]">
+          <p className="mx-auto mt-2 max-w-xl break-keep text-sm font-medium leading-6 text-[var(--text-muted)]">
             {loadError}
           </p>
           {onRetry ? (
             <button
               type="button"
               onClick={() => void onRetry()}
-              className="mt-5 min-h-11 rounded-full bg-[#df6f5d] px-5 text-sm font-black text-white transition hover:bg-[#c95b4b] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#df6f5d]/20"
+              className="mt-5 min-h-10 rounded-lg bg-[var(--text-strong)] px-5 text-sm font-bold text-[var(--surface)] transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               다시 불러오기
             </button>
@@ -185,7 +221,7 @@ export default function FeedList({
         <>
         <div
           id="auction-feed-items"
-          className="grid grid-cols-1 items-stretch gap-3 sm:gap-4 md:grid-cols-2 2xl:grid-cols-3"
+          className="grid grid-cols-1 items-stretch gap-px overflow-hidden border border-[var(--border)] bg-[var(--border)] sm:grid-cols-2 2xl:grid-cols-3"
         >
           {visiblePosts.map((post) => (
             <PostCard
@@ -199,13 +235,13 @@ export default function FeedList({
           ))}
         </div>
         {hiddenPostCount > 0 || hasMoreProducts ? (
-          <div className="mt-5 flex justify-center">
+          <div className="mt-7 flex justify-center">
             <button
               type="button"
               aria-controls="auction-feed-items"
               disabled={isLoadingMore}
               onClick={() => void showMorePosts()}
-              className="min-h-11 rounded-full border border-[var(--border-strong)] bg-[var(--surface-raised)] px-5 text-sm font-black text-[var(--text-strong)] shadow-sm transition hover:border-[var(--accent)] hover:text-[var(--accent-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:cursor-wait disabled:opacity-60"
+              className="min-h-10 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-raised)] px-5 text-sm font-bold text-[var(--text-strong)] transition-all duration-200 ease-out hover:scale-[1.02] hover:border-[var(--text-strong)] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:cursor-wait disabled:opacity-60"
             >
               {isLoadingMore
                 ? "추가 상품 불러오는 중…"
@@ -217,14 +253,12 @@ export default function FeedList({
         ) : null}
         </>
       ) : (
-        <div className="rounded-[1.5rem] border border-dashed border-[#dfcdbc] bg-[#fff9f2] px-6 py-14 text-center">
-          <span aria-hidden="true" className="text-4xl text-[#c8aa96]">
-            ◇
-          </span>
-          <h3 className="mt-3 text-lg font-black text-[#54463e]">
+        <div className="border border-dashed border-[var(--border-strong)] bg-[var(--surface-raised)] px-6 py-16 text-center">
+          <EmptyRackIcon />
+          <h3 className="mt-4 text-lg font-black tracking-[-0.02em] text-[var(--text-strong)]">
             이 날짜에 등록된 상품이 없어요
           </h3>
-          <p className="mt-1 text-base text-[#89776b]">
+          <p className="mt-1.5 text-sm font-medium text-[var(--text-muted)]">
             다른 날짜 버튼이나 전체보기를 눌러 주세요.
           </p>
         </div>

@@ -127,23 +127,23 @@ export function ManualBankTransferPanel() {
   };
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4 sm:p-5">
+    <div className="space-y-4">
+      <section className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/55 p-3.5 sm:p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-black tracking-[0.14em] text-[var(--accent-text)]">
+            <p className="text-[10px] font-black tracking-[0.16em] text-[var(--accent-text)]">
               COMMON DEPOSIT ACCOUNT
             </p>
-            <h3 className="mt-1 text-lg font-black text-[var(--text-strong)]">
+            <h3 className="mt-0.5 text-base font-black text-[var(--text-strong)]">
               공용 계좌이체 계좌
             </h3>
-            <p className="mt-2 max-w-3xl break-keep text-sm font-bold leading-6 text-[var(--text-muted)]">
+            <p className="mt-1.5 max-w-3xl break-keep text-xs font-semibold leading-5 text-[var(--text-muted)]">
               이 계좌는 사이트 전체에 하나만 적용됩니다. 수정 후 새로 계좌를
               여는 회원부터 변경된 정보를 보게 됩니다.
             </p>
           </div>
           <span
-            className={`rounded-full px-3 py-1.5 text-xs font-black ${
+            className={`rounded-md border border-[var(--border)] px-2.5 py-1.5 text-[10px] font-black ${
               configured
                 ? "bg-[var(--success-surface)] text-[var(--success-text)]"
                 : "bg-[var(--warning-surface)] text-[var(--warning-text)]"
@@ -154,7 +154,7 @@ export function ManualBankTransferPanel() {
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(150px,0.45fr)_minmax(240px,1fr)_auto] sm:items-end">
-          <label className="text-sm font-black text-[var(--text-strong)]">
+          <label className="text-xs font-black text-[var(--text-strong)]">
             은행명
             <input
               value={bankName}
@@ -162,10 +162,10 @@ export function ManualBankTransferPanel() {
               maxLength={40}
               placeholder="예: 국민은행"
               disabled={isLoading || isSaving}
-              className="mt-2 min-h-12 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 font-bold text-[var(--text-strong)] outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-surface)]"
+              className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 text-sm font-bold text-[var(--text-strong)] outline-none transition-all duration-200 focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)]"
             />
           </label>
-          <label className="text-sm font-black text-[var(--text-strong)]">
+          <label className="text-xs font-black text-[var(--text-strong)]">
             계좌번호
             <input
               value={accountNumber}
@@ -175,7 +175,7 @@ export function ManualBankTransferPanel() {
               autoComplete="off"
               placeholder="예: 123-456-789012"
               disabled={isLoading || isSaving}
-              className="mt-2 min-h-12 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 font-bold text-[var(--text-strong)] outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-surface)]"
+              className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 font-mono text-sm font-bold tabular-nums text-[var(--text-strong)] outline-none transition-all duration-200 focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)]"
             />
           </label>
           <Button
@@ -188,18 +188,18 @@ export function ManualBankTransferPanel() {
         </div>
       </section>
 
-      <section className="rounded-[1.4rem] border border-[var(--info-border)] bg-[var(--info-surface)] p-4 sm:p-5">
+      <section className="rounded-lg border border-[var(--info-border)] bg-[var(--info-surface)] p-3.5 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-black tracking-[0.14em] text-[var(--info-text)]">
+            <p className="text-[10px] font-black tracking-[0.16em] text-[var(--info-text)]">
               DEPOSIT CONFIRMATION
             </p>
-            <h3 className="mt-1 text-lg font-black text-[var(--text-strong)]">
+            <h3 className="mt-0.5 text-base font-black text-[var(--text-strong)]">
               입금 진행 중
             </h3>
           </div>
           <div className="flex items-center gap-2">
-            <span className="rounded-full bg-[var(--surface-raised)] px-3 py-1 text-sm font-black text-[var(--info-text)]">
+            <span className="rounded-md border border-[var(--info-border)] bg-[var(--surface-raised)] px-2 py-1 font-mono text-xs font-black tabular-nums text-[var(--info-text)]">
               {pendingTotalCount.toLocaleString("ko-KR")}건
             </span>
             <Button size="sm" variant="ghost" onClick={() => void load()} isLoading={isLoading}>
@@ -208,17 +208,18 @@ export function ManualBankTransferPanel() {
           </div>
         </div>
 
-        <p className="mt-3 rounded-2xl border border-[var(--warning-text)]/25 bg-[var(--warning-surface)] px-4 py-3 text-sm font-bold leading-6 text-[var(--warning-text)]">
+        <p className="mt-3 rounded-lg border border-[var(--warning-text)]/25 bg-[var(--warning-surface)] px-3.5 py-2.5 text-xs font-bold leading-5 text-[var(--warning-text)]">
           통장의 입금자명과 금액을 직접 대조한 후에만 확정해 주세요. 버튼을
           누르면 회원의 결제를 완료 처리하고 이력을 남깁니다.
         </p>
 
         {isLoading && transfers.length === 0 ? (
-          <p className="mt-4 rounded-2xl bg-[var(--surface-raised)] px-4 py-7 text-center font-bold text-[var(--text-muted)]" role="status">
-            입금 확인 대기 목록을 불러오는 중…
-          </p>
+          <div className="mt-4 space-y-2 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-3" role="status" aria-label="입금 확인 대기 목록을 불러오는 중">
+            <span className="sr-only">입금 확인 대기 목록을 불러오는 중…</span>
+            {Array.from({ length: 3 }).map((_, index) => <div key={index} className="commerce-skeleton h-16 rounded-lg" />)}
+          </div>
         ) : transfers.length === 0 ? (
-          <p className="mt-4 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-raised)] px-4 py-7 text-center font-bold text-[var(--text-muted)]">
+          <p className="mt-4 rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface-raised)] px-4 py-8 text-center text-sm font-bold text-[var(--text-muted)]">
             {pendingTotalCount > 0
               ? "현재 표시된 내역을 모두 처리했습니다. 새로고침하면 다음 내역이 표시됩니다."
               : "현재 계좌를 확인하고 입금을 진행 중인 회원이 없습니다."}
@@ -232,18 +233,18 @@ export function ManualBankTransferPanel() {
                 이어서 표시됩니다.
               </p>
             ) : null}
-            <ul className="mt-4 grid gap-3 lg:grid-cols-2">
+            <ul className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] divide-y divide-[var(--border)]">
               {transfers.map((transfer) => (
               <li
                 key={transfer.orderId}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-sm"
+                className="p-3.5 transition-colors duration-200 hover:bg-[var(--surface-muted)]/35"
               >
                 <div className="flex items-start gap-3">
                   {transfer.productImageUrl ? (
                     <img
                       src={transfer.productImageUrl}
                       alt=""
-                      className="size-16 shrink-0 rounded-xl bg-[var(--surface-muted)] object-cover"
+                      className="size-14 shrink-0 rounded-lg bg-[var(--surface-muted)] object-cover"
                     />
                   ) : null}
                   <div className="min-w-0 flex-1">
@@ -254,17 +255,17 @@ export function ManualBankTransferPanel() {
                       입금자 확인 대상 · {transfer.buyerDisplayName}
                     </p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-[var(--warning-surface)] px-2.5 py-1 text-xs font-black text-[var(--warning-text)]">
+                  <span className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--warning-surface)] px-2 py-1 text-[10px] font-black text-[var(--warning-text)]">
                     입금 진행 중
                   </span>
                 </div>
-                <p className="mt-4 text-2xl font-black text-[var(--accent-text)]">
+                <p className="mt-3 font-mono text-xl font-black tabular-nums tracking-tight text-[var(--accent-text)]">
                   {formatKRW(transfer.expectedAmount)}
                 </p>
-                <p className="mt-1 text-xs font-bold text-[var(--text-muted)]">
+                <p className="mt-1 font-mono text-[10px] font-bold tabular-nums text-[var(--text-muted)]">
                   계좌 확인 {dateTime(transfer.requestedAt)}
                 </p>
-                <p className="mt-2 rounded-xl bg-[var(--surface-muted)] px-3 py-2 text-xs font-bold text-[var(--text-muted)]">
+                <p className="mt-2 rounded-md bg-[var(--surface-muted)] px-3 py-2 text-xs font-bold text-[var(--text-muted)]">
                   안내 계좌 · <strong className="text-[var(--text-strong)]">{transfer.bankName} {transfer.accountNumber}</strong>
                 </p>
                 <Button

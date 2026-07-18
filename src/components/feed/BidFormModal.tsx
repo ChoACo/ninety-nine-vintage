@@ -29,6 +29,7 @@ export default function BidFormModal({
       title="경매 참여하기"
       description={`‘${title}’의 희망 입찰가를 입력해 주세요.`}
       size="sm"
+      className="max-sm:absolute max-sm:bottom-0 max-sm:max-h-[92dvh] max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0"
     >
       {open ? (
         <BidForm

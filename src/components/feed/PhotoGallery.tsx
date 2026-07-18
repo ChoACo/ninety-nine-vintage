@@ -25,9 +25,9 @@ function GalleryImage({ src, alt, className }: GalleryImageProps) {
       <span
         role="img"
         aria-label={`${alt} 이미지를 불러오지 못함`}
-        className={`${className} grid place-items-center bg-[#f3e5d8] text-3xl`}
+        className={`${className} grid place-items-center bg-[var(--surface-muted)] text-[var(--text-muted)]`}
       >
-        ◇
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-8 w-8"><path d="m4 16 4.5-4.5 3 3 2-2L20 19M7.5 8.5h.01M4 4h16v16H4V4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </span>
     );
   }
@@ -74,12 +74,10 @@ export default function PhotoGallery({
 
   if (cleanImages.length === 0) {
     return (
-      <div className="grid aspect-[4/3] place-items-center rounded-[1.5rem] bg-[#f3e5d8] text-center text-[#846e60]">
+      <div className="grid aspect-[4/3] place-items-center bg-[var(--surface-muted)] text-center text-[var(--text-muted)]">
         <div>
-          <span aria-hidden="true" className="text-4xl">
-            ◇
-          </span>
-          <p className="mt-2 text-sm font-semibold">등록된 사진이 없어요</p>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="mx-auto h-9 w-9"><path d="m4 16 4.5-4.5 3 3 2-2L20 19M7.5 8.5h.01M4 4h16v16H4V4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <p className="mt-2 text-xs font-bold tracking-[-0.01em]">등록된 사진이 없어요</p>
         </div>
       </div>
     );
@@ -87,29 +85,29 @@ export default function PhotoGallery({
 
   return (
     <>
-      <div className={compact ? "space-y-1.5" : "space-y-2.5"}>
+      <div className={compact ? "space-y-px bg-[var(--border)]" : "space-y-2.5"}>
         <button
           type="button"
           onClick={() => openAt(0)}
           aria-label={`${title} 메인 사진 크게 보기`}
-          className={`group relative block aspect-[4/3] w-full overflow-hidden bg-[#eadfd4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ec7866] focus-visible:ring-offset-2 ${
-            compact ? "rounded-[1.1rem]" : "rounded-[1.5rem]"
+          className={`group relative block aspect-[4/3] w-full overflow-hidden bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-inset ${
+            compact ? "rounded-none" : "rounded-xl"
           }`}
         >
           <GalleryImage
             key={galleryItems[0].thumbnail}
             src={galleryItems[0].thumbnail}
             alt={`${title} 메인 사진`}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]"
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.035]"
           />
-          <span className="absolute bottom-3 right-3 rounded-full border border-white/40 bg-[#2f2924]/65 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm">
+          <span className="absolute bottom-3 right-3 border border-white/20 bg-black/70 px-2 py-1 font-mono text-[10px] font-bold tabular-nums tracking-tight text-white backdrop-blur-md">
             사진 {cleanImages.length}장
           </span>
         </button>
 
         {thumbnails.length > 0 ? (
           <div
-            className={`grid grid-cols-3 ${compact ? "gap-1.5" : "gap-2.5"}`}
+            className={`grid grid-cols-3 ${compact ? "gap-px" : "gap-2.5"}`}
           >
             {thumbnails.map((item, thumbnailIndex) => {
               const actualIndex = thumbnailIndex + 1;
@@ -124,19 +122,19 @@ export default function PhotoGallery({
                   aria-label={`${title} ${actualIndex + 1}번째 사진 크게 보기${
                     showMore ? `, 추가 사진 ${hiddenCount}장` : ""
                   }`}
-                  className={`group relative overflow-hidden bg-[#eadfd4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ec7866] focus-visible:ring-offset-2 ${
+                  className={`group relative overflow-hidden bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-inset ${
                     compact
-                      ? "aspect-[2/1] rounded-xl"
-                      : "aspect-[5/3] rounded-2xl"
+                      ? "aspect-[2/1] rounded-none"
+                      : "aspect-[5/3] rounded-lg"
                   }`}
                 >
                   <GalleryImage
                     src={item.thumbnail}
                     alt=""
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                    className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
                   />
                   {showMore ? (
-                    <span className="absolute inset-0 grid place-items-center bg-[#2f2924]/55 text-xl font-black text-white backdrop-blur-[1px]">
+                    <span className="absolute inset-0 grid place-items-center bg-black/60 font-mono text-lg font-black tabular-nums tracking-tight text-white backdrop-blur-[1px]">
                       +{hiddenCount}
                     </span>
                   ) : null}

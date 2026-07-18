@@ -539,17 +539,20 @@ export function ShippingWorkPanel({
       </section>
 
       {isLoading && items.length === 0 ? (
-        <p className="mt-4 rounded-2xl bg-[var(--surface-raised)] px-4 py-8 text-center text-sm font-bold text-[var(--text-muted)]">
-          배송 업무 목록을 불러오는 중입니다…
-        </p>
+        <div role="status" aria-label="배송 업무 목록을 불러오는 중" className="mt-4 space-y-2 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-3">
+          <span className="sr-only">배송 업무 목록을 불러오는 중입니다…</span>
+          {Array.from({ length: 4 }).map((_, index) => <div key={index} className="commerce-skeleton h-20 rounded-lg" />)}
+        </div>
       ) : items.length === 0 ? (
-        <p className="mt-4 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-raised)] px-4 py-8 text-center text-sm font-bold text-[var(--text-muted)]">
-          현재 배송 신청 내역이 없습니다.
-        </p>
+        <div className="mt-4 rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface-raised)] px-4 py-8 text-center">
+          <span className="mx-auto grid size-9 place-items-center rounded-lg bg-[var(--surface-muted)] text-[var(--text-muted)]" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="size-4"><path d="M3.5 7.5h11v9h-11zM14.5 10h3l3 3v3.5h-6z" strokeLinejoin="round" /><circle cx="7" cy="18" r="1.5" /><circle cx="17.5" cy="18" r="1.5" /></svg></span>
+          <p className="mt-3 text-sm font-black text-[var(--text-strong)]">현재 배송 신청 내역이 없습니다</p>
+          <p className="mt-1 text-xs font-semibold text-[var(--text-muted)]">새 배송 접수가 들어오면 이 목록에 표시됩니다.</p>
+        </div>
       ) : (
-        <ul className="mt-4 space-y-3">
+        <ul className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] divide-y divide-[var(--border)]">
           {items.map((item) => (
-            <li key={item.requestId} className="rounded-[1.4rem] border border-[var(--border)] bg-[var(--surface-raised)] p-4 sm:p-5">
+            <li key={item.requestId} className="p-3.5 transition-colors duration-200 hover:bg-[var(--surface-muted)]/35 sm:p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-3">
                   <input
@@ -562,10 +565,10 @@ export function ShippingWorkPanel({
                   />
                   <div className="min-w-0">
                     <p className="font-black text-[var(--text-strong)]">상품 {item.itemCount}건 배송 접수</p>
-                    <p className="mt-1 text-xs font-bold text-[var(--text-muted)]">{formatDateTime(item.requestedAt)}</p>
+                    <p className="mt-1 font-mono text-[10px] font-bold tabular-nums text-[var(--text-muted)]">{formatDateTime(item.requestedAt)}</p>
                   </div>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-black ${item.status === "shipped" ? "bg-[var(--success-surface)] text-[var(--success-text)]" : "bg-[var(--warning-surface)] text-[var(--warning-text)]"}`}>
+                <span className={`rounded-md border border-[var(--border)] px-2.5 py-1 text-[10px] font-black ${item.status === "shipped" ? "bg-[var(--success-surface)] text-[var(--success-text)]" : "bg-[var(--warning-surface)] text-[var(--warning-text)]"}`}>
                   {item.status === "shipped" ? "발송 완료" : "배송 대기"}
                 </span>
               </div>

@@ -15,19 +15,19 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "bg-[var(--accent)] text-white shadow-[0_8px_22px_rgba(211,101,83,0.24)] hover:bg-[var(--accent-hover)] focus-visible:ring-[var(--accent)]",
+    "border border-transparent bg-[var(--accent)] text-[var(--accent-contrast)] shadow-[0_6px_18px_rgba(18,18,17,0.14)] hover:bg-[var(--accent-hover)] hover:shadow-[0_10px_26px_rgba(18,18,17,0.2)] focus-visible:ring-[var(--focus-ring)]",
   secondary:
-    "border border-[var(--info-border)] bg-[var(--info-surface)] text-[var(--info-text)] hover:brightness-[1.04] focus-visible:ring-[var(--info-border)]",
+    "border border-[var(--border-strong)] bg-[var(--surface-raised)] text-[var(--text-strong)] shadow-[0_1px_0_rgba(255,255,255,0.38)] hover:border-[var(--text-strong)] hover:bg-[var(--surface)] focus-visible:ring-[var(--focus-ring)]",
   ghost:
-    "border border-[var(--border)] bg-[var(--surface-raised)]/70 text-[var(--foreground)] hover:bg-[var(--surface-raised)] focus-visible:ring-[var(--border-strong)]",
+    "border border-[var(--border)] bg-transparent text-[var(--text-strong)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] focus-visible:ring-[var(--focus-ring)]",
   danger:
-    "bg-[var(--danger-text)] text-white hover:brightness-110 focus-visible:ring-[var(--danger-text)]",
+    "border border-transparent bg-[var(--danger-text)] text-white shadow-[0_6px_18px_rgba(126,35,31,0.16)] hover:brightness-95 hover:shadow-[0_10px_24px_rgba(126,35,31,0.22)] focus-visible:ring-[var(--danger-text)]",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: "min-h-11 px-4 py-2 text-[15px]",
-  md: "min-h-12 px-5 py-2.5 text-base",
-  lg: "min-h-14 px-6 py-3 text-lg",
+  sm: "min-h-10 px-3.5 py-2 text-sm",
+  md: "min-h-11 px-4.5 py-2.5 text-[15px]",
+  lg: "min-h-12 px-5 py-3 text-base",
 };
 
 export default function Button({
@@ -44,7 +44,7 @@ export default function Button({
   return (
     <button
       type={type}
-      className={`inline-flex items-center justify-center gap-2 rounded-2xl font-bold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${sizeClasses[size]} ${fullWidth ? "w-full" : ""} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg font-bold tracking-[-0.015em] transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] disabled:pointer-events-none disabled:opacity-45 disabled:hover:scale-100 motion-reduce:transform-none motion-reduce:transition-none ${variantClasses[variant]} ${sizeClasses[size]} ${fullWidth ? "w-full" : ""} ${className}`}
       disabled={disabled || isLoading}
       aria-busy={isLoading || undefined}
       {...props}
@@ -52,7 +52,7 @@ export default function Button({
       {isLoading ? (
         <span
           aria-hidden="true"
-          className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent"
+          className="size-4 animate-spin rounded-full border-[1.5px] border-current border-r-transparent motion-reduce:animate-none"
         />
       ) : null}
       {children}

@@ -70,10 +70,10 @@ export default function PhotoGalleryModal({
       description="좌우 화살표 키나 화면의 버튼으로 사진을 넘겨보세요."
       size="gallery"
       tone="dark"
-      className="h-[calc(100dvh-1rem)] rounded-[2rem] sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)]"
+      className="h-[calc(100dvh-1rem)] rounded-xl sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)]"
     >
       <div
-        className="flex h-full min-h-0 flex-col bg-[#282e33]"
+        className="flex h-full min-h-0 flex-col bg-[#111315]"
         onTouchStart={(event) => {
           touchStartX.current = event.changedTouches[0]?.clientX ?? null;
         }}
@@ -87,12 +87,12 @@ export default function PhotoGalleryModal({
           else showNext();
         }}
       >
-        <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_center,_#41484e_0%,_#282e33_72%)] px-2 py-4 sm:px-16 sm:py-5">
+        <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_center,_#292d30_0%,_#111315_72%)] px-2 py-4 sm:px-16 sm:py-5">
           <img
             key={images[activeIndex]}
             src={images[activeIndex]}
             alt={`${title} 사진 ${activeIndex + 1}`}
-            className="max-h-full max-w-full select-none rounded-xl object-contain shadow-[0_18px_52px_rgba(0,0,0,0.34)]"
+            className="max-h-full max-w-full select-none object-contain shadow-[0_18px_52px_rgba(0,0,0,0.4)]"
             decoding="async"
             draggable={false}
           />
@@ -103,7 +103,7 @@ export default function PhotoGalleryModal({
                 type="button"
                 onClick={showPrevious}
                 aria-label="이전 사진"
-                className="absolute left-2 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/25 bg-[#1b2024]/70 text-2xl text-white shadow-lg backdrop-blur transition hover:bg-[#15191c]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffad99] sm:left-5 sm:h-12 sm:w-12"
+                className="absolute left-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-md border border-white/20 bg-black/65 text-2xl text-white shadow-lg backdrop-blur transition-all duration-200 ease-out hover:scale-105 hover:border-white/40 hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:left-5 sm:h-11 sm:w-11"
               >
                 <span aria-hidden="true">‹</span>
               </button>
@@ -111,7 +111,7 @@ export default function PhotoGalleryModal({
                 type="button"
                 onClick={showNext}
                 aria-label="다음 사진"
-                className="absolute right-2 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border border-white/25 bg-[#1b2024]/70 text-2xl text-white shadow-lg backdrop-blur transition hover:bg-[#15191c]/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffad99] sm:right-5 sm:h-12 sm:w-12"
+                className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-md border border-white/20 bg-black/65 text-2xl text-white shadow-lg backdrop-blur transition-all duration-200 ease-out hover:scale-105 hover:border-white/40 hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:right-5 sm:h-11 sm:w-11"
               >
                 <span aria-hidden="true">›</span>
               </button>
@@ -120,7 +120,7 @@ export default function PhotoGalleryModal({
 
           <span
             aria-hidden="true"
-            className="absolute right-3 top-3 rounded-full border border-white/15 bg-[#1b2024]/70 px-3 py-1.5 text-sm font-bold tabular-nums text-white backdrop-blur sm:right-5 sm:top-5"
+            className="absolute right-3 top-3 border border-white/15 bg-black/70 px-2.5 py-1.5 font-mono text-xs font-bold tabular-nums tracking-tight text-white backdrop-blur sm:right-5 sm:top-5"
           >
             {activeIndex + 1} / {images.length}
           </span>
@@ -130,7 +130,7 @@ export default function PhotoGalleryModal({
         </div>
 
         {images.length > 1 ? (
-          <div className="shrink-0 border-t border-white/10 bg-[#353c42] px-4 py-3">
+          <div className="shrink-0 border-t border-white/10 bg-[#191c1e] px-4 py-3">
             <div className="mx-auto flex max-w-3xl gap-2 overflow-x-auto pb-1">
               {images.map((image, index) => (
                 <button
@@ -139,9 +139,9 @@ export default function PhotoGalleryModal({
                   onClick={() => setActiveIndex(index)}
                   aria-label={`${index + 1}번째 사진 보기`}
                   aria-current={index === activeIndex ? "true" : undefined}
-                  className={`h-14 w-16 shrink-0 overflow-hidden rounded-xl border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffad99] sm:h-16 sm:w-20 ${
+                  className={`h-14 w-16 shrink-0 overflow-hidden border transition-all duration-200 ease-out hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:h-16 sm:w-20 ${
                     index === activeIndex
-                      ? "border-[#ff9a82] opacity-100"
+                      ? "border-white opacity-100"
                       : "border-transparent opacity-55 hover:opacity-90"
                   }`}
                 >

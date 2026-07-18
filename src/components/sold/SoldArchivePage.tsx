@@ -20,6 +20,28 @@ function toLoadError(error: unknown): string {
     : "판매 완료 상품을 불러오지 못했습니다.";
 }
 
+function SoldArchiveSkeleton() {
+  return (
+    <article aria-hidden="true" className="bg-[var(--surface-raised)]">
+      <div className="commerce-skeleton aspect-[4/3] rounded-none" />
+      <div className="space-y-3 p-4">
+        <div className="commerce-skeleton h-3 w-16 rounded-sm" />
+        <div className="commerce-skeleton h-5 w-4/5 rounded-sm" />
+        <div className="commerce-skeleton h-14 rounded-md" />
+      </div>
+    </article>
+  );
+}
+
+function SoldArchiveEmptyIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 32 32" fill="none" className="mx-auto h-11 w-11 text-[var(--text-muted)]">
+      <path d="M7 10h18v16H7V10Zm4 0V8a5 5 0 0 1 10 0v2" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="m12.5 18 2.2 2.2 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function SoldArchivePage() {
   const [auctions, setAuctions] = useState<PublicSoldAuction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -106,14 +128,14 @@ export function SoldArchivePage() {
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3">
           <Link
             href="/feed"
-            className="flex min-w-0 items-center gap-2.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            className="flex min-w-0 items-center gap-2.5 rounded-md transition-opacity duration-200 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           >
             <img
               src="/ninety-nine-vintage-brand.jpg"
               alt=""
               width="48"
               height="48"
-              className="size-10 shrink-0 rounded-xl object-cover"
+              className="size-9 shrink-0 object-cover sm:size-10"
             />
             <span className="min-w-0">
               <span className="block truncate text-[10px] font-black tracking-[0.14em] text-[var(--accent-text)] sm:text-xs">
@@ -128,7 +150,7 @@ export function SoldArchivePage() {
             <ThemeToggle />
             <Link
               href="/feed"
-              className="inline-flex min-h-10 items-center rounded-xl bg-[var(--accent)] px-3 text-sm font-black text-white sm:px-4"
+              className="inline-flex min-h-10 items-center rounded-md bg-[var(--accent)] px-3 text-sm font-black text-[var(--accent-contrast)] transition-all duration-200 ease-out hover:scale-[1.02] hover:bg-[var(--accent-hover)] hover:shadow-md sm:px-4"
             >
               경매 피드
             </Link>
@@ -138,44 +160,44 @@ export function SoldArchivePage() {
 
       <main className="mx-auto w-full max-w-7xl px-3 pb-16 pt-5 sm:px-6 sm:pt-8 lg:px-8">
         <section
-          className="theme-panel rounded-[1.6rem] border p-5 sm:rounded-[1.9rem] sm:p-7"
+          className="border-y border-[var(--border)] py-6 sm:py-8"
           aria-labelledby="sold-archive-title"
         >
-          <p className="text-xs font-black tracking-[0.16em] text-[var(--accent-text)]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--accent-text)]">
             SOLD ARCHIVE
           </p>
           <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h1
                 id="sold-archive-title"
-                className="text-2xl font-black tracking-[-0.04em] text-[var(--text-strong)] sm:text-3xl"
+                className="text-3xl font-black tracking-[-0.05em] text-[var(--text-strong)] sm:text-4xl"
               >
                 판매 완료 상품 전체보기
               </h1>
-              <p className="mt-2 max-w-2xl break-keep text-sm font-bold leading-6 text-[var(--text-muted)] sm:text-base sm:leading-7">
+              <p className="mt-3 max-w-2xl break-keep text-sm font-medium leading-6 text-[var(--text-muted)] sm:text-[15px]">
                 마감된 상품의 낙찰가와 공개 닉네임을 최근 순서대로 투명하게 확인할 수 있습니다.
               </p>
             </div>
-            <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1.5 text-sm font-black text-[var(--text-muted)]">
-              불러온 상품 {auctions.length.toLocaleString("ko-KR")}건
+            <span className="border-y border-[var(--border)] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+              LOADED <strong className="ml-1 font-mono text-sm font-black tabular-nums tracking-tight text-[var(--text-strong)]">{auctions.length.toLocaleString("ko-KR")}</strong>
             </span>
           </div>
         </section>
 
         {isLoading ? (
-          <p
-            role="status"
-            className="theme-panel mt-4 rounded-2xl border p-7 text-center font-bold text-[var(--text-muted)]"
-          >
-            판매 완료 상품을 불러오는 중…
-          </p>
+          <div role="status" className="mt-5">
+            <span className="sr-only">판매 완료 상품을 불러오는 중…</span>
+            <div className="grid grid-cols-1 gap-px overflow-hidden border border-[var(--border)] bg-[var(--border)] md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }, (_, index) => <SoldArchiveSkeleton key={index} />)}
+            </div>
+          </div>
         ) : error && auctions.length === 0 ? (
-          <div className="theme-panel mt-4 rounded-2xl border p-7 text-center">
+          <div className="mt-5 border border-[var(--danger-text)]/35 bg-[var(--danger-surface)] p-10 text-center">
             <p role="alert" className="font-bold text-[var(--danger-text)]">
               {error}
             </p>
             <Button
-              className="mt-4"
+              className="mt-4 rounded-lg transition-all duration-200 ease-out hover:scale-[1.02]"
               variant="secondary"
               onClick={() => void loadFirstPage()}
             >
@@ -183,14 +205,16 @@ export function SoldArchivePage() {
             </Button>
           </div>
         ) : auctions.length === 0 ? (
-          <p className="theme-panel mt-4 rounded-2xl border p-7 text-center font-bold text-[var(--text-muted)]">
-            아직 판매 완료된 상품이 없습니다.
-          </p>
+          <div className="mt-5 border border-dashed border-[var(--border-strong)] bg-[var(--surface-raised)] p-14 text-center">
+            <SoldArchiveEmptyIcon />
+            <p className="mt-3 text-sm font-bold text-[var(--text-strong)]">아직 판매 완료된 상품이 없습니다.</p>
+            <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">첫 경매가 마감되면 투명한 낙찰 기록이 시작됩니다.</p>
+          </div>
         ) : (
           <>
             <div
               id="sold-archive-items"
-              className="mt-4 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3"
+              className="mt-5 grid grid-cols-1 gap-px overflow-hidden border border-[var(--border)] bg-[var(--border)] md:grid-cols-2 xl:grid-cols-3"
             >
               {auctions.map((auction) => (
                 <SoldArchiveCard key={auction.productId} auction={auction} />
@@ -200,7 +224,7 @@ export function SoldArchivePage() {
             {error ? (
               <p
                 role="alert"
-                className="theme-panel mx-auto mt-4 max-w-2xl rounded-2xl border px-4 py-3 text-center text-sm font-bold text-[var(--danger-text)]"
+                className="mx-auto mt-4 max-w-2xl border-l-2 border-[var(--danger-text)] bg-[var(--danger-surface)] px-4 py-3 text-center text-sm font-bold text-[var(--danger-text)]"
               >
                 {error}
               </p>
@@ -212,6 +236,7 @@ export function SoldArchivePage() {
                   variant="secondary"
                   aria-controls="sold-archive-items"
                   isLoading={isLoadingMore}
+                  className="rounded-lg transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-md"
                   onClick={() => void loadMore()}
                 >
                   {isLoadingMore ? "이전 판매 상품 불러오는 중…" : "판매 완료 더 보기"}
@@ -233,13 +258,13 @@ function SoldArchiveCard({ auction }: { auction: PublicSoldAuction }) {
   const imageUrl = auction.thumbnailUrls[0] || auction.imageUrls[0];
 
   return (
-    <article className="theme-panel render-lazy overflow-hidden rounded-[1.5rem] border">
+    <article className="render-lazy group overflow-hidden bg-[var(--surface-raised)] transition-all duration-200 ease-out hover:relative hover:z-[1] hover:shadow-[var(--shadow-hover)]">
       <div className="aspect-[4/3] overflow-hidden bg-[var(--surface-muted)]">
         {imageUrl ? (
           <img
             src={imageUrl}
             alt={`${auction.title} 판매 완료 상품`}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.035]"
             loading="lazy"
             decoding="async"
           />
@@ -251,32 +276,32 @@ function SoldArchiveCard({ auction }: { auction: PublicSoldAuction }) {
       </div>
       <div className="p-4 sm:p-5">
         <div className="flex items-center justify-between gap-2">
-          <span className="rounded-full bg-[var(--success-surface)] px-3 py-1 text-xs font-black text-[var(--success-text)]">
+          <span className="border border-[var(--success-text)]/25 bg-[var(--success-surface)] px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--success-text)]">
             판매 완료
           </span>
           <time
             dateTime={auction.soldAt}
-            className="text-xs font-bold text-[var(--text-muted)]"
+            className="font-mono text-[10px] font-medium tabular-nums tracking-tight text-[var(--text-muted)]"
           >
             {formatKoreanDate(new Date(auction.soldAt))}
           </time>
         </div>
-        <h2 className="mt-3 line-clamp-2 text-lg font-black text-[var(--text-strong)]">
+        <h2 className="mt-3 line-clamp-2 text-lg font-black tracking-[-0.025em] text-[var(--text-strong)]">
           {auction.title}
         </h2>
-        <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-[var(--text-muted)]">
+        <p className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-[var(--text-muted)]">
           {auction.description}
         </p>
-        <dl className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-[var(--surface-muted)] p-3">
+        <dl className="mt-4 grid grid-cols-2 divide-x divide-[var(--border)] border-y border-[var(--border)] py-3">
           <div>
-            <dt className="text-xs font-bold text-[var(--text-muted)]">낙찰가</dt>
-            <dd className="mt-1 font-black text-[var(--accent-text)]">
+            <dt className="px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-muted)]">낙찰가</dt>
+            <dd className="mt-1 px-3 font-mono text-sm font-black tabular-nums tracking-tight text-[var(--accent-text)]">
               {formatKRW(auction.winningAmount)}
             </dd>
           </div>
-          <div>
-            <dt className="text-xs font-bold text-[var(--text-muted)]">낙찰자</dt>
-            <dd className="mt-1 truncate font-black text-[var(--text-strong)]">
+          <div className="min-w-0">
+            <dt className="px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-muted)]">낙찰자</dt>
+            <dd className="mt-1 break-all px-3 text-sm font-black text-[var(--text-strong)]">
               {auction.winnerDisplayName}
             </dd>
           </div>

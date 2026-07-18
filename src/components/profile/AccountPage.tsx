@@ -77,12 +77,6 @@ function getRuntimePaymentProjection(
   };
 }
 
-const roleLabel: Record<Role, string> = {
-  user: "일반 회원",
-  operator: "운영자",
-  admin: "운영자",
-};
-
 const shippingStatusLabel: Record<WonProductShippingStatus, string> = {
   ready: "보관 중 · 택배 접수 가능",
   requested: "택배 접수 완료",
@@ -166,27 +160,43 @@ function DeleteAccountModal({
       description="회원 프로필과 서비스 이용 정보를 삭제합니다. 되돌릴 수 없습니다."
       size="sm"
     >
-      <form onSubmit={handleDelete} className="space-y-4">
-        <p className="rounded-2xl border border-[#edc2b8] bg-[#fff0ea] px-4 py-3 text-sm font-bold leading-6 text-[#974a3e]">
+      <form onSubmit={handleDelete} className="space-y-4 p-5 sm:p-6">
+        <div className="flex gap-3 rounded-xl border border-[var(--danger-text)]/25 bg-[var(--danger-surface)] px-4 py-3 text-sm font-medium leading-6 text-[var(--danger-text)]">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            className="mt-0.5 size-5 shrink-0"
+          >
+            <path d="M12 8v5m0 3.25v.05M10.3 4.4 2.8 17.2A1.2 1.2 0 0 0 3.84 19h16.32a1.2 1.2 0 0 0 1.04-1.8L13.7 4.4a1.98 1.98 0 0 0-3.4 0Z" />
+          </svg>
+          <p>
           관계 법령상 보관 의무가 있는 거래 기록을 제외한 회원 정보는 탈퇴 처리와 함께
           삭제됩니다. 계속하려면 아래에 <strong>탈퇴</strong>를 입력하세요.
-        </p>
-        <label className="block text-sm font-black text-[#4c4039]">
+          </p>
+        </div>
+        <label className="block text-xs font-semibold tracking-wide text-[var(--text-strong)]">
           확인 문구
           <input
             value={confirmation}
             onChange={(event) => setConfirmation(event.target.value)}
             placeholder="탈퇴"
-            className="mt-2 h-12 w-full rounded-2xl border-2 border-[#ddcbbb] bg-white px-4 font-bold outline-none focus:border-[#d77b67]"
+            className="mt-2 min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--input-surface)] px-3 text-sm font-medium text-[var(--text-strong)] outline-none transition-all duration-200 ease-out placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--focus-ring)]/20"
             disabled={isDeleting}
           />
         </label>
-        {error ? <p role="alert" className="text-sm font-bold text-[#a84c3f]">{error}</p> : null}
-        <div className="flex justify-end gap-2">
+        {error ? (
+          <p role="alert" className="rounded-lg bg-[var(--danger-surface)] px-3 py-2 text-sm font-semibold text-[var(--danger-text)]">
+            {error}
+          </p>
+        ) : null}
+        <div className="sticky bottom-0 -mx-5 flex flex-col-reverse gap-2 border-t border-[var(--border)] bg-[var(--surface)] px-5 pb-[max(0px,env(safe-area-inset-bottom))] pt-4 sm:static sm:mx-0 sm:flex-row sm:justify-end sm:bg-transparent sm:px-0 sm:pb-0">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isDeleting}>
             취소
           </Button>
-          <Button type="submit" disabled={confirmation !== "탈퇴"} isLoading={isDeleting}>
+          <Button type="submit" variant="danger" disabled={confirmation !== "탈퇴"} isLoading={isDeleting}>
             {isDeleting ? "탈퇴 처리 중..." : "회원 탈퇴"}
           </Button>
         </div>
@@ -218,65 +228,68 @@ function VerifiedKakaoProfilePanel({ userId }: { userId: string }) {
   }, [userId]);
 
   return (
-    <details className="theme-panel group mt-6 rounded-[2rem] border px-6 py-5 shadow-sm sm:px-9">
+    <details className="theme-panel group mt-5 rounded-2xl border px-5 py-4 shadow-sm transition-all duration-200 ease-out open:shadow-md sm:px-7">
       <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--accent-surface)] [&::-webkit-details-marker]:hidden">
         <div>
-          <p className="text-xs font-black tracking-[0.16em] text-[#a85e50]">
+          <p className="text-[10px] font-bold tracking-[0.2em] text-[var(--accent-text)]">
             KAKAO VERIFIED PROFILE
           </p>
-          <h3 className="mt-2 text-xl font-black text-[#443830]">
+          <h3 className="mt-1.5 text-lg font-semibold tracking-tight text-[var(--text-strong)]">
             카카오 회원 정보
           </h3>
-          <p className="mt-2 break-keep text-sm font-bold leading-6 text-[#7c6b60]">
+          <p className="mt-1.5 break-keep text-sm font-medium leading-6 text-[var(--text-muted)]">
             회원 식별·고객 지원과 연령·성별 기반 서비스 운영에 사용되는 본인 정보입니다.
           </p>
         </div>
         <span className="flex items-center gap-2">
           <span
-            className={`rounded-full px-3 py-1 text-xs font-black ${
+            className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold ${
               profile?.profileComplete
-                ? "bg-[#e2f2e8] text-[#3d6b50]"
-                : "bg-[#fff0d9] text-[#8a6731]"
+                ? "border-[var(--success-text)]/20 bg-[var(--success-surface)] text-[var(--success-text)]"
+                : "border-[var(--warning-text)]/20 bg-[var(--warning-surface)] text-[var(--warning-text)]"
             }`}
           >
             {profile?.profileComplete ? "필수 정보 확인 완료" : "정보 확인 대기"}
           </span>
-          <span aria-hidden="true" className="text-xl font-black text-[var(--text-muted)] transition-transform group-open:rotate-180">⌄</span>
+          <span aria-hidden="true" className="text-lg font-semibold text-[var(--text-muted)] transition-transform duration-200 group-open:rotate-180">⌄</span>
         </span>
       </summary>
 
       {status === "loading" ? (
-        <p className="mt-5 text-sm font-bold text-[#7b6a5f]" role="status">
-          카카오 회원 정보를 확인하고 있어요.
-        </p>
+        <div className="mt-5 grid gap-3 sm:grid-cols-3" role="status" aria-label="카카오 회원 정보를 확인하고 있어요">
+          {Array.from({ length: 3 }, (_, index) => (
+            <span key={index} className="commerce-skeleton h-[4.5rem] rounded-xl" />
+          ))}
+        </div>
       ) : status === "error" ? (
-        <p className="mt-5 text-sm font-bold text-[#a45145]" role="alert">
-          회원 정보를 불러오지 못했습니다. 잠시 후 다시 로그인해 주세요.
-        </p>
+        <div className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--danger-text)]/20 bg-[var(--danger-surface)] px-4 py-3" role="alert">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="mt-0.5 size-5 shrink-0 text-[var(--danger-text)]"><path d="M12 8v4m0 4h.01M10.3 4.4 2.8 17.2A1.2 1.2 0 0 0 3.84 19h16.32a1.2 1.2 0 0 0 1.04-1.8L13.7 4.4a1.98 1.98 0 0 0-3.4 0Z" /></svg>
+          <p className="text-sm font-medium leading-6 text-[var(--danger-text)]">회원 정보를 불러오지 못했습니다. 잠시 후 다시 로그인해 주세요.</p>
+        </div>
       ) : (
         <dl className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-[#eadfd4] bg-white px-4 py-3">
-            <dt className="text-xs font-black text-[#8c796c]">이름</dt>
-            <dd className="mt-1 font-black text-[#4a3e36]">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3">
+            <dt className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">이름</dt>
+            <dd className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
               {profile?.fullName || "심사 승인 후 제공"}
             </dd>
           </div>
-          <div className="rounded-2xl border border-[#eadfd4] bg-white px-4 py-3">
-            <dt className="text-xs font-black text-[#8c796c]">성별</dt>
-            <dd className="mt-1 font-black text-[#4a3e36]">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3">
+            <dt className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">성별</dt>
+            <dd className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
               {profile?.gender ? genderLabel[profile.gender] : "심사 승인 후 제공"}
             </dd>
           </div>
-          <div className="rounded-2xl border border-[#eadfd4] bg-white px-4 py-3">
-            <dt className="text-xs font-black text-[#8c796c]">출생연도</dt>
-            <dd className="mt-1 font-black text-[#4a3e36]">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3">
+            <dt className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">출생연도</dt>
+            <dd className="mt-1 font-mono text-sm font-semibold tabular-nums tracking-tight text-[var(--text-strong)]">
               {profile?.birthYear ? `${profile.birthYear}년` : "심사 승인 후 제공"}
             </dd>
           </div>
         </dl>
       )}
 
-      <p className="mt-4 text-xs font-bold leading-5 text-[#89786d]">
+      <p className="mt-4 text-xs font-medium leading-5 text-[var(--text-muted)]">
         이메일과 카카오계정 전화번호는 요청하거나 저장하지 않습니다. 자세한 내용은{" "}
         <Link href="/privacy" className="underline underline-offset-2">
           개인정보처리방침
@@ -412,7 +425,7 @@ function AddressEditorModal({
   };
 
   const inputClasses =
-    "mt-2 min-h-12 w-full rounded-2xl border-2 border-[#ddcbbb] bg-[#fffdf9] px-4 py-3 text-base font-bold text-[#463a34] outline-none transition placeholder:font-medium placeholder:text-[#ad9d92] focus:border-[#d77b67] focus:ring-4 focus:ring-[#e9a99b]/20 disabled:opacity-60";
+    "mt-2 min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--input-surface)] px-3 py-2.5 text-sm font-medium text-[var(--text-strong)] outline-none transition-all duration-200 ease-out placeholder:font-normal placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--focus-ring)]/20 disabled:cursor-not-allowed disabled:opacity-60";
 
   return (
     <Modal
@@ -426,7 +439,7 @@ function AddressEditorModal({
       size="sm"
     >
       <form onSubmit={handleSubmit} className="space-y-4 p-5 sm:p-6">
-        <label className="block text-sm font-black text-[#4c4039]">
+        <label className="block text-xs font-semibold tracking-wide text-[var(--text-strong)]">
           배송지 이름
           <input
             type="text"
@@ -440,7 +453,7 @@ function AddressEditorModal({
             autoFocus
           />
         </label>
-        <label className="block text-sm font-black text-[#4c4039]">
+        <label className="block text-xs font-semibold tracking-wide text-[var(--text-strong)]">
           받는 분
           <input
             type="text"
@@ -453,7 +466,7 @@ function AddressEditorModal({
             className={inputClasses}
           />
         </label>
-        <label className="block text-sm font-black text-[#4c4039]">
+        <label className="block text-xs font-semibold tracking-wide text-[var(--text-strong)]">
           연락처
           <input
             type="tel"
@@ -468,8 +481,8 @@ function AddressEditorModal({
             className={inputClasses}
           />
         </label>
-        <label className="block text-sm font-black text-[#4c4039]">
-          우편번호 <span className="text-[#bd5f50]">(필수)</span>
+        <label className="block text-xs font-semibold tracking-wide text-[var(--text-strong)]">
+          우편번호 <span className="text-[var(--accent-text)]">(필수)</span>
           <input
             type="text"
             inputMode="numeric"
@@ -489,12 +502,12 @@ function AddressEditorModal({
           />
           <span
             id="shipping-postal-code-help"
-            className="mt-1.5 block text-xs font-bold text-[#88766b]"
+            className="mt-1.5 block text-[11px] font-medium normal-case tracking-normal text-[var(--text-muted)]"
           >
             택배 접수에 필요한 숫자 5자리 우편번호를 입력해 주세요.
           </span>
         </label>
-        <label className="block text-sm font-black text-[#4c4039]">
+        <label className="block text-xs font-semibold tracking-wide text-[var(--text-strong)]">
           배송 주소
           <textarea
             value={streetAddress}
@@ -508,13 +521,13 @@ function AddressEditorModal({
             className={`${inputClasses} resize-none`}
           />
         </label>
-        <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl border border-[#e4d6ca] bg-white px-4 py-3 text-sm font-black text-[#59483f]">
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2.5 text-sm font-medium text-[var(--text-strong)] transition-all duration-200 ease-out hover:border-[var(--border-strong)]">
           <input
             type="checkbox"
             checked={forceDefault || isDefault}
             onChange={(event) => setIsDefault(event.target.checked)}
             disabled={forceDefault || isSubmitting}
-            className="size-5 accent-[#df7966]"
+            className="size-4 accent-[var(--accent)]"
           />
           기본 배송지로 사용
         </label>
@@ -522,13 +535,13 @@ function AddressEditorModal({
         {error ? (
           <p
             role="alert"
-            className="rounded-2xl border border-[#f0c5bb] bg-[#fff0ea] px-4 py-3 text-sm font-bold leading-6 text-[#a9493e]"
+            className="rounded-lg border border-[var(--danger-text)]/20 bg-[var(--danger-surface)] px-4 py-3 text-sm font-semibold leading-6 text-[var(--danger-text)]"
           >
             {error}
           </p>
         ) : null}
 
-        <div className="flex flex-col-reverse gap-2 border-t border-[#eee0d5] pt-4 sm:flex-row sm:justify-end">
+        <div className="sticky bottom-0 -mx-5 flex flex-col-reverse gap-2 border-t border-[var(--border)] bg-[var(--surface)] px-5 pb-[max(0px,env(safe-area-inset-bottom))] pt-4 sm:static sm:mx-0 sm:flex-row sm:justify-end sm:bg-transparent sm:px-0 sm:pb-0">
           <Button
             type="button"
             variant="ghost"
@@ -625,33 +638,33 @@ function PortOnePaymentModal({
       size="sm"
     >
       <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
-        <div className="flex gap-4 rounded-2xl border border-[#ead8c8] bg-[#fff8ee] p-4">
+        <div className="flex gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-3">
           {product.imageUrls[0] ? (
             <img
               src={product.imageUrls[0]}
               alt=""
-              className="size-20 shrink-0 rounded-xl bg-[#eee7df] object-cover"
+              className="size-20 shrink-0 rounded-lg bg-[var(--surface-raised)] object-cover"
             />
           ) : (
-            <span className="grid size-20 shrink-0 place-items-center rounded-xl bg-[#eee7df] text-xs font-bold text-[#8c8178]">
-              사진 없음
+            <span className="grid size-20 shrink-0 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-muted)]">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-6"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-11Z" /><path d="m5 16 4.2-4.2 3.1 3.1 2.2-2.2L19 17M15.7 8.5h.01" /></svg>
             </span>
           )}
           <div className="min-w-0">
-            <strong className="line-clamp-2 block font-black leading-6 text-[#473a32]">
+            <strong className="line-clamp-2 block text-sm font-semibold leading-5 text-[var(--text-strong)]">
               {product.title}
             </strong>
-            <span className="mt-2 block text-xl font-black text-[#b85e4f]">
+            <span className="mt-2 block font-mono text-xl font-semibold tabular-nums tracking-tight text-[var(--accent-text)]">
               {formatKRW(product.finalBidAmount)}
             </span>
-            <span className="mt-1 block text-xs font-bold text-[#887568]">
+            <span className="mt-1 block text-[11px] font-medium text-[var(--text-muted)]">
               최종 낙찰 금액
             </span>
           </div>
         </div>
 
         <fieldset disabled={isSubmitting}>
-          <legend className="text-sm font-black text-[#55463c]">
+          <legend className="text-xs font-semibold tracking-wide text-[var(--text-strong)]">
             결제 수단 선택
           </legend>
           <div className="mt-3 grid gap-2">
@@ -661,10 +674,10 @@ function PortOnePaymentModal({
                 <label
                   key={option.value}
                   className={
-                    "flex min-h-20 cursor-pointer items-center gap-3 rounded-2xl border-2 px-4 py-3 transition " +
+                    "flex min-h-16 cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 transition-all duration-200 ease-out hover:scale-[1.01] " +
                     (selected
-                      ? "border-[#dc806d] bg-[#fff0e9] shadow-sm"
-                      : "border-[#e4d8ce] bg-white hover:border-[#d8b9ad]")
+                      ? "border-[var(--accent)] bg-[var(--accent-surface)] shadow-sm"
+                      : "border-[var(--border)] bg-[var(--surface-raised)] hover:border-[var(--border-strong)]")
                   }
                 >
                   <input
@@ -677,24 +690,24 @@ function PortOnePaymentModal({
                       isSubmitting ||
                       (lockedMethod !== null && option.value !== lockedMethod)
                     }
-                    className="size-5 shrink-0 accent-[#d86f5c]"
+                    className="size-4 shrink-0 accent-[var(--accent)]"
                   />
                   <span
                     aria-hidden="true"
                     className={
-                      "grid size-10 shrink-0 place-items-center rounded-xl text-lg font-black " +
+                      "grid size-9 shrink-0 place-items-center rounded-lg text-sm font-semibold " +
                       (selected
-                        ? "bg-[#dd7b68] text-white"
-                        : "bg-[#f2ebe5] text-[#7d6b60]")
+                        ? "bg-[var(--accent)] text-white"
+                        : "bg-[var(--surface-muted)] text-[var(--text-muted)]")
                     }
                   >
                     {option.icon}
                   </span>
                   <span className="min-w-0">
-                    <strong className="block font-black text-[#4a3e36]">
+                    <strong className="block text-sm font-semibold text-[var(--text-strong)]">
                       {option.label}
                     </strong>
-                    <span className="mt-0.5 block break-keep text-xs font-bold leading-5 text-[#807066]">
+                    <span className="mt-0.5 block break-keep text-xs font-medium leading-5 text-[var(--text-muted)]">
                       {option.description}
                     </span>
                   </span>
@@ -704,7 +717,7 @@ function PortOnePaymentModal({
           </div>
         </fieldset>
 
-        <p className="rounded-2xl border border-[#d8e2df] bg-[#f4f8f6] px-4 py-3 text-xs font-bold leading-5 text-[#62756f]">
+        <p className="rounded-xl border border-[var(--info-border)] bg-[var(--info-surface)] px-4 py-3 text-xs font-medium leading-5 text-[var(--info-text)]">
           현재 포트원 V2 테스트 환경입니다. 실제 청구 전환은 PG 심사와 운영 채널
           설정을 마친 뒤 진행합니다.
         </p>
@@ -712,13 +725,13 @@ function PortOnePaymentModal({
         {error ? (
           <p
             role="alert"
-            className="rounded-2xl border border-[#f0c5bb] bg-[#fff0ea] px-4 py-3 text-sm font-bold leading-6 text-[#a9493e]"
+            className="rounded-xl border border-[var(--danger-text)]/20 bg-[var(--danger-surface)] px-4 py-3 text-sm font-semibold leading-6 text-[var(--danger-text)]"
           >
             {error}
           </p>
         ) : null}
 
-        <div className="flex flex-col-reverse gap-2 border-t border-[#eee0d5] pt-4 sm:flex-row sm:justify-end">
+        <div className="sticky bottom-0 -mx-5 flex flex-col-reverse gap-2 border-t border-[var(--border)] bg-[var(--surface)] px-5 pb-[max(0px,env(safe-area-inset-bottom))] pt-4 sm:static sm:mx-0 sm:flex-row sm:justify-end sm:bg-transparent sm:px-0 sm:pb-0">
           <Button
             type="button"
             variant="ghost"
@@ -812,10 +825,10 @@ function ManualTransferPaymentModal({
             </span>
           )}
           <div className="min-w-0">
-            <strong className="line-clamp-2 block font-black leading-6 text-[var(--text-strong)]">
+            <strong className="line-clamp-2 block text-sm font-semibold leading-5 text-[var(--text-strong)]">
               {product.title}
             </strong>
-            <span className="mt-2 block text-2xl font-black text-[var(--accent-text)]">
+            <span className="mt-2 block font-mono text-2xl font-semibold tabular-nums tracking-tight text-[var(--accent-text)]">
               {formatKRW(amount)}
             </span>
             <span className="mt-1 block text-xs font-bold text-[var(--text-muted)]">
@@ -826,7 +839,7 @@ function ManualTransferPaymentModal({
 
         {!transfer ? (
           <div className="rounded-2xl border border-[var(--info-border)] bg-[var(--info-surface)] px-4 py-4">
-            <p className="text-sm font-black text-[var(--info-text)]">
+            <p className="text-sm font-semibold text-[var(--info-text)]">
               계좌번호는 아래 버튼을 누른 후에 표시됩니다.
             </p>
             <p className="mt-1 break-keep text-xs font-bold leading-5 text-[var(--text-muted)]">
@@ -836,16 +849,16 @@ function ManualTransferPaymentModal({
           </div>
         ) : (
           <section className="rounded-2xl border-2 border-[var(--accent)] bg-[var(--accent-surface)] p-5 text-center" aria-label="입금 계좌">
-            <p className="text-sm font-black text-[var(--accent-text)]">
+            <p className="text-xs font-semibold tracking-wide text-[var(--accent-text)]">
               {transfer.bankName}
             </p>
-            <p className="mt-2 select-all break-all text-2xl font-black tracking-wide text-[var(--text-strong)] sm:text-3xl">
+            <p className="mt-2 select-all break-all font-mono text-2xl font-semibold tabular-nums tracking-tight text-[var(--text-strong)] sm:text-3xl">
               {transfer.accountNumber}
             </p>
             <Button size="sm" variant="ghost" className="mt-3" onClick={() => void copyAccount()}>
               계좌번호 복사
             </Button>
-            <p className="mt-3 text-sm font-black text-[var(--warning-text)]">
+            <p className="mt-3 font-mono text-sm font-semibold tabular-nums tracking-tight text-[var(--warning-text)]">
               정확히 {formatKRW(transfer.expectedAmount)}을 입금해 주세요.
             </p>
             <p className="mt-1 text-xs font-bold leading-5 text-[var(--text-muted)]">
@@ -865,7 +878,7 @@ function ManualTransferPaymentModal({
           </p>
         ) : null}
 
-        <div className="flex flex-col-reverse gap-2 border-t border-[var(--border)] pt-4 sm:flex-row sm:justify-end">
+        <div className="sticky bottom-0 -mx-5 flex flex-col-reverse gap-2 border-t border-[var(--border)] bg-[var(--surface)] px-5 pb-[max(0px,env(safe-area-inset-bottom))] pt-4 sm:static sm:mx-0 sm:flex-row sm:justify-end sm:bg-transparent sm:px-0 sm:pb-0">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isRevealing}>
             닫기
           </Button>
@@ -930,12 +943,12 @@ function WonProductCard({
   return (
     <li>
       <div
-        className={`flex h-full gap-3 rounded-2xl border p-3 transition ${
+        className={`flex h-full gap-3 rounded-xl border p-3 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-sm ${
           selected
-            ? "border-[#de8270] bg-[#fff1eb] ring-2 ring-[#edb3a6]/50"
+            ? "border-[var(--accent)] bg-[var(--accent-surface)] ring-2 ring-[var(--accent)]/15"
             : ready
-              ? "border-[#d8e1de] bg-white hover:border-[#c2d4d0]"
-              : "border-[#e1e3e1] bg-[var(--surface-raised)]"
+              ? "border-[var(--border)] bg-[var(--surface-raised)] hover:border-[var(--border-strong)]"
+              : "border-[var(--border)] bg-[var(--surface-muted)]"
         }`}
       >
         {section === "storage" ? (
@@ -944,7 +957,7 @@ function WonProductCard({
             checked={selected}
             onChange={onToggle}
             disabled={!ready || isMutating}
-            className="mt-1 size-5 shrink-0 accent-[#df7966]"
+            className="mt-1 size-4 shrink-0 accent-[var(--accent)]"
             aria-label={`${product.title} 택배 접수 선택`}
           />
         ) : null}
@@ -952,38 +965,38 @@ function WonProductCard({
           <img
             src={product.imageUrls[0]}
             alt=""
-            className="size-20 shrink-0 rounded-xl bg-[#eee7df] object-cover"
+            className="size-20 shrink-0 rounded-lg bg-[var(--surface-muted)] object-cover"
           />
         ) : (
-          <span className="grid size-20 shrink-0 place-items-center rounded-xl bg-[#eee7df] text-xs font-bold text-[#8c8178]">
-            사진 없음
+          <span className="grid size-20 shrink-0 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-muted)]">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-6"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-11Z" /><path d="m5 16 4.2-4.2 3.1 3.1 2.2-2.2L19 17M15.7 8.5h.01" /></svg>
           </span>
         )}
         <span className="min-w-0">
-          <strong className="line-clamp-2 block font-black leading-6 text-[var(--text-strong)]">
+          <strong className="line-clamp-2 block text-sm font-semibold leading-5 text-[var(--text-strong)]">
             {product.title}
           </strong>
-          <span className="mt-1 block text-sm font-bold text-[#b05c4e]">
+          <span className="mt-1 block font-mono text-sm font-semibold tabular-nums tracking-tight text-[var(--accent-text)]">
             {formatKRW(product.finalBidAmount)}
           </span>
-          <span className="mt-1 block text-xs font-bold text-[var(--text-muted)]">
+          <span className="mt-1 block font-mono text-[11px] font-medium tabular-nums tracking-tight text-[var(--text-muted)]">
             {formatClosedAt(product.closedAt)}
           </span>
           {section === "storage" ? (
-            <span className="mt-1 block text-xs font-black text-[#53756c]">
+            <span className="mt-1 block text-xs font-semibold text-[var(--success-text)]">
               {shippingStatusLabel[product.shippingStatus]}
             </span>
           ) : null}
           <span
             className={
-              "mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-black " +
+              "mt-2 inline-flex rounded-md border px-2 py-1 text-[10px] font-semibold tracking-wide " +
               (paid
-                ? "bg-[#dff1e6] text-[#376a50]"
+                ? "border-[var(--success-text)]/20 bg-[var(--success-surface)] text-[var(--success-text)]"
                 : (isManualMode
                     ? manualTransferStarted
                     : product.paymentStatus === "가상계좌발급")
-                  ? "bg-[#e3f0f4] text-[#376676]"
-                  : "bg-[#fff0e5] text-[#9a5c43]")
+                  ? "border-[var(--info-text)]/20 bg-[var(--info-surface)] text-[var(--info-text)]"
+                  : "border-[var(--warning-text)]/20 bg-[var(--warning-surface)] text-[var(--warning-text)]")
             }
           >
             {paymentLabel}
@@ -998,11 +1011,11 @@ function WonProductCard({
 
       {paymentProjection.activePaymentMode === "portone" &&
       product.paymentStatus === "가상계좌발급" ? (
-        <div className="mt-2 rounded-2xl border border-[#c9dce2] bg-[#eff7f8] px-4 py-3 text-sm font-bold leading-6 text-[#496b74]">
-          <p className="font-black">
+        <div className="mt-2 rounded-xl border border-[var(--info-border)] bg-[var(--info-surface)] px-4 py-3 text-sm font-medium leading-6 text-[var(--info-text)]">
+          <p className="font-mono font-semibold tabular-nums tracking-tight">
             {formatVbankBank(product.vbankBank)} {product.vbankNum || "계좌번호 확인 중"}
           </p>
-          <p className="mt-0.5 text-xs">
+          <p className="mt-0.5 font-mono text-xs tabular-nums tracking-tight">
             {product.vbankDue
               ? formatPaymentDue(product.vbankDue)
               : "입금 기한은 결제 내역에서 확인해 주세요."}
@@ -1025,7 +1038,7 @@ function WonProductCard({
       {paymentProjection.activePaymentMode === "portone" &&
       (product.portoneStatus === "CANCELLED" ||
         product.portoneStatus === "PARTIAL_CANCELLED") ? (
-        <p className="mt-2 rounded-xl bg-[#fff0ea] px-3 py-2 text-xs font-bold leading-5 text-[#9a4f43]">
+        <p className="mt-2 rounded-lg border border-[var(--danger-text)]/20 bg-[var(--danger-surface)] px-3 py-2 text-xs font-medium leading-5 text-[var(--danger-text)]">
           취소 상태 확인이 필요합니다. 추가 결제나 배송 전에 운영팀에 문의해 주세요.
         </p>
       ) : null}
@@ -1051,24 +1064,24 @@ function MemberAccountPanel({ userId }: { userId: string }) {
   if (member.isLoading) {
     return (
       <section
-        className="mt-6 rounded-[2rem] border border-[#eadbcd] bg-[#fffaf4] px-6 py-10 text-center shadow-sm"
+        className="theme-panel mt-5 rounded-2xl border p-5 shadow-sm"
         role="status"
+        aria-label="실제 배송 정보와 낙찰 상품을 불러오고 있어요"
       >
-        <span
-          aria-hidden="true"
-          className="mx-auto block size-7 animate-spin rounded-full border-3 border-[#e8d8cb] border-r-[#db7865]"
-        />
-        <p className="mt-3 font-bold text-[#78675d]">
-          실제 배송 정보와 낙찰 상품을 불러오고 있어요.
-        </p>
+        <div className="commerce-skeleton h-16 rounded-xl" />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="commerce-skeleton h-44 rounded-xl" />
+          <div className="commerce-skeleton h-44 rounded-xl" />
+        </div>
       </section>
     );
   }
 
   if (!member.account) {
     return (
-      <section className="mt-6 rounded-[2rem] border border-[#efc4bb] bg-[#fff4ef] px-6 py-8 text-center shadow-sm">
-        <p role="alert" className="font-black leading-7 text-[#a64e42]">
+      <section className="theme-panel mt-5 rounded-2xl border px-6 py-8 text-center shadow-sm">
+        <span aria-hidden="true" className="commerce-empty-icon mx-auto text-[var(--danger-text)]"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="size-5"><path d="M12 8v4m0 4h.01M10.3 4.4 2.8 17.2A1.2 1.2 0 0 0 3.84 19h16.32a1.2 1.2 0 0 0 1.04-1.8L13.7 4.4a1.98 1.98 0 0 0-3.4 0Z" /></svg></span>
+        <p role="alert" className="mt-3 text-sm font-semibold leading-6 text-[var(--danger-text)]">
           {member.error ?? "회원 배송 정보를 불러오지 못했습니다."}
         </p>
         <Button variant="ghost" className="mt-4" onClick={() => void member.refresh()}>
@@ -1229,39 +1242,39 @@ function MemberAccountPanel({ userId }: { userId: string }) {
   };
 
   return (
-    <div className="mt-6 space-y-6">
+    <div className="mt-5 space-y-5">
       {member.error ? (
         <p
           role="alert"
-          className="rounded-2xl border border-[#efc4bb] bg-[#fff0eb] px-5 py-3 font-bold text-[#a64e42]"
+          className="rounded-xl border border-[var(--danger-text)]/20 bg-[var(--danger-surface)] px-4 py-3 text-sm font-semibold text-[var(--danger-text)]"
         >
           {member.error}
         </p>
       ) : null}
 
-      <section className="overflow-hidden rounded-[2rem] border border-[#eadbcd] bg-[#fffaf4] shadow-[0_18px_50px_rgba(92,67,51,0.08)]">
+      <section className="theme-panel overflow-hidden rounded-2xl border shadow-sm">
         <button
           type="button"
           aria-expanded={isAddressOpen}
           aria-controls={accordionId}
           onClick={() => setIsAddressOpen((current) => !current)}
-          className="flex min-h-24 w-full items-center justify-between gap-4 px-6 py-5 text-left transition hover:bg-[#fff5e9] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[#f1c7bb] sm:px-8"
+          className="flex min-h-20 w-full items-center justify-between gap-4 px-5 py-4 text-left transition-all duration-200 ease-out hover:bg-[var(--surface-raised)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent)] sm:px-7"
         >
           <span>
-            <span className="block text-xs font-black tracking-[0.16em] text-[#ba6d5c]">
+            <span className="block text-[10px] font-bold tracking-[0.2em] text-[var(--accent-text)]">
               DELIVERY ADDRESS
             </span>
-            <strong className="mt-1 block text-xl font-black text-[#493b31]">
+            <strong className="mt-1 block text-lg font-semibold tracking-tight text-[var(--text-strong)]">
               배송지 관리
             </strong>
-            <span className="mt-1 block text-sm font-bold text-[#817066]">
-              실제 등록 배송지 {member.addresses.length}곳
+            <span className="mt-1 block text-xs font-medium text-[var(--text-muted)]">
+              실제 등록 배송지 <span className="font-mono tabular-nums tracking-tight">{member.addresses.length}</span>곳
               {defaultAddress ? ` · 기본 ${defaultAddress.label}` : " · 기본 배송지 없음"}
             </span>
           </span>
           <span
             aria-hidden="true"
-            className={`grid size-11 shrink-0 place-items-center rounded-full bg-[#f7e5d8] text-xl font-black text-[#9b6558] transition-transform ${
+            className={`grid size-9 shrink-0 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] text-base font-semibold text-[var(--text-muted)] transition-transform duration-200 ${
               isAddressOpen ? "rotate-180" : "rotate-0"
             }`}
           >
@@ -1270,9 +1283,9 @@ function MemberAccountPanel({ userId }: { userId: string }) {
         </button>
 
         <div id={accordionId} hidden={!isAddressOpen}>
-          <div className="border-t border-[#eee1d6] px-5 py-5 sm:px-8 sm:py-6">
+          <div className="border-t border-[var(--border)] px-5 py-5 sm:px-7 sm:py-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-bold leading-7 text-[#74645b]">
+              <p className="text-sm font-medium leading-6 text-[var(--text-muted)]">
                 추가·수정·삭제·기본 지정 결과는 Supabase에서 다시 조회해 반영합니다.
               </p>
               <Button
@@ -1285,43 +1298,47 @@ function MemberAccountPanel({ userId }: { userId: string }) {
             </div>
 
             {member.addresses.length === 0 ? (
-              <p className="mt-5 rounded-2xl border border-dashed border-[#ddcbbc] bg-white/70 px-5 py-8 text-center font-bold text-[#806f64]">
-                등록된 배송지가 없습니다. 택배 접수 전에 실제 주소를 추가해 주세요.
-              </p>
+              <div className="mt-5 rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-raised)] px-5 py-8 text-center">
+                <span aria-hidden="true" className="commerce-empty-icon mx-auto">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="size-5"><path d="m3.5 10.5 8.5-7 8.5 7M5.5 9v10h13V9M9.5 19v-5.5h5V19" /></svg>
+                </span>
+                <p className="mt-3 text-sm font-medium text-[var(--text-muted)]">등록된 배송지가 없습니다.</p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">택배 접수 전에 실제 주소를 추가해 주세요.</p>
+              </div>
             ) : (
               <ul className="mt-5 grid gap-3 sm:grid-cols-2">
                 {member.addresses.map((address) => (
                   <li
                     key={address.id}
-                    className={`rounded-2xl border p-4 ${
+                    className={`rounded-xl border p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-sm ${
                       address.isDefault
-                        ? "border-[#e1ad9f] bg-[#fff0ea]"
-                        : "border-[#e2d7cc] bg-white"
+                        ? "border-[var(--accent-text)]/30 bg-[var(--accent-surface)]"
+                        : "border-[var(--border)] bg-[var(--surface-raised)] hover:border-[var(--border-strong)]"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <strong className="font-black text-[#493b31]">
+                      <strong className="text-sm font-semibold text-[var(--text-strong)]">
                         {address.label}
                       </strong>
                       {address.isDefault ? (
-                        <span className="rounded-full bg-[#df806c] px-2.5 py-1 text-xs font-black text-white">
+                        <span className="rounded-md bg-[var(--accent)] px-2 py-1 text-[10px] font-semibold tracking-wide text-[var(--accent-contrast)]">
                           기본
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-3 font-bold text-[#59483b]">
-                      {address.recipientName} · {address.phone}
+                    <p className="mt-3 text-sm font-medium text-[var(--text-strong)]">
+                      {address.recipientName} · <span className="font-mono tabular-nums tracking-tight">{address.phone}</span>
                     </p>
-                    <p className="mt-1 break-words font-medium leading-7 text-[#76685d]">
-                      {address.postalCode ? `[${address.postalCode}] ` : ""}
+                    <p className="mt-1 break-words text-sm font-normal leading-6 text-[var(--text-muted)]">
+                      {address.postalCode ? <span className="font-mono tabular-nums tracking-tight">[{address.postalCode}] </span> : ""}
                       {address.address}
                     </p>
                     {!address.postalCode ? (
-                      <p className="mt-2 text-xs font-black text-[#a64e42]">
+                      <p className="mt-2 text-xs font-semibold text-[var(--danger-text)]">
                         택배 접수 전에 수정 버튼에서 5자리 우편번호를 입력해 주세요.
                       </p>
                     ) : null}
-                    <div className="mt-4 flex flex-wrap gap-2 border-t border-[#eadfd5] pt-3">
+                    <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border)] pt-3">
                       <Button
                         size="sm"
                         variant="ghost"
@@ -1357,41 +1374,44 @@ function MemberAccountPanel({ userId }: { userId: string }) {
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-[#d8e3e4] bg-[#f8fbfa] p-5 shadow-[0_18px_50px_rgba(62,91,92,0.07)] sm:p-8">
+      <section className="theme-panel rounded-2xl border p-5 shadow-sm sm:p-7">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-black tracking-[0.16em] text-[#61818a]">
+            <p className="text-[10px] font-bold tracking-[0.2em] text-[var(--info-text)]">
               WON &amp; KEEP
             </p>
-            <h2 className="mt-1 text-xl font-black text-[#3f4d4f] sm:text-2xl">
+            <h2 className="mt-1 text-xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-2xl">
               낙찰 상품 결제·택배 접수
             </h2>
           </div>
-          <span className="text-sm font-bold text-[#718083]">
-            Supabase 낙찰 원장 기준 {member.wonProducts.length}건
+          <span className="text-xs font-medium text-[var(--text-muted)]">
+            낙찰 원장 <span className="font-mono tabular-nums tracking-tight">{member.wonProducts.length}</span>건
           </span>
         </div>
 
         {!accountActive ? (
-          <p role="alert" className="mt-4 rounded-2xl bg-[#fff0ea] px-4 py-3 font-bold text-[#a64e42]">
+          <p role="alert" className="mt-4 rounded-xl border border-[var(--danger-text)]/20 bg-[var(--danger-surface)] px-4 py-3 text-sm font-semibold text-[var(--danger-text)]">
             현재 회원 상태에서는 결제와 택배 접수를 진행할 수 없습니다.
           </p>
         ) : null}
 
-        <section className="mt-6 rounded-[1.5rem] border border-[#ead8c8] bg-[#fff9f3] p-4 sm:p-5">
+        <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-black tracking-[0.14em] text-[#a76555]">PAYMENT</p>
-              <h3 className="mt-1 text-lg font-black text-[#4f4037]">결제할 낙찰품</h3>
+              <p className="text-[10px] font-bold tracking-[0.18em] text-[var(--accent-text)]">PAYMENT</p>
+              <h3 className="mt-1 text-lg font-semibold tracking-tight text-[var(--text-strong)]">결제할 낙찰품</h3>
             </div>
-            <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-[#a76555]">
+            <span className="rounded-md border border-[var(--border)] bg-[var(--surface-raised)] px-2.5 py-1 font-mono text-xs font-semibold tabular-nums tracking-tight text-[var(--accent-text)]">
               {paymentPendingProducts.length}건
             </span>
           </div>
           {paymentPendingProducts.length === 0 ? (
-            <p className="mt-4 rounded-2xl border border-dashed border-[#decfc2] bg-white/70 px-4 py-6 text-center font-bold text-[#7d6d63]">
-              현재 결제할 낙찰품이 없습니다.
-            </p>
+            <div className="mt-4 rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-raised)] px-4 py-6 text-center">
+              <span aria-hidden="true" className="commerce-empty-icon mx-auto">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="size-5"><path d="M4 7.5h16v11H4zM7 7.5V5.8h10v1.7M4 11h16M8 15h3" /></svg>
+              </span>
+              <p className="mt-2 text-sm font-medium text-[var(--text-muted)]">현재 결제할 낙찰품이 없습니다.</p>
+            </div>
           ) : (
             <ul className="mt-4 grid gap-3 sm:grid-cols-2">
               {paymentPendingProducts.map((product) => (
@@ -1411,26 +1431,29 @@ function MemberAccountPanel({ userId }: { userId: string }) {
               ))}
             </ul>
           )}
-          <p className="mt-4 text-sm font-bold leading-6 text-[#776456]">
+          <p className="mt-4 text-xs font-medium leading-5 text-[var(--text-muted)]">
             계좌이체 입금은 운영자가 실제 통장 내역을 확인한 뒤 결제 완료로
             처리되어 보관함으로 이동합니다.
           </p>
         </section>
 
-        <section className="mt-5 rounded-[1.5rem] border border-[#cfe0dc] bg-[#f3faf7] p-4 sm:p-5">
+        <section className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-black tracking-[0.14em] text-[#477265]">KEEP</p>
-              <h3 className="mt-1 text-lg font-black text-[#3f504b]">결제 완료 보관함</h3>
+              <p className="text-[10px] font-bold tracking-[0.18em] text-[var(--success-text)]">ARCHIVE</p>
+              <h3 className="mt-1 text-lg font-semibold tracking-tight text-[var(--text-strong)]">결제 완료 보관함</h3>
             </div>
-            <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-[#477265]">
+            <span className="rounded-md border border-[var(--border)] bg-[var(--surface-raised)] px-2.5 py-1 font-mono text-xs font-semibold tabular-nums tracking-tight text-[var(--success-text)]">
               {storedProducts.length}건
             </span>
           </div>
           {storedProducts.length === 0 ? (
-            <p className="mt-4 rounded-2xl border border-dashed border-[#cbdadb] bg-white/70 px-4 py-6 text-center font-bold text-[#718083]">
-              결제 완료 후 보관 중인 상품이 없습니다.
-            </p>
+            <div className="mt-4 rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-raised)] px-4 py-6 text-center">
+              <span aria-hidden="true" className="commerce-empty-icon mx-auto">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="size-5"><path d="M4.5 7.5h15v12h-15zM3.5 4.5h17v3h-17zM9 11.5h6" /></svg>
+              </span>
+              <p className="mt-2 text-sm font-medium text-[var(--text-muted)]">결제 완료 후 보관 중인 상품이 없습니다.</p>
+            </div>
           ) : (
             <ul className="mt-4 grid gap-3 sm:grid-cols-2">
               {storedProducts.map((product) => (
@@ -1452,13 +1475,13 @@ function MemberAccountPanel({ userId }: { userId: string }) {
           )}
         </section>
 
-        <label className="mt-5 block text-sm font-black text-[#4f5e5f]">
+        <label className="mt-5 block text-xs font-semibold text-[var(--text-strong)]">
           택배를 받을 배송지
           <select
             value={effectiveAddressId}
             onChange={(event) => setSelectedAddressId(event.target.value)}
             disabled={member.addresses.length === 0 || member.isMutating}
-            className="mt-2 min-h-12 w-full rounded-2xl border-2 border-[#cfdcda] bg-white px-4 font-bold text-[#3f4d4f] outline-none focus:border-[#75a99d] focus:ring-4 focus:ring-[#bcded6]/40 disabled:opacity-60"
+            className="mt-2 min-h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface-raised)] px-3 text-sm font-medium text-[var(--text-strong)] outline-none transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15 disabled:opacity-60"
           >
             {member.addresses.length === 0 ? (
               <option value="">배송지를 먼저 등록해 주세요</option>
@@ -1472,19 +1495,19 @@ function MemberAccountPanel({ userId }: { userId: string }) {
         </label>
 
         {effectiveAddressId && !effectiveAddress?.postalCode ? (
-          <p role="alert" className="mt-3 rounded-2xl border border-[#efc4bb] bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#a64e42]">
+          <p role="alert" className="mt-3 rounded-xl border border-[var(--danger-text)]/20 bg-[var(--danger-surface)] px-4 py-3 text-sm font-semibold text-[var(--danger-text)]">
             선택한 기존 배송지에 우편번호가 없습니다. 배송지를 수정한 뒤 택배를 접수해 주세요.
           </p>
         ) : null}
 
-        <div className="mt-5 rounded-2xl border-2 border-[#b7d7e1] bg-[#eaf6fa] px-5 py-4 shadow-sm">
-          <p className="text-lg font-black text-[#315f6d]">
-            📦 택배 가능 횟수: {" "}
-            <strong className="text-[#c86150]">
+        <div className="mt-5 rounded-xl border border-[var(--info-border)] bg-[var(--info-surface)] px-4 py-3">
+          <p className="text-sm font-semibold text-[var(--info-text)]">
+            택배 가능 횟수 {" "}
+            <strong className="font-mono tabular-nums tracking-tight text-[var(--accent-text)]">
               {member.account.shippingCreditCount}회
             </strong>
           </p>
-          <p className="mt-1 text-sm font-bold leading-6 text-[#5e7a82]">
+          <p className="mt-1 text-xs font-medium leading-5 text-[var(--text-muted)]">
             한 번 접수할 때 1회가 서버에서 차감됩니다. 잔여 횟수가 없으면 접수할 수 없습니다.
           </p>
         </div>
@@ -1497,18 +1520,23 @@ function MemberAccountPanel({ userId }: { userId: string }) {
           disabled={!canRequestShipping}
           isLoading={member.isMutating}
         >
-          {member.isMutating
-            ? "택배 접수 중..."
-            : `선택 상품 택배 접수하기 (${effectiveSelectedIds.length}개)`}
+          {member.isMutating ? (
+            "택배 접수 중..."
+          ) : (
+            <>
+              선택 상품 택배 접수하기
+              <span className="font-mono tabular-nums tracking-tight">({effectiveSelectedIds.length}개)</span>
+            </>
+          )}
         </Button>
 
         {feedback ? (
           <p
             role={feedback.type === "error" ? "alert" : "status"}
-            className={`mt-4 rounded-2xl px-4 py-3 font-bold ${
+            className={`mt-4 rounded-xl border px-4 py-3 text-sm font-semibold ${
               feedback.type === "error"
-                ? "bg-[#fff0ea] text-[#a64e42]"
-                : "bg-[#e8f5ee] text-[#376b55]"
+                ? "border-[var(--danger-text)]/20 bg-[var(--danger-surface)] text-[var(--danger-text)]"
+                : "border-[var(--success-text)]/20 bg-[var(--success-surface)] text-[var(--success-text)]"
             }`}
           >
             {feedback.message}
@@ -1561,15 +1589,16 @@ export function AccountPage({
   if (!userId) {
     return (
       <main className="mx-auto w-full max-w-3xl px-4 pb-28 pt-8 sm:px-6 lg:pb-12">
-        <section className="rounded-[2rem] border border-[#eadbcd] bg-[#fffaf4] px-6 py-14 text-center shadow-[0_22px_60px_rgba(92,67,51,0.09)] sm:px-10">
-          <span className="mx-auto grid size-16 place-items-center rounded-[1.4rem] bg-[#fee500] text-3xl" aria-hidden="true">
+        <section className="theme-panel rounded-2xl border px-6 py-14 text-center shadow-[0_22px_60px_rgba(15,23,42,0.08)] sm:px-10">
+          <span className="mx-auto grid size-12 place-items-center rounded-xl bg-[#fee500] text-lg font-semibold text-[#191919] shadow-sm" aria-hidden="true">
             K
           </span>
-          <h2 className="mt-5 text-2xl font-black text-[#463a33]">
+          <p className="mt-5 text-[10px] font-bold tracking-[0.2em] text-[var(--text-muted)]">MEMBER ACCESS</p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[var(--text-strong)]">
             내 정보를 보려면 로그인해 주세요
           </h2>
-          <p className="mx-auto mt-3 max-w-lg break-keep text-[17px] font-bold leading-8 text-[#7a6b62]">
-            일반 회원은 카카오 계정으로 가입과 로그인을 한 번에 진행할 수 있습니다.
+          <p className="mx-auto mt-3 max-w-lg break-keep text-sm font-medium leading-6 text-[var(--text-muted)]">
+            카카오 계정으로 가입과 로그인을 한 번에 진행할 수 있습니다.
           </p>
           <Button size="lg" className="mt-6" onClick={onSignIn}>
             카카오로 시작하기
@@ -1580,10 +1609,10 @@ export function AccountPage({
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-8 sm:px-6 lg:pb-12">
-      <section className="overflow-hidden rounded-[2rem] border border-[#eadbcd] bg-[#fffaf4] shadow-[0_22px_60px_rgba(92,67,51,0.09)]">
-        <div className="bg-[linear-gradient(135deg,#f8ded3_0%,#e6f1f2_100%)] px-6 py-8 sm:px-9">
-          <p className="text-sm font-black tracking-[0.14em] text-[#a85e50]">
+    <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-6 sm:px-6 sm:pt-8 lg:pb-12">
+      <section className="theme-panel overflow-hidden rounded-2xl border shadow-[0_22px_60px_rgba(15,23,42,0.07)]">
+        <div className="border-b border-[var(--border)] bg-[var(--surface-raised)] px-5 py-6 sm:px-8 sm:py-7">
+          <p className="text-[10px] font-bold tracking-[0.2em] text-[var(--accent-text)]">
             MY ACCOUNT
           </p>
           <div className="mt-4 flex items-center gap-4">
@@ -1591,40 +1620,38 @@ export function AccountPage({
               <img
                 src={avatarUrl}
                 alt=""
-                className="size-16 rounded-2xl object-cover shadow-sm"
+                className="size-12 rounded-xl border border-[var(--border)] object-cover shadow-sm"
               />
             ) : (
-              <span className="grid size-16 place-items-center rounded-2xl bg-white text-2xl font-black text-[#b45d4f] shadow-sm" aria-hidden="true">
+              <span className="grid size-12 place-items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-lg font-semibold text-[var(--accent-text)] shadow-sm" aria-hidden="true">
                 {(displayName || "회").slice(0, 1)}
               </span>
             )}
             <div>
-              <h2 className="text-2xl font-black text-[#40352f]">
+              <h2 className="text-xl font-semibold tracking-tight text-[var(--text-strong)]">
                 {displayName || "회원"}
               </h2>
-              <span className="mt-1 inline-flex rounded-full bg-white/80 px-3 py-1 text-sm font-black text-[#5d7768]">
-                {roleLabel[role]}
-              </span>
+              <span className="mt-1 inline-flex rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--success-text)]">본인 인증 완료</span>
             </div>
           </div>
         </div>
 
-        <dl className="grid gap-px bg-[#eadfd5] sm:grid-cols-2">
-          <div className="bg-[#fffdf9] px-6 py-5">
-            <dt className="text-sm font-black text-[#8a776b]">로그인 계정</dt>
-            <dd className="mt-1 break-all text-[17px] font-bold text-[#4c4039]">
-              {email || (role === "user" ? "카카오 연결 계정" : "운영 계정")}
+        <dl className="grid gap-px bg-[var(--border)] sm:grid-cols-2">
+          <div className="bg-[var(--surface)] px-5 py-4 sm:px-8">
+            <dt className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">로그인 계정</dt>
+            <dd className="mt-1 break-all text-sm font-medium text-[var(--text-strong)]">
+              {email || "카카오 연결 계정"}
             </dd>
           </div>
-          <div className="bg-[#fffdf9] px-6 py-5">
-            <dt className="text-sm font-black text-[#8a776b]">회원 식별 상태</dt>
-            <dd className="mt-1 text-[17px] font-bold text-[#4c4039]">
+          <div className="bg-[var(--surface)] px-5 py-4 sm:px-8">
+            <dt className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">회원 식별 상태</dt>
+            <dd className="mt-1 text-sm font-medium text-[var(--text-strong)]">
               Supabase 인증 완료
             </dd>
           </div>
         </dl>
 
-        <div className="flex flex-wrap justify-end gap-2 px-6 py-5 sm:px-9">
+        <div className="flex flex-wrap justify-end gap-2 px-5 py-4 sm:px-8">
           {role === "user" ? (
             <Button variant="ghost" onClick={() => setDeleteModalOpen(true)}>
               회원 탈퇴

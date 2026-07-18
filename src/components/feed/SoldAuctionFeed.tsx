@@ -16,6 +16,28 @@ export interface SoldAuctionFeedProps {
 
 const RECENT_SOLD_ITEMS = 9;
 
+function SoldFeedSkeleton() {
+  return (
+    <article aria-hidden="true" className="bg-[var(--surface-raised)]">
+      <div className="commerce-skeleton aspect-[4/3] rounded-none" />
+      <div className="space-y-3 p-4">
+        <div className="commerce-skeleton h-3 w-16 rounded-sm" />
+        <div className="commerce-skeleton h-5 w-3/4 rounded-sm" />
+        <div className="commerce-skeleton h-12 rounded-md" />
+      </div>
+    </article>
+  );
+}
+
+function SoldEmptyIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 32 32" fill="none" className="mx-auto h-10 w-10 text-[var(--text-muted)]">
+      <path d="M7 10h18v16H7V10Zm4 0V8a5 5 0 0 1 10 0v2" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="m12.5 18 2.2 2.2 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function SoldAuctionFeed({
   auctions,
   isLoading,
@@ -25,32 +47,32 @@ export function SoldAuctionFeed({
   const visibleAuctions = auctions.slice(0, RECENT_SOLD_ITEMS);
 
   return (
-    <section className="mt-8" aria-labelledby="sold-auction-feed-title">
-      <header className="theme-panel rounded-[1.8rem] border p-5 sm:p-6">
+    <section className="mt-12" aria-labelledby="sold-auction-feed-title">
+      <header className="border-y border-[var(--border)] py-5 sm:py-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-black tracking-[0.16em] text-[var(--accent-text)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--accent-text)]">
               SOLD ARCHIVE
             </p>
             <h2
               id="sold-auction-feed-title"
-              className="mt-1 text-2xl font-black text-[var(--text-strong)]"
+              className="mt-1.5 text-2xl font-black tracking-[-0.04em] text-[var(--text-strong)]"
             >
               판매 완료 상품
             </h2>
-            <p className="mt-2 break-keep font-bold leading-7 text-[var(--text-muted)]">
+            <p className="mt-2 break-keep text-sm font-medium leading-6 text-[var(--text-muted)]">
               마감된 상품과 낙찰 금액, 공개 닉네임을 투명하게 확인할 수 있습니다.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1.5 text-sm font-black text-[var(--text-muted)]">
-              최근 {auctions.length.toLocaleString("ko-KR")}건
+            <span className="border-y border-[var(--border)] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+              RECENT <strong className="ml-1 font-mono text-sm font-black tabular-nums tracking-tight text-[var(--text-strong)]">{auctions.length.toLocaleString("ko-KR")}</strong>
             </span>
             <Link
               href="/sold"
               prefetch={false}
               aria-label="판매 완료 상품 전체보기"
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-[var(--info-border)] bg-[var(--info-surface)] px-4 py-2 text-sm font-black text-[var(--info-text)] transition hover:brightness-[1.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--info-border)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
+              className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border-strong)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-bold text-[var(--text-strong)] transition-all duration-200 ease-out hover:scale-[1.02] hover:border-[var(--text-strong)] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
             >
               전체보기
               <svg
@@ -73,14 +95,17 @@ export function SoldAuctionFeed({
       </header>
 
       {isLoading ? (
-        <p className="theme-panel mt-3 rounded-2xl border p-5 text-center font-bold text-[var(--text-muted)]">
-          판매 완료 상품을 불러오는 중…
-        </p>
+        <div role="status" className="mt-4">
+          <span className="sr-only">판매 완료 상품을 불러오는 중…</span>
+          <div className="grid grid-cols-1 gap-px overflow-hidden border border-[var(--border)] bg-[var(--border)] md:grid-cols-2 2xl:grid-cols-3">
+            {Array.from({ length: 3 }, (_, index) => <SoldFeedSkeleton key={index} />)}
+          </div>
+        </div>
       ) : error ? (
-        <div className="theme-panel mt-3 rounded-2xl border p-5 text-center">
+        <div className="mt-4 border border-[var(--danger-text)]/35 bg-[var(--danger-surface)] p-7 text-center">
           <p className="font-bold text-[var(--danger-text)]">{error}</p>
           <Button
-            className="mt-3"
+            className="mt-4 rounded-lg transition-all duration-200 ease-out hover:scale-[1.02]"
             size="sm"
             variant="secondary"
             onClick={() => void onRetry()}
@@ -89,25 +114,27 @@ export function SoldAuctionFeed({
           </Button>
         </div>
       ) : auctions.length === 0 ? (
-        <p className="theme-panel mt-3 rounded-2xl border p-5 text-center font-bold text-[var(--text-muted)]">
-          아직 판매 완료된 상품이 없습니다.
-        </p>
+        <div className="mt-4 border border-dashed border-[var(--border-strong)] bg-[var(--surface-raised)] p-12 text-center">
+          <SoldEmptyIcon />
+          <p className="mt-3 text-sm font-bold text-[var(--text-strong)]">아직 판매 완료된 상품이 없습니다.</p>
+          <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">경매가 마감되면 낙찰 기록이 이곳에 공개됩니다.</p>
+        </div>
       ) : (
         <div
           id="sold-auction-items"
-          className="mt-3 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 2xl:grid-cols-3"
+          className="mt-4 grid grid-cols-1 gap-px overflow-hidden border border-[var(--border)] bg-[var(--border)] md:grid-cols-2 2xl:grid-cols-3"
         >
           {visibleAuctions.map((auction) => (
             <article
               key={auction.productId}
-              className="theme-panel render-lazy overflow-hidden rounded-[1.6rem] border"
+              className="render-lazy group overflow-hidden bg-[var(--surface-raised)] transition-all duration-200 ease-out hover:relative hover:z-[1] hover:shadow-[var(--shadow-hover)]"
             >
               <div className="aspect-[4/3] overflow-hidden bg-[var(--surface-muted)]">
                 {auction.thumbnailUrls[0] || auction.imageUrls[0] ? (
                   <img
                     src={auction.thumbnailUrls[0] || auction.imageUrls[0]}
                     alt={`${auction.title} 판매 완료 상품`}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.035]"
                     loading="lazy"
                     decoding="async"
                   />
@@ -119,36 +146,36 @@ export function SoldAuctionFeed({
               </div>
               <div className="p-4 sm:p-5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="rounded-full bg-[var(--success-surface)] px-3 py-1 text-xs font-black text-[var(--success-text)]">
+                  <span className="border border-[var(--success-text)]/25 bg-[var(--success-surface)] px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--success-text)]">
                     판매 완료
                   </span>
                   <time
-                    className="text-xs font-bold text-[var(--text-muted)]"
+                    className="font-mono text-[10px] font-medium tabular-nums tracking-tight text-[var(--text-muted)]"
                     dateTime={auction.soldAt}
                   >
                     {formatKoreanDate(new Date(auction.soldAt))}
                   </time>
                 </div>
-                <h3 className="mt-3 line-clamp-2 text-lg font-black text-[var(--text-strong)]">
+                <h3 className="mt-3 line-clamp-2 text-lg font-black tracking-[-0.025em] text-[var(--text-strong)]">
                   {auction.title}
                 </h3>
-                <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-[var(--text-muted)]">
+                <p className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-[var(--text-muted)]">
                   {auction.description}
                 </p>
-                <dl className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-[var(--surface-muted)] p-3">
+                <dl className="mt-4 grid grid-cols-2 divide-x divide-[var(--border)] border-y border-[var(--border)] py-3">
                   <div>
-                    <dt className="text-xs font-bold text-[var(--text-muted)]">
+                    <dt className="px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-muted)]">
                       낙찰가
                     </dt>
-                    <dd className="mt-1 font-black text-[var(--accent-text)]">
+                    <dd className="mt-1 px-3 font-mono text-sm font-black tabular-nums tracking-tight text-[var(--accent-text)]">
                       {formatKRW(auction.winningAmount)}
                     </dd>
                   </div>
-                  <div>
-                    <dt className="text-xs font-bold text-[var(--text-muted)]">
+                  <div className="min-w-0">
+                    <dt className="px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-muted)]">
                       낙찰자
                     </dt>
-                    <dd className="mt-1 font-black text-[var(--text-strong)]">
+                    <dd className="mt-1 break-all px-3 text-sm font-black text-[var(--text-strong)]">
                       {auction.winnerDisplayName}
                     </dd>
                   </div>

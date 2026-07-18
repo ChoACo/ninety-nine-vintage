@@ -41,16 +41,16 @@ export default function OnlineMembersSidebar({
   return (
     <aside
       aria-labelledby="online-members-title"
-      className={`theme-panel sticky top-4 max-h-[calc(100dvh-2rem)] self-start overflow-y-auto overscroll-contain rounded-[1.35rem] border p-3.5 shadow-[0_10px_30px_rgba(69,96,79,0.08)] ${className}`}
+      className={`theme-panel sticky top-4 max-h-[calc(100dvh-2rem)] self-start overflow-y-auto overscroll-contain border p-3.5 shadow-[var(--panel-shadow)] ${className}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[11px] font-extrabold tracking-[0.14em] text-[#63806b]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--success-text)]">
             ONLINE NOW
           </p>
           <h2
             id="online-members-title"
-            className="mt-1 break-keep text-[15px] font-black leading-5 text-[var(--text-strong)]"
+            className="mt-1 break-keep text-[15px] font-black leading-5 tracking-[-0.02em] text-[var(--text-strong)]"
           >
             현재 접속
           </h2>
@@ -61,10 +61,10 @@ export default function OnlineMembersSidebar({
               ? `${totalCount}명 온라인`
               : `접속 상태 ${statusLabel}`
           }
-          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-black ${
+          className={`shrink-0 border-y px-2.5 py-1 font-mono text-[11px] font-black tabular-nums tracking-tight ${
             status === "error"
-              ? "bg-[#f4e8e4] text-[#9a594e]"
-              : "bg-[#e1f3e6] text-[#39704a]"
+              ? "border-[var(--danger-text)]/30 bg-[var(--danger-surface)] text-[var(--danger-text)]"
+              : "border-[var(--success-text)]/30 bg-[var(--success-surface)] text-[var(--success-text)]"
           }`}
         >
           {statusLabel}
@@ -80,10 +80,10 @@ export default function OnlineMembersSidebar({
             {operators.map((member) => (
             <li
               key={member.id}
-              className="flex min-h-10 items-center gap-2.5 rounded-xl bg-[var(--accent-surface)] px-2.5 py-2 text-sm font-extrabold text-[var(--text-strong)]"
+              className="flex min-h-9 items-center gap-2.5 border-l-2 border-[var(--accent-text)] bg-[var(--accent-surface)] px-2.5 py-2 text-xs font-bold text-[var(--text-strong)] transition-colors duration-200 hover:brightness-[.98]"
             >
               <span className="relative flex size-2.5 shrink-0" aria-hidden="true">
-                <span className="inline-flex size-2.5 rounded-full bg-[#4aaf63] ring-2 ring-[#dff2e4]" />
+                <span className="inline-flex size-2.5 rounded-full bg-[var(--success-text)] ring-2 ring-[var(--success-surface)]" />
               </span>
               <span>{member.displayName}</span>
             </li>
@@ -101,10 +101,10 @@ export default function OnlineMembersSidebar({
           signedInMembers.map((member) => (
             <li
               key={member.id}
-              className="flex min-h-10 items-center gap-2.5 rounded-xl bg-[var(--surface-raised)] px-2.5 py-2 text-sm font-extrabold text-[var(--text-strong)]"
+              className="flex min-h-9 items-center gap-2.5 border-b border-[var(--border)] bg-[var(--surface-raised)] px-2.5 py-2 text-xs font-bold text-[var(--text-strong)] transition-colors duration-200 hover:bg-[var(--surface-muted)]"
             >
               <span className="relative flex size-2.5 shrink-0" aria-hidden="true">
-                <span className="inline-flex size-2.5 rounded-full bg-[#4aaf63] ring-2 ring-[#dff2e4]" />
+                <span className="inline-flex size-2.5 rounded-full bg-[var(--success-text)] ring-2 ring-[var(--success-surface)]" />
               </span>
               <span>{member.displayName}</span>
             </li>
@@ -112,12 +112,12 @@ export default function OnlineMembersSidebar({
         ) : members.length === 0 ? (
           <li
             role={status === "error" ? "alert" : "status"}
-            className="rounded-2xl border border-dashed border-[#cadccf] bg-white/60 px-3 py-4 text-center text-[15px] font-bold leading-6 text-[#66786b]"
+            className="border border-dashed border-[var(--border)] bg-[var(--surface-raised)] px-3 py-5 text-center text-xs font-medium leading-5 text-[var(--text-muted)]"
           >
             {emptyMessage}
           </li>
         ) : (
-          <li className="rounded-2xl border border-dashed border-[var(--border)] px-3 py-4 text-center text-sm font-bold text-[var(--text-muted)]">
+          <li className="border border-dashed border-[var(--border)] px-3 py-5 text-center text-xs font-medium text-[var(--text-muted)]">
             현재 접속 중인 로그인 회원이 없습니다.
           </li>
         )}
@@ -136,11 +136,11 @@ export default function OnlineMembersSidebar({
             {guests.map((guest) => (
               <li
                 key={guest.id}
-                className="flex min-h-10 items-center gap-2.5 rounded-xl bg-[var(--info-surface)] px-2.5 py-2 text-sm font-extrabold text-[var(--text-strong)]"
+                className="flex min-h-9 items-center gap-2.5 border-b border-[var(--info-border)] bg-[var(--info-surface)] px-2.5 py-2 text-xs font-bold text-[var(--text-strong)] transition-colors duration-200 hover:brightness-[.98]"
               >
                 <span
                   aria-hidden="true"
-                  className="inline-flex size-2.5 shrink-0 rounded-full bg-[#55a970] ring-2 ring-[#dff2e4]"
+                  className="inline-flex size-2.5 shrink-0 rounded-full bg-[var(--success-text)] ring-2 ring-[var(--success-surface)]"
                 />
                 <span>{guest.displayName}</span>
               </li>
@@ -150,7 +150,7 @@ export default function OnlineMembersSidebar({
       ) : null}
 
       {hasMore ? (
-        <p className="mt-4 break-keep rounded-2xl bg-[var(--info-surface)] px-3 py-2.5 text-[14px] font-bold leading-5 text-[var(--info-text)]">
+        <p className="mt-4 break-keep border-l-2 border-[var(--info-text)] bg-[var(--info-surface)] px-3 py-2.5 text-[11px] font-medium leading-5 text-[var(--info-text)]">
           목록에는 최대 50명만 표시되며 전체 접속 인원은 상단 숫자에 반영됩니다.
         </p>
       ) : null}

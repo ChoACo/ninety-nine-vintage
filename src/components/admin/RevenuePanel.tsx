@@ -118,50 +118,56 @@ export function RevenuePanel() {
           ["이번 달", summary.month],
           ["올해", summary.year],
         ].map(([label, amount]) => (
-          <article key={label} className="rounded-[1.3rem] border border-[#dfd3c7] bg-white p-4">
-            <p className="text-sm font-black text-[#8b7a6d]">{label}</p>
-            <p className="mt-2 text-xl font-black text-[#493b31]">{isLoading ? "—" : formatKRW(Number(amount))}</p>
+          <article key={label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3.5 transition-all duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-sm">
+            <p className="text-xs font-black text-[var(--text-muted)]">{label}</p>
+            {isLoading ? (
+              <div role="status" aria-label={`${label} 매출 불러오는 중`} className="commerce-skeleton mt-2 h-6 w-28 rounded" />
+            ) : (
+              <p className="mt-1.5 font-mono text-lg font-black tabular-nums tracking-tight text-[var(--text-strong)]">{formatKRW(Number(amount))}</p>
+            )}
           </article>
         ))}
       </div>
 
-      <form onSubmit={save} className="mt-5 grid gap-3 rounded-[1.4rem] border border-[#ead5a9] bg-[#fff9e9] p-4 sm:grid-cols-[160px_minmax(0,1fr)_160px_auto] sm:items-end">
-        <label className="text-sm font-black text-[#65533f]">
+      <form onSubmit={save} className="mt-4 grid gap-3 rounded-lg border border-[var(--border)] bg-[var(--warning-surface)] p-3.5 sm:grid-cols-[160px_minmax(0,1fr)_160px_auto] sm:items-end">
+        <label className="text-xs font-black text-[var(--text-strong)]">
           매출 날짜
-          <input type="date" max={today} value={revenueDate} onChange={(event) => setRevenueDate(event.target.value)} className="mt-2 w-full rounded-xl border border-[#dfcfb5] bg-white px-3 py-2.5 font-semibold" required />
+          <input type="date" max={today} value={revenueDate} onChange={(event) => setRevenueDate(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 font-mono text-sm font-semibold tabular-nums" required />
         </label>
-        <label className="text-sm font-black text-[#65533f]">
+        <label className="text-xs font-black text-[var(--text-strong)]">
           확정 하루 매출
-          <input type="number" min="0" step="1" value={grossAmount} onChange={(event) => setGrossAmount(event.target.value)} placeholder="입금 확인 금액" className="mt-2 w-full rounded-xl border border-[#dfcfb5] bg-white px-3 py-2.5 font-semibold" required />
+          <input type="number" min="0" step="1" value={grossAmount} onChange={(event) => setGrossAmount(event.target.value)} placeholder="입금 확인 금액" className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 font-mono text-sm font-semibold tabular-nums" required />
         </label>
-        <label className="text-sm font-black text-[#65533f]">
+        <label className="text-xs font-black text-[var(--text-strong)]">
           결제 건수
-          <input type="number" min="0" step="1" value={paidOrderCount} onChange={(event) => setPaidOrderCount(event.target.value)} placeholder="0" className="mt-2 w-full rounded-xl border border-[#dfcfb5] bg-white px-3 py-2.5 font-semibold" required />
+          <input type="number" min="0" step="1" value={paidOrderCount} onChange={(event) => setPaidOrderCount(event.target.value)} placeholder="0" className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 font-mono text-sm font-semibold tabular-nums" required />
         </label>
         <Button type="submit" isLoading={isSaving}>일 매출 저장</Button>
       </form>
-      <p className="mt-2 text-xs font-bold leading-5 text-[#8b7a6d]">
+      <p className="mt-2 text-[11px] font-semibold leading-5 text-[var(--text-muted)]">
         낙찰가는 자동 매출로 잡지 않습니다. 실제 입금이 확인된 하루 합계와 건수만 한 줄로 보관합니다.
       </p>
 
-      {error ? <p role="alert" className="mt-4 rounded-2xl bg-[#fff0ea] px-4 py-3 text-sm font-bold text-[#a84c3f]">{error}</p> : null}
+      {error ? <p role="alert" className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--danger-surface)] px-3.5 py-2.5 text-xs font-bold text-[var(--danger-text)]">{error}</p> : null}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-        <div className="overflow-x-auto rounded-2xl border border-[#e4d8cd] bg-white">
-          <table className="w-full min-w-[520px] text-left text-sm">
-            <thead className="bg-[#faf5ef] text-[#77685d]"><tr><th className="px-4 py-3">날짜</th><th className="px-4 py-3">하루 매출</th><th className="px-4 py-3">결제 건수</th><th className="px-4 py-3">수정 시각</th></tr></thead>
+        <div className="overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] [scrollbar-gutter:stable]">
+          <table className="w-full min-w-[520px] text-left text-xs">
+            <thead className="bg-[var(--surface-muted)] text-[var(--text-muted)]"><tr><th className="px-3 py-2.5 font-black">날짜</th><th className="px-3 py-2.5 font-black">하루 매출</th><th className="px-3 py-2.5 font-black">결제 건수</th><th className="px-3 py-2.5 font-black">수정 시각</th></tr></thead>
             <tbody>
               {[...rows].sort((a, b) => b.revenueDate.localeCompare(a.revenueDate)).slice(0, 31).map((row) => (
-                <tr key={row.revenueDate} className="border-t border-[#eee4db]"><td className="px-4 py-3 font-black text-[#493b31]">{row.revenueDate}</td><td className="px-4 py-3 font-bold">{formatKRW(row.grossAmount)}</td><td className="px-4 py-3">{row.paidOrderCount}건</td><td className="px-4 py-3 text-xs text-[#8b7a6d]">{new Date(row.updatedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}</td></tr>
+                <tr key={row.revenueDate} className="border-t border-[var(--border)] transition-colors duration-200 hover:bg-[var(--surface-muted)]/50"><td className="px-3 py-2.5 font-mono font-black tabular-nums text-[var(--text-strong)]">{row.revenueDate}</td><td className="px-3 py-2.5 font-mono font-bold tabular-nums text-[var(--text-strong)]">{formatKRW(row.grossAmount)}</td><td className="px-3 py-2.5 font-mono tabular-nums">{row.paidOrderCount}건</td><td className="px-3 py-2.5 font-mono text-[10px] tabular-nums text-[var(--text-muted)]">{new Date(row.updatedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}</td></tr>
               ))}
-              {!isLoading && rows.length === 0 ? <tr><td colSpan={4} className="px-4 py-8 text-center font-bold text-[#8b7a6d]">저장된 매출이 없습니다.</td></tr> : null}
+              {isLoading ? <tr><td colSpan={4} className="p-3"><div role="status" aria-label="매출 내역 불러오는 중" className="commerce-skeleton h-10 rounded" /></td></tr> : null}
+              {!isLoading && rows.length === 0 ? <tr><td colSpan={4} className="px-4 py-10 text-center"><span className="block text-sm font-black text-[var(--text-strong)]">저장된 매출이 없습니다</span><span className="mt-1 block text-xs font-semibold text-[var(--text-muted)]">입금 확인이 끝난 하루 매출을 위 입력란에서 저장하세요.</span></td></tr> : null}
             </tbody>
           </table>
         </div>
-        <aside className="rounded-2xl border border-[#cbdde5] bg-[#edf7fa] p-4">
-          <h3 className="font-black text-[#3e5b69]">연도별 누적</h3>
+        <aside className="rounded-lg border border-[var(--info-border)] bg-[var(--info-surface)] p-3.5">
+          <h3 className="text-sm font-black text-[var(--text-strong)]">연도별 누적</h3>
           <ul className="mt-3 space-y-2">
-            {yearly.map(([year, amount]) => <li key={year} className="flex justify-between gap-3 rounded-xl bg-white/80 px-3 py-2 text-sm"><span className="font-black text-[#526e78]">{year}년</span><span className="font-bold text-[#3e5b69]">{formatKRW(amount)}</span></li>)}
+            {yearly.map(([year, amount]) => <li key={year} className="flex justify-between gap-3 rounded-md border border-[var(--info-border)] bg-[var(--surface-raised)] px-3 py-2 text-xs"><span className="font-mono font-black tabular-nums text-[var(--info-text)]">{year}년</span><span className="font-mono font-bold tabular-nums text-[var(--text-strong)]">{formatKRW(amount)}</span></li>)}
+            {!isLoading && yearly.length === 0 ? <li className="py-5 text-center text-xs font-semibold text-[var(--info-text)]">누적 데이터가 없습니다.</li> : null}
           </ul>
         </aside>
       </div>

@@ -6,3 +6,4 @@ export { default as Navigation } from "./Navigation";
 export type { NavigationTarget } from "./Navigation";
 export { default as SiteHeader } from "./SiteHeader";
 export { default as ThemeToggle } from "./ThemeToggle";
+export { Toast } from "./Toast";

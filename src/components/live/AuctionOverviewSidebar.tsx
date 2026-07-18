@@ -53,22 +53,22 @@ export default function AuctionOverviewSidebar({
   return (
     <aside
       aria-labelledby="auction-overview-title"
-      className={`theme-panel sticky top-24 max-h-[calc(100dvh-7rem)] self-start overflow-y-auto overscroll-contain rounded-[1.6rem] border p-4 shadow-[0_16px_40px_rgba(93,69,54,0.12)] backdrop-blur motion-safe:transition-[top,box-shadow] motion-safe:duration-300 motion-safe:ease-out ${className}`}
+      className={`theme-panel sticky top-24 max-h-[calc(100dvh-7rem)] self-start overflow-y-auto overscroll-contain border p-4 shadow-[var(--panel-shadow)] backdrop-blur motion-safe:transition-[top,box-shadow] motion-safe:duration-300 motion-safe:ease-out ${className}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[13px] font-extrabold tracking-[0.12em] text-[var(--accent-text)]">
-            LIVE AUCTION OVERVIEW
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent-text)]">
+            Live auction overview
           </p>
           <h2
             id="auction-overview-title"
-            className="mt-1 break-keep text-[17px] font-black leading-6 text-[var(--text-strong)]"
+            className="mt-1 break-keep text-base font-black leading-6 tracking-[-0.025em] text-[var(--text-strong)]"
           >
             전체 경매 진행 현황
           </h2>
         </div>
         <span
-          className="shrink-0 rounded-full bg-[var(--surface-muted)] px-2.5 py-1 text-[14px] font-black text-[var(--text-strong)]"
+          className="shrink-0 border-y border-[var(--border)] px-2.5 py-1 font-mono text-xs font-black tabular-nums tracking-tight text-[var(--text-strong)]"
           aria-label={`현재 진행 상품 ${inProgressPosts.length}개`}
         >
           {inProgressPosts.length}개
@@ -76,7 +76,7 @@ export default function AuctionOverviewSidebar({
       </div>
 
       {inProgressPosts.length > 0 ? (
-        <ul className="mt-4 space-y-2" aria-label="전체 진행 상품 목록">
+        <ul className="mt-4 divide-y divide-[var(--border)] border-y border-[var(--border)]" aria-label="전체 진행 상품 목록">
           {inProgressPosts.map((post) => {
             const state = getAuctionState(post);
             const thumbnail = post.thumbnailUrls[0] || post.imageUrls[0];
@@ -84,42 +84,42 @@ export default function AuctionOverviewSidebar({
             return (
               <li
                 key={post.id}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-2.5"
+                className="bg-[var(--surface-raised)] py-3 transition-all duration-200 ease-out hover:bg-[var(--surface-muted)]"
               >
                 <div className="flex gap-2.5">
-                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[var(--surface-muted)]">
+                  <div className="h-14 w-14 shrink-0 overflow-hidden bg-[var(--surface-muted)]">
                     {thumbnail ? (
                       <img
                         src={thumbnail}
                         alt=""
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-cover transition-transform duration-300 ease-out hover:scale-[1.04]"
                         loading="lazy"
                       />
                     ) : (
                       <span
-                        className="grid h-full w-full place-items-center text-xl text-[var(--text-muted)]"
+                        className="grid h-full w-full place-items-center text-[var(--text-muted)]"
                         aria-hidden="true"
                       >
-                        ◇
+                        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5"><path d="m4 16 4.5-4.5 3 3 2-2L20 19M7.5 8.5h.01M4 4h16v16H4V4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       </span>
                     )}
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 break-keep text-[15px] font-extrabold leading-5 text-[var(--text-strong)]">
+                    <p className="line-clamp-2 break-keep text-[13px] font-bold leading-5 text-[var(--text-strong)]">
                       {post.title}
                     </p>
-                    <p className="mt-1 text-[17px] font-black text-[var(--accent-text)]">
+                    <p className="mt-1 font-mono text-sm font-black tabular-nums tracking-tight text-[var(--accent-text)]">
                       {formatKRW(post.currentPrice)}
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-2.5 flex items-center justify-between gap-2">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-black ${state.classes}`}>
+                  <span className={`border border-current/15 px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] ${state.classes}`}>
                     {state.label}
                   </span>
-                  <span className="text-xs font-black text-[var(--text-muted)]">
+                  <span className="font-mono text-[10px] font-black tabular-nums tracking-tight text-[var(--text-muted)]">
                     참여 {post.participantCount.toLocaleString("ko-KR")}명
                   </span>
                 </div>
@@ -128,12 +128,13 @@ export default function AuctionOverviewSidebar({
           })}
         </ul>
       ) : (
-        <p className="mt-4 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-muted)] px-3 py-5 text-center text-[15px] font-bold leading-6 text-[var(--text-muted)]">
-          현재 입찰자가 있는 진행 상품이 없습니다.
-        </p>
+        <div className="mt-4 border border-dashed border-[var(--border)] bg-[var(--surface-muted)] px-3 py-8 text-center text-[var(--text-muted)]">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="mx-auto h-7 w-7"><path d="M4 18V9m5 9V5m5 13v-7m5 7V8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+          <p className="mt-2 text-xs font-bold leading-5">현재 입찰자가 있는 진행 상품이 없습니다.</p>
+        </div>
       )}
 
-      <p className="mt-3 break-keep text-center text-[13px] font-bold leading-5 text-[var(--text-muted)]">
+      <p className="mt-3 break-keep text-center text-[11px] font-medium leading-5 text-[var(--text-muted)]">
         입찰자가 있는 진행 상품과 참여 수가 실시간으로 갱신됩니다.
       </p>
     </aside>

@@ -354,12 +354,12 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
     }
 
     return (
-      <main className="mx-auto w-full max-w-[1800px] px-3 pb-28 pt-6 sm:px-4 sm:pt-8 lg:px-5 lg:pb-12">
+      <main className="mx-auto w-full max-w-[1680px] px-3 pb-28 pt-4 sm:px-5 sm:pt-6 lg:px-6 lg:pb-14">
         <div
-          className={`grid items-start gap-3 xl:gap-4 ${
+          className={`grid items-start gap-4 2xl:gap-5 ${
             showOnlineMembers
-              ? "xl:grid-cols-[180px_minmax(0,1fr)_220px] 2xl:grid-cols-[200px_minmax(0,1fr)_240px]"
-              : "xl:grid-cols-[minmax(0,1fr)_235px]"
+              ? "xl:grid-cols-[200px_minmax(0,1fr)_248px] 2xl:grid-cols-[220px_minmax(0,1fr)_272px]"
+              : "xl:grid-cols-[minmax(0,1fr)_272px]"
           }`}
         >
           {showOnlineMembers && showDesktopRails ? (
@@ -379,20 +379,20 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
             {showOnlineMembers ? (
               <section
                 aria-label="현재 온라인 사용자 요약"
-                className="theme-panel mt-3 flex min-h-12 items-center gap-2 overflow-hidden rounded-2xl border px-3 py-2 xl:hidden"
+                className="theme-panel mt-3 flex min-h-11 items-center gap-2 overflow-hidden rounded-xl border px-3 py-2 shadow-sm xl:hidden"
               >
-                <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-black text-[var(--success-text)]">
+                <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-bold tracking-tight text-[var(--success-text)]">
                   <span
                     aria-hidden="true"
-                    className="size-2 rounded-full bg-[#4aaf63]"
+                    className="size-1.5 rounded-full bg-[#2f9e5b] shadow-[0_0_0_3px_rgba(47,158,91,0.12)]"
                   />
-                  온라인 {onlineMemberCount}명
+                  LIVE <span className="font-mono tabular-nums">{onlineMemberCount}</span>명
                 </span>
                 <span
                   aria-hidden="true"
                   className="h-4 w-px shrink-0 bg-[var(--border)]"
                 />
-                <span className="truncate text-sm font-bold text-[var(--text-muted)]">
+                <span className="truncate text-xs font-medium text-[var(--text-muted)] sm:text-sm">
                   {onlineMembersStatus === "connecting"
                     ? "접속 상태 확인 중"
                     : onlineMembersStatus === "error"
@@ -411,25 +411,35 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
               </section>
             ) : null}
 
-            <section className="theme-panel relative my-4 overflow-hidden rounded-[1.6rem] border sm:my-5 sm:rounded-[1.8rem]">
-              <div className="grid items-stretch md:grid-cols-[minmax(0,1.2fr)_minmax(15rem,0.8fr)]">
-                <div className="flex flex-col justify-center px-4 py-5 sm:px-6 sm:py-6 lg:px-7">
-                  <p className="text-xs font-black tracking-[0.16em] text-[var(--accent-text)] sm:text-sm">
-                    NINETY-NINE VINTAGE
-                  </p>
-                  <h2 className="mt-1.5 text-xl font-black tracking-[-0.035em] text-[var(--text-strong)] sm:text-2xl">
-                    오늘의 빈티지를 투명한 경매로 만나보세요
+            <section className="theme-panel group relative my-4 overflow-hidden rounded-2xl border shadow-[0_18px_55px_rgba(15,23,42,0.06)] transition-all duration-200 ease-out sm:my-5 sm:rounded-[1.35rem]">
+              <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(115deg,transparent_45%,rgba(255,255,255,0.04)_55%,transparent_65%)] opacity-0 transition-opacity duration-200 group-hover:opacity-100" aria-hidden="true" />
+              <div className="grid items-stretch md:grid-cols-[minmax(0,1.12fr)_minmax(18rem,0.88fr)]">
+                <div className="relative z-20 flex flex-col justify-center px-5 py-7 sm:px-7 sm:py-9 lg:px-9 lg:py-10">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-[10px] font-bold tracking-[0.22em] text-[var(--accent-text)] sm:text-xs">
+                      NINETY-NINE VINTAGE
+                    </p>
+                    <span className="h-px w-8 bg-[var(--border-strong)]" aria-hidden="true" />
+                    <span className="text-[10px] font-semibold tracking-[0.14em] text-[var(--text-muted)] sm:text-xs">
+                      CURATED DAILY
+                    </span>
+                  </div>
+                  <h2 className="mt-3 max-w-2xl text-[1.45rem] font-semibold leading-[1.18] tracking-[-0.04em] text-[var(--text-strong)] sm:text-[2rem] lg:text-[2.35rem]">
+                    단 하나뿐인 빈티지,
+                    <span className="block">투명한 라이브 경매로.</span>
                   </h2>
-                  <p className="mt-2 max-w-2xl break-keep text-sm font-semibold leading-6 text-[var(--text-muted)] sm:text-[15px] sm:leading-7">
-                    오후 8시 56분부터 기존 참여자만 입찰할 수 있습니다. 오후 9시
-                    정산 후 미판매 상품은 오후 10시에 다시 열립니다.
+                  <p className="mt-3 max-w-2xl break-keep text-sm font-medium leading-6 text-[var(--text-muted)] sm:text-[15px] sm:leading-7">
+                    매일 엄선한 빈티지를 공개합니다. 모든 입찰 기록과 낙찰 결과를
+                    확인하며 안심하고 참여하세요.
                   </p>
-                  <span className="mt-3 w-fit rounded-full bg-[var(--info-surface)] px-3 py-1.5 text-xs font-black text-[var(--info-text)] sm:text-sm">
-                    20:56 신규 제한 · 21:00 정산 · 22:00 재개
-                  </span>
+                  <div className="mt-5 flex w-fit items-center divide-x divide-[var(--border)] overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] text-[10px] font-semibold text-[var(--text-muted)] shadow-sm sm:text-xs">
+                    <span className="px-2.5 py-2 font-mono tabular-nums tracking-tight sm:px-3">20:56 신규 제한</span>
+                    <span className="px-2.5 py-2 font-mono tabular-nums tracking-tight sm:px-3">21:00 정산</span>
+                    <span className="px-2.5 py-2 font-mono tabular-nums tracking-tight sm:px-3">22:00 재개</span>
+                  </div>
                 </div>
 
-                <picture className="block min-h-40 overflow-hidden bg-black md:min-h-full">
+                <picture className="relative block min-h-48 overflow-hidden bg-black md:min-h-full">
                   <source
                     media="(min-width: 1440px)"
                     srcSet="/ninety-nine-vintage-banner.png"
@@ -445,7 +455,7 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
                     height={1024}
                     loading="lazy"
                     decoding="async"
-                    className="h-full max-h-64 w-full object-contain md:max-h-none"
+                    className="h-full max-h-72 w-full object-contain transition-transform duration-500 ease-out group-hover:scale-[1.02] md:max-h-none"
                   />
                 </picture>
               </div>
@@ -485,20 +495,26 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
               className="hidden xl:block"
             />
           ) : showDesktopRails ? (
-            <aside className="theme-panel sticky top-24 hidden rounded-[1.6rem] border p-5 text-center xl:block">
-              <p className="text-[17px] font-black text-[var(--text-strong)]">내 입찰 현황</p>
-              <p className="mt-2 break-keep text-[15px] font-bold leading-6 text-[var(--text-muted)]">
+            <aside className="theme-panel sticky top-24 hidden overflow-hidden rounded-2xl border shadow-sm xl:block">
+              <div className="border-b border-[var(--border)] px-4 py-3 text-left">
+                <p className="text-[10px] font-bold tracking-[0.18em] text-[var(--text-muted)]">MY AUCTIONS</p>
+                <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">내 입찰 현황</p>
+              </div>
+              <div className="px-4 py-6 text-center">
+                <span aria-hidden="true" className="mx-auto grid size-10 place-items-center rounded-full border border-[var(--border)] text-[var(--text-muted)]">↗</span>
+                <p className="mt-3 break-keep text-xs font-medium leading-5 text-[var(--text-muted)]">
                 카카오 회원으로 로그인하면 참여 중인 상품을 실시간으로 확인할 수 있어요.
-              </p>
+                </p>
               {!auth.user ? (
                 <button
                   type="button"
                   onClick={openAuthentication}
-                  className="mt-4 min-h-11 rounded-xl bg-[#fee500] px-4 text-sm font-black text-[#191919]"
+                  className="mt-4 min-h-10 w-full rounded-lg bg-[#fee500] px-4 text-xs font-bold text-[#191919] shadow-sm transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#191919]/30"
                 >
                   카카오 로그인
                 </button>
               ) : null}
+              </div>
             </aside>
           ) : null}
         </div>
@@ -512,10 +528,12 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
 
   return (
     <div className="theme-app-shell relative min-h-screen overflow-x-clip">
-      <div aria-hidden="true" className="theme-coral-glow pointer-events-none fixed -left-20 top-36 h-72 w-72 rounded-full blur-3xl" />
-      <div aria-hidden="true" className="theme-sky-glow pointer-events-none fixed -right-24 top-[45%] h-80 w-80 rounded-full blur-3xl" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 opacity-[0.32] [background-image:linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:linear-gradient(to_bottom,black,transparent_38%)]"
+      />
 
-      <div className="relative mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
+      <div className="relative mx-auto w-full max-w-[1680px] px-3 pt-3 sm:px-5 sm:pt-5 lg:px-6">
         <SiteHeader
           role={auth.role}
           isAuthenticated={Boolean(auth.user)}
@@ -605,12 +623,34 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
 function RouteLoadingFallback() {
   return (
     <main
-      className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8"
+      className="mx-auto w-full max-w-[1680px] px-3 py-6 sm:px-5 lg:px-6"
       aria-busy="true"
       aria-live="polite"
     >
-      <div className="theme-panel rounded-[1.6rem] border px-5 py-8 text-center font-bold text-[var(--text-muted)]">
-        화면을 불러오는 중…
+      <span className="sr-only">화면을 불러오는 중…</span>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_272px]">
+        <div className="space-y-4">
+          <div className="theme-panel overflow-hidden rounded-2xl border p-4">
+            <div className="commerce-skeleton h-3 w-28 rounded" />
+            <div className="commerce-skeleton mt-3 h-7 w-2/3 rounded" />
+            <div className="commerce-skeleton mt-5 aspect-[16/6] w-full rounded-xl" />
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {Array.from({ length: 6 }, (_, index) => (
+              <div key={index} className="theme-panel overflow-hidden rounded-xl border p-2.5">
+                <div className="commerce-skeleton aspect-[3/4] w-full rounded-lg" />
+                <div className="commerce-skeleton mt-3 h-3 w-3/4 rounded" />
+                <div className="commerce-skeleton mt-2 h-4 w-1/2 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="theme-panel hidden h-72 rounded-2xl border p-4 lg:block">
+          <div className="commerce-skeleton h-3 w-24 rounded" />
+          <div className="commerce-skeleton mt-5 h-12 w-full rounded-lg" />
+          <div className="commerce-skeleton mt-2 h-12 w-full rounded-lg" />
+          <div className="commerce-skeleton mt-2 h-12 w-full rounded-lg" />
+        </div>
       </div>
     </main>
   );
@@ -619,23 +659,24 @@ function RouteLoadingFallback() {
 function NetworkBlockedPage() {
   return (
     <main className="theme-app-shell grid min-h-[75dvh] place-items-center px-4 py-12">
-      <section className="theme-panel w-full max-w-xl rounded-[2rem] border p-7 text-center shadow-[0_22px_60px_rgba(92,67,51,0.09)] sm:p-9">
+      <section className="theme-panel w-full max-w-xl rounded-2xl border p-7 text-center shadow-[0_24px_70px_rgba(15,23,42,0.09)] sm:p-9">
         <span
           aria-hidden="true"
-          className="mx-auto grid size-16 place-items-center rounded-2xl bg-[var(--danger-surface)] text-2xl font-black text-[var(--danger-text)]"
+          className="mx-auto grid size-12 place-items-center rounded-xl border border-[var(--danger-text)]/20 bg-[var(--danger-surface)] text-lg font-bold text-[var(--danger-text)]"
         >
           !
         </span>
-        <h1 className="mt-5 text-2xl font-black text-[var(--text-strong)]">
+        <p className="mt-5 text-[10px] font-bold tracking-[0.2em] text-[var(--danger-text)]">ACCESS RESTRICTED</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
           보안 정책에 따라 접속이 제한되었습니다
         </h1>
-        <p className="mt-3 break-keep font-bold leading-7 text-[var(--text-muted)]">
+        <p className="mt-3 break-keep text-sm font-medium leading-6 text-[var(--text-muted)]">
           비정상 접속이나 오남용 방지를 위해 현재 네트워크 세션이 차단되었습니다.
           잘못 차단되었다면 고객센터에 차단 시각과 함께 해제를 요청해 주세요.
         </p>
         <a
           href="/privacy"
-          className="mt-6 inline-flex min-h-12 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-5 font-black text-[var(--text-strong)]"
+          className="mt-6 inline-flex min-h-10 items-center justify-center rounded-lg border border-[var(--border-strong)] bg-[var(--surface-raised)] px-4 text-sm font-semibold text-[var(--text-strong)] transition-all duration-200 ease-out hover:scale-[1.02] hover:border-[var(--text-muted)] hover:shadow-sm"
         >
           개인정보처리방침 확인
         </a>
@@ -660,23 +701,23 @@ function StaffAccountPage({
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 pb-28 pt-8 sm:px-6 lg:pb-12">
-      <section className="theme-panel overflow-hidden rounded-[2rem] border shadow-[0_22px_60px_rgba(92,67,51,0.09)]">
-        <div className="bg-[linear-gradient(135deg,var(--accent-surface)_0%,var(--info-surface)_100%)] px-6 py-8 sm:px-9">
-          <p className="text-sm font-black tracking-[0.14em] text-[var(--accent-text)]">
+      <section className="theme-panel overflow-hidden rounded-2xl border shadow-[0_22px_60px_rgba(15,23,42,0.07)]">
+        <div className="border-b border-[var(--border)] bg-[var(--surface-raised)] px-6 py-7 sm:px-9">
+          <p className="text-[10px] font-bold tracking-[0.2em] text-[var(--accent-text)]">
             OPERATIONS ACCOUNT
           </p>
           <div className="mt-4 flex items-center gap-4">
             <span
               aria-hidden="true"
-              className="grid size-16 place-items-center rounded-2xl bg-[var(--surface)] text-2xl font-black text-[var(--accent-text)] shadow-sm"
+              className="grid size-12 place-items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-sm font-bold text-[var(--accent-text)] shadow-sm"
             >
               운영
             </span>
             <div>
-              <h2 className="text-2xl font-black text-[var(--text-strong)]">
+              <h2 className="text-xl font-semibold tracking-tight text-[var(--text-strong)]">
                 {safeDisplayName || "운영 계정"}
               </h2>
-              <span className="mt-1 inline-flex rounded-full bg-[var(--surface)]/80 px-3 py-1 text-sm font-black text-[var(--success-text)]">
+              <span className="mt-1 inline-flex rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--success-text)]">
                 {roleLabel}
               </span>
             </div>
@@ -684,7 +725,7 @@ function StaffAccountPage({
         </div>
 
         <div className="px-6 py-6 sm:px-9">
-          <p className="break-keep text-[17px] font-bold leading-8 text-[var(--text-muted)]">
+          <p className="break-keep text-sm font-medium leading-6 text-[var(--text-muted)]">
             운영 계정의 로그인 주소와 내부 식별 정보는 공개 화면에 표시하지 않습니다.
             허용된 업무는 서버 역할 정책으로 확인합니다.
           </p>
@@ -711,33 +752,33 @@ function EmployeeOperationsPage({
 }) {
   return (
     <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-8 sm:px-6 lg:pb-12">
-      <header className="mb-7">
-        <p className="text-sm font-black tracking-[0.16em] text-[var(--info-text)]">
+      <header className="mb-7 border-b border-[var(--border)] pb-5">
+        <p className="text-[10px] font-bold tracking-[0.2em] text-[var(--info-text)]">
           EMPLOYEE WORKSPACE
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-black tracking-tight text-[var(--text-strong)]">
+          <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[var(--text-strong)]">
             직원 업무 도구
           </h1>
-          <span className="rounded-full bg-[var(--info-surface)] px-3 py-1.5 text-sm font-black text-[var(--info-text)]">
+          <span className="rounded-md border border-[var(--border)] bg-[var(--info-surface)] px-2.5 py-1 text-xs font-semibold text-[var(--info-text)]">
             직원
           </span>
         </div>
-        <p className="mt-3 max-w-3xl break-keep text-[17px] font-bold leading-8 text-[var(--text-muted)]">
+        <p className="mt-3 max-w-3xl break-keep text-sm font-medium leading-6 text-[var(--text-muted)]">
           상품 등록과 배송 대기 처리에 필요한 권한만 사용할 수 있습니다. 회원 관리와
           상담함은 이 계정에 노출되지 않습니다.
         </p>
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <section className="theme-panel rounded-[1.6rem] border p-6">
-          <p className="text-xs font-black tracking-[0.14em] text-[var(--accent-text)]">
+        <section className="theme-panel rounded-2xl border p-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md">
+          <p className="text-[10px] font-bold tracking-[0.18em] text-[var(--accent-text)]">
             BULK REGISTRATION
           </p>
-          <h2 className="mt-2 text-xl font-black text-[var(--text-strong)]">
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-[var(--text-strong)]">
             상품 일괄 등록
           </h2>
-          <p className="mt-2 break-keep font-bold leading-7 text-[var(--text-muted)]">
+          <p className="mt-2 break-keep text-sm font-medium leading-6 text-[var(--text-muted)]">
             Excel 상품 정보와 이미지 폴더를 검토한 뒤 여러 경매글을 등록합니다.
           </p>
           <Button className="mt-5" onClick={onOpenBulkImport}>
@@ -745,14 +786,14 @@ function EmployeeOperationsPage({
           </Button>
         </section>
 
-        <section className="theme-panel rounded-[1.6rem] border p-6">
-          <p className="text-xs font-black tracking-[0.14em] text-[var(--info-text)]">
+        <section className="theme-panel rounded-2xl border p-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md">
+          <p className="text-[10px] font-bold tracking-[0.18em] text-[var(--info-text)]">
             SINGLE REGISTRATION
           </p>
-          <h2 className="mt-2 text-xl font-black text-[var(--text-strong)]">
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-[var(--text-strong)]">
             상품 개별 등록
           </h2>
-          <p className="mt-2 break-keep font-bold leading-7 text-[var(--text-muted)]">
+          <p className="mt-2 break-keep text-sm font-medium leading-6 text-[var(--text-muted)]">
             예외 상품 한 건의 사진·설명·공개 시각을 확인해 등록합니다.
           </p>
           <Button
@@ -765,9 +806,9 @@ function EmployeeOperationsPage({
         </section>
       </div>
 
-      <section className="theme-panel mt-4 rounded-[1.6rem] border p-5 sm:p-6">
-        <h2 className="text-xl font-black text-[var(--text-strong)]">배송 대기 업무</h2>
-        <p className="mt-1 break-keep font-bold leading-7 text-[var(--text-muted)]">
+      <section className="theme-panel mt-4 rounded-2xl border p-5 shadow-sm sm:p-6">
+        <h2 className="text-xl font-semibold tracking-tight text-[var(--text-strong)]">배송 대기 업무</h2>
+        <p className="mt-1 break-keep text-sm font-medium leading-6 text-[var(--text-muted)]">
           접수된 배송지와 상품을 확인하고 운송장 번호를 등록합니다.
         </p>
         <div className="mt-4">

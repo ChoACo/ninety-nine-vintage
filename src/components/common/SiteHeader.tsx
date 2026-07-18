@@ -33,9 +33,9 @@ export default function SiteHeader({
   const safeDisplayName = isOwnerRole(role) ? "" : displayName?.trim();
 
   return (
-    <header className="theme-surface-glass rounded-[1.5rem] border px-3 py-3 sm:rounded-[1.75rem] sm:px-5 sm:py-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+    <header className="theme-surface-glass rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3">
+      <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between lg:gap-5">
+        <div className="flex min-w-0 items-center gap-3">
           <img
             src="/ninety-nine-vintage-brand.jpg"
             alt="나인티 나인 빈티지 공식 로고"
@@ -43,36 +43,39 @@ export default function SiteHeader({
             height={96}
             decoding="async"
             fetchPriority="high"
-            className="aspect-square size-10 shrink-0 rounded-[0.9rem] object-cover shadow-[0_7px_18px_rgba(83,50,39,0.18)] sm:size-12 sm:rounded-[1.05rem]"
+            className="aspect-square size-10 shrink-0 rounded-md border border-[var(--border)] object-cover shadow-[0_5px_16px_rgba(18,18,17,0.16)] sm:size-11"
           />
           <div className="min-w-0">
-            <p className="truncate text-[10px] font-extrabold tracking-[0.16em] text-[var(--accent-text)] sm:text-xs">
-              NINETY-NINE VINTAGE AUCTION
+            <p className="truncate text-[9px] font-bold tracking-[0.22em] text-[var(--text-muted)] sm:text-[10px]">
+              NINETY-NINE · LIVE AUCTION
             </p>
-            <h1 className="mt-0.5 truncate text-[18px] font-black tracking-[-0.045em] text-[var(--text-strong)] sm:text-[22px]">
+            <h1 className="mt-0.5 truncate text-[17px] font-extrabold tracking-[-0.04em] text-[var(--text-strong)] sm:text-xl">
               나인티 나인 빈티지
             </h1>
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:justify-end sm:gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 lg:justify-end lg:gap-2">
           <ThemeToggle />
 
           {isAuthenticated &&
           isOwnerRole(role) &&
           onOpenOwnerTools ? (
-            <Button className="!min-h-10 !rounded-xl !px-3 text-sm" size="sm" variant="secondary" onClick={onOpenOwnerTools}>
+            <Button className="px-3" size="sm" variant="secondary" onClick={onOpenOwnerTools}>
               관리자 메뉴
             </Button>
           ) : null}
 
           {isAuthenticated ? (
-            <span className="min-h-10 max-w-[11rem] truncate rounded-xl bg-[var(--success-surface)] px-3 py-2 text-sm font-bold text-[var(--success-text)] sm:max-w-[15rem]">
-              {safeDisplayName ? `${safeDisplayName} · ` : ""}
-              {roleLabel}
+            <span className="inline-flex min-h-10 max-w-[12rem] items-center gap-2 truncate rounded-md border border-[var(--border)] bg-[var(--success-surface)] px-3 py-2 text-xs font-bold text-[var(--success-text)] sm:max-w-[16rem]">
+              <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />
+              <span className="truncate">
+                {safeDisplayName ? `${safeDisplayName} · ` : ""}
+                {roleLabel}
+              </span>
             </span>
           ) : (
-            <Button className="!min-h-10 !rounded-xl !px-3 text-sm" size="sm" onClick={onOpenAuth}>
+            <Button className="px-3" size="sm" onClick={onOpenAuth}>
               카카오로 시작하기
             </Button>
           )}
@@ -81,7 +84,7 @@ export default function SiteHeader({
             <Button
               variant="ghost"
               size="sm"
-              className="!min-h-10 !rounded-xl !px-3 text-sm"
+              className="px-3"
               isLoading={isSigningOut}
               onClick={() => void onSignOut()}
             >

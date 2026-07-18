@@ -64,27 +64,28 @@ export default function BidConfirmModal({
       size="sm"
       showCloseButton={false}
       closeOnBackdrop={false}
+      className="max-sm:absolute max-sm:bottom-0 max-sm:max-h-[92dvh] max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0"
     >
       <div className="p-5 sm:p-7">
-        <p className="break-keep text-center text-base font-bold leading-7 text-[#6d5c52]">
+        <p className="line-clamp-2 break-keep text-center text-sm font-semibold leading-6 text-[var(--text-muted)]">
           {itemTitle}
         </p>
-        <p className="mt-4 break-keep text-center text-2xl font-black leading-tight text-[#382f2a] sm:text-3xl">
-          <strong className="text-[#b34537]">{formatKRW(amount)}</strong>
+        <p className="mt-4 break-keep text-center text-xl font-black leading-tight tracking-[-0.03em] text-[var(--text-strong)] sm:text-2xl">
+          <strong className="font-mono text-[1.75rem] tabular-nums tracking-tight text-[var(--accent-text)] sm:text-[2rem]">{formatKRW(amount)}</strong>
           <br />
-          입찰을 진행하시겠습니까?
+          <span className="mt-2 inline-block">입찰을 진행하시겠습니까?</span>
         </p>
 
-        <div className="mt-5 rounded-2xl border-2 border-[#efab92] bg-[#fff0e6] px-4 py-3 text-center text-[17px] font-black leading-7 text-[#9b3f34]">
+        <div className="mt-5 border-l-2 border-[var(--warning-text)] bg-[var(--warning-surface)] px-4 py-3 text-sm font-bold leading-6 text-[var(--warning-text)]">
           {isFinalBid
-            ? "⚠️ 이 입찰은 즉시 낙찰 확정되며 추가 입찰·취소가 불가능합니다."
-            : "⚠️ 입찰 후 취소 불가 (미입금 시 누적 경고 부여)"}
+            ? "이 입찰은 즉시 낙찰 확정되며 추가 입찰·취소가 불가능합니다."
+            : "입찰 후 취소 불가 (미입금 시 누적 경고 부여)"}
         </div>
 
         {error ? (
           <p
             role="alert"
-            className="mt-4 rounded-xl bg-[#fff0ef] px-3 py-2 text-center text-base font-bold text-[#a33f38]"
+            className="mt-4 border-l-2 border-[var(--danger-text)] bg-[var(--danger-surface)] px-3 py-2 text-sm font-bold text-[var(--danger-text)]"
           >
             {error}
           </p>
@@ -96,7 +97,7 @@ export default function BidConfirmModal({
             size="lg"
             onClick={handleClose}
             disabled={isSubmitting}
-            className="min-h-16 text-xl font-black"
+            className="min-h-12 rounded-lg text-sm font-bold transition-all duration-200 ease-out hover:scale-[1.02]"
           >
             아니오
           </Button>
@@ -104,7 +105,7 @@ export default function BidConfirmModal({
             size="lg"
             onClick={handleConfirm}
             isLoading={isSubmitting}
-            className="min-h-16 text-xl font-black"
+            className="min-h-12 rounded-lg text-sm font-black transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-lg"
           >
             예
           </Button>

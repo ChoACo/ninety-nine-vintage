@@ -26,10 +26,10 @@ export interface ModalProps {
 }
 
 const sizeClasses: Record<ModalSize, string> = {
-  sm: "max-w-md",
-  md: "max-w-xl",
-  lg: "max-w-4xl",
-  gallery: "max-w-6xl",
+  sm: "max-w-[26rem]",
+  md: "max-w-[36rem]",
+  lg: "max-w-[64rem]",
+  gallery: "max-w-[76rem]",
   full: "h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] sm:h-[calc(100dvh-2rem)] sm:max-w-[calc(100vw-2rem)]",
 };
 
@@ -121,12 +121,12 @@ export default function Modal({
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4">
+    <div className="fixed inset-0 z-[100] flex items-end justify-center pt-6 sm:items-center sm:p-4">
       <button
         type="button"
         aria-label="모달 닫기"
         tabIndex={-1}
-        className="absolute inset-0 cursor-default bg-[#302821]/60 backdrop-blur-sm"
+        className="absolute inset-0 cursor-default bg-black/70 backdrop-blur-[2px] transition-opacity duration-200"
         onClick={closeOnBackdrop ? onClose : undefined}
       />
 
@@ -137,23 +137,29 @@ export default function Modal({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className={`relative flex max-h-[calc(100dvh-1rem)] w-full flex-col overflow-hidden rounded-[1.75rem] border outline-none sm:max-h-[calc(100dvh-2rem)] ${
+        className={`animate-fade-in-up relative flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-t-xl border outline-none sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl ${
           tone === "dark"
-            ? "border-white/15 bg-[#2b343b] text-white shadow-[0_28px_90px_rgba(18,22,25,0.52)]"
-            : "border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] shadow-[0_24px_80px_rgba(48,40,33,0.3)]"
+            ? "border-white/15 bg-[#151514] text-[#f7f3e9] shadow-[0_30px_100px_rgba(0,0,0,0.62)]"
+            : "border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] shadow-[0_30px_100px_rgba(18,18,17,0.32)]"
         } ${sizeClasses[size]} ${className}`}
       >
+        <span
+          aria-hidden="true"
+          className={`mx-auto mt-2 block h-1 w-9 shrink-0 rounded-full sm:hidden ${
+            tone === "dark" ? "bg-white/20" : "bg-[var(--border-strong)]"
+          }`}
+        />
         <div
-          className={`flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4 sm:px-6 ${
+          className={`flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4 sm:px-6 sm:py-5 ${
             tone === "dark"
-              ? "border-white/10 bg-white/[0.035]"
+              ? "border-white/10 bg-white/[0.025]"
               : "border-[var(--border)] bg-[var(--surface)]"
           }`}
         >
           <div className="min-w-0">
             <h2
               id={titleId}
-              className={`text-lg font-bold sm:text-xl ${
+              className={`text-lg font-extrabold tracking-[-0.025em] sm:text-xl ${
                 tone === "dark" ? "text-white" : "text-[var(--text-strong)]"
               }`}
             >
@@ -162,7 +168,7 @@ export default function Modal({
             {description ? (
               <p
                 id={descriptionId}
-                className={`mt-1 text-[17px] leading-7 ${
+                className={`mt-1.5 max-w-2xl break-keep text-sm font-medium leading-6 ${
                   tone === "dark" ? "text-white/60" : "text-[var(--text-muted)]"
                 }`}
               >
@@ -175,19 +181,29 @@ export default function Modal({
             <button
               type="button"
               onClick={onClose}
-              className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border text-xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ec7866] ${
+              className={`grid size-9 shrink-0 place-items-center rounded-md border transition-all duration-200 ease-out hover:scale-[1.04] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
                 tone === "dark"
-                  ? "border-white/15 bg-white/10 text-white hover:bg-white/20"
-                  : "border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-muted)] hover:bg-[var(--accent-surface)]"
+                  ? "border-white/15 bg-white/[0.04] text-white/70 hover:border-white/30 hover:bg-white/10 hover:text-white"
+                  : "border-[var(--border)] bg-transparent text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-strong)]"
               }`}
               aria-label="닫기"
             >
-              <span aria-hidden="true">×</span>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                className="size-[18px]"
+              >
+                <path d="m6 6 12 12M18 6 6 18" />
+              </svg>
             </button>
           ) : null}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+        <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto">{children}</div>
       </div>
     </div>,
     document.body,

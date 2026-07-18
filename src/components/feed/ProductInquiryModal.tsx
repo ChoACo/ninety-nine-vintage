@@ -62,12 +62,13 @@ export default function ProductInquiryModal({
       description={`‘${productLabel}’의 담당 운영자에게 비공개 문의를 남겨 주세요.`}
       size="sm"
       closeOnBackdrop={!isSending}
+      className="max-sm:absolute max-sm:bottom-0 max-sm:max-h-[92dvh] max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0"
     >
       <form onSubmit={handleSubmit} className="space-y-4 p-5 sm:p-6">
         <div>
           <label
             htmlFor="product-inquiry-message"
-            className="text-[17px] font-black text-[#443830]"
+            className="text-sm font-black text-[var(--text-strong)]"
           >
             문의 내용
           </label>
@@ -82,19 +83,19 @@ export default function ProductInquiryModal({
             maxLength={500}
             autoFocus
             placeholder="사이즈, 옷 상태, 배송 등에 대해 적어 주세요."
-            className="mt-2 min-h-36 w-full resize-y rounded-2xl border-2 border-[#dfcdbf] bg-white px-4 py-3 text-[17px] font-semibold leading-7 text-[#3e342e] outline-none transition placeholder:text-[#a18e81] focus:border-[#ec7866] focus:ring-4 focus:ring-[#ec7866]/15"
+            className="mt-2 min-h-36 w-full resize-y rounded-lg border border-[var(--border-strong)] bg-[var(--input-surface)] px-4 py-3 text-sm font-medium leading-6 text-[var(--text-strong)] outline-none transition-all duration-200 placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
           />
           <div className="mt-1.5 flex items-start justify-between gap-3">
-            <p className="min-h-6 text-sm font-bold text-[#a24439]" role="alert">
+            <p className="min-h-6 text-xs font-bold text-[var(--danger-text)]" role="alert">
               {error}
             </p>
-            <span className="shrink-0 text-sm font-bold text-[#87766b]">
+            <span className="shrink-0 font-mono text-xs font-bold tabular-nums tracking-tight text-[var(--text-muted)]">
               {message.length}/500
             </span>
           </div>
         </div>
 
-        <p className="rounded-2xl bg-[#edf7f9] px-4 py-3 text-[15px] font-bold leading-6 text-[#4c7079]">
+        <p className="border-l-2 border-[var(--info-text)] bg-[var(--info-surface)] px-4 py-3 text-xs font-medium leading-5 text-[var(--info-text)]">
           문의는 담당 운영자에게만 전달되며, 답변은 상담 페이지의 상품 대화에서 확인할 수 있습니다.
         </p>
 
@@ -106,7 +107,7 @@ export default function ProductInquiryModal({
             variant="ghost"
             disabled={isSending}
             onClick={closeModal}
-            className="min-h-14 text-[17px] font-black"
+            className="min-h-12 rounded-lg text-sm font-bold transition-all duration-200 ease-out hover:scale-[1.02]"
           >
             취소
           </Button>
@@ -115,7 +116,7 @@ export default function ProductInquiryModal({
             fullWidth
             size="lg"
             isLoading={isSending}
-            className="min-h-14 text-[17px] font-black"
+            className="min-h-12 rounded-lg text-sm font-black transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-lg"
           >
             보내기
           </Button>

@@ -133,3 +133,23 @@ test("uses a fresh verified owner bearer for every owner API request", async () 
   assert.match(address, /owner_upsert_hidden_test_shipping_address/);
   assert.match(shipping, /owner_request_hidden_test_shipping/);
 });
+
+test("uses isolated realtime topics for concurrent product consumers", async () => {
+  const [productsHook, soldHook, realtime] = await Promise.all([
+    source("src/hooks/useSupabaseProducts.ts"),
+    source("src/hooks/usePublicSoldAuctions.ts"),
+    source("src/lib/supabase/realtime.ts"),
+  ]);
+
+  assert.match(
+    productsHook,
+    /channel\(createRealtimeChannelName\("products-feed"\)\)/,
+  );
+  assert.match(
+    soldHook,
+    /channel\(createRealtimeChannelName\("public-sold-auctions"\)\)/,
+  );
+  assert.doesNotMatch(productsHook, /\.channel\("products-feed"\)/);
+  assert.doesNotMatch(soldHook, /\.channel\("public-sold-auctions"\)/);
+  assert.match(realtime, /globalThis\.crypto\?\.randomUUID/);
+});

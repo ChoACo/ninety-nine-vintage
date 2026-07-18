@@ -10,6 +10,7 @@ import {
 import type { AuctionPost } from "@/src/types/auction";
 import { getSupabaseBrowserClient } from "@/src/lib/supabase/client";
 import { fetchPublishedProducts } from "@/src/lib/supabase/products";
+import { createRealtimeChannelName } from "@/src/lib/supabase/realtime";
 
 export interface SupabaseProductsState {
   posts: AuctionPost[];
@@ -67,7 +68,7 @@ export function useSupabaseProducts(): SupabaseProductsState {
     void loadProducts(true);
 
     const channel = client
-      .channel("products-feed")
+      .channel(createRealtimeChannelName("products-feed"))
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "products" },

@@ -7,6 +7,7 @@ import {
   type PublicSoldAuction,
 } from "@/src/lib/supabase/auctionLifecycle";
 import { getSupabaseBrowserClient } from "@/src/lib/supabase/client";
+import { createRealtimeChannelName } from "@/src/lib/supabase/realtime";
 
 export interface PublicSoldAuctionsState {
   auctions: PublicSoldAuction[];
@@ -54,7 +55,7 @@ export function usePublicSoldAuctions(): PublicSoldAuctionsState {
 
     void load(true);
     const channel = client
-      .channel("public-sold-auctions")
+      .channel(createRealtimeChannelName("public-sold-auctions"))
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "products" },

@@ -21,12 +21,14 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [buying, setBuying] = useState(false);
+  const [buyNotice, setBuyNotice] = useState("");
   const bids = useBidStore((state) => state.bids);
   const currentPrice = useBidStore((state) => state.currentPrice);
   const hydrate = useBidStore((state) => state.hydrate);
   const addBid = useBidStore((state) => state.addBid);
   const receiveBid = useBidStore((state) => state.receiveBid);
   const addToCart = useCommerceStore((state) => state.addToCart);
+  const removeFromCart = useCommerceStore((state) => state.removeFromCart);
   const liked = useCommerceStore((state) => state.likedIds.includes(item.id));
   const toggleLike = useCommerceStore((state) => state.toggleLike);
   const hydrateCommerce = useCommerceStore((state) => state.hydrate);
@@ -69,12 +71,43 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
     };
   }, [item.id, receiveBid]);
 
-  const buyNow = () => {
+  const addFixedToCart = async () => {
     if (buying) return;
     setBuying(true);
-    addToCart(item.id);
-    void persistCart(item.id, true);
-    router.push("/cart");
+    setBuyNotice("");
+    try {
+      const { data } = await getSupabaseBrowserClient().auth.getSession();
+      if (!data.session?.access_token) throw new Error("카카오 로그인 후 장바구니를 이용할 수 있습니다.");
+      addToCart(item.id);
+      if (!await persistCart(item.id, true)) {
+        removeFromCart(item.id);
+        throw new Error("현재 구매할 수 없는 상품입니다.");
+      }
+      setBuyNotice("장바구니에 담았습니다.");
+    } catch (error) {
+      setBuyNotice(error instanceof Error ? error.message : "장바구니에 담지 못했습니다.");
+    } finally {
+      setBuying(false);
+    }
+  };
+
+  const buyNow = async () => {
+    if (buying) return;
+    setBuying(true);
+    setBuyNotice("");
+    try {
+      const { data } = await getSupabaseBrowserClient().auth.getSession();
+      if (!data.session?.access_token) throw new Error("카카오 로그인 후 구매할 수 있습니다.");
+      addToCart(item.id);
+      if (!await persistCart(item.id, true)) {
+        removeFromCart(item.id);
+        throw new Error("현재 구매할 수 없는 상품입니다.");
+      }
+      router.push("/cart");
+    } catch (error) {
+      setBuyNotice(error instanceof Error ? error.message : "구매 준비에 실패했습니다.");
+      setBuying(false);
+    }
   };
 
   const visibleBids = bids.length > 0 ? bids : item.bidHistory;
@@ -123,7 +156,8 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
         </div>
       </div>}
 
-      {item.saleType === "auction" ? <button className="mt-6 flex h-14 w-full items-center justify-center gap-2 bg-zinc-950 text-sm font-bold text-white transition-colors hover:bg-zinc-800" onClick={() => setModalOpen(true)} type="button"><LockKeyhole size={15} /> 실시간 경매 입찰하기</button> : <div className="mt-6 grid grid-cols-2 gap-2"><button className="flex h-14 items-center justify-center gap-2 border border-zinc-950 text-sm font-bold text-zinc-950" onClick={() => { addToCart(item.id); void persistCart(item.id, true); }} type="button"><ShoppingBag size={15} /> 장바구니</button><button className="flex h-14 items-center justify-center bg-zinc-950 text-sm font-bold text-white disabled:opacity-50" disabled={buying} onClick={buyNow} type="button">{buying ? "장바구니 준비 중..." : "바로 구매"}</button></div>}
+      {item.saleType === "auction" ? <button className="mt-6 flex h-14 w-full items-center justify-center gap-2 bg-zinc-950 text-sm font-bold text-white transition-colors hover:bg-zinc-800" onClick={() => setModalOpen(true)} type="button"><LockKeyhole size={15} /> 실시간 경매 입찰하기</button> : <div className="mt-6 grid grid-cols-2 gap-2"><button className="flex h-14 items-center justify-center gap-2 border border-zinc-950 text-sm font-bold text-zinc-950 disabled:opacity-50" disabled={buying} onClick={() => void addFixedToCart()} type="button"><ShoppingBag size={15} /> 장바구니</button><button className="flex h-14 items-center justify-center bg-zinc-950 text-sm font-bold text-white disabled:opacity-50" disabled={buying} onClick={() => void buyNow()} type="button">{buying ? "장바구니 준비 중..." : "바로 구매"}</button></div>}
+      {buyNotice && <p aria-live="polite" className="mt-3 text-xs font-bold text-emerald-700">{buyNotice}</p>}
       <button className="mt-2 flex h-12 w-full items-center justify-center gap-2 border border-zinc-200 text-xs font-bold text-zinc-950 transition-colors hover:border-zinc-950" onClick={() => { const nextLiked = !liked; toggleLike(item.id); void persistWishlist(item.id, nextLiked); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} /> {liked ? "찜 해제" : "관심 상품 담기"}</button>
       {item.saleType === "auction" && <SettlementActions productId={item.id} />}
       {item.saleType === "auction" && <BidModal currentPrice={displayPrice} key={`${modalOpen}-${displayPrice}`} onClose={() => setModalOpen(false)} onSubmit={addBid} open={modalOpen} />}

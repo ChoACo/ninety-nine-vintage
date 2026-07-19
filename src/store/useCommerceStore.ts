@@ -46,13 +46,21 @@ export const useCommerceStore = create<CommerceState>((set, get) => ({
     try {
       const { data } = await getSupabaseBrowserClient().auth.getSession();
       const token = data.session?.access_token;
-      if (!token) { set({ serverInitialized: false }); return; }
+      if (!token) {
+        set({ serverInitialized: false, cartIds: [], likedIds: [] });
+        save([], []);
+        return;
+      }
       const headers = { Authorization: `Bearer ${token}` };
       const [cartResponse, wishlistResponse] = await Promise.all([
         fetch("/api/cart", { headers, cache: "no-store" }),
         fetch("/api/wishlist", { headers, cache: "no-store" }),
       ]);
-      if (!cartResponse.ok || !wishlistResponse.ok) return;
+      if (!cartResponse.ok || !wishlistResponse.ok) {
+        set({ serverInitialized: false, cartIds: [], likedIds: [] });
+        save([], []);
+        return;
+      }
       const cartPayload = await cartResponse.json() as { productIds?: string[] };
       const wishlistPayload = await wishlistResponse.json() as { productIds?: string[] };
       const local = get();

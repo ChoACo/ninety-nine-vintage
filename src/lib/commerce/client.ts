@@ -17,17 +17,19 @@ export async function persistWishlist(productId: string, liked: boolean) {
   }
 }
 
-export async function persistCart(productId: string, inCart: boolean) {
+export async function persistCart(productId: string, inCart: boolean): Promise<boolean> {
   try {
     const { data } = await getSupabaseBrowserClient().auth.getSession();
     const token = data.session?.access_token;
-    if (!token) return;
-    await fetch("/api/cart", {
+    if (!token) return false;
+    const response = await fetch("/api/cart", {
       method: inCart ? "POST" : "DELETE",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ productId }),
     });
+    return response.ok;
   } catch {
     // The local store remains a temporary presentation cache until login.
+    return false;
   }
 }

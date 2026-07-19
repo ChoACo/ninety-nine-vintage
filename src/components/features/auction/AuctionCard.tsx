@@ -19,8 +19,10 @@ export function AuctionCard({ item }: AuctionCardProps) {
   const toggleLike = useCommerceStore((state) => state.toggleLike);
   const hydrate = useCommerceStore((state) => state.hydrate);
   const addToCart = useCommerceStore((state) => state.addToCart);
+  const removeFromCart = useCommerceStore((state) => state.removeFromCart);
   const [bidOpen, setBidOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [cartBusy, setCartBusy] = useState(false);
   useEffect(() => hydrate(), [hydrate]);
   const quickBid = async (amount: number) => {
     const { data } = await getSupabaseBrowserClient().auth.getSession();
@@ -30,7 +32,25 @@ export function AuctionCard({ item }: AuctionCardProps) {
     if (!response.ok) throw new Error(payload.error ?? "입찰을 저장하지 못했습니다.");
     setActionMessage("입찰이 완료되었습니다.");
   };
-  const addFixedToCart = () => { addToCart(item.id); void persistCart(item.id, true); setActionMessage("장바구니에 담았습니다."); };
+  const addFixedToCart = async () => {
+    if (cartBusy) return;
+    setCartBusy(true);
+    setActionMessage("");
+    try {
+      const { data } = await getSupabaseBrowserClient().auth.getSession();
+      if (!data.session?.access_token) throw new Error("카카오 로그인 후 장바구니를 이용할 수 있습니다.");
+      addToCart(item.id);
+      if (!await persistCart(item.id, true)) {
+        removeFromCart(item.id);
+        throw new Error("현재 구매할 수 없는 상품입니다.");
+      }
+      setActionMessage("장바구니에 담았습니다.");
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "장바구니에 담지 못했습니다.");
+    } finally {
+      setCartBusy(false);
+    }
+  };
   return (
     <article className="group min-w-0">
       <Link className="block" href={`/auction/${item.id}`}>
@@ -52,7 +72,7 @@ export function AuctionCard({ item }: AuctionCardProps) {
           <p className="text-[10px] text-muted">{isFixed ? "즉시 구매" : `입찰 ${item.bidCount}건`}</p>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2">
-          {isFixed ? <><button className="flex h-9 items-center justify-center gap-1 border border-line text-[10px] font-bold transition-colors hover:border-ink" onClick={(event) => { event.preventDefault(); addFixedToCart(); }} type="button"><ShoppingBag size={13} /> 장바구니</button><Link className="flex h-9 items-center justify-center bg-ink text-[10px] font-bold text-paper" href={`/auction/${item.id}`}>바로 구매</Link></> : <><button className="flex h-9 items-center justify-center gap-1 bg-ink text-[10px] font-bold text-paper" onClick={(event) => { event.preventDefault(); setBidOpen(true); }} type="button"><Gavel size={13} /> 간편 입찰</button><button className="flex h-9 cursor-not-allowed items-center justify-center gap-1 border border-line text-[10px] font-bold text-muted" disabled title="경매 상품은 장바구니에 담을 수 없습니다." type="button"><ShoppingBag size={13} /> 장바구니</button></>}
+          {isFixed ? <><button className="flex h-9 items-center justify-center gap-1 border border-line text-[10px] font-bold transition-colors hover:border-ink disabled:opacity-50" disabled={cartBusy} onClick={(event) => { event.preventDefault(); void addFixedToCart(); }} type="button"><ShoppingBag size={13} /> {cartBusy ? "저장 중" : "장바구니"}</button><Link className="flex h-9 items-center justify-center bg-ink text-[10px] font-bold text-paper" href={`/auction/${item.id}`}>바로 구매</Link></> : <><button className="flex h-9 items-center justify-center gap-1 bg-ink text-[10px] font-bold text-paper" onClick={(event) => { event.preventDefault(); setBidOpen(true); }} type="button"><Gavel size={13} /> 간편 입찰</button><button className="flex h-9 cursor-not-allowed items-center justify-center gap-1 border border-line text-[10px] font-bold text-muted" disabled title="경매 상품은 장바구니에 담을 수 없습니다." type="button"><ShoppingBag size={13} /> 장바구니</button></>}
         </div>
         {actionMessage && <p aria-live="polite" className="mt-2 text-[10px] font-bold text-emerald-700">{actionMessage}</p>}
       </div>

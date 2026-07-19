@@ -73,6 +73,7 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
   const [error, setError] = useState("");
 
   const lastRouteQuery = useRef(routeQuery);
+  const realtimeRefreshTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (routeQuery === lastRouteQuery.current) return;
@@ -139,10 +140,19 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
         const productId = typeof row.product_id === "string" ? row.product_id : "";
         const amount = typeof row.amount === "number" ? row.amount : Number(row.amount);
         if (!productId || !Number.isSafeInteger(amount)) return;
-        setProducts((current) => current.map((product) => product.id === productId ? { ...product, currentPrice: Math.max(product.currentPrice, amount), bidHistory: [...product.bidHistory, row] } : product));
+        setProducts((current) => current.map((product) => product.id === productId ? { ...product, currentPrice: Math.max(product.currentPrice, amount) } : product));
+        if (realtimeRefreshTimer.current !== null) window.clearTimeout(realtimeRefreshTimer.current);
+        realtimeRefreshTimer.current = window.setTimeout(() => {
+          realtimeRefreshTimer.current = null;
+          setRefreshNonce((value) => value + 1);
+        }, 800);
       })
       .subscribe();
-    return () => { void client.removeChannel(channel); };
+    return () => {
+      if (realtimeRefreshTimer.current !== null) window.clearTimeout(realtimeRefreshTimer.current);
+      realtimeRefreshTimer.current = null;
+      void client.removeChannel(channel);
+    };
   }, [saleType]);
 
   useEffect(() => {

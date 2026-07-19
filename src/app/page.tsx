@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight, Clock3 } from "lucide-react";
 import { ProductRail } from "@/components/features/catalog/ProductRail";
-import { getCatalogImageUrl } from "@/lib/images";
+import { CatalogImage } from "@/components/ui/CatalogImage";
 import { fetchPublishedProducts } from "@/services/products";
 import { fetchActiveStores } from "@/services/stores";
 
@@ -34,7 +34,7 @@ export default async function Home() {
           </div>
         </div>
         <div className="relative min-h-[360px] bg-[#c7b9a5] lg:min-h-0">
-          {feature?.imageUrls[0] ? <img alt={feature.title} className="h-full w-full object-cover mix-blend-multiply" decoding="async" fetchPriority="high" src={getCatalogImageUrl(feature.imageUrls[0])} /> : <div className="grid h-full place-items-center text-ink/60"><span className="eyebrow">NEW DROP SOON</span></div>}
+          {feature?.imageUrls[0] ? <CatalogImage alt={feature.title} className="h-full w-full object-cover mix-blend-multiply" decoding="async" fetchPriority="high" src={feature.imageUrls[0]} /> : <div className="grid h-full place-items-center text-ink/60"><span className="eyebrow">NEW DROP SOON</span></div>}
           <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between text-ink">
             <div><p className="eyebrow">{feature ? (feature.saleType === "fixed" ? "BUY NOW" : "LIVE") + " / LIVE CATALOG" : "CATALOG / PREPARING"}</p><p className="mt-2 text-sm font-bold">{feature?.title ?? "새로운 상품을 준비 중입니다"}</p></div>
             <span className="grid size-12 place-items-center rounded-full border border-ink"><ArrowDownRight size={18} /></span>

@@ -11,9 +11,10 @@ interface CommerceState {
   addToCart: (id: string) => void;
   removeFromCart: (id: string) => void;
   clearCart: () => void;
+  replaceCart: (ids: string[]) => void;
 }
 
-const KEY = "ninetynine-commerce-demo";
+const KEY = "ninetynine-commerce-cache";
 const save = (likedIds: string[], cartIds: string[]) => {
   if (typeof window !== "undefined") window.localStorage.setItem(KEY, JSON.stringify({ likedIds, cartIds }));
 };
@@ -40,5 +41,5 @@ export const useCommerceStore = create<CommerceState>((set, get) => ({
     set({ cartIds }); save(get().likedIds, cartIds);
   },
   clearCart: () => { set({ cartIds: [] }); save(get().likedIds, []); },
+  replaceCart: (ids) => { const cartIds = [...new Set(ids)]; set({ cartIds }); save(get().likedIds, cartIds); },
 }));
-

@@ -16,3 +16,18 @@ export async function persistWishlist(productId: string, liked: boolean) {
     // Local storage remains available as an offline guest presentation cache.
   }
 }
+
+export async function persistCart(productId: string, inCart: boolean) {
+  try {
+    const { data } = await getSupabaseBrowserClient().auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return;
+    await fetch("/api/cart", {
+      method: inCart ? "POST" : "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ productId }),
+    });
+  } catch {
+    // The local store remains a temporary presentation cache until login.
+  }
+}

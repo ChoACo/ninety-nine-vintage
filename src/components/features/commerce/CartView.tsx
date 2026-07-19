@@ -146,6 +146,7 @@ export function CartView() {
   const clear = () => {
     products.forEach((product) => void persistCart(product.id, false));
     clearCart();
+    setMessage("");
   };
 
   return <div className="space-y-10">

@@ -1,7 +1,7 @@
 "use client";
 
 import { Search, SlidersHorizontal } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ProductSaleType } from "@/types/auction";
 import { AuctionCard } from "@/components/features/auction/AuctionCard";
@@ -63,7 +63,7 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
   const routeSearchParams = useSearchParams();
   const routeQuery = routeSearchParams.get("q") ?? "";
   const [products, setProducts] = useState<ProductPayload[]>([]);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(routeQuery);
   const [sort, setSort] = useState<"latest" | "ending" | "price_asc" | "price_desc">(saleType === "fixed" ? "latest" : "ending");
   const [filters, setFilters] = useState<CatalogFilters>({ sizes: [], categories: [], liveOnly: true, closingOnly: false, sort: saleType === "fixed" ? "latest" : "ending" });
   const [now, setNow] = useState(0);
@@ -71,9 +71,12 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const lastRouteQuery = useRef(routeQuery);
+
   useEffect(() => {
-    const task = window.setTimeout(() => setQuery(routeQuery), 0);
-    return () => window.clearTimeout(task);
+    if (routeQuery === lastRouteQuery.current) return;
+    lastRouteQuery.current = routeQuery;
+    setQuery(routeQuery);
   }, [routeQuery]);
 
   useEffect(() => {
@@ -102,7 +105,7 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
   useEffect(() => {
     const updateNow = () => setNow(Date.now());
     updateNow();
-    const interval = window.setInterval(updateNow, 60_000);
+    const interval = window.setInterval(updateNow, 1_000);
     return () => window.clearInterval(interval);
   }, []);
 

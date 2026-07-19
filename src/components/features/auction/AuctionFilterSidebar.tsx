@@ -4,27 +4,21 @@ import { RotateCcw } from "lucide-react";
 import { useState } from "react";
 
 const sizes = ["S", "M", "L", "XL", "FREE"];
-const categories = ["Outer", "Top", "Bottom", "Acc"];
+const categories = ["구제 의류"];
+type Sort = "latest" | "ending" | "price_asc" | "price_desc";
+interface CatalogFilters { sizes: string[]; categories: string[]; liveOnly: boolean; closingOnly: boolean; sort: Sort; }
 
 export function AuctionFilterSidebar() {
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [liveOnly, setLiveOnly] = useState(true);
   const [closingOnly, setClosingOnly] = useState(false);
-
-  const toggleValue = (
-    value: string,
-    values: string[],
-    setValues: (next: string[]) => void,
-  ) => {
-    setValues(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
-  };
+  const [selectedSort, setSelectedSort] = useState<Sort>("ending");
+  const notify = (next: CatalogFilters) => window.dispatchEvent(new CustomEvent<CatalogFilters>("catalog-filters", { detail: next }));
 
   const resetFilters = () => {
-    setSelectedSizes([]);
-    setSelectedCategories([]);
-    setLiveOnly(true);
-    setClosingOnly(false);
+    setSelectedSizes([]); setSelectedCategories([]); setLiveOnly(true); setClosingOnly(false); setSelectedSort("ending");
+    notify({ sizes: [], categories: [], liveOnly: true, closingOnly: false, sort: "ending" });
   };
 
   return (
@@ -39,9 +33,9 @@ export function AuctionFilterSidebar() {
       <section className="border-b border-zinc-200 py-5">
         <h3 className="mb-4 text-xs font-bold">정렬</h3>
         <div className="space-y-3 text-xs text-zinc-600">
-          {["마감 임박순", "최신 등록순", "현재 입찰가 높은순", "현재 입찰가 낮은순"].map((label, index) => (
+          {[["마감 임박순", "ending"], ["최신 등록순", "latest"], ["현재 입찰가 높은순", "price_desc"], ["현재 입찰가 낮은순", "price_asc"]].map(([label, value]) => (
             <label className="flex cursor-pointer items-center gap-2 hover:text-zinc-950" key={label}>
-              <input className="accent-zinc-950" defaultChecked={index === 0} name="sort" type="radio" />
+              <input checked={selectedSort === value} className="accent-zinc-950" name="sort" onChange={() => { const nextSort = value as Sort; setSelectedSort(nextSort); notify({ sizes: selectedSizes, categories: selectedCategories, liveOnly, closingOnly, sort: nextSort }); }} type="radio" />
               {label}
             </label>
           ))}
@@ -54,7 +48,7 @@ export function AuctionFilterSidebar() {
           {sizes.map((size) => {
             const selected = selectedSizes.includes(size);
             return (
-              <button className={`h-8 border text-[11px] transition-colors ${selected ? "border-zinc-950 bg-zinc-950 text-white" : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-950 hover:text-zinc-950"}`} key={size} onClick={() => toggleValue(size, selectedSizes, setSelectedSizes)} type="button">
+              <button className={`h-8 border text-[11px] transition-colors ${selected ? "border-zinc-950 bg-zinc-950 text-white" : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-950 hover:text-zinc-950"}`} key={size} onClick={() => { const next = selected ? selectedSizes.filter((item) => item !== size) : [...selectedSizes, size]; setSelectedSizes(next); notify({ sizes: next, categories: selectedCategories, liveOnly, closingOnly, sort: selectedSort }); }} type="button">
                 {size}
               </button>
             );
@@ -67,7 +61,7 @@ export function AuctionFilterSidebar() {
         <div className="space-y-3 text-xs text-zinc-600">
           {categories.map((category) => (
             <label className="flex cursor-pointer items-center gap-2 hover:text-zinc-950" key={category}>
-              <input checked={selectedCategories.includes(category)} className="accent-zinc-950" onChange={() => toggleValue(category, selectedCategories, setSelectedCategories)} type="checkbox" />
+              <input checked={selectedCategories.includes(category)} className="accent-zinc-950" onChange={() => { const next = selectedCategories.includes(category) ? selectedCategories.filter((item) => item !== category) : [...selectedCategories, category]; setSelectedCategories(next); notify({ sizes: selectedSizes, categories: next, liveOnly, closingOnly, sort: selectedSort }); }} type="checkbox" />
               {category}
             </label>
           ))}
@@ -78,11 +72,11 @@ export function AuctionFilterSidebar() {
         <h3 className="mb-4 text-xs font-bold">경매 상태</h3>
         <div className="space-y-3 text-xs text-zinc-600">
           <label className="flex cursor-pointer items-center gap-2 hover:text-zinc-950">
-            <input checked={liveOnly} className="accent-zinc-950" onChange={(event) => setLiveOnly(event.target.checked)} type="checkbox" />
+            <input checked={liveOnly} className="accent-zinc-950" onChange={(event) => { setLiveOnly(event.target.checked); notify({ sizes: selectedSizes, categories: selectedCategories, liveOnly: event.target.checked, closingOnly, sort: selectedSort }); }} type="checkbox" />
             <span className="text-emerald-500">●</span> LIVE DROP (진행중)
           </label>
           <label className="flex cursor-pointer items-center gap-2 hover:text-zinc-950">
-            <input checked={closingOnly} className="accent-zinc-950" onChange={(event) => setClosingOnly(event.target.checked)} type="checkbox" />
+            <input checked={closingOnly} className="accent-zinc-950" onChange={(event) => { setClosingOnly(event.target.checked); notify({ sizes: selectedSizes, categories: selectedCategories, liveOnly, closingOnly: event.target.checked, sort: selectedSort }); }} type="checkbox" />
             <span className="text-amber-500">●</span> CLOSING SOON (마감 임박)
           </label>
         </div>

@@ -21,6 +21,15 @@ interface ProductPayload {
   participantCount: number;
   imageUrls: string[];
   thumbnailUrls: string[];
+  sizeLabel: string;
+}
+
+interface CatalogFilters {
+  sizes: string[];
+  categories: string[];
+  liveOnly: boolean;
+  closingOnly: boolean;
+  sort: "latest" | "ending" | "price_asc" | "price_desc";
 }
 
 interface AuctionFeedGridProps {
@@ -38,8 +47,10 @@ function remainingLabel(closesAt: string) {
 
 export function AuctionFeedGrid({ className = "", saleType = "auction", title }: AuctionFeedGridProps) {
   const [products, setProducts] = useState<ProductPayload[]>([]);
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<"latest" | "ending" | "price_asc" | "price_desc">("latest");
+  const [query, setQuery] = useState(() => (typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("q") ?? ""));
+  const [sort, setSort] = useState<"latest" | "ending" | "price_asc" | "price_desc">("ending");
+  const [filters, setFilters] = useState<CatalogFilters>({ sizes: [], categories: [], liveOnly: true, closingOnly: false, sort: "ending" });
+  const [now, setNow] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -54,6 +65,24 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
     window.addEventListener("scroll", save, { passive: true });
     return () => window.removeEventListener("scroll", save);
   }, [saleType]);
+
+  useEffect(() => {
+    const receiveFilters = (event: Event) => {
+      const next = (event as CustomEvent<CatalogFilters>).detail;
+      if (!next) return;
+      setFilters(next);
+      setSort(next.sort);
+    };
+    window.addEventListener("catalog-filters", receiveFilters);
+    return () => window.removeEventListener("catalog-filters", receiveFilters);
+  }, []);
+
+  useEffect(() => {
+    const updateNow = () => setNow(Date.now());
+    updateNow();
+    const interval = window.setInterval(updateNow, 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -92,8 +121,18 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
     closesAt: product.closesAt,
     publishAt: product.publishAt,
     bidIncrement: product.bidIncrement,
-    timeLeft: remainingLabel(product.closesAt),
-  })), [products]);
+    sizeLabel: product.sizeLabel,
+    timeLeft: saleType === "fixed" ? "IN STOCK" : remainingLabel(product.closesAt),
+  })), [products, saleType]);
+
+  const visibleCards = useMemo(() => cards.filter((card) => {
+    const sizeMatch = filters.sizes.length === 0 || filters.sizes.includes(card.sizeLabel);
+    const categoryMatch = filters.categories.length === 0 || filters.categories.includes(card.category);
+    const closesAt = new Date(card.closesAt).getTime();
+    const liveMatch = !filters.liveOnly || saleType === "fixed" || !now || closesAt > now;
+    const closingMatch = !filters.closingOnly || (saleType === "auction" && (!now || (closesAt > now && closesAt <= now + 3 * 60 * 60 * 1000)));
+    return sizeMatch && categoryMatch && liveMatch && closingMatch;
+  }), [cards, filters, now, saleType]);
 
   return (
     <section className={`min-w-0 ${className}`}>
@@ -103,7 +142,7 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
             <p className="mb-2 text-[11px] font-bold tracking-[0.14em] text-muted">{saleType === "fixed" ? "SHOP / BUY NOW" : "LIVE AUCTION / 21:00 KST CLOSE"}</p>
             <h1 className="text-2xl font-black tracking-[-0.05em]">{title ?? (saleType === "fixed" ? "상시 바로구매" : "LIVE DROP")}</h1>
           </div>
-          <span className="font-mono text-xs font-bold tabular-nums text-muted">{loading ? "—" : `${cards.length} ITEMS`}</span>
+          <span className="font-mono text-xs font-bold tabular-nums text-muted">{loading ? "—" : `${visibleCards.length} ITEMS`}</span>
         </div>
         <div className="mt-5 flex flex-col gap-2 sm:flex-row">
           <label className="flex h-11 min-w-0 flex-1 items-center gap-2 border border-line bg-surface px-3 focus-within:border-ink">
@@ -124,8 +163,8 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
 
       {error && <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {loading && <div className="grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{Array.from({ length: 10 }).map((_, index) => <div aria-hidden="true" className="aspect-[4/5] animate-pulse bg-surface" key={index} />)}</div>}
-      {!loading && !error && cards.length === 0 && <div className="grid min-h-64 place-items-center border border-dashed border-line px-6 text-center"><div><p className="text-sm font-bold">현재 공개된 상품이 없습니다.</p><p className="mt-2 text-xs text-muted">새로운 드롭이 준비되면 이곳에 표시됩니다.</p></div></div>}
-      {!loading && cards.length > 0 && <div className="grid grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3 lg:grid-cols-4 lg:gap-x-5 xl:grid-cols-5">{cards.map((item) => <AuctionCard item={item} key={item.id} />)}</div>}
+      {!loading && !error && visibleCards.length === 0 && <div className="grid min-h-64 place-items-center border border-dashed border-line px-6 text-center"><div><p className="text-sm font-bold">현재 조건에 맞는 상품이 없습니다.</p><p className="mt-2 text-xs text-muted">필터를 초기화하거나 새로운 드롭을 기다려 주세요.</p></div></div>}
+      {!loading && visibleCards.length > 0 && <div className="grid grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3 lg:grid-cols-4 lg:gap-x-5 xl:grid-cols-5">{visibleCards.map((item) => <AuctionCard item={item} key={item.id} />)}</div>}
     </section>
   );
 }

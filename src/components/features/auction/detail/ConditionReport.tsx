@@ -6,11 +6,12 @@ interface ConditionReportProps {
 }
 
 export function ConditionReport({ item }: ConditionReportProps) {
+  const formatMeasurement = (value: number) => value > 0 ? `${value} cm` : "미등록";
   const rows = [
-    ["어깨", `${item.measurements.shoulder} cm`],
-    ["가슴", `${item.measurements.chest} cm`],
-    ["소매", `${item.measurements.sleeve} cm`],
-    ["총장", `${item.measurements.length} cm`],
+    ["어깨", formatMeasurement(item.measurements.shoulder)],
+    ["가슴", formatMeasurement(item.measurements.chest)],
+    ["소매", formatMeasurement(item.measurements.sleeve)],
+    ["총장", formatMeasurement(item.measurements.length)],
   ];
 
   return (
@@ -38,7 +39,7 @@ export function ConditionReport({ item }: ConditionReportProps) {
         <div className="border border-zinc-200 bg-zinc-50 p-5">
           <h3 className="mb-3 text-xs font-bold">사용감 및 하자 안내</h3>
           <ul className="space-y-3 text-xs leading-5 text-zinc-600">
-            {item.inspectionNotes.map((note) => <li className="border-l-2 border-zinc-300 pl-3" key={note}>{note}</li>)}
+            {item.inspectionNotes.length > 0 ? item.inspectionNotes.map((note) => <li className="border-l-2 border-zinc-300 pl-3" key={note}>{note}</li>) : <li className="border-l-2 border-zinc-300 pl-3">특이사항 없음</li>}
           </ul>
         </div>
       </div>

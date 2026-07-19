@@ -1,6 +1,7 @@
 "use client";
 
 import { Heart, LockKeyhole, ShoppingBag } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuctionTimer } from "@/hooks/useAuctionTimer";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -17,6 +18,7 @@ interface StickyBidPanelProps {
 
 export function StickyBidPanel({ item }: StickyBidPanelProps) {
   const { timeLeft } = useAuctionTimer();
+  const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const bids = useBidStore((state) => state.bids);
   const currentPrice = useBidStore((state) => state.currentPrice);
@@ -79,12 +81,12 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
             <p className="mb-2 text-xs text-zinc-500">{item.saleType === "fixed" ? "판매 정가" : "현재 최고 입찰가"}</p>
             <p className="font-mono text-3xl font-bold tracking-[-0.04em]">{displayPrice.toLocaleString("ko-KR")} <span className="text-base">KRW</span></p>
           </div>
-          <p className="text-xs text-zinc-500">입찰 {item.bidCount}건</p>
+          <p className="text-xs text-zinc-500">{item.saleType === "fixed" ? "즉시 구매 가능" : `입찰 ${item.bidCount}건`}</p>
         </div>
         <div className="mt-5 flex gap-2 text-[11px] text-zinc-600">
-          <span className="border border-zinc-200 px-3 py-2">어깨 {item.measurements.shoulder}</span>
-          <span className="border border-zinc-200 px-3 py-2">가슴 {item.measurements.chest}</span>
-          <span className="border border-zinc-200 px-3 py-2">총장 {item.measurements.length}</span>
+          <span className="border border-zinc-200 px-3 py-2">어깨 {item.measurements.shoulder > 0 ? item.measurements.shoulder : "미등록"}</span>
+          <span className="border border-zinc-200 px-3 py-2">가슴 {item.measurements.chest > 0 ? item.measurements.chest : "미등록"}</span>
+          <span className="border border-zinc-200 px-3 py-2">총장 {item.measurements.length > 0 ? item.measurements.length : "미등록"}</span>
         </div>
       </div>
 
@@ -112,7 +114,7 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
         </div>
       </div>}
 
-      {item.saleType === "auction" ? <button className="mt-6 flex h-14 w-full items-center justify-center gap-2 bg-zinc-950 text-sm font-bold text-white transition-colors hover:bg-zinc-800" onClick={() => setModalOpen(true)} type="button"><LockKeyhole size={15} /> 실시간 경매 입찰하기</button> : <button className="mt-6 flex h-14 w-full items-center justify-center gap-2 bg-zinc-950 text-sm font-bold text-white transition-colors hover:bg-zinc-800" onClick={() => { addToCart(item.id); void persistCart(item.id, true); }} type="button"><ShoppingBag size={15} /> 장바구니에 담기</button>}
+      {item.saleType === "auction" ? <button className="mt-6 flex h-14 w-full items-center justify-center gap-2 bg-zinc-950 text-sm font-bold text-white transition-colors hover:bg-zinc-800" onClick={() => setModalOpen(true)} type="button"><LockKeyhole size={15} /> 실시간 경매 입찰하기</button> : <div className="mt-6 grid grid-cols-2 gap-2"><button className="flex h-14 items-center justify-center gap-2 border border-zinc-950 text-sm font-bold text-zinc-950" onClick={() => { addToCart(item.id); void persistCart(item.id, true); }} type="button"><ShoppingBag size={15} /> 장바구니</button><button className="flex h-14 items-center justify-center bg-zinc-950 text-sm font-bold text-white" onClick={() => { addToCart(item.id); void persistCart(item.id, true); router.push("/cart"); }} type="button">바로 구매</button></div>}
       <button className="mt-2 flex h-12 w-full items-center justify-center gap-2 border border-zinc-200 text-xs font-bold text-zinc-950 transition-colors hover:border-zinc-950" onClick={() => { const nextLiked = !liked; toggleLike(item.id); void persistWishlist(item.id, nextLiked); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} /> {liked ? "찜 해제" : "관심 상품 담기"}</button>
       {item.saleType === "auction" && <SettlementActions productId={item.id} />}
       {item.saleType === "auction" && <BidModal currentPrice={displayPrice} key={`${modalOpen}-${displayPrice}`} onClose={() => setModalOpen(false)} onSubmit={addBid} open={modalOpen} />}

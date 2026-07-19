@@ -27,6 +27,13 @@ function maskPublicBidHistory(value: Json): Json {
   });
 }
 
+function resolveSizeLabel(title: string, sizeLabel: string | null): string {
+  const value = sizeLabel?.trim();
+  if (value) return value;
+  const match = title.match(/^\[([^\]]+)\]/);
+  return match?.[1]?.trim() ?? "";
+}
+
 export interface PublishedProduct {
   id: string;
   title: string;
@@ -78,7 +85,7 @@ export function mapPublishedProduct(row: ProductRow): PublishedProduct {
     updatedAt: row.updated_at,
     storeId: row.store_id,
     storageClass: row.storage_class === "large" ? "large" : "small",
-    sizeLabel: row.size_label,
+    sizeLabel: resolveSizeLabel(row.title, row.size_label),
     conditionGrade: ["S", "A+", "A", "B"].includes(row.condition_grade) ? row.condition_grade as "S" | "A+" | "A" | "B" : "A",
     measurements: row.measurements,
     inspectionNotes: row.inspection_notes,

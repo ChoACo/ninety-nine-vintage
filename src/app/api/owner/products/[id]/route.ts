@@ -15,7 +15,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (typeof body.status === "string" && ["pending", "active", "closed"].includes(body.status)) update.status = body.status;
   if (typeof body.saleType === "string" && ["auction", "fixed"].includes(body.saleType)) update.sale_type = body.saleType;
   if (typeof body.price === "number" && Number.isSafeInteger(body.price) && body.price > 0) { update.current_price = body.price; update.starting_price = body.price; if (update.sale_type === "fixed" || body.saleType === "fixed") update.fixed_price = body.price; }
-  if (Array.isArray(body.imageUrls)) update.image_urls = body.imageUrls.filter((item): item is string => typeof item === "string" && item.startsWith("http"));
+  if (Array.isArray(body.imageUrls)) {
+    const imageUrls = body.imageUrls.filter((item): item is string => typeof item === "string" && item.startsWith("http"));
+    update.image_urls = imageUrls;
+    update.thumbnail_urls = imageUrls;
+  }
   if (Array.isArray(body.inspectionNotes)) update.inspection_notes = body.inspectionNotes.filter((item): item is string => typeof item === "string");
   if (body.measurements && typeof body.measurements === "object") update.measurements = body.measurements as Json;
   if (typeof body.sizeLabel === "string") update.size_label = text(body.sizeLabel);

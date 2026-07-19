@@ -82,9 +82,9 @@ function mapPublishedProductToDetail(product: Awaited<ReturnType<typeof fetchPub
     currentBid: product.currentPrice,
     fixedPrice: product.saleType === "fixed" ? product.currentPrice : null,
     bidCount: product.participantCount,
-    status: product.status,
+    status: product.status === "pending" || product.status === "closed" ? product.status : "active",
     bidHistory,
-    saleType: product.saleType,
+    saleType: product.saleType === "fixed" ? "fixed" : "auction",
   };
 }
 

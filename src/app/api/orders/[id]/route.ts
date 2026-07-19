@@ -1,7 +1,16 @@
-import { DEMO_PRODUCTS } from "@/lib/catalog";
+import { authenticateCommerceRequest, commerceJson } from "@/lib/commerce/server";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await authenticateCommerceRequest(request);
+  if (!auth.ok) return auth.response;
   const { id } = await params;
-  return Response.json({ order: { id, status: "awaiting_payment", items: DEMO_PRODUCTS.slice(3, 5), storagePolicy: { smallDays: 14, largeDays: 7 } } }, { headers: { "Cache-Control": "no-store" } });
+  const { data, error } = await auth.admin
+    .from("commerce_orders")
+    .select("*, commerce_order_items(*, products(*), stores(*))")
+    .eq("id", id)
+    .eq("member_id", auth.userId)
+    .maybeSingle();
+  if (error) return commerceJson({ error: "order_unavailable" }, 503);
+  if (!data) return commerceJson({ error: "order_not_found" }, 404);
+  return commerceJson({ order: data, storagePolicy: { smallDays: 14, largeDays: 7 } });
 }
-

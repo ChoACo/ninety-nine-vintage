@@ -24,6 +24,7 @@ export function AccountDashboard() {
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [addressForm, setAddressForm] = useState({ label: "집", recipientName: "", phone: "", postalCode: "", address: "" });
   const [shippingMessage, setShippingMessage] = useState("");
+  const [applyShippingCredit, setApplyShippingCredit] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +59,7 @@ export function AccountDashboard() {
           setStorage(storageData.items ?? []);
           setWins(storageData.auctionWins ?? []);
           setCredits(Number(creditData.credits ?? 0));
+          setApplyShippingCredit(Number(creditData.credits ?? 0) > 0);
           setLiked(allProducts.filter((product) => ids.includes(product.id)));
           setAddresses(addressData.addresses ?? []);
           setSelectedAddressId(addressData.addresses?.find((address) => address.is_default)?.id ?? addressData.addresses?.[0]?.id ?? "");
@@ -76,7 +78,7 @@ export function AccountDashboard() {
   ] as const;
   const eligible = storage.filter((item) => item.shippingEligible);
   const saveAddress = async () => { if (!token) return; const response = await fetch("/api/account/addresses", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ ...addressForm, isDefault: addresses.length === 0 }) }); const payload = await response.json() as { address?: Address; error?: string }; if (!response.ok || !payload.address) { setShippingMessage(payload.error ?? "배송지를 저장하지 못했습니다."); return; } setAddresses((current) => [...current, payload.address as Address]); setSelectedAddressId(payload.address.id); setAddressForm({ label: "집", recipientName: "", phone: "", postalCode: "", address: "" }); setShippingMessage("배송지를 저장했습니다."); };
-  const requestShipping = async () => { if (!token || selectedIds.length === 0 || !selectedAddressId) { setShippingMessage("배송 상품과 배송지를 선택해 주세요."); return; } const response = await fetch("/api/shipping/requests", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ productIds: selectedIds, addressId: selectedAddressId }) }); const payload = await response.json() as { error?: string; request?: { id: string } }; if (!response.ok) { setShippingMessage(payload.error ?? "배송 요청을 만들지 못했습니다."); return; } setSelectedIds([]); setShippingMessage(`합배송 요청 ${payload.request?.id ?? "완료"}을 접수했습니다.`); };
+  const requestShipping = async () => { if (!token || selectedIds.length === 0 || !selectedAddressId) { setShippingMessage("배송 상품과 배송지를 선택해 주세요."); return; } const response = await fetch("/api/shipping/requests", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ productIds: selectedIds, addressId: selectedAddressId, applyShippingCredit }) }); const payload = await response.json() as { error?: string; request?: { id: string } }; if (!response.ok) { setShippingMessage(payload.error ?? "배송 요청을 만들지 못했습니다."); return; } setSelectedIds([]); setCredits((current) => applyShippingCredit ? Math.max(0, current - 1) : current); setShippingMessage(applyShippingCredit ? `합배송 요청 ${payload.request?.id ?? "완료"}을 접수했습니다. 배송 크레딧 1회를 사용했습니다.` : `합배송 요청 ${payload.request?.id ?? "완료"}을 접수했습니다. 배송비 계좌이체 안내를 준비했습니다.`); };
   const prepareShippingFee = async () => { if (!token) return; const response = await fetch("/api/shipping/credits", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({}) }); const payload = await response.json() as { payment?: { expected_amount: number; bank_name_snapshot: string; account_number_snapshot: string }; error?: string }; if (!response.ok || !payload.payment) { setShippingMessage(payload.error ?? "배송비 안내를 불러오지 못했습니다."); return; } setShippingMessage(`${payload.payment.expected_amount.toLocaleString("ko-KR")}원 · ${payload.payment.bank_name_snapshot} ${payload.payment.account_number_snapshot}로 입금해 주세요.`); };
   return <div className="space-y-14"><div className="flex flex-col justify-between gap-5 border-b border-ink pb-8 md:flex-row md:items-end"><div><p className="eyebrow text-muted">MY ACCOUNT / LIVE DATA</p><h1 className="mt-3 text-4xl font-black tracking-[-0.08em]">안녕하세요, {userName}.</h1><p className="mt-3 text-sm text-muted">나의 경매와 보관, 배송을 한 곳에서 관리하세요.</p></div>{token ? <span className="flex items-center gap-2 border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800"><UserRound size={15} /> 로그인 상태</span> : <Link className="flex items-center gap-2 border border-line px-4 py-3 text-xs font-bold" href="/api/auth/kakao/start?returnTo=%2Faccount"><LogIn size={15} /> 카카오로 로그인하기</Link>}</div>
     {!token && <div className="border border-dashed border-line bg-surface p-6 text-sm">입찰, 장바구니, 보관 상품은 카카오 로그인 후 확인할 수 있습니다.</div>}

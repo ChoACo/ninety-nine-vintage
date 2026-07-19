@@ -17,14 +17,20 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null) as { shippingRequestId?: string } | null;
   const amount = Number(process.env.SHIPPING_FEE_AMOUNT ?? "3500");
   if (!Number.isSafeInteger(amount) || amount <= 0) return commerceJson({ error: "배송비 설정이 없습니다." }, 503);
+  const { data: setting } = await auth.admin
+    .from("payment_runtime_settings")
+    .select("active_mode, bank_name, account_number")
+    .eq("singleton", true)
+    .maybeSingle();
+  if (setting?.active_mode !== "manual_transfer" || !setting.bank_name || !setting.account_number) return commerceJson({ error: "manual_transfer_unavailable" }, 503);
   const { data: payment, error } = await auth.admin
     .from("shipping_fee_payments")
     .insert({
       member_id: auth.userId,
       shipping_request_id: body?.shippingRequestId ?? null,
       expected_amount: amount,
-      bank_name_snapshot: process.env.MANUAL_TRANSFER_BANK_NAME ?? "운영자 계좌",
-      account_number_snapshot: process.env.MANUAL_TRANSFER_ACCOUNT_NUMBER ?? "운영자 문의",
+      bank_name_snapshot: setting.bank_name,
+      account_number_snapshot: setting.account_number,
     })
     .select("*")
     .single();

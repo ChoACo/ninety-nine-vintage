@@ -94,11 +94,13 @@ export function CartView() {
       const response = await fetch("/api/orders/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ productIds: products.map((product) => product.id), applyShippingCredit: true, idempotencyKey: crypto.randomUUID() }),
+        body: JSON.stringify({ productIds: products.map((product) => product.id), idempotencyKey: crypto.randomUUID() }),
       });
-      const payload = await response.json() as { order?: { id: string; total: number }; error?: string };
+      const payload = await response.json() as { order?: { id: string; total: number }; transfer?: { bank_name_snapshot: string; account_number_snapshot: string; expected_amount: number }; error?: string };
       if (!response.ok || !payload.order) throw new Error(payload.error ?? "주문을 만들지 못했습니다.");
-      setMessage(`주문 ${payload.order.id} 생성 완료 · ${payload.order.total.toLocaleString("ko-KR")}원 계좌이체 안내를 준비 중입니다.`);
+      products.forEach((product) => void persistCart(product.id, false));
+      clearCart();
+      setMessage(payload.transfer ? `주문 ${payload.order.id} 생성 완료 · ${payload.transfer.expected_amount.toLocaleString("ko-KR")}원 · ${payload.transfer.bank_name_snapshot} ${payload.transfer.account_number_snapshot}로 입금해 주세요.` : `주문 ${payload.order.id} 생성 완료 · ${payload.order.total.toLocaleString("ko-KR")}원. 계좌이체 안내를 불러오지 못해 운영자 확인이 필요합니다.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : "주문을 만들지 못했습니다."); }
     finally { setBusy(false); }
   };

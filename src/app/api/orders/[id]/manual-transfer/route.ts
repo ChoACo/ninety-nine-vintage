@@ -22,10 +22,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (existingError) return commerceJson({ error: "transfer_unavailable" }, 503);
   if (existing) return commerceJson({ transfer: existing }, 200);
 
-  const { data: settings, error: settingsError } = await auth.user.rpc("get_manual_transfer_settings");
-  if (settingsError) return commerceJson({ error: "manual_transfer_unavailable" }, 503);
-  const setting = Array.isArray(settings) ? settings[0] : settings;
-  if (!setting?.configured) return commerceJson({ error: "manual_transfer_unavailable" }, 503);
+  const { data: setting, error: settingsError } = await auth.admin
+    .from("payment_runtime_settings")
+    .select("active_mode, bank_name, account_number")
+    .eq("singleton", true)
+    .maybeSingle();
+  if (settingsError || setting?.active_mode !== "manual_transfer" || !setting.bank_name || !setting.account_number) return commerceJson({ error: "manual_transfer_unavailable" }, 503);
 
   const { data: transfer, error } = await auth.admin
     .from("commerce_order_transfers")

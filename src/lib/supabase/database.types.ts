@@ -2035,6 +2035,7 @@ export type Database = {
           confirmed_by: string | null
           expected_amount: number
           id: string
+          idempotency_key: string | null
           member_id: string
           requested_at: string
           shipping_request_id: string | null
@@ -2047,6 +2048,7 @@ export type Database = {
           confirmed_by?: string | null
           expected_amount: number
           id?: string
+          idempotency_key?: string | null
           member_id: string
           requested_at?: string
           shipping_request_id?: string | null
@@ -2059,6 +2061,7 @@ export type Database = {
           confirmed_by?: string | null
           expected_amount?: number
           id?: string
+          idempotency_key?: string | null
           member_id?: string
           requested_at?: string
           shipping_request_id?: string | null
@@ -2121,6 +2124,7 @@ export type Database = {
           courier: string | null
           created_at: string
           id: string
+          idempotency_key: string | null
           member_deleted_at: string | null
           member_id: string | null
           requested_at: string
@@ -2135,6 +2139,7 @@ export type Database = {
           courier?: string | null
           created_at?: string
           id?: string
+          idempotency_key?: string | null
           member_deleted_at?: string | null
           member_id?: string | null
           requested_at?: string
@@ -2149,6 +2154,7 @@ export type Database = {
           courier?: string | null
           created_at?: string
           id?: string
+          idempotency_key?: string | null
           member_deleted_at?: string | null
           member_id?: string | null
           requested_at?: string
@@ -3518,7 +3524,7 @@ export type Database = {
         Returns: string
       }
       request_product_shipping: {
-        Args: { p_address_id: string; p_product_ids: string[] }
+        Args: { p_address_id: string; p_apply_shipping_credit?: boolean; p_idempotency_key?: string | null; p_product_ids: string[] }
         Returns: string
       }
       request_security_log_access: {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Minus, Plus, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { persistCart } from "@/lib/commerce/client";
 import { useCommerceStore } from "@/store/useCommerceStore";
@@ -63,6 +63,7 @@ export function CartView() {
   const [liveProducts, setLiveProducts] = useState<CartProduct[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const checkoutKey = useRef<string | null>(null);
 
   useEffect(() => { hydrate(); }, [hydrate]);
   useEffect(() => {
@@ -94,12 +95,13 @@ export function CartView() {
       const response = await fetch("/api/orders/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ productIds: products.map((product) => product.id), idempotencyKey: crypto.randomUUID() }),
+        body: JSON.stringify({ productIds: products.map((product) => product.id), idempotencyKey: checkoutKey.current ?? (checkoutKey.current = crypto.randomUUID()) }),
       });
       const payload = await response.json() as { order?: { id: string; total: number }; transfer?: { bank_name_snapshot: string; account_number_snapshot: string; expected_amount: number }; error?: string };
       if (!response.ok || !payload.order) throw new Error(payload.error ?? "주문을 만들지 못했습니다.");
       products.forEach((product) => void persistCart(product.id, false));
       clearCart();
+      checkoutKey.current = null;
       setMessage(payload.transfer ? `주문 ${payload.order.id} 생성 완료 · ${payload.transfer.expected_amount.toLocaleString("ko-KR")}원 · ${payload.transfer.bank_name_snapshot} ${payload.transfer.account_number_snapshot}로 입금해 주세요.` : `주문 ${payload.order.id} 생성 완료 · ${payload.order.total.toLocaleString("ko-KR")}원. 계좌이체 안내를 불러오지 못해 운영자 확인이 필요합니다.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : "주문을 만들지 못했습니다."); }
     finally { setBusy(false); }

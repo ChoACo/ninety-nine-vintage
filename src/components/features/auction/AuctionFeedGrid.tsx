@@ -4,6 +4,7 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { ProductSaleType } from "@/types/auction";
 import { AuctionCard } from "@/components/features/auction/AuctionCard";
+import { getCatalogImageUrl } from "@/lib/images";
 
 interface ProductPayload {
   id: string;
@@ -117,8 +118,8 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
     brand: "NINETY-NINE VINTAGE",
     category: product.category,
     description: product.description,
-    imageUrl: product.thumbnailUrls[0] ?? product.imageUrls[0] ?? "",
-    thumbnailUrl: product.thumbnailUrls[0] ?? product.imageUrls[0] ?? "",
+    imageUrl: getCatalogImageUrl(product.thumbnailUrls[0] ?? product.imageUrls[0] ?? ""),
+    thumbnailUrl: getCatalogImageUrl(product.thumbnailUrls[0] ?? product.imageUrls[0] ?? ""),
     startingPrice: product.startingPrice,
     currentBid: product.currentPrice,
     fixedPrice: product.fixedPrice,

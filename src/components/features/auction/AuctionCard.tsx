@@ -8,6 +8,7 @@ import { useCommerceStore } from "@/store/useCommerceStore";
 import { persistCart, persistWishlist } from "@/lib/commerce/client";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { BidModal } from "@/components/features/auction/detail/BidModal";
+import { getCatalogImageUrl } from "@/lib/images";
 
 interface AuctionCardProps { item: Item & { closesAt?: string; timeLeft?: string }; }
 
@@ -34,7 +35,7 @@ export function AuctionCard({ item }: AuctionCardProps) {
     <article className="group min-w-0">
       <Link className="block" href={`/auction/${item.id}`}>
         <div className="relative aspect-[4/5] overflow-hidden bg-surface">
-          {item.imageUrl ? <img alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
+          {item.imageUrl ? <img alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" src={getCatalogImageUrl(item.imageUrl)} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
           <span className="absolute left-2 top-2 bg-paper px-2 py-1 font-mono text-[9px] font-bold tracking-[0.1em]">{isFixed ? "BUY NOW" : "LIVE BID"}</span>
           <button aria-label={liked ? "찜 해제" : "찜하기"} className={`absolute right-2 top-2 grid size-8 place-items-center bg-paper/90 transition-colors ${liked ? "text-red-700" : "text-ink"}`} onClick={(event) => { event.preventDefault(); const nextLiked = !liked; toggleLike(item.id); void persistWishlist(item.id, nextLiked); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>
           <div className="absolute inset-x-0 bottom-0 translate-y-full bg-ink/95 px-3 py-3 text-paper opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">

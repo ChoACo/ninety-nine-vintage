@@ -48,7 +48,13 @@ export const useBidStore = create<BidStore>((set, get) => ({
       };
       error?: string;
     } | null;
-    if (!response.ok || !payload?.bid) throw new Error(payload?.error || "입찰을 저장하지 못했습니다.");
+    if (!response.ok || !payload?.bid) {
+      const message = payload?.error || "입찰을 저장하지 못했습니다.";
+      if (message.includes("카카오 회원 로그인")) {
+        throw new Error("현재 계정은 운영자 계정이거나 회원 프로필이 완성되지 않았습니다. 입찰은 카카오 회원 계정으로 이용해 주세요.");
+      }
+      throw new Error(message);
+    }
 
     const newBid: BidHistoryEntry = {
       id: payload.bid.bidId,

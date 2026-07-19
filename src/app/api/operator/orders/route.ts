@@ -1,4 +1,5 @@
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { getCatalogImageUrl } from "@/lib/images";
 
 export async function GET(request: Request) {
   const auth = await authenticateStaffRequest(request);
@@ -19,5 +20,5 @@ export async function GET(request: Request) {
   const { data: transfers } = orderIds.length === 0
     ? { data: [] }
     : await auth.admin.from("commerce_order_transfers").select("*").in("order_id", orderIds).order("requested_at", { ascending: false });
-  return commerceJson({ stores: stores ?? [], items: items ?? [], transfers: transfers ?? [] });
+  return commerceJson({ stores: stores ?? [], items: (items ?? []).map((item) => ({ ...item, products: item.products ? { ...item.products, image_urls: item.products.image_urls.map((image) => getCatalogImageUrl(image, 320)) } : item.products })), transfers: transfers ?? [] });
 }

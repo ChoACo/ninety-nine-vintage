@@ -1,5 +1,6 @@
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
 import type { Json } from "@/lib/supabase/database.types";
+import { getCatalogImageUrl } from "@/lib/images";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
     ? { data: [], error: null }
     : await auth.admin.from("products").select("*, stores(id, name, slug)").in("store_id", storeIds).order("created_at", { ascending: false });
   if (productError) return commerceJson({ error: "operator_products_unavailable" }, 503);
-  return commerceJson({ stores: stores ?? [], products: products ?? [] });
+  return commerceJson({ stores: stores ?? [], products: (products ?? []).map((product) => ({ ...product, image_urls: product.image_urls.map((image) => getCatalogImageUrl(image, 320)), thumbnail_urls: product.thumbnail_urls.map((image) => getCatalogImageUrl(image, 320)) })) });
 }
 
 export async function POST(request: Request) {

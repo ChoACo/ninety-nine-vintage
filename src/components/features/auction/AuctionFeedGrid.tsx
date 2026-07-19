@@ -2,6 +2,7 @@
 
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { ProductSaleType } from "@/types/auction";
 import { AuctionCard } from "@/components/features/auction/AuctionCard";
 import { getCatalogImageUrl } from "@/lib/images";
@@ -47,6 +48,8 @@ function remainingLabel(closesAt: string) {
 }
 
 export function AuctionFeedGrid({ className = "", saleType = "auction", title }: AuctionFeedGridProps) {
+  const routeSearchParams = useSearchParams();
+  const routeQuery = routeSearchParams.get("q") ?? "";
   const [products, setProducts] = useState<ProductPayload[]>([]);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"latest" | "ending" | "price_asc" | "price_desc">("ending");
@@ -56,11 +59,9 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const initialQuery = new URLSearchParams(window.location.search).get("q") ?? "";
-    if (!initialQuery) return;
-    const task = window.setTimeout(() => setQuery(initialQuery), 0);
+    const task = window.setTimeout(() => setQuery(routeQuery), 0);
     return () => window.clearTimeout(task);
-  }, []);
+  }, [routeQuery]);
 
   useEffect(() => {
     const key = `ninety-nine:${saleType}:scroll`;

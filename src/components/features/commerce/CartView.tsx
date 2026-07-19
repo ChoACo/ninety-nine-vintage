@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ArrowRight, Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { DEMO_PRODUCTS, type CatalogProduct } from "@/lib/catalog";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useCommerceStore } from "@/store/useCommerceStore";
 
@@ -23,7 +22,16 @@ interface PublishedFixedProduct {
   conditionGrade?: "S" | "A+" | "A" | "B";
 }
 
-function toCartProduct(product: PublishedFixedProduct): CatalogProduct {
+interface CartProduct {
+  id: string; title: string; description: string; category: string; size: string;
+  condition: "NEW" | "EXCELLENT" | "GOOD" | "FAIR"; conditionGrade: "S" | "A+" | "A" | "B";
+  saleType: "fixed"; price: number; startingPrice: number; bidCount: number; closesAt: string;
+  store: { id: string; slug: string; name: string; operator: string; description: string; accent: string };
+  imageUrls: string[]; storageClass: "small" | "large";
+  measurements: { shoulder: number; chest: number; sleeve: number; length: number }; inspectionNotes: string[];
+}
+
+function toCartProduct(product: PublishedFixedProduct): CartProduct {
   return {
     id: product.id,
     title: product.title,
@@ -54,7 +62,7 @@ export function CartView() {
   const cartIds = useCommerceStore((state) => state.cartIds);
   const removeFromCart = useCommerceStore((state) => state.removeFromCart);
   const clearCart = useCommerceStore((state) => state.clearCart);
-  const [liveProducts, setLiveProducts] = useState<CatalogProduct[]>([]);
+  const [liveProducts, setLiveProducts] = useState<CartProduct[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -66,7 +74,7 @@ export function CartView() {
       .catch(() => setLiveProducts([]));
   }, []);
 
-  const catalog = useMemo(() => [...liveProducts, ...DEMO_PRODUCTS.filter((product) => product.saleType === "fixed" && !liveProducts.some((live) => live.id === product.id))], [liveProducts]);
+  const catalog = useMemo(() => liveProducts, [liveProducts]);
   const products = catalog.filter((product) => cartIds.includes(product.id) && product.saleType === "fixed");
   const total = products.reduce((sum, product) => sum + product.price, 0);
   const containsDemo = products.some((product) => !isUuid(product.id));

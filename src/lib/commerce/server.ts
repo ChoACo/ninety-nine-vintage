@@ -47,3 +47,19 @@ export function normalizeIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.filter((item): item is string => typeof item === "string" && item.length > 0))];
 }
+
+export async function authenticateStaffRequest(request: Request, mutation = false) {
+  const auth = await authenticateCommerceRequest(request, mutation);
+  if (!auth.ok) return auth;
+  const { data: role, error } = await auth.admin
+    .from("account_access_roles")
+    .select("role_code, grade_level")
+    .eq("user_id", auth.userId)
+    .maybeSingle();
+  if (error) return { ok: false as const, response: commerceJson({ error: "role_unavailable" }, 503) };
+  const roleCode = role?.role_code;
+  if (roleCode !== "owner" && roleCode !== "operator" && roleCode !== "employee") {
+    return { ok: false as const, response: commerceJson({ error: "forbidden" }, 403) };
+  }
+  return { ...auth, roleCode, gradeLevel: Number(role?.grade_level ?? 99) };
+}

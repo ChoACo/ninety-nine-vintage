@@ -9,6 +9,7 @@ import type { ItemDetail } from "@/types/detail";
 import { BidModal } from "@/components/features/auction/detail/BidModal";
 import { SettlementActions } from "@/components/features/auction/detail/SettlementActions";
 import { useCommerceStore } from "@/store/useCommerceStore";
+import { persistWishlist } from "@/lib/commerce/client";
 
 interface StickyBidPanelProps {
   item: ItemDetail;
@@ -112,7 +113,7 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
       </div>}
 
       {item.saleType === "auction" ? <button className="mt-6 flex h-14 w-full items-center justify-center gap-2 bg-zinc-950 text-sm font-bold text-white transition-colors hover:bg-zinc-800" onClick={() => setModalOpen(true)} type="button"><LockKeyhole size={15} /> 실시간 경매 입찰하기</button> : <button className="mt-6 flex h-14 w-full items-center justify-center gap-2 bg-zinc-950 text-sm font-bold text-white transition-colors hover:bg-zinc-800" onClick={() => addToCart(item.id)} type="button"><ShoppingBag size={15} /> 장바구니에 담기</button>}
-      <button className="mt-2 flex h-12 w-full items-center justify-center gap-2 border border-zinc-200 text-xs font-bold text-zinc-950 transition-colors hover:border-zinc-950" onClick={() => toggleLike(item.id)} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} /> {liked ? "찜 해제" : "관심 상품 담기"}</button>
+      <button className="mt-2 flex h-12 w-full items-center justify-center gap-2 border border-zinc-200 text-xs font-bold text-zinc-950 transition-colors hover:border-zinc-950" onClick={() => { const nextLiked = !liked; toggleLike(item.id); void persistWishlist(item.id, nextLiked); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} /> {liked ? "찜 해제" : "관심 상품 담기"}</button>
       {item.saleType === "auction" && <SettlementActions productId={item.id} />}
       {item.saleType === "auction" && <BidModal currentPrice={displayPrice} key={`${modalOpen}-${displayPrice}`} onClose={() => setModalOpen(false)} onSubmit={addBid} open={modalOpen} />}
     </aside>

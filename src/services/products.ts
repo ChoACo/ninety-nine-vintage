@@ -47,9 +47,15 @@ export interface PublishedProduct {
   bidLockedAt: string | null;
   finalBidAmount: number | null;
   updatedAt: string;
+  storeId: string | null;
+  storageClass: "small" | "large";
+  sizeLabel: string;
+  conditionGrade: "S" | "A+" | "A" | "B";
+  measurements: Json;
+  inspectionNotes: string[];
 }
 
-function mapProduct(row: ProductRow): PublishedProduct {
+export function mapPublishedProduct(row: ProductRow): PublishedProduct {
   return {
     id: row.id,
     title: row.title,
@@ -70,6 +76,12 @@ function mapProduct(row: ProductRow): PublishedProduct {
     bidLockedAt: row.bid_locked_at,
     finalBidAmount: row.final_bid_amount,
     updatedAt: row.updated_at,
+    storeId: row.store_id,
+    storageClass: row.storage_class === "large" ? "large" : "small",
+    sizeLabel: row.size_label,
+    conditionGrade: ["S", "A+", "A", "B"].includes(row.condition_grade) ? row.condition_grade as "S" | "A+" | "A" | "B" : "A",
+    measurements: row.measurements,
+    inspectionNotes: row.inspection_notes,
   };
 }
 
@@ -96,7 +108,7 @@ export async function fetchPublishedProducts(input: {
   else query = query.order("publish_at", { ascending: false });
   const { data, error } = await query.limit(safeLimit);
   if (error) throw new Error("상품 목록을 불러오지 못했습니다.");
-  return (data ?? []).map(mapProduct);
+  return (data ?? []).map(mapPublishedProduct);
 }
 
 export async function fetchPublishedProduct(productId: string): Promise<PublishedProduct | null> {
@@ -109,7 +121,7 @@ export async function fetchPublishedProduct(productId: string): Promise<Publishe
     .lte("publish_at", new Date().toISOString())
     .maybeSingle();
   if (error) throw new Error("상품을 불러오지 못했습니다.");
-  return data ? mapProduct(data) : null;
+  return data ? mapPublishedProduct(data) : null;
 }
 
 export async function publishPendingProductsNow(accessToken: string, productIds: string[]) {

@@ -1,7 +1,7 @@
-import { authenticateCommerceRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateMemberCommerceRequest, commerceJson } from "@/lib/commerce/server";
 
 export async function GET(request: Request) {
-  const auth = await authenticateCommerceRequest(request);
+  const auth = await authenticateMemberCommerceRequest(request);
   if (!auth.ok) return auth.response;
   const [{ data: account, error: accountError }, { data: ledger, error: ledgerError }] = await Promise.all([
     auth.admin.from("member_accounts").select("shipping_credit_count").eq("member_id", auth.userId).maybeSingle(),
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateCommerceRequest(request, true);
+  const auth = await authenticateMemberCommerceRequest(request, true);
   if (!auth.ok) return auth.response;
   const body = await request.json().catch(() => null) as { shippingRequestId?: string; idempotencyKey?: string } | null;
   const idempotencyKey = body?.idempotencyKey?.trim();

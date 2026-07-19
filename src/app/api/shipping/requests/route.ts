@@ -1,7 +1,7 @@
-import { authenticateCommerceRequest, commerceJson, normalizeIds } from "@/lib/commerce/server";
+import { authenticateMemberCommerceRequest, commerceJson, normalizeIds } from "@/lib/commerce/server";
 
 export async function POST(request: Request) {
-  const auth = await authenticateCommerceRequest(request, true);
+  const auth = await authenticateMemberCommerceRequest(request, true);
   if (!auth.ok) return auth.response;
   const body = await request.json().catch(() => null) as { productIds?: unknown; addressId?: string; applyShippingCredit?: boolean; idempotencyKey?: string } | null;
   const productIds = normalizeIds(body?.productIds);

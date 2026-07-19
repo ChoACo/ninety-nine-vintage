@@ -1,7 +1,7 @@
-import { authenticateCommerceRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateMemberCommerceRequest, commerceJson } from "@/lib/commerce/server";
 
 export async function GET(request: Request) {
-  const auth = await authenticateCommerceRequest(request);
+  const auth = await authenticateMemberCommerceRequest(request);
   if (!auth.ok) return auth.response;
   const conversationId = new URL(request.url).searchParams.get("conversationId");
   if (conversationId) {
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateCommerceRequest(request, true);
+  const auth = await authenticateMemberCommerceRequest(request, true);
   if (!auth.ok) return auth.response;
   const body = await request.json().catch(() => null) as {
     conversationId?: string;

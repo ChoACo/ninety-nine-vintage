@@ -43,6 +43,20 @@ export async function authenticateCommerceRequest(
   }
 }
 
+export async function authenticateMemberCommerceRequest(request: Request, mutation = false) {
+  const auth = await authenticateCommerceRequest(request, mutation);
+  if (!auth.ok) return auth;
+  const { data: account, error } = await auth.admin
+    .from("member_accounts")
+    .select("member_id, account_status")
+    .eq("member_id", auth.userId)
+    .eq("account_status", "active")
+    .maybeSingle();
+  if (error) return { ok: false as const, response: commerceJson({ error: "member_unavailable" }, 503) };
+  if (!account) return { ok: false as const, response: commerceJson({ error: "member_required", message: "카카오 회원 계정으로 이용해 주세요." }, 403) };
+  return auth;
+}
+
 export function normalizeIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.filter((item): item is string => typeof item === "string" && item.length > 0))];

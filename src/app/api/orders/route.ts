@@ -1,8 +1,8 @@
-import { authenticateCommerceRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateMemberCommerceRequest, commerceJson } from "@/lib/commerce/server";
 import { getCatalogImageUrl } from "@/lib/images";
 
 export async function GET(request: Request) {
-  const auth = await authenticateCommerceRequest(request);
+  const auth = await authenticateMemberCommerceRequest(request);
   if (!auth.ok) return auth.response;
   const { data: orders, error } = await auth.admin
     .from("commerce_orders")

@@ -1,7 +1,7 @@
-import { authenticateCommerceRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateMemberCommerceRequest, commerceJson } from "@/lib/commerce/server";
 
 export async function GET(request: Request) {
-  const auth = await authenticateCommerceRequest(request);
+  const auth = await authenticateMemberCommerceRequest(request);
   if (!auth.ok) return auth.response;
   const { data, error } = await auth.user
     .from("cart_items")
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateCommerceRequest(request, true);
+  const auth = await authenticateMemberCommerceRequest(request, true);
   if (!auth.ok) return auth.response;
   const body = await request.json().catch(() => null) as { productId?: string } | null;
   if (!body?.productId) return commerceJson({ error: "상품을 선택해 주세요." }, 400);
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const auth = await authenticateCommerceRequest(request, true);
+  const auth = await authenticateMemberCommerceRequest(request, true);
   if (!auth.ok) return auth.response;
   const body = await request.json().catch(() => null) as { productId?: string } | null;
   if (!body?.productId) return commerceJson({ error: "상품을 선택해 주세요." }, 400);

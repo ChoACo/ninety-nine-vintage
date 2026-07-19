@@ -1,7 +1,7 @@
-import { authenticateCommerceRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateMemberCommerceRequest, commerceJson } from "@/lib/commerce/server";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await authenticateCommerceRequest(request, true);
+  const auth = await authenticateMemberCommerceRequest(request, true);
   if (!auth.ok) return auth.response;
   const { id } = await params;
   const { data: order, error: orderError } = await auth.admin

@@ -6,7 +6,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!auth.ok) return auth.response;
   const { id } = await params;
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
-  const { data: product, error: lookupError } = await auth.admin.from("products").select("id, store_id, updated_at").eq("id", id).maybeSingle();
+  const { data: product, error: lookupError } = await auth.admin.from("products").select("id, store_id, updated_at, status, sale_type, current_price, fixed_price").eq("id", id).maybeSingle();
   if (lookupError) return commerceJson({ error: "product_unavailable" }, 503);
   if (!product) return commerceJson({ error: "product_not_found" }, 404);
   const { data: store } = product.store_id ? await auth.admin.from("stores").select("operator_id").eq("id", product.store_id).maybeSingle() : { data: null };
@@ -17,9 +17,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (typeof body?.[key] === "string") writable[key] = body[key];
   }
   if (Array.isArray(body?.imageUrls)) updates.image_urls = body.imageUrls.filter((value): value is string => typeof value === "string" && value.startsWith("http"));
+  if (["pending", "active", "closed"].includes(String(body?.status))) updates.status = body?.status as string;
+  if (product.status === "pending" && ["auction", "fixed"].includes(String(body?.saleType))) {
+    const saleType = body?.saleType as "auction" | "fixed";
+    const price = Number(body?.price);
+    if (Number.isSafeInteger(price) && price > 0) {
+      updates.sale_type = saleType;
+      updates.starting_price = price;
+      updates.current_price = price;
+      updates.fixed_price = saleType === "fixed" ? price : null;
+    }
+  }
   if (Array.isArray(body?.inspectionNotes)) updates.inspection_notes = body.inspectionNotes.filter((value): value is string => typeof value === "string");
   if (body?.measurements && typeof body.measurements === "object") updates.measurements = body.measurements as Database["public"]["Tables"]["products"]["Update"]["measurements"];
-  if (["pending", "active", "closed"].includes(String(body?.status))) updates.status = body?.status as string;
   const { data: updated, error } = await auth.admin.from("products").update(updates).eq("id", id).eq("updated_at", product.updated_at).select("*").maybeSingle();
   if (error) return commerceJson({ error: error.message || "상품을 수정하지 못했습니다." }, 409);
   if (!updated) return commerceJson({ error: "stale_product" }, 409);

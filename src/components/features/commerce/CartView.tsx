@@ -85,6 +85,8 @@ export function CartView() {
         const payload = await response.json() as { productIds?: string[]; items?: Array<{ id?: string; product_id?: string }> };
         const ids = payload.productIds ?? (payload.items ?? []).map((item) => item.product_id ?? item.id).filter((id): id is string => Boolean(id));
         replaceCart(ids);
+      } catch {
+        // Keep the local cart available when session refresh is temporarily unavailable.
       } finally {
         setCartLoading(false);
       }

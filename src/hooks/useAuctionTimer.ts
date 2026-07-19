@@ -17,9 +17,21 @@ const INITIAL_STATE: AuctionTimerState = {
   remainingSeconds: 0,
 };
 
-function atTime(date: Date, hours: number, minutes = 0, seconds = 0) {
-  const target = new Date(date);
-  target.setHours(hours, minutes, seconds, 0);
+function kstDateParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function atKstTime(date: Date, hours = 0, minutes = 0, seconds = 0, nextDay = false) {
+  const target = new Date(`${kstDateParts(date)}T00:00:00+09:00`);
+  if (nextDay) target.setUTCDate(target.getUTCDate() + 1);
+  target.setUTCHours(hours - 9, minutes, seconds, 0);
   return target;
 }
 
@@ -34,11 +46,11 @@ function formatTime(totalSeconds: number) {
 }
 
 function getAuctionTimerState(now = new Date()): AuctionTimerState {
-  const opensAt = atTime(now, 10);
-  const biddingRestrictedAt = atTime(now, 20, 56);
-  const closesAt = atTime(now, 21);
-  const reAuctionStartsAt = atTime(now, 22);
-  const endOfDay = atTime(now, 24);
+  const opensAt = atKstTime(now, 10);
+  const biddingRestrictedAt = atKstTime(now, 20, 56);
+  const closesAt = atKstTime(now, 21);
+  const reAuctionStartsAt = atKstTime(now, 22);
+  const endOfDay = atKstTime(now, 0, 0, 0, true);
 
   let status: AuctionClockStatus;
   let target: Date;

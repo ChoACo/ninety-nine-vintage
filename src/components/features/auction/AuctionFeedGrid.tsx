@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ProductSaleType } from "@/types/auction";
 import { AuctionCard } from "@/components/features/auction/AuctionCard";
+import { AuctionBidSummary } from "@/components/features/auction/AuctionBidSummary";
 import { AuctionFeedCard, type AuctionFeedPhase } from "@/components/features/auction/AuctionFeedCard";
 import { getCatalogImageUrl } from "@/lib/images";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -208,6 +209,8 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
           </label>
         </div>
       </div>
+
+      {saleType === "auction" && <AuctionBidSummary />}
 
       {error && <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {loading && <div className="grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{Array.from({ length: 10 }).map((_, index) => <div aria-hidden="true" className="aspect-[4/5] animate-pulse bg-surface" key={index} />)}</div>}

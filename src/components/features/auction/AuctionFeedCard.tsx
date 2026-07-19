@@ -2,7 +2,7 @@
 
 import { Gavel, Heart } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Item } from "@/types/auction";
 import { BidModal } from "@/components/features/auction/detail/BidModal";
 import { CatalogImage } from "@/components/ui/CatalogImage";
@@ -32,12 +32,9 @@ function bidErrorMessage(message: string) {
 export function AuctionFeedCard({ item }: AuctionFeedCardProps) {
   const liked = useCommerceStore((state) => state.likedIds.includes(item.id));
   const toggleLike = useCommerceStore((state) => state.toggleLike);
-  const hydrate = useCommerceStore((state) => state.hydrate);
   const [bidOpen, setBidOpen] = useState(false);
   const [optimisticBid, setOptimisticBid] = useState<{ amount: number; bidCount: number; participantCount: number } | null>(null);
   const [actionMessage, setActionMessage] = useState("");
-
-  useEffect(() => hydrate(), [hydrate]);
 
   const currentPrice = Math.max(item.currentBid, optimisticBid?.amount ?? 0);
   const bidCount = Math.max(item.bidCount, optimisticBid?.bidCount ?? 0);

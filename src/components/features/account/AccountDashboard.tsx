@@ -72,7 +72,7 @@ export function AccountDashboard() {
   }, []);
 
   const cards = [
-    ["진행 중인 입찰", String(wins?.length ?? 0).padStart(2, "0"), "낙찰·결제 현황", "/feed", ReceiptText],
+    ["낙찰·결제", String(wins?.length ?? 0).padStart(2, "0"), "보관·결제 현황", "#storage", ReceiptText],
     ["보관 중인 상품", String(storage.length).padStart(2, "0"), "합배송 가능한 상품", "#storage", PackageCheck],
     ["배송 요청 가능", String(credits).padStart(2, "0"), "남은 배송 크레딧", "#shipping", Truck],
     ["찜한 상품", String(liked.length).padStart(2, "0"), "다시 보고 싶은 아이템", "#likes", Heart],

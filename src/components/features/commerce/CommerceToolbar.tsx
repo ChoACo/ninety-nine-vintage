@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, ShoppingBag } from "lucide-react";
+import { Gavel, Heart, ShoppingBag } from "lucide-react";
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useCommerceStore } from "@/store/useCommerceStore";
 
 export function CommerceToolbar() {
+  const pathname = usePathname();
+  const auctionContext = pathname === "/feed" || pathname.startsWith("/auction/");
   const hydrate = useCommerceStore((state) => state.hydrate);
   const refreshLocal = useCommerceStore((state) => state.refreshLocal);
   const syncWithServer = useCommerceStore((state) => state.syncWithServer);
@@ -27,5 +30,5 @@ export function CommerceToolbar() {
       window.removeEventListener("storage", onStorage);
     };
   }, [hydrate, refreshLocal, syncWithServer]);
-  return <div className="flex shrink-0 items-center gap-2"><Link className="relative grid size-10 shrink-0 place-items-center border border-line" href="/account#likes"><Heart size={16} /><span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-ink text-[9px] text-paper">{likedCount}</span></Link><Link className="relative grid size-10 shrink-0 place-items-center border border-line" href="/cart"><ShoppingBag size={16} /><span className="absolute -right-1 -top-1 grid size-4 shrink-0 place-items-center rounded-full bg-ink text-[9px] text-paper">{cartCount}</span></Link></div>;
+  return <div className="flex shrink-0 items-center gap-2"><Link aria-label="찜한 상품" className="relative grid size-10 shrink-0 place-items-center border border-line" href="/account#likes"><Heart size={16} /><span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-ink text-[9px] text-paper">{likedCount}</span></Link>{auctionContext ? <Link aria-label="입찰 현황" className="relative grid size-10 shrink-0 place-items-center border border-line" href="/account#bids"><Gavel size={16} /><span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-ink px-1 text-[8px] text-paper">BID</span></Link> : <Link aria-label="장바구니" className="relative grid size-10 shrink-0 place-items-center border border-line" href="/cart"><ShoppingBag size={16} /><span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-ink text-[9px] text-paper">{cartCount}</span></Link>}</div>;
 }

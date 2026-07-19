@@ -78,8 +78,9 @@ export function CartView() {
       if (!data.session?.access_token) return;
       const response = await fetch("/api/cart", { headers: { Authorization: `Bearer ${data.session.access_token}` }, cache: "no-store" });
       if (!response.ok) return;
-      const payload = await response.json() as { items?: Array<{ product_id: string }> };
-      replaceCart((payload.items ?? []).map((item) => item.product_id));
+      const payload = await response.json() as { productIds?: string[]; items?: Array<{ id?: string; product_id?: string }> };
+      const ids = payload.productIds ?? (payload.items ?? []).map((item) => item.product_id ?? item.id).filter((id): id is string => Boolean(id));
+      replaceCart(ids);
     })();
   }, [replaceCart]);
 

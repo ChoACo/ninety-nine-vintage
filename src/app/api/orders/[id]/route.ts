@@ -4,7 +4,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const auth = await authenticateMemberCommerceRequest(request);
   if (!auth.ok) return auth.response;
   const { id } = await params;
-  const { data, error } = await auth.admin
+  const { data, error } = await auth.user
     .from("commerce_orders")
     .select("*, commerce_order_items(*, products(*), stores(*))")
     .eq("id", id)

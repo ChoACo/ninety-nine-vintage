@@ -11,20 +11,17 @@ export async function POST(request: Request) {
   }
 
   // Do not create an order that the member cannot actually pay. The current
-  // production checkout is manual-transfer only, so missing bank settings
-  // must fail before the order RPC can reserve fixed-price products.
-  const { data: paymentSetting, error: paymentSettingError } = await auth.admin
-    .from("payment_runtime_settings")
-    .select("active_mode, bank_name, account_number")
-    .eq("singleton", true)
-    .maybeSingle();
-  if (paymentSettingError || !paymentSetting) {
+  // production checkout is manual-transfer only, so the member-safe RPC
+  // checks configuration before the order RPC can reserve fixed-price items.
+  const { data: paymentRows, error: paymentStatusError } = await auth.user.rpc("get_commerce_payment_status");
+  const paymentStatus = Array.isArray(paymentRows) ? paymentRows[0] : paymentRows;
+  if (paymentStatusError || !paymentStatus) {
     return commerceJson({ error: "결제 설정을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요." }, 503);
   }
-  if (paymentSetting.active_mode !== "manual_transfer") {
+  if (paymentStatus.active_mode !== "manual_transfer") {
     return commerceJson({ error: "현재 사용 가능한 결제 수단이 없습니다. 운영자에게 문의해 주세요." }, 503);
   }
-  if (!paymentSetting.bank_name || !paymentSetting.account_number) {
+  if (!paymentStatus.configured) {
     return commerceJson({ error: "운영자가 입금 계좌를 설정한 후 주문할 수 있습니다." }, 503);
   }
 
@@ -40,36 +37,11 @@ export async function POST(request: Request) {
   const order = data as { id?: string; total?: number } | null;
   let transfer: Record<string, unknown> | null = null;
   if (order?.id) {
-    const { data: existingTransfer } = await auth.admin
-      .from("commerce_order_transfers")
-      .select("*")
-      .eq("order_id", order.id)
-      .maybeSingle();
-    transfer = existingTransfer;
-    if (!transfer) {
-      if (typeof order.total === "number") {
-        const { data: createdTransfer, error: transferError } = await auth.admin
-          .from("commerce_order_transfers")
-          .insert({
-            order_id: order.id,
-            member_id: auth.userId,
-            expected_amount: order.total,
-            bank_name_snapshot: paymentSetting.bank_name,
-            account_number_snapshot: paymentSetting.account_number,
-          })
-          .select("*")
-          .maybeSingle();
-        transfer = createdTransfer;
-        if (!transfer && transferError) {
-          const { data: racedTransfer } = await auth.admin
-            .from("commerce_order_transfers")
-            .select("*")
-            .eq("order_id", order.id)
-            .maybeSingle();
-          transfer = racedTransfer;
-        }
-      }
+    const { data: createdTransfer, error: transferError } = await auth.user.rpc("create_commerce_order_transfer", { p_order_id: order.id });
+    if (transferError || !createdTransfer) {
+      return commerceJson({ error: transferError?.message || "입금 안내를 만들지 못했습니다. 잠시 후 다시 시도해 주세요." }, 503);
     }
+    transfer = createdTransfer as Record<string, unknown>;
   }
   return commerceJson({ order: data, transfer }, 201);
 }

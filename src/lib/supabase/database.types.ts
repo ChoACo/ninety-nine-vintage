@@ -2536,6 +2536,10 @@ export type Database = {
         }
         Returns: Json
       }
+      create_commerce_order_transfer: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
       current_access_role: { Args: never; Returns: string }
       current_owner_delegated_operator: { Args: never; Returns: string }
       decline_my_second_chance_offer: {
@@ -2579,6 +2583,13 @@ export type Database = {
         }[]
       }
       get_auction_server_time: { Args: never; Returns: string }
+      get_commerce_payment_status: {
+        Args: never
+        Returns: {
+          active_mode: string
+          configured: boolean
+        }[]
+      }
       get_current_owner_operator_delegation: {
         Args: never
         Returns: {

@@ -4,7 +4,7 @@ import { getCatalogImageUrl } from "@/lib/images";
 export async function GET(request: Request) {
   const auth = await authenticateMemberCommerceRequest(request);
   if (!auth.ok) return auth.response;
-  const { data: orders, error } = await auth.admin
+  const { data: orders, error } = await auth.user
     .from("commerce_orders")
     .select("id, status, subtotal, shipping_fee, total, created_at, updated_at, commerce_order_items(id, product_id, unit_price, payment_status, paid_at, storage_expires_at, products(id, title, image_urls))")
     .eq("member_id", auth.userId)
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const orderIds = (orders ?? []).map((order) => order.id);
   const { data: transfers, error: transferError } = orderIds.length === 0
     ? { data: [], error: null }
-    : await auth.admin.from("commerce_order_transfers").select("*").in("order_id", orderIds);
+    : await auth.user.from("commerce_order_transfers").select("*").in("order_id", orderIds);
   if (transferError) return commerceJson({ error: "orders_unavailable" }, 503);
   const transferByOrder = new Map((transfers ?? []).map((transfer) => [transfer.order_id, transfer]));
   return commerceJson({ orders: (orders ?? []).map((order) => ({

@@ -47,12 +47,19 @@ function remainingLabel(closesAt: string) {
 
 export function AuctionFeedGrid({ className = "", saleType = "auction", title }: AuctionFeedGridProps) {
   const [products, setProducts] = useState<ProductPayload[]>([]);
-  const [query, setQuery] = useState(() => (typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("q") ?? ""));
+  const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"latest" | "ending" | "price_asc" | "price_desc">("ending");
   const [filters, setFilters] = useState<CatalogFilters>({ sizes: [], categories: [], liveOnly: true, closingOnly: false, sort: "ending" });
   const [now, setNow] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const initialQuery = new URLSearchParams(window.location.search).get("q") ?? "";
+    if (!initialQuery) return;
+    const task = window.setTimeout(() => setQuery(initialQuery), 0);
+    return () => window.clearTimeout(task);
+  }, []);
 
   useEffect(() => {
     const key = `ninety-nine:${saleType}:scroll`;

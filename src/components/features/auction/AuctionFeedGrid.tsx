@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ProductSaleType } from "@/types/auction";
 import { AuctionCard } from "@/components/features/auction/AuctionCard";
+import { AuctionFeedCard, type AuctionFeedPhase } from "@/components/features/auction/AuctionFeedCard";
 import { getCatalogImageUrl } from "@/lib/images";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface ProductPayload {
   id: string;
@@ -21,6 +23,7 @@ interface ProductPayload {
   fixedPrice: number | null;
   bidIncrement: number;
   participantCount: number;
+  bidHistory: unknown[];
   imageUrls: string[];
   thumbnailUrls: string[];
   sizeLabel: string;
@@ -44,7 +47,16 @@ function remainingLabel(closesAt: string) {
   const remaining = Math.max(0, new Date(closesAt).getTime() - Date.now());
   const hours = Math.floor(remaining / 3_600_000);
   const minutes = Math.floor((remaining % 3_600_000) / 60_000);
-  return remaining > 0 ? `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}` : "마감";
+  const seconds = Math.floor((remaining % 60_000) / 1000);
+  return remaining > 0 ? `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}` : "마감";
+}
+
+function auctionPhase(closesAt: string, now: number): AuctionFeedPhase {
+  if (!now) return "OPEN";
+  const closeTime = new Date(closesAt).getTime();
+  if (!Number.isFinite(closeTime) || closeTime <= now) return "CLOSED";
+  if (closeTime - now <= 4 * 60 * 1000) return "CLOSING_SOON";
+  return "OPEN";
 }
 
 export function AuctionFeedGrid({ className = "", saleType = "auction", title }: AuctionFeedGridProps) {
@@ -55,6 +67,7 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
   const [sort, setSort] = useState<"latest" | "ending" | "price_asc" | "price_desc">("ending");
   const [filters, setFilters] = useState<CatalogFilters>({ sizes: [], categories: [], liveOnly: true, closingOnly: false, sort: "ending" });
   const [now, setNow] = useState(0);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -102,15 +115,37 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
         if (!response.ok) throw new Error("상품 목록을 불러오지 못했습니다.");
         return response.json() as Promise<{ products?: ProductPayload[] }>;
       })
-      .then((payload) => setProducts(Array.isArray(payload.products) ? payload.products : []))
+      .then((payload) => { setError(""); setProducts(Array.isArray(payload.products) ? payload.products : []); })
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === "AbortError") return;
         setError("상품 목록을 불러오지 못했습니다.");
         setProducts([]);
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [query, saleType, sort]);
+  }, [query, refreshNonce, saleType, sort]);
+
+  useEffect(() => {
+    if (saleType !== "auction") return;
+    const client = getSupabaseBrowserClient();
+    const channel = client
+      .channel("live-auction-feed-bids")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "auction_bids" }, (payload) => {
+        const row = payload.new as Record<string, unknown>;
+        const productId = typeof row.product_id === "string" ? row.product_id : "";
+        const amount = typeof row.amount === "number" ? row.amount : Number(row.amount);
+        if (!productId || !Number.isSafeInteger(amount)) return;
+        setProducts((current) => current.map((product) => product.id === productId ? { ...product, currentPrice: Math.max(product.currentPrice, amount), bidHistory: [...product.bidHistory, row] } : product));
+      })
+      .subscribe();
+    return () => { void client.removeChannel(channel); };
+  }, [saleType]);
+
+  useEffect(() => {
+    if (saleType !== "auction") return;
+    const refresh = window.setInterval(() => setRefreshNonce((value) => value + 1), 30_000);
+    return () => window.clearInterval(refresh);
+  }, [saleType]);
 
   const cards = useMemo(() => products.map((product) => ({
     id: product.id,
@@ -124,24 +159,25 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
     startingPrice: product.startingPrice,
     currentBid: product.currentPrice,
     fixedPrice: product.fixedPrice,
-    bidCount: product.participantCount,
+    bidCount: Array.isArray(product.bidHistory) ? product.bidHistory.length : product.participantCount,
+    participantCount: product.participantCount,
     status: product.status,
     saleType: product.saleType,
     closesAt: product.closesAt,
     publishAt: product.publishAt,
     bidIncrement: product.bidIncrement,
     sizeLabel: product.sizeLabel,
+    auctionPhase: saleType === "auction" ? auctionPhase(product.closesAt, now) : undefined,
     timeLeft: saleType === "fixed" ? "IN STOCK" : remainingLabel(product.closesAt),
-  })), [products, saleType]);
+  })), [now, products, saleType]);
 
   const visibleCards = useMemo(() => cards.filter((card) => {
     const sizeMatch = filters.sizes.length === 0 || filters.sizes.includes(card.sizeLabel);
     const categoryMatch = filters.categories.length === 0 || filters.categories.includes(card.category);
-    const closesAt = new Date(card.closesAt).getTime();
-    const liveMatch = !filters.liveOnly || saleType === "fixed" || !now || closesAt > now;
-    const closingMatch = !filters.closingOnly || (saleType === "auction" && (!now || (closesAt > now && closesAt <= now + 3 * 60 * 60 * 1000)));
+    const liveMatch = !filters.liveOnly || saleType === "fixed" || card.auctionPhase !== "CLOSED";
+    const closingMatch = !filters.closingOnly || (saleType === "auction" && card.auctionPhase === "CLOSING_SOON");
     return sizeMatch && categoryMatch && liveMatch && closingMatch;
-  }), [cards, filters, now, saleType]);
+  }), [cards, filters, saleType]);
 
   return (
     <section className={`min-w-0 ${className}`}>
@@ -173,7 +209,7 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
       {error && <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {loading && <div className="grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{Array.from({ length: 10 }).map((_, index) => <div aria-hidden="true" className="aspect-[4/5] animate-pulse bg-surface" key={index} />)}</div>}
       {!loading && !error && visibleCards.length === 0 && <div className="grid min-h-64 place-items-center border border-dashed border-line px-6 text-center"><div><p className="text-sm font-bold">현재 조건에 맞는 상품이 없습니다.</p><p className="mt-2 text-xs text-muted">필터를 초기화하거나 새로운 드롭을 기다려 주세요.</p></div></div>}
-      {!loading && visibleCards.length > 0 && <div className="grid grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3 lg:grid-cols-4 lg:gap-x-5 xl:grid-cols-5">{visibleCards.map((item) => <AuctionCard item={item} key={item.id} />)}</div>}
+      {!loading && visibleCards.length > 0 && <div className="grid grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3 lg:grid-cols-4 lg:gap-x-5 xl:grid-cols-5">{visibleCards.map((item) => saleType === "auction" ? <AuctionFeedCard item={item} key={item.id} /> : <AuctionCard item={item} key={item.id} />)}</div>}
     </section>
   );
 }

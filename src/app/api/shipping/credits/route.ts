@@ -14,7 +14,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await authenticateCommerceRequest(request, true);
   if (!auth.ok) return auth.response;
-  const body = await request.json().catch(() => null) as { shippingRequestId?: string } | null;
+  const body = await request.json().catch(() => null) as { shippingRequestId?: string; idempotencyKey?: string } | null;
+  const idempotencyKey = body?.idempotencyKey?.trim();
+  if (!idempotencyKey || idempotencyKey.length > 128) return commerceJson({ error: "배송비 요청 키가 올바르지 않습니다." }, 400);
   const amount = Number(process.env.SHIPPING_FEE_AMOUNT ?? "3500");
   if (!Number.isSafeInteger(amount) || amount <= 0) return commerceJson({ error: "배송비 설정이 없습니다." }, 503);
   const { data: setting } = await auth.admin
@@ -23,6 +25,13 @@ export async function POST(request: Request) {
     .eq("singleton", true)
     .maybeSingle();
   if (setting?.active_mode !== "manual_transfer" || !setting.bank_name || !setting.account_number) return commerceJson({ error: "manual_transfer_unavailable" }, 503);
+  const { data: existingPayment } = await auth.admin
+    .from("shipping_fee_payments")
+    .select("*")
+    .eq("member_id", auth.userId)
+    .eq("idempotency_key", idempotencyKey)
+    .maybeSingle();
+  if (existingPayment) return commerceJson({ payment: existingPayment }, 200);
   const { data: payment, error } = await auth.admin
     .from("shipping_fee_payments")
     .insert({
@@ -31,9 +40,19 @@ export async function POST(request: Request) {
       expected_amount: amount,
       bank_name_snapshot: setting.bank_name,
       account_number_snapshot: setting.account_number,
+      idempotency_key: idempotencyKey,
     })
     .select("*")
     .single();
-  if (error) return commerceJson({ error: "shipping_fee_unavailable" }, 503);
+  if (error) {
+    const { data: retryPayment } = await auth.admin
+      .from("shipping_fee_payments")
+      .select("*")
+      .eq("member_id", auth.userId)
+      .eq("idempotency_key", idempotencyKey)
+      .maybeSingle();
+    if (!retryPayment) return commerceJson({ error: "shipping_fee_unavailable" }, 503);
+    return commerceJson({ payment: retryPayment }, 200);
+  }
   return commerceJson({ payment }, 201);
 }

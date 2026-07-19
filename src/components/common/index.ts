@@ -6,4 +6,6 @@ export { default as Navigation } from "./Navigation";
 export type { NavigationTarget } from "./Navigation";
 export { default as SiteHeader } from "./SiteHeader";
 export { default as ThemeToggle } from "./ThemeToggle";
+export { EditorialChrome } from "./EditorialChrome";
+export { CommerceShell } from "../commerce/CommerceShell";
 export { Toast } from "./Toast";

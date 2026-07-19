@@ -16,6 +16,9 @@ const eslintConfig = defineConfig([
     ".vercel/**",
     ".vinext/**",
     ".wrangler/**",
+    // Legacy Cloudflare worker sources remain archived for rollback only;
+    // Next.js is the sole active runtime after this migration.
+    "worker/**",
     "dist/**",
   ]),
 ]);

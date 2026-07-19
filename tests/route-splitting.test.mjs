@@ -27,18 +27,20 @@ async function render(path) {
   );
 }
 
-test("exposes feed, shop, account, chat, and operator as independent routes", async () => {
-  const [home, feed, shop, account, chat, operator, app] = await Promise.all([
-    source("app/page.tsx"),
-    source("app/feed/page.tsx"),
-    source("app/shop/page.tsx"),
-    source("app/account/page.tsx"),
-    source("app/chat/page.tsx"),
-    source("app/operator/page.tsx"),
+test("exposes home, feed, shop, account, chat, and operator as independent routes", async () => {
+  const [home, homeGuide, feed, shop, account, chat, operator, app] = await Promise.all([
+    source("src/app/page.tsx"),
+    source("src/app/home/page.tsx"),
+    source("src/app/feed/page.tsx"),
+    source("src/app/shop/page.tsx"),
+    source("src/app/account/page.tsx"),
+    source("src/app/chat/page.tsx"),
+    source("src/app/operator/page.tsx"),
     source("src/components/AuctionApp.tsx"),
   ]);
 
   assert.match(home, /<AuctionApp page="home"/);
+  assert.match(homeGuide, /<AuctionApp page="home"/);
   assert.match(feed, /<AuctionApp page="feed"/);
   assert.match(shop, /<AuctionApp page="shop"/);
   assert.match(account, /<AuctionApp page="profile"/);
@@ -50,25 +52,22 @@ test("exposes feed, shop, account, chat, and operator as independent routes", as
   assert.match(app, /admin: "\/operator"/);
 });
 
-test("separates auction and fixed catalog realtime while keeping sold work on home", async () => {
-  const [app, productsHook, soldHook] = await Promise.all([
+test("separates auction and fixed catalog realtime while keeping sold work on its archive route", async () => {
+  const [app, productsHook] = await Promise.all([
     source("src/components/AuctionApp.tsx"),
     source("src/hooks/useSupabaseProducts.ts"),
-    source("src/hooks/usePublicSoldAuctions.ts"),
   ]);
 
   assert.match(app, /const isFeedPage = activePage === "feed"/);
   assert.match(app, /const isProductSurface = isHomePage \|\| isFeedPage/);
   assert.match(app, /useSupabaseProducts\(\{ enabled: isProductSurface \}\)/);
-  assert.match(app, /enabled: isHomePage \|\| isShopPage/);
+  assert.match(app, /enabled: isShopPage/);
   assert.match(app, /saleType: "fixed"/);
-  assert.match(app, /usePublicSoldAuctions\(\{ enabled: isHomePage \}\)/);
   assert.match(
     app,
     /enabled: isFeedPage && !auth\.isLoading && showOnlineMembers/,
   );
   assert.match(productsHook, /if \(!enabled\) \{/);
-  assert.match(soldHook, /if \(!enabled\) return;/);
 });
 
 test("coalesces product realtime bursts and rejects stale request results", async () => {
@@ -116,8 +115,10 @@ test("pages the public product feed in stable 24-row server ranges", async () =>
   assert.match(app, /hasMoreProducts=\{hasMoreProducts\}/);
   assert.match(app, /isLoadingMore=\{productsLoadingMore\}/);
   assert.match(app, /onLoadMore=\{loadMoreProducts\}/);
-  assert.match(feed, /hiddenPostCount > 0 \|\| hasMoreProducts/);
-  assert.match(feed, /await onLoadMore\(\)/);
+  assert.match(feed, /const PAGE_SIZE = 24/);
+  assert.match(feed, /aria-label="경매 상품 페이지 이동"/);
+  assert.match(feed, /const renderedPageCount/);
+  assert.match(feed, /page \* PAGE_SIZE > posts\.length/);
 });
 
 test("defers closed operator section bodies until their first expansion", async () => {

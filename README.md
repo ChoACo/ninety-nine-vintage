@@ -1,6 +1,6 @@
-# 다미네 구제
+# 나인티 나인 빈티지
 
-빈티지 의류 경매를 위한 vinext 기반 웹 애플리케이션입니다. Vercel의 SSR 런타임에서 실행하며, 상품·입찰·회원 인증·상담 채팅·이미지는 Supabase Database, Auth, Realtime, Storage에 저장합니다.
+빈티지 의류 경매를 위한 Next.js App Router 애플리케이션입니다. Vercel의 SSR 런타임에서 실행하며, 상품·입찰·회원 인증·상담 채팅·이미지는 Supabase Database, Auth, Realtime, Storage에 저장합니다.
 
 - 운영 도메인: <https://www.ninety-nine-vintage.store>
 - Supabase 프로젝트: `bkwesxsznqupoqnwzzmn`
@@ -160,13 +160,13 @@ VITE_PORTONE_WEBHOOK_URL
 채널, 웹훅 등록과 테스트 절차는 [PortOne V2 설정 문서](docs/portone-v2-setup.md)를
 따릅니다.
 
-`vercel.json`과 Vite 설정은 vinext를 정적 사이트가 아닌 Nitro/Vercel SSR 출력으로 빌드합니다. pnpm이 네이티브 빌드 스크립트를 차단하지 않도록 `pnpm-workspace.yaml`의 허용 목록도 유지합니다.
+라우트는 `src/app` 아래의 Next.js App Router에서 SSR과 Route Handler로 제공됩니다. `vercel.json`은 Next.js 프레임워크와 `pnpm build`를 사용하며, pnpm이 네이티브 빌드 스크립트를 차단하지 않도록 `pnpm-workspace.yaml`과 `package.json`의 허용 목록을 유지합니다. 기존 Cloudflare/Vite 산출물(`build/`, `worker/`, `.openai/hosting.json`)은 롤백을 위한 비활성 보관본입니다.
 
 ```powershell
 pnpm lint
 pnpm exec tsc --noEmit
 pnpm test
-pnpm dlx vercel@latest --prod --yes
+pnpm build
 ```
 
 ## 배포 후 확인

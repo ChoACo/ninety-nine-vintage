@@ -728,6 +728,41 @@ export async function fetchPublishedProductsPage({
   };
 }
 
+/**
+ * 데스크톱 상품 상세 라우트가 사용하는 단건 공개 조회입니다.
+ * 목록 페이지와 동일하게 현재 공개 시각·상태·판매 경로를 서버에서 제한해
+ * 비공개/예약 상품이 상세 URL을 통해 노출되지 않도록 합니다.
+ */
+export async function fetchPublishedProductById(
+  productId: string,
+  now: Date = new Date(),
+): Promise<AuctionPost | null> {
+  const normalizedId = productId.trim();
+  if (!normalizedId) return null;
+
+  const { data, error } = await getSupabaseBrowserClient()
+    .from("products")
+    .select(PRODUCT_COLUMNS)
+    .eq("id", normalizedId)
+    .eq("status", "active")
+    .lte("publish_at", now.toISOString())
+    .maybeSingle();
+
+  if (error) {
+    throw new ProductRepositoryError(
+      "상품 상세를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+      { cause: error },
+    );
+  }
+  if (!data) return null;
+
+  const post = mapProductRowToAuctionPost(data as unknown as ProductRow);
+  return post.status === "active" &&
+    Date.parse(post.publish_at ?? post.createdAt) <= now.getTime()
+    ? post
+    : null;
+}
+
 /** 정가 상점 전용 페이지 조회입니다. 경매 피드와 서버 범위를 분리합니다. */
 export async function fetchPublishedFixedProductsPage({
   page = 0,

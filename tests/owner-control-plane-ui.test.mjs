@@ -7,8 +7,8 @@ const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8"
 test("owner route hides unauthorized users behind the route not-found boundary", async () => {
   const [page, route, notFoundPage] = await Promise.all([
     source("src/components/owner/OwnerPrivatePage.tsx"),
-    source("app/owner/page.tsx"),
-    source("app/owner/not-found.tsx"),
+    source("src/app/owner/page.tsx"),
+    source("src/app/owner/not-found.tsx"),
   ]);
 
   assert.match(page, /!auth\.user \|\| !auth\.session \|\| !isOwnerRole\(auth\.role\)/);
@@ -90,7 +90,7 @@ test("RBAC engine exposes four assignable roles and immutable authorization hist
 test("emergency zone changes only supported payment runtime and refuses fake controls", async () => {
   const [panel, route, client] = await Promise.all([
     source("src/components/owner/OwnerEmergencyControlPanel.tsx"),
-    source("app/api/owner/payment-mode/route.ts"),
+    source("src/app/api/owner/payment-mode/route.ts"),
     source("src/lib/ownerAccess/client.ts"),
   ]);
 

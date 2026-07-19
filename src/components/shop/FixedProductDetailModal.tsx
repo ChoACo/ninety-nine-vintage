@@ -5,7 +5,7 @@ import Modal from "@/src/components/common/Modal";
 import PhotoGallery from "@/src/components/feed/PhotoGallery";
 import type { AuctionPost } from "@/src/types/auction";
 import { formatKRW } from "@/src/utils/formatters";
-import { getProductFeedDetails } from "@/src/utils/productFeedDetails";
+import { toCommerceProductView } from "@/src/features/commerce/productViewModel";
 
 export interface FixedProductDetailModalProps {
   open: boolean;
@@ -22,8 +22,8 @@ export default function FixedProductDetailModal({
 }: FixedProductDetailModalProps) {
   if (!post) return null;
 
-  const details = getProductFeedDetails(post);
-  const productLabel = details.name || post.title;
+  const productView = toCommerceProductView(post);
+  const productLabel = productView.name;
   const fixedPrice = post.fixedPrice ?? 0;
 
   return (
@@ -76,7 +76,7 @@ export default function FixedProductDetailModal({
                     Size
                   </dt>
                   <dd className="break-words font-bold text-[var(--text-strong)]">
-                    {details.size || "표기 없음"}
+                    {productView.size}
                   </dd>
                 </div>
                 <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 py-3">
@@ -84,13 +84,13 @@ export default function FixedProductDetailModal({
                     Condition
                   </dt>
                   <dd className="break-words font-bold text-[var(--text-strong)]">
-                    {details.condition || "상세 사진 참고"}
+                    {productView.condition}
                   </dd>
                 </div>
               </dl>
-              {!details.isCanonical && details.legacyDescription ? (
+              {productView.description ? (
                 <p className="mt-4 whitespace-pre-line break-keep text-sm font-medium leading-7 text-[var(--text-muted)]">
-                  {details.legacyDescription}
+                  {productView.description}
                 </p>
               ) : null}
             </div>

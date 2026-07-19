@@ -7,11 +7,17 @@ import { useAuctionPolicyMinuteClock } from "@/src/hooks/useAuctionPolicyClock";
 import type { AuctionPost } from "@/src/types/auction";
 import { getAuctionBidDecision } from "@/src/utils/auctionBidPolicy";
 import {
+  getCatalogBrand,
   matchesCatalogSearch,
+  matchesCatalogBrand,
+  matchesCatalogCategory,
+  matchesCatalogGender,
   matchesCatalogSize,
   sortCatalogPosts,
+  type CatalogCategory,
   type CatalogSize,
   type CatalogSort,
+  type CatalogGender,
 } from "@/src/utils/catalogFilters";
 import DateFilterChips, { getKoreanDateKey } from "./DateFilterChips";
 import FeedProductControlModal, {
@@ -22,8 +28,21 @@ import PostCard, {
   type InquiryHandler,
 } from "./PostCard";
 
-const INITIAL_VISIBLE_POSTS = 8;
-const VISIBLE_POST_STEP = 8;
+const PAGE_SIZE = 24;
+const FEED_PAGE_STORAGE_KEY = "nnv:feed-page:v1";
+const CATALOG_CATEGORIES: readonly CatalogCategory[] = [
+  "all",
+  "아우터",
+  "셔츠",
+  "티셔츠",
+  "니트",
+  "팬츠",
+  "데님",
+  "스커트",
+  "원피스",
+  "기타",
+];
+const CATALOG_GENDERS: readonly CatalogGender[] = ["all", "남성", "여성", "공용"];
 
 export interface FeedListProps {
   posts: AuctionPost[];
@@ -103,13 +122,17 @@ export default function FeedList({
   } | null>(null);
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
   const [productControlError, setProductControlError] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageHydrated, setPageHydrated] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState<CatalogCategory>("all");
+  const [selectedGender, setSelectedGender] = useState<CatalogGender>("all");
   const fullCatalogLoadAttemptRef = useRef(-1);
   const {
     query,
     selectedDate,
     sort,
     size,
-    visibleCount,
     showTopButton,
     restorationMinHeight,
     feedRootRef,
@@ -117,12 +140,11 @@ export default function FeedList({
     setSelectedDate,
     setSort,
     setSize,
-    showMore,
     resetCatalog,
     scrollToTop,
   } = useFeedCatalogState({
-    initialVisibleCount: INITIAL_VISIBLE_POSTS,
-    visibleStep: VISIBLE_POST_STEP,
+    initialVisibleCount: PAGE_SIZE,
+    visibleStep: PAGE_SIZE,
     loadedProductCount: posts.length,
     isLoading,
     hasMoreProducts,
@@ -154,6 +176,15 @@ export default function FeedList({
       ).sort((a, b) => b.localeCompare(a)),
     [publishedPosts],
   );
+  const brandOptions = useMemo(
+    () => [
+      "all",
+      ...Array.from(new Set(publishedPosts.map((post) => getCatalogBrand(post)))).sort((a, b) =>
+        a.localeCompare(b, "ko-KR"),
+      ),
+    ],
+    [publishedPosts],
+  );
   const effectiveSelectedDate =
     selectedDate === "all" || dateKeys.includes(selectedDate)
       ? selectedDate
@@ -170,7 +201,10 @@ export default function FeedList({
     const refined = dateFiltered.filter(
       (post) =>
         matchesCatalogSize(post, size) &&
-        matchesCatalogSearch(post, query),
+        matchesCatalogSearch(post, query) &&
+        matchesCatalogBrand(post, selectedBrand) &&
+        matchesCatalogCategory(post, selectedCategory) &&
+        matchesCatalogGender(post, selectedGender),
     );
     return sortCatalogPosts(refined, sort);
   }, [
@@ -179,23 +213,128 @@ export default function FeedList({
     sort,
     effectiveSelectedDate,
     publishedPosts,
+    selectedBrand,
+    selectedCategory,
+    selectedGender,
   ]);
   const availableCount = filteredPosts.filter(
     (post) =>
       getAuctionBidDecision({ post, currentUserName, now: auctionNow }).allowed,
   ).length;
-  const visiblePosts = filteredPosts.slice(0, visibleCount);
-  const hiddenPostCount = Math.max(filteredPosts.length - visiblePosts.length, 0);
+  const pageCount = Math.max(1, Math.ceil(filteredPosts.length / PAGE_SIZE));
+  const visiblePosts = filteredPosts.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
+  const renderedPageCount = Math.min(pageCount + (hasMoreProducts ? 1 : 0), 99);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      const urlPage = Number(params.get("page"));
+      let savedPage = 1;
+      try {
+        savedPage = Number(sessionStorage.getItem(FEED_PAGE_STORAGE_KEY));
+      } catch {
+        savedPage = 1;
+      }
+      const nextPage = Number.isSafeInteger(urlPage) && urlPage > 0 ? urlPage : savedPage;
+      setPage(Number.isSafeInteger(nextPage) && nextPage > 0 ? Math.min(nextPage, 99) : 1);
+      setSelectedBrand(params.get("brand") || "all");
+      setSelectedCategory((params.get("category") as CatalogCategory) || "all");
+      setSelectedGender((params.get("gender") as CatalogGender) || "all");
+      setPageHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!pageHydrated) return;
+    const params = new URLSearchParams(window.location.search);
+    if (page > 1) params.set("page", String(page));
+    else params.delete("page");
+    if (selectedBrand !== "all") params.set("brand", selectedBrand);
+    else params.delete("brand");
+    if (selectedCategory !== "all") params.set("category", selectedCategory);
+    else params.delete("category");
+    if (selectedGender !== "all") params.set("gender", selectedGender);
+    else params.delete("gender");
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${params.toString()}${window.location.hash}`.replace(/\?$/, ""));
+    try {
+      sessionStorage.setItem(FEED_PAGE_STORAGE_KEY, String(page));
+    } catch {
+      // URL state still preserves the current page when storage is unavailable.
+    }
+  }, [page, pageHydrated, selectedBrand, selectedCategory, selectedGender]);
+
+  useEffect(() => {
+    if (page > pageCount && !hasMoreProducts) {
+      const timer = window.setTimeout(() => setPage(pageCount), 0);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
+  }, [hasMoreProducts, page, pageCount]);
+
+  useEffect(() => {
+    if (
+      pageHydrated &&
+      page * PAGE_SIZE > posts.length &&
+      hasMoreProducts &&
+      !isLoadingMore &&
+      onLoadMore
+    ) {
+      void onLoadMore();
+    }
+  }, [hasMoreProducts, isLoadingMore, onLoadMore, page, pageHydrated, posts.length]);
+
+  const updatePage = (nextPage: number) => {
+    const safePage = Math.max(1, Math.min(nextPage, renderedPageCount));
+    setPage(safePage);
+    if (safePage * PAGE_SIZE > posts.length && hasMoreProducts && onLoadMore) {
+      void onLoadMore();
+    }
+  };
+
+  const updateQuery = (value: string) => {
+    setQuery(value);
+    setPage(1);
+  };
+
+  const updateSort = (value: CatalogSort) => {
+    setSort(value);
+    setPage(1);
+  };
+
+  const updateSize = (value: CatalogSize) => {
+    setSize(value);
+    setPage(1);
+  };
+
+  const updateDate = (value: string) => {
+    setSelectedDate(value);
+    setPage(1);
+  };
+
+  const resetAllFilters = () => {
+    resetCatalog();
+    setSelectedBrand("all");
+    setSelectedCategory("all");
+    setSelectedGender("all");
+    setPage(1);
+  };
 
   const selectDate = (dateKey: string) => {
-    setSelectedDate(dateKey);
+    updateDate(dateKey);
   };
 
   const needsCompleteCatalog =
     query.trim().length > 0 ||
     size !== "all" ||
     sort !== "latest" ||
-    selectedDate !== "all";
+    selectedDate !== "all" ||
+    selectedBrand !== "all" ||
+    selectedCategory !== "all" ||
+    selectedGender !== "all";
 
   useEffect(() => {
     if (isLoading) fullCatalogLoadAttemptRef.current = -1;
@@ -225,17 +364,6 @@ export default function FeedList({
     onLoadMore,
     posts.length,
   ]);
-
-  const showMorePosts = async () => {
-    if (
-      hasMoreProducts &&
-      hiddenPostCount <= VISIBLE_POST_STEP &&
-      onLoadMore
-    ) {
-      await onLoadMore();
-    }
-    showMore();
-  };
 
   const confirmDeleteProduct = async () => {
     if (
@@ -308,7 +436,7 @@ export default function FeedList({
             <input
               type="search"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => updateQuery(event.target.value)}
               placeholder="상품명·설명·사이즈 검색"
               maxLength={80}
               className="min-w-0 flex-1 bg-transparent text-sm font-bold text-[var(--text-strong)] outline-none placeholder:text-[var(--text-muted)]"
@@ -316,7 +444,7 @@ export default function FeedList({
             {query ? (
               <button
                 type="button"
-                onClick={() => setQuery("")}
+                onClick={() => updateQuery("")}
                 aria-label="검색어 지우기"
                 className="grid min-h-9 min-w-9 place-items-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--text-strong)]"
               >
@@ -328,7 +456,7 @@ export default function FeedList({
 
         <button
           type="button"
-          onClick={resetCatalog}
+          onClick={resetAllFilters}
           className="min-h-11 rounded-lg border border-[var(--border)] px-4 text-xs font-black text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--text-strong)] hover:text-[var(--text-strong)] active:scale-[0.98]"
         >
           검색·필터 초기화
@@ -350,7 +478,7 @@ export default function FeedList({
                 key={value}
                 type="button"
                 aria-pressed={sort === value}
-                onClick={() => setSort(value)}
+                onClick={() => updateSort(value)}
                 className={`min-h-10 rounded-full border px-3.5 text-xs font-black transition-all duration-200 active:scale-[0.98] ${
                   sort === value
                     ? "border-[var(--text-strong)] bg-[var(--text-strong)] text-[var(--surface)] shadow-sm"
@@ -372,7 +500,7 @@ export default function FeedList({
               key={sizeOption}
               type="button"
               aria-pressed={size === sizeOption}
-              onClick={() => setSize(sizeOption)}
+              onClick={() => updateSize(sizeOption)}
               className={`min-h-10 min-w-10 rounded-md border px-3 font-mono text-xs font-black tabular-nums transition-all duration-200 active:scale-[0.97] ${
                 size === sizeOption
                   ? "border-[var(--accent)] bg-[var(--accent-surface)] text-[var(--accent-text)]"
@@ -391,6 +519,27 @@ export default function FeedList({
           selectedDate={effectiveSelectedDate}
           onSelect={selectDate}
         />
+      </div>
+
+      <div className="mb-5 grid gap-3 border-b border-[var(--border)] pb-5 lg:grid-cols-3" aria-label="상품 상세 필터">
+        <label className="grid gap-1.5">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">Brand</span>
+          <select value={selectedBrand} onChange={(event) => { setSelectedBrand(event.target.value); setPage(1); }} className="min-h-10 border border-[var(--border)] bg-[var(--surface-raised)] px-3 text-xs font-bold text-[var(--text-strong)] outline-none focus:border-[var(--text-strong)]">
+            {brandOptions.map((brand) => <option key={brand} value={brand}>{brand === "all" ? "모든 브랜드" : brand}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-1.5">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">Category</span>
+          <select value={selectedCategory} onChange={(event) => { setSelectedCategory(event.target.value as CatalogCategory); setPage(1); }} className="min-h-10 border border-[var(--border)] bg-[var(--surface-raised)] px-3 text-xs font-bold text-[var(--text-strong)] outline-none focus:border-[var(--text-strong)]">
+            {CATALOG_CATEGORIES.map((category) => <option key={category} value={category}>{category === "all" ? "모든 카테고리" : category}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-1.5">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">Gender</span>
+          <select value={selectedGender} onChange={(event) => { setSelectedGender(event.target.value as CatalogGender); setPage(1); }} className="min-h-10 border border-[var(--border)] bg-[var(--surface-raised)] px-3 text-xs font-bold text-[var(--text-strong)] outline-none focus:border-[var(--text-strong)]">
+            {CATALOG_GENDERS.map((gender) => <option key={gender} value={gender}>{gender === "all" ? "모든 성별" : gender}</option>)}
+          </select>
+        </label>
       </div>
 
       {needsCompleteCatalog && hasMoreProducts && !loadError ? (
@@ -479,23 +628,13 @@ export default function FeedList({
             />
           ))}
         </div>
-        {hiddenPostCount > 0 || hasMoreProducts ? (
-          <div className="mt-7 flex justify-center">
-            <button
-              type="button"
-              aria-controls="auction-feed-items"
-              disabled={isLoadingMore}
-              onClick={() => void showMorePosts()}
-              className="min-h-10 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-raised)] px-5 text-sm font-bold text-[var(--text-strong)] transition-all duration-200 ease-out hover:scale-[1.02] hover:border-[var(--text-strong)] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:cursor-wait disabled:opacity-60"
-            >
-              {isLoadingMore
-                ? "추가 상품 불러오는 중…"
-                : hiddenPostCount > 0
-                  ? `상품 더 보기 · ${hiddenPostCount.toLocaleString("ko-KR")}${hasMoreProducts ? "+" : ""}개 남음`
-                  : "추가 상품 불러오기"}
-            </button>
-          </div>
-        ) : null}
+        <nav className="mt-8 flex items-center justify-center gap-1.5" aria-label="경매 상품 페이지 이동">
+          <button type="button" onClick={() => updatePage(page - 1)} disabled={page <= 1} className="min-h-10 min-w-10 border border-[var(--border)] px-3 text-xs font-black text-[var(--text-muted)] transition-colors hover:border-[var(--text-strong)] hover:text-[var(--text-strong)] disabled:cursor-not-allowed disabled:opacity-35">이전</button>
+          {Array.from({ length: renderedPageCount }, (_, index) => index + 1).map((pageNumber) => (
+            <button key={pageNumber} type="button" aria-current={pageNumber === page ? "page" : undefined} aria-label={`${pageNumber}페이지`} onClick={() => updatePage(pageNumber)} disabled={isLoadingMore && pageNumber === page} className={`min-h-10 min-w-10 border px-3 font-mono text-xs font-black tabular-nums transition-all active:scale-95 ${pageNumber === page ? "border-[var(--text-strong)] bg-[var(--text-strong)] text-[var(--surface)]" : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--text-strong)] hover:text-[var(--text-strong)]"}`}>{isLoadingMore && pageNumber === page ? "…" : pageNumber}</button>
+          ))}
+          <button type="button" onClick={() => updatePage(page + 1)} disabled={page >= renderedPageCount || (isLoadingMore && page >= pageCount)} className="min-h-10 min-w-10 border border-[var(--border)] px-3 text-xs font-black text-[var(--text-muted)] transition-colors hover:border-[var(--text-strong)] hover:text-[var(--text-strong)] disabled:cursor-not-allowed disabled:opacity-35">다음</button>
+        </nav>
         </>
       ) : (
         <div className="border border-dashed border-[var(--border-strong)] bg-[var(--surface-raised)] px-6 py-16 text-center">

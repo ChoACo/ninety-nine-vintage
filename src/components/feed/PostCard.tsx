@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Button from "@/src/components/common/Button";
 import type { AuctionPost } from "@/src/types/auction";
 import {
@@ -17,10 +18,10 @@ import { getUserBidState, type UserBidStatus } from "@/src/utils/bidStatus";
 import BidConfirmModal from "./BidConfirmModal";
 import BidParticipationBadge from "./BidParticipationBadge";
 import { getProductFeedDetails } from "@/src/utils/productFeedDetails";
+import { toCommerceProductView } from "@/src/features/commerce/productViewModel";
 import BidFormModal from "./BidFormModal";
 import BidHistoryModal from "./BidHistoryModal";
 import PhotoGallery from "./PhotoGallery";
-import ProductDetailModal from "./ProductDetailModal";
 import ProductInquiryModal from "./ProductInquiryModal";
 import SizeComparisonScanner from "./SizeComparisonScanner";
 import type { FeedProductControlAction } from "./FeedProductControlModal";
@@ -139,7 +140,6 @@ export default function PostCard({
   const [bidModalOpen, setBidModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [inquiryModalOpen, setInquiryModalOpen] = useState(false);
-  const [productDetailOpen, setProductDetailOpen] = useState(false);
   const [sizeScannerOpen, setSizeScannerOpen] = useState(false);
   const [pendingBidAmount, setPendingBidAmount] = useState<number | null>(null);
   const [pendingCurrentPrice, setPendingCurrentPrice] = useState<number | null>(
@@ -158,12 +158,9 @@ export default function PostCard({
   const bidPresentation = bidStatusStyles[bidState.status];
   const displayedPrice = bidState.leadingBid?.amount ?? post.startingPrice;
   const productDetails = getProductFeedDetails(post);
-  const productLabel = productDetails.name;
-  const galleryProductLabel =
-    post.title
-      .normalize("NFKC")
-      .replace(/^\s*\[[^\]\r\n]*\]\s*/u, "")
-      .trim() || productLabel;
+  const productView = toCommerceProductView(post);
+  const productLabel = productView.name;
+  const galleryProductLabel = productLabel;
   const galleryLotLabel = `LOT ${post.id.slice(0, 8).toUpperCase()}`;
   const publishedAt = post.publish_at ?? post.createdAt;
   const closingPresentation = getClosingPresentation(post.closesAt, auctionNow);
@@ -255,62 +252,23 @@ export default function PostCard({
           lotLabel={galleryLotLabel}
           compact
         />
-        <span
-          className={`pointer-events-none absolute left-2 top-2 border px-1.5 py-1 font-mono text-[9px] font-black tabular-nums tracking-tight shadow-sm backdrop-blur-md sm:left-3 sm:top-3 sm:px-2.5 sm:py-1.5 sm:text-[11px] ${closingPresentation.classes}`}
-        >
-          {closingPresentation.label}
-        </span>
-        <span className="pointer-events-none absolute bottom-2 left-2 inline-flex items-center gap-1.5 rounded-md border border-orange-300/30 bg-black/75 px-2 py-1 text-[9px] font-black tracking-[0.1em] text-white backdrop-blur-md sm:bottom-3 sm:left-3 sm:text-[10px]">
-          <span aria-hidden="true" className="size-1.5 rounded-full bg-orange-400" />
-          LIVE BID
-        </span>
-        {bidDecision.reason === "auction-closed" &&
-        post.participantCount === 0 ? (
-          <span
-            role="status"
-            className="pointer-events-none absolute inset-x-2 bottom-10 z-10 rounded-md border border-amber-300/35 bg-black/82 px-2 py-1.5 text-center font-mono text-[9px] font-black tabular-nums tracking-tight text-amber-100 backdrop-blur-md sm:inset-x-3 sm:bottom-12 sm:text-[10px]"
-          >
-            ⏳ 22:00 재입찰 오픈 예정
-          </span>
-        ) : null}
-        {antiSnipingActive ? (
-          <span
-            role="status"
-            className="anti-sniping-pulse pointer-events-none absolute left-2 top-10 inline-flex items-center gap-1 rounded-md border border-orange-300/70 bg-gradient-to-r from-orange-600/95 to-red-600/95 px-2 py-1 font-mono text-[9px] font-black tabular-nums tracking-tight text-white shadow-[0_0_20px_rgba(249,115,22,0.45)] backdrop-blur-md sm:left-3 sm:top-12 sm:px-2.5 sm:text-[10px]"
-          >
-            <span aria-hidden="true">🔥</span>
-            마감 연장 · +3 MIN
-          </span>
-        ) : null}
-        {showOperatorControls && onRequestProductControl ? (
-          <div
-            role="toolbar"
-            aria-label={`${galleryLotLabel} 운영자 제어`}
-            className="absolute right-2 top-2 z-20 flex items-center gap-1 rounded-lg border border-red-400/20 bg-black/75 p-1 text-white shadow-lg backdrop-blur-md sm:right-3 sm:top-3"
-          >
-            <button
-              type="button"
-              aria-label={`${galleryLotLabel} 일시정지 및 미공개 전환`}
-              title="일시정지 · 서버 보호 정책 확인"
-              onClick={() => onRequestProductControl(post, "pause")}
-              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm transition-all duration-200 ease-out hover:scale-105 hover:border-amber-300/45 hover:bg-amber-500/20 active:scale-95 sm:min-h-9 sm:min-w-9"
-            >
-              <span aria-hidden="true">⏸</span>
-            </button>
-            <button
-              type="button"
-              aria-label={`${galleryLotLabel} 즉시 삭제`}
-              title="즉시 삭제"
-              onClick={() => onRequestProductControl(post, "delete")}
-              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md border border-red-400/25 bg-red-500/15 text-sm text-red-100 transition-all duration-200 ease-out hover:scale-105 hover:border-red-300/60 hover:bg-red-500/35 active:scale-95 sm:min-h-9 sm:min-w-9"
-            >
-              <span aria-hidden="true">🗑</span>
-            </button>
-          </div>
-        ) : null}
       </div>
 
       <div className="flex flex-1 flex-col p-2.5 sm:p-5 lg:p-4">
+        <div className="mb-2.5 flex min-h-9 items-center justify-between gap-2 border-b border-[var(--border)] pb-2.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className={`border px-2 py-1 font-mono text-[9px] font-black tabular-nums tracking-tight ${closingPresentation.classes.replace("bg-black/72", "bg-transparent").replace("bg-orange-500/90", "bg-[var(--warning-surface)]").replace("bg-red-600/90", "bg-[var(--danger-surface)]").replace("text-white", "text-[var(--text-strong)]")}`}>{closingPresentation.label}</span>
+            <span className="border border-[var(--border)] px-2 py-1 text-[9px] font-black tracking-[0.1em] text-[var(--text-muted)]">LIVE BID</span>
+            {antiSnipingActive ? <span role="status" className="border border-[var(--warning-text)]/40 bg-[var(--warning-surface)] px-2 py-1 font-mono text-[9px] font-black tabular-nums text-[var(--warning-text)]">🔥 +3 MIN</span> : null}
+            {bidDecision.reason === "auction-closed" && post.participantCount === 0 ? <span role="status" className="border border-[var(--warning-text)]/40 bg-[var(--warning-surface)] px-2 py-1 font-mono text-[9px] font-black tabular-nums text-[var(--warning-text)]">22:00 재입찰</span> : null}
+          </div>
+          {showOperatorControls && onRequestProductControl ? (
+            <div role="toolbar" aria-label={`${galleryLotLabel} 운영자 제어`} className="flex shrink-0 items-center gap-1">
+              <button type="button" aria-label={`${galleryLotLabel} 일시정지 및 미공개 전환`} title="일시정지 · 서버 보호 정책 확인" onClick={() => onRequestProductControl(post, "pause")} className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border border-[var(--border)] text-sm transition-all hover:border-[var(--warning-text)] hover:bg-[var(--warning-surface)] active:scale-95"><span aria-hidden="true">⏸</span></button>
+              <button type="button" aria-label={`${galleryLotLabel} 즉시 삭제`} title="즉시 삭제" onClick={() => onRequestProductControl(post, "delete")} className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border border-[var(--danger-text)]/35 text-sm text-[var(--danger-text)] transition-all hover:bg-[var(--danger-surface)] active:scale-95"><span aria-hidden="true">🗑</span></button>
+            </div>
+          ) : null}
+        </div>
         <header className="mb-2.5 flex items-center justify-between gap-1.5 border-b border-[var(--border)] pb-2.5 sm:mb-4 sm:gap-3 sm:pb-3">
           <div className="min-w-0 truncate text-[9px] font-bold uppercase tracking-[0.04em] text-[var(--text-muted)] sm:text-[11px] sm:tracking-[0.08em]">
             <time dateTime={publishedAt}>
@@ -331,49 +289,21 @@ export default function PostCard({
         </header>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {productDetails.isCanonical ? (
-            <dl
-              aria-label="상품 정보"
-              className="break-keep text-[11px] leading-4 tracking-[-0.015em] text-[var(--text-strong)] sm:text-sm sm:leading-6"
+          <div className="min-w-0 border-b border-[var(--border)] pb-3">
+            <p className="nn-data-label">{productView.brand}</p>
+            <Link
+              href={`/auction/${encodeURIComponent(post.id)}`}
+              className="mt-2 block line-clamp-2 text-[15px] font-black leading-5 tracking-[-0.035em] text-[var(--text-strong)] transition-colors hover:text-[var(--accent-text)]"
+              aria-label={`${productLabel} 상품 상세 보기`}
             >
-              <div>
-                <dt className="sr-only">Name:</dt>
-                <dd className="min-w-0">
-                  <button
-                    type="button"
-                    onClick={() => setProductDetailOpen(true)}
-                    className="line-clamp-2 w-full break-words text-left text-sm font-black leading-5 tracking-[-0.025em] text-[var(--text-strong)] underline-offset-4 transition-colors hover:text-[var(--accent-text)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] sm:text-lg sm:leading-6 lg:text-base"
-                    aria-label={`${productDetails.name} 상품 상세 보기`}
-                  >
-                    {productDetails.name}
-                  </button>
-                </dd>
-              </div>
-              <div className="mt-1.5 flex min-w-0 items-start gap-1 text-[11px] font-medium text-[var(--text-muted)] sm:mt-2 sm:gap-2 sm:text-[13px]">
-                <dt className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-[0.08em] sm:text-[10px] sm:tracking-[0.12em]">Size :</dt>
-                <dd className="line-clamp-2 min-w-0 break-words">{productDetails.size}</dd>
-              </div>
-              {productDetails.condition ? (
-                <div className="mt-1 flex min-w-0 items-start gap-1 text-[11px] font-medium text-[var(--text-muted)] sm:gap-2 sm:text-[13px]">
-                  <dt className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-[0.08em] sm:text-[10px] sm:tracking-[0.12em]">상품상태:</dt>
-                  <dd className="line-clamp-2 min-w-0 break-words">
-                    {productDetails.condition}
-                  </dd>
-                </div>
-              ) : null}
-            </dl>
-          ) : (
-            <div className="break-keep text-[var(--text-strong)]">
-              <button
-                type="button"
-                onClick={() => setProductDetailOpen(true)}
-                className="line-clamp-2 w-full whitespace-pre-line text-left text-xs font-bold leading-5 tracking-[-0.02em] text-[var(--text-strong)] underline-offset-4 transition-colors hover:text-[var(--accent-text)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] sm:line-clamp-4 sm:text-base sm:leading-6 lg:text-sm"
-                aria-label={`${productLabel} 상품 상세 보기`}
-              >
-                {productDetails.legacyDescription}
-              </button>
+              {productLabel}
+            </Link>
+            <div className="mt-2 flex items-center justify-between gap-3 text-[11px] font-bold text-[var(--text-muted)]">
+              <span className="truncate">SIZE {productView.size}</span>
+              <span className="shrink-0">{productView.condition}</span>
             </div>
-          )}
+            <Link href={`/auction/${encodeURIComponent(post.id)}`} className="mt-3 inline-flex text-[10px] font-black tracking-[0.12em] text-[var(--accent-text)] transition-colors hover:text-[var(--text-strong)]">DETAIL VIEW ↗</Link>
+          </div>
 
           <button
             type="button"
@@ -475,27 +405,6 @@ export default function PostCard({
           </div>
         </div>
       </div>
-
-      <ProductDetailModal
-        open={productDetailOpen}
-        onClose={() => setProductDetailOpen(false)}
-        post={post}
-        details={productDetails}
-        lotLabel={galleryLotLabel}
-        galleryTitle={galleryProductLabel}
-        closingLabel={closingPresentation.label}
-        priceLabel={bidPresentation.label}
-        displayedPrice={displayedPrice}
-        bidCount={post.bidHistory.length}
-        bidAllowed={bidDecision.allowed && !isSold}
-        unavailableBidLabel={unavailableBidLabel}
-        quickBidLabel={quickBidLabel}
-        onOpenInquiry={() => setInquiryModalOpen(true)}
-        onOpenSizeScanner={() => setSizeScannerOpen(true)}
-        onOpenBidHistory={() => setHistoryModalOpen(true)}
-        onOpenManualBid={() => setBidModalOpen(true)}
-        onQuickBid={requestQuickBid}
-      />
 
       <BidFormModal
         open={bidModalOpen}

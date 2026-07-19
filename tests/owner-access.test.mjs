@@ -115,10 +115,10 @@ test("provisions the non-login test identity only through the Supabase Admin API
 test("uses a fresh verified owner bearer for every owner API request", async () => {
   const [server, delegation, testMember, address, shipping] = await Promise.all([
     source("src/lib/ownerAccess/server.ts"),
-    source("app/api/owner/delegation/route.ts"),
-    source("app/api/owner/test-member/route.ts"),
-    source("app/api/owner/test-member/addresses/route.ts"),
-    source("app/api/owner/test-member/shipping/route.ts"),
+    source("src/app/api/owner/delegation/route.ts"),
+    source("src/app/api/owner/test-member/route.ts"),
+    source("src/app/api/owner/test-member/addresses/route.ts"),
+    source("src/app/api/owner/test-member/shipping/route.ts"),
   ]);
   assert.match(server, /verifier\.auth\.getUser\(accessToken\)/);
   assert.match(server, /data\.user\.id !== OWNER_USER_ID/);

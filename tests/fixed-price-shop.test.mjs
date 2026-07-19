@@ -7,7 +7,7 @@ const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 test("keeps the fixed-price shop prop-driven and separate from auction cards", async () => {
   const [route, app, shop, fixedDetail, home] = await Promise.all([
-    source("app/shop/page.tsx"),
+    source("src/app/shop/page.tsx"),
     source("src/components/AuctionApp.tsx"),
     source("src/components/shop/ShopPage.tsx"),
     source("src/components/shop/FixedProductDetailModal.tsx"),

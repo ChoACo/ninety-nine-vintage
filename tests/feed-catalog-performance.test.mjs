@@ -66,8 +66,8 @@ test("restores deep catalog state and mirrors refinements in the URL", async () 
 
 test("splits the brand home from the full catalog and gates destructive tools", async () => {
   const [homeRoute, feedRoute, home, app, card, modal, products] = await Promise.all([
-    source("app/page.tsx"),
-    source("app/feed/page.tsx"),
+    source("src/app/page.tsx"),
+    source("src/app/feed/page.tsx"),
     source("src/components/home/HomeLanding.tsx"),
     source("src/components/AuctionApp.tsx"),
     source("src/components/feed/PostCard.tsx"),

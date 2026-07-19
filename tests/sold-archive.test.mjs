@@ -114,7 +114,7 @@ test("keeps every same-time sale while advancing the composite cursor", async ()
 
 test("loads the sold archive in bounded cursor pages", async () => {
   const [route, page, repository, existingFeed] = await Promise.all([
-    source("app/sold/page.tsx"),
+    source("src/app/sold/page.tsx"),
     source("src/components/sold/SoldArchivePage.tsx"),
     source("src/lib/supabase/auctionLifecycle.ts"),
     source("src/components/feed/SoldAuctionFeed.tsx"),

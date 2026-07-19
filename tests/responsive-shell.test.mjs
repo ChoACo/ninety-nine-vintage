@@ -8,8 +8,8 @@ const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 test("keeps the application shell usable from 320px phones through tablets", async () => {
   const [globals, layout, header, navigation, themeToggle, themeStyles] =
     await Promise.all([
-      source("app/globals.css"),
-      source("app/layout.tsx"),
+      source("src/app/globals.css"),
+      source("src/app/layout.tsx"),
       source("src/components/common/SiteHeader.tsx"),
       source("src/components/common/Navigation.tsx"),
       source("src/components/common/ThemeToggle.tsx"),
@@ -49,7 +49,7 @@ test("uses a dense desktop catalog and a sticky two-column product detail worksp
   const [feed, card, detail, shop, fixedDetail] = await Promise.all([
     source("src/components/feed/FeedList.tsx"),
     source("src/components/feed/PostCard.tsx"),
-    source("src/components/feed/ProductDetailModal.tsx"),
+    source("src/components/features/auction/EditorialAuctionDetail.tsx"),
     source("src/components/shop/ShopPage.tsx"),
     source("src/components/shop/FixedProductDetailModal.tsx"),
   ]);
@@ -58,15 +58,15 @@ test("uses a dense desktop catalog and a sticky two-column product detail worksp
     feed,
     /grid grid-cols-2 items-stretch[^\"]*lg:grid-cols-4[^\"]*xl:grid-cols-5/,
   );
-  assert.match(card, /setProductDetailOpen\(true\)/);
-  assert.match(card, /<ProductDetailModal[\s\S]*onQuickBid=\{requestQuickBid\}/);
+  assert.match(card, /href=\{`\/auction\/\$\{encodeURIComponent\(post\.id\)\}`\}/);
+  assert.doesNotMatch(card, /<ProductDetailModal/);
   assert.match(
     detail,
-    /lg:grid-cols-\[minmax\(0,1\.35fr\)_minmax\(340px,\.65fr\)\]/,
+    /grid-cols-\[minmax\(0,1\.35fr\)_minmax\(360px,\.65fr\)\]/,
   );
   assert.match(
     detail,
-    /lg:sticky lg:top-0 lg:max-h-\[calc\(100dvh-8rem\)\]/,
+    /sticky top-\[7\.5rem\]/,
   );
   assert.match(shop, /lg:grid-cols-4 xl:grid-cols-5/);
   assert.match(

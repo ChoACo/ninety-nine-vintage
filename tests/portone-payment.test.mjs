@@ -145,9 +145,9 @@ test("fails closed and disables PortOne while the singleton mode is manual trans
 
 test("gates active payment endpoints before provider or ledger mutation", async () => {
   const [prepareSource, syncSource, webhookSource] = await Promise.all([
-    readFile(new URL("../app/api/payments/prepare/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/api/payments/sync/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/api/webhook/portone/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/api/payments/prepare/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/api/payments/sync/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/api/webhook/portone/route.ts", import.meta.url), "utf8"),
   ]);
 
   assert.ok(
@@ -190,7 +190,7 @@ test("payment backend keeps API secrets server-only and verifies provider data",
   const [serverSource, webhookSource, migrationSource] = await Promise.all([
     readFile(new URL("../src/lib/portone/server.ts", import.meta.url), "utf8"),
     readFile(
-      new URL("../app/api/webhook/portone/route.ts", import.meta.url),
+      new URL("../src/app/api/webhook/portone/route.ts", import.meta.url),
       "utf8",
     ),
     readFile(

@@ -13,7 +13,6 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "types": ["@cloudflare/workers-types"],
     "plugins": [
       {
         "name": "next"
@@ -31,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "db", "drizzle", "examples"]
+  "exclude": ["node_modules", "db", "drizzle", "examples", "worker", "build"]
 }

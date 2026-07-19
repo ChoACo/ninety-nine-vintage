@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import CommerceScheduleBanner from "@/src/components/commerce/CommerceScheduleBanner";
 import Button from "@/src/components/common/Button";
 import Modal from "@/src/components/common/Modal";
@@ -9,9 +10,21 @@ import { useAuctionPolicyMinuteClock } from "@/src/hooks/useAuctionPolicyClock";
 import type { AuctionPost } from "@/src/types/auction";
 import { formatKRW } from "@/src/utils/formatters";
 import { getProductFeedDetails } from "@/src/utils/productFeedDetails";
+import { toCommerceProductView } from "@/src/features/commerce/productViewModel";
+import {
+  getCatalogBrand,
+  getCatalogSizeTokens,
+  matchesCatalogCategory,
+  matchesCatalogGender,
+  type CatalogCategory,
+  type CatalogGender,
+} from "@/src/utils/catalogFilters";
 import FixedProductDetailModal from "./FixedProductDetailModal";
 
 type ShopSort = "latest" | "price-asc" | "price-desc";
+const SHOP_PAGE_SIZE = 20;
+const SHOP_CATEGORIES: readonly CatalogCategory[] = ["all", "아우터", "셔츠", "티셔츠", "니트", "팬츠", "데님", "스커트", "원피스", "기타"];
+const SHOP_GENDERS: readonly CatalogGender[] = ["all", "남성", "여성", "공용"];
 
 export interface ShopPageProps {
   posts: readonly AuctionPost[];
@@ -59,9 +72,9 @@ function FixedProductCard({
   onBuyNow: (post: AuctionPost) => void | Promise<void>;
   onOpenDetails: (post: AuctionPost) => void;
 }) {
-  const details = getProductFeedDetails(post);
   const fixedPrice = fixedPriceOf(post);
-  const productLabel = details.name || post.title;
+  const productView = toCommerceProductView(post);
+  const productLabel = productView.name;
 
   return (
     <article
@@ -95,10 +108,11 @@ function FixedProductCard({
             {productLabel}
           </button>
         </h2>
+        <button type="button" onClick={() => onOpenDetails(post)} className="mt-2 w-fit text-[10px] font-black tracking-[0.12em] text-[var(--accent-text)] underline-offset-4 transition-colors hover:text-[var(--text-strong)] hover:underline">상세 보기 →</button>
 
-        {details.size ? (
+        {productView.size !== "표기 없음" ? (
           <p className="mt-1.5 line-clamp-1 text-[11px] font-bold text-[var(--text-muted)] sm:text-xs">
-            SIZE · {details.size}
+            SIZE · {productView.size}
           </p>
         ) : null}
 
@@ -140,13 +154,15 @@ export default function ShopPage({
   error,
   onRetry,
   onBuyNow,
-  hasMoreProducts = false,
-  isLoadingMore = false,
-  onLoadMore,
 }: ShopPageProps) {
   const now = useAuctionPolicyMinuteClock();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<ShopSort>("latest");
+  const [selectedBrand, setSelectedBrand] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState<CatalogCategory>("all");
+  const [selectedGender, setSelectedGender] = useState<CatalogGender>("all");
+  const [selectedSize, setSelectedSize] = useState("all");
+  const [page, setPage] = useState(1);
   const [buyingProductId, setBuyingProductId] = useState<string | null>(null);
   const [pendingPurchase, setPendingPurchase] = useState<AuctionPost | null>(
     null,
@@ -166,11 +182,15 @@ export default function ShopPage({
       ) {
         return false;
       }
-      if (!normalizedQuery) return true;
       const details = getProductFeedDetails(post);
-      return normalizeSearch(
+      const matchesQuery = !normalizedQuery || normalizeSearch(
         [post.title, post.description, post.category, details.name, details.size ?? ""].join("\n"),
       ).includes(normalizedQuery);
+      return matchesQuery &&
+        (selectedBrand === "all" || getCatalogBrand(post) === selectedBrand) &&
+        matchesCatalogCategory(post, selectedCategory) &&
+        matchesCatalogGender(post, selectedGender) &&
+        (selectedSize === "all" || getCatalogSizeTokens(post).has(selectedSize));
     });
 
     return visible
@@ -196,7 +216,15 @@ export default function ShopPage({
         return difference || left.originalIndex - right.originalIndex;
       })
       .map(({ post }) => post);
-  }, [now, posts, query, sort]);
+  }, [now, posts, query, selectedBrand, selectedCategory, selectedGender, selectedSize, sort]);
+
+  const brandOptions = useMemo(
+    () => ["all", ...Array.from(new Set(posts.filter((post) => post.saleType === "fixed").map((post) => getCatalogBrand(post)))).sort((a, b) => a.localeCompare(b, "ko-KR"))],
+    [posts],
+  );
+  const pageCount = Math.max(1, Math.ceil(fixedProducts.length / SHOP_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const visibleProducts = fixedProducts.slice((safePage - 1) * SHOP_PAGE_SIZE, safePage * SHOP_PAGE_SIZE);
 
   const handleBuyNow = async (post: AuctionPost) => {
     if (buyingProductId) return;
@@ -216,34 +244,38 @@ export default function ShopPage({
     }
   };
 
+  const resetShopFilters = () => {
+    setQuery("");
+    setSort("latest");
+    setSelectedBrand("all");
+    setSelectedCategory("all");
+    setSelectedGender("all");
+    setSelectedSize("all");
+    setPage(1);
+  };
+
   return (
-    <main className="mx-auto w-full max-w-[1680px] px-3 pb-28 pt-4 sm:px-5 sm:pt-6 lg:px-6 lg:pb-14">
-      <header className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] shadow-sm">
-        <div className="grid items-end gap-5 px-5 py-7 sm:px-7 sm:py-9 lg:grid-cols-[minmax(0,1fr)_auto] lg:px-9">
+    <main className="mx-auto w-full max-w-[1920px] px-8 pb-20 pt-8">
+      <header className="grid min-h-[300px] grid-cols-[minmax(0,1fr)_360px] border-b-2 border-[var(--text-strong)]">
+        <div className="flex flex-col justify-between border-r border-[var(--border)] py-10 pr-12">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-text)]">
-              NINETY-NINE FIXED PRICE SHOP
-            </p>
-            <h1 className="mt-2 text-[2rem] font-black tracking-[-0.05em] text-[var(--text-strong)] sm:text-[2.75rem]">
-              기다림 없이 만나는 빈티지
-            </h1>
-            <p className="mt-3 max-w-2xl break-keep text-sm font-medium leading-6 text-[var(--text-muted)] sm:text-[15px] sm:leading-7">
-              상시 구매 상품은 표시된 정가로 바로 구매할 수 있습니다. 구매 버튼을 누른 뒤 서버에서 재고를 다시 확인해 결제 대기 상품으로 안전하게 연결합니다.
-            </p>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[var(--accent-text)]">NINETY-NINE · BUY NOW</p>
+            <h1 className="mt-5 text-[3.8rem] font-black leading-[0.98] tracking-[-0.07em] text-[var(--text-strong)]">기다림 없이<br />만나는 빈티지.</h1>
+            <p className="mt-5 max-w-2xl break-keep text-sm font-medium leading-6 text-[var(--text-muted)]">검수된 빈티지 의류를 표시된 정가로 바로 구매하세요. 구매 확정 후 서버가 재고를 다시 확인하고 결제 대기 상품으로 안전하게 연결합니다.</p>
           </div>
-          <span className="inline-flex w-fit items-baseline gap-1 border-y border-[var(--border)] px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--text-muted)]">
-            AVAILABLE
-            <strong className="font-mono text-lg font-black tabular-nums tracking-tight text-[var(--text-strong)]">
-              {fixedProducts.length.toLocaleString("ko-KR")}
-            </strong>
-          </span>
+          <div className="mt-8 flex items-center gap-6 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--text-muted)]"><span>READY TO SHIP</span><span>·</span><span>ONE-OF-ONE VINTAGE</span></div>
+        </div>
+        <div className="flex flex-col justify-between bg-[var(--surface-muted)] p-8">
+          <div className="flex items-center justify-between border-b border-[var(--border)] pb-4"><span className="text-[10px] font-black tracking-[0.18em]">SHOP INDEX</span><span className="font-mono text-xs font-black tabular-nums">01</span></div>
+          <div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--text-muted)]">AVAILABLE NOW</p><p className="mt-3 font-mono text-5xl font-black tabular-nums tracking-[-0.07em]">{fixedProducts.length.toLocaleString("ko-KR")}</p><p className="mt-3 text-sm font-medium leading-6 text-[var(--text-muted)]">선착순 한정 상품<br />재고 소진 시 자동 종료</p></div>
+          <Link href="/feed" className="text-xs font-black underline underline-offset-4 transition-colors hover:text-[var(--accent-text)]">라이브 경매도 둘러보기 →</Link>
         </div>
       </header>
 
       <CommerceScheduleBanner className="mt-4" compact />
 
-      <section className="mt-8" aria-labelledby="fixed-price-products-title">
-        <div className="mb-5 grid gap-3 border-b border-[var(--border)] pb-4 lg:grid-cols-[minmax(14rem,1fr)_auto] lg:items-end">
+      <section className="mt-10" aria-labelledby="fixed-price-products-title">
+        <div className="mb-5 grid gap-4 border-b border-[var(--border)] pb-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <label className="block min-w-0">
             <span id="fixed-price-products-title" className="text-xs font-black text-[var(--text-strong)]">
               상시 구매 상품 검색
@@ -254,14 +286,14 @@ export default function ShopPage({
                 type="search"
                 value={query}
                 maxLength={80}
-                onChange={(event) => setQuery(event.target.value.slice(0, 80))}
+                onChange={(event) => { setQuery(event.target.value.slice(0, 80)); setPage(1); }}
                 placeholder="상품명·설명·사이즈 검색"
                 className="min-w-0 flex-1 bg-transparent text-sm font-bold text-[var(--text-strong)] outline-none placeholder:text-[var(--text-muted)]"
               />
             </span>
           </label>
 
-          <div className="flex min-w-0 gap-1 overflow-x-auto" role="group" aria-label="상시 구매 상품 정렬">
+          <div className="flex min-w-0 items-center gap-1 overflow-x-auto" role="group" aria-label="상시 구매 상품 정렬">
             {(
               [
                 ["latest", "최신순"],
@@ -273,7 +305,7 @@ export default function ShopPage({
                 key={value}
                 type="button"
                 aria-pressed={sort === value}
-                onClick={() => setSort(value)}
+                onClick={() => { setSort(value); setPage(1); }}
                 className={`min-h-10 shrink-0 rounded-md border px-3 text-xs font-black transition-all duration-200 active:scale-[0.98] ${
                   sort === value
                     ? "border-[var(--text-strong)] bg-[var(--text-strong)] text-[var(--surface)]"
@@ -284,6 +316,14 @@ export default function ShopPage({
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="mb-6 grid grid-cols-5 gap-3 border-b border-[var(--border)] pb-6" aria-label="상시 구매 필터">
+          <label className="grid gap-1.5"><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">Brand</span><select value={selectedBrand} onChange={(event) => { setSelectedBrand(event.target.value); setPage(1); }} className="min-h-10 border border-[var(--border)] bg-[var(--surface-raised)] px-3 text-xs font-bold outline-none focus:border-[var(--text-strong)]"><option value="all">모든 브랜드</option>{brandOptions.filter((brand) => brand !== "all").map((brand) => <option key={brand} value={brand}>{brand}</option>)}</select></label>
+          <label className="grid gap-1.5"><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">Category</span><select value={selectedCategory} onChange={(event) => { setSelectedCategory(event.target.value as CatalogCategory); setPage(1); }} className="min-h-10 border border-[var(--border)] bg-[var(--surface-raised)] px-3 text-xs font-bold outline-none focus:border-[var(--text-strong)]">{SHOP_CATEGORIES.map((category) => <option key={category} value={category}>{category === "all" ? "모든 카테고리" : category}</option>)}</select></label>
+          <label className="grid gap-1.5"><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">Gender</span><select value={selectedGender} onChange={(event) => { setSelectedGender(event.target.value as CatalogGender); setPage(1); }} className="min-h-10 border border-[var(--border)] bg-[var(--surface-raised)] px-3 text-xs font-bold outline-none focus:border-[var(--text-strong)]">{SHOP_GENDERS.map((gender) => <option key={gender} value={gender}>{gender === "all" ? "모든 성별" : gender}</option>)}</select></label>
+          <label className="grid gap-1.5"><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">Size</span><select value={selectedSize} onChange={(event) => { setSelectedSize(event.target.value); setPage(1); }} className="min-h-10 border border-[var(--border)] bg-[var(--surface-raised)] px-3 text-xs font-bold outline-none focus:border-[var(--text-strong)]"><option value="all">모든 사이즈</option>{["S", "M", "L", "XL"].map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
+          <button type="button" onClick={resetShopFilters} className="mt-auto min-h-10 border border-[var(--border-strong)] px-3 text-xs font-black text-[var(--text-muted)] transition-colors hover:border-[var(--text-strong)] hover:text-[var(--text-strong)]">필터 초기화</button>
         </div>
 
         {actionError ? (
@@ -308,7 +348,7 @@ export default function ShopPage({
           </div>
         ) : fixedProducts.length > 0 ? (
           <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {fixedProducts.map((post) => (
+            {visibleProducts.map((post) => (
               <FixedProductCard
                 key={post.id}
                 post={post}
@@ -326,17 +366,42 @@ export default function ShopPage({
           </div>
         )}
 
-        {hasMoreProducts && onLoadMore ? (
-          <div className="mt-7 flex justify-center">
+        {fixedProducts.length > SHOP_PAGE_SIZE ? (
+          <nav className="mt-10 flex items-center justify-center gap-1.5 border-t border-[var(--border)] pt-6" aria-label="상시 구매 상품 페이지 이동">
             <button
               type="button"
-              disabled={isLoadingMore}
-              onClick={() => void onLoadMore()}
-              className="min-h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-raised)] px-5 text-sm font-black text-[var(--text-strong)] transition-all duration-200 hover:scale-[1.02] hover:border-[var(--text-strong)] active:scale-[0.98] disabled:cursor-wait disabled:opacity-55"
+              aria-label="이전 페이지"
+              disabled={safePage === 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              className="min-h-10 rounded-md border border-[var(--border)] px-3 text-xs font-black text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--text-strong)] hover:text-[var(--text-strong)] disabled:cursor-not-allowed disabled:opacity-35"
             >
-              {isLoadingMore ? "상품 불러오는 중…" : "상시 구매 상품 더 보기"}
+              ←
             </button>
-          </div>
+            {Array.from({ length: pageCount }, (_, index) => index + 1).map((pageNumber) => (
+              <button
+                key={pageNumber}
+                type="button"
+                aria-current={safePage === pageNumber ? "page" : undefined}
+                onClick={() => setPage(pageNumber)}
+                className={`min-h-10 min-w-10 rounded-md border px-3 text-xs font-mono font-black tabular-nums transition-all duration-200 active:scale-[0.98] ${
+                  safePage === pageNumber
+                    ? "border-[var(--text-strong)] bg-[var(--text-strong)] text-[var(--surface)]"
+                    : "border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-muted)] hover:border-[var(--text-strong)] hover:text-[var(--text-strong)]"
+                }`}
+              >
+                {String(pageNumber).padStart(2, "0")}
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-label="다음 페이지"
+              disabled={safePage === pageCount}
+              onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
+              className="min-h-10 rounded-md border border-[var(--border)] px-3 text-xs font-black text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--text-strong)] hover:text-[var(--text-strong)] disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              →
+            </button>
+          </nav>
         ) : null}
       </section>
 
@@ -360,7 +425,7 @@ export default function ShopPage({
         {pendingPurchase ? (
           <div className="p-5 sm:p-6">
             <p className="line-clamp-2 text-lg font-black tracking-[-0.03em] text-[var(--text-strong)]">
-              {getProductFeedDetails(pendingPurchase).name || pendingPurchase.title}
+              {toCommerceProductView(pendingPurchase).name}
             </p>
             <div className="mt-4 border-y border-[var(--border)] py-4">
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">

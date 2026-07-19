@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f2f0ea;
-  --foreground: #242321;
+  --background: #ffffff;
+  --foreground: #09090b;
   --coral: #a54a3c;
-  --cream: #f9f7f1;
-  --sky: #cdd2d0;
-  --surface: #f9f7f1;
-  --surface-raised: #fffefb;
-  --surface-muted: #eae7df;
-  --surface-glass: rgba(249, 247, 241, 0.92);
+  --cream: #ffffff;
+  --sky: #d4d4d8;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-muted: #f4f4f5;
+  --surface-glass: rgba(255, 255, 255, 0.95);
   --input-surface: #ffffff;
-  --text-strong: #171716;
-  --text-muted: #6e6b65;
-  --border: #d9d5cc;
-  --border-strong: #b8b3a9;
-  --accent: #20201f;
-  --accent-hover: #080808;
-  --accent-contrast: #fffef9;
+  --text-strong: #09090b;
+  --text-muted: #71717a;
+  --border: #e4e4e7;
+  --border-strong: #a1a1aa;
+  --accent: #09090b;
+  --accent-hover: #18181b;
+  --accent-contrast: #ffffff;
   --accent-text: #852f25;
   --accent-surface: #f1e3df;
   --info-surface: #e7ebe9;
@@ -29,15 +29,15 @@
   --warning-text: #755018;
   --danger-surface: #f3dfdc;
   --danger-text: #9b302a;
-  --app-gradient: linear-gradient(180deg, #f8f6f0 0%, #f2f0ea 45%, #eeece6 100%);
+  --app-gradient: linear-gradient(180deg, #ffffff 0%, #fafafa 55%, #f4f4f5 100%);
   --coral-glow: rgba(133, 47, 37, 0.06);
   --sky-glow: rgba(38, 52, 48, 0.05);
-  --header-shadow: 0 10px 32px rgba(30, 29, 27, 0.07);
-  --panel-shadow: 0 18px 48px rgba(30, 29, 27, 0.08);
-  --shadow-hover: 0 22px 54px rgba(30, 29, 27, 0.13);
+  --header-shadow: 0 10px 32px rgba(9, 9, 11, 0.07);
+  --panel-shadow: 0 18px 48px rgba(9, 9, 11, 0.08);
+  --shadow-hover: 0 22px 54px rgba(9, 9, 11, 0.13);
   --focus-ring: #8f3b30;
   --live-surface: #181817;
-  --live-foreground: #f7f3e9;
+  --live-foreground: #fafafa;
   --live-muted: #aaa69d;
   --live-border: rgba(255, 255, 255, 0.14);
   --urgency-soon: #d77a28;
@@ -109,6 +109,7 @@
 }
 
 html {
+  min-width: 1200px;
   scroll-behavior: smooth;
   background: var(--background);
   font-size: 16px;
@@ -117,6 +118,7 @@ html {
 }
 
 body {
+  min-width: 1200px;
   min-height: 100vh;
   min-height: 100dvh;
   margin: 0;
@@ -133,6 +135,105 @@ body {
 .theme-app-shell {
   background: var(--app-gradient);
   color: var(--foreground);
+}
+
+/* The v2 desktop commerce system intentionally lives beside legacy utility
+   classes while routes are migrated. It is token-only: commerce modules do
+   not own credentials, data transport, or authorization state. */
+.nn-site {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--surface-muted) 58%, transparent) 1px, transparent 1px) 0 0 / 96px 96px,
+    var(--background);
+}
+
+.nn-page::before {
+  position: fixed;
+  inset: 9rem 0 auto;
+  z-index: -1;
+  height: 22rem;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-muted) 68%, transparent), transparent);
+}
+
+.nn-ribbon {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.nn-header {
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--text-strong) 5%, transparent);
+}
+
+.nn-kicker {
+  font-size: 0.625rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.nn-display {
+  font-weight: 900;
+  letter-spacing: -0.075em;
+  line-height: 0.94;
+  color: var(--text-strong);
+}
+
+.nn-surface {
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.nn-surface:hover {
+  border-color: var(--border-strong);
+}
+
+.nn-data-label {
+  font-family: "SFMono-Regular", "Roboto Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.nn-page-title {
+  font-size: clamp(3rem, 5vw, 5.8rem);
+  font-weight: 900;
+  letter-spacing: -0.085em;
+  line-height: 0.88;
+  color: var(--text-strong);
+}
+
+.nn-action {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--text-strong);
+  background: var(--text-strong);
+  padding: 0.65rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: var(--surface);
+  transition: transform 180ms ease-out, box-shadow 180ms ease-out, background 180ms ease-out;
+}
+
+.nn-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--text-strong) 18%, transparent);
+}
+
+.nn-action:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.nn-action-secondary {
+  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--text-strong);
 }
 
 .theme-coral-glow {
@@ -560,6 +661,49 @@ video {
   .theme-surface-glass {
     background: var(--surface);
     backdrop-filter: none !important;
+  }
+}
+
+/* Editorial catalog language shared by every route. Functional components
+   continue to own their state and handlers; these rules only unify the shell,
+   dense grids, borders, and typography imported from the new prototype. */
+.editorial-site {
+  font-family: var(--font-sans);
+  letter-spacing: -0.012em;
+}
+
+.editorial-site .theme-panel,
+.editorial-site .theme-surface-glass {
+  border-radius: 0.18rem;
+  box-shadow: 0 1px 2px rgba(9, 9, 11, 0.04);
+}
+
+.editorial-site .theme-panel:hover,
+.editorial-site .theme-surface-glass:hover {
+  border-color: var(--border-strong);
+}
+
+.editorial-site .editorial-header a,
+.editorial-site .editorial-header button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.editorial-site .render-lazy {
+  border-radius: 0.12rem;
+}
+
+.editorial-site .commerce-skeleton {
+  background-color: var(--surface-muted);
+}
+
+.editorial-site .editorial-content {
+  min-height: calc(100vh - 7rem);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .editorial-site .theme-panel,
+  :root:not([data-theme="light"]) .editorial-site .theme-surface-glass {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
   }
 }
 

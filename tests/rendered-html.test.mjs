@@ -46,7 +46,7 @@ test("server-renders the Supabase-backed auction application", async () => {
   assert.doesNotMatch(html, /버버리 체크 안감|카멜 핸드메이드|Mock Data/i);
 });
 
-test("keeps the OAuth callback on the vinext SSR router", async () => {
+test("keeps the OAuth callback on the Next.js App Router", async () => {
   const response = await render("/auth/callback");
   assert.equal(response.status, 200);
   const html = await response.text();
@@ -57,9 +57,9 @@ test("keeps the OAuth callback on the vinext SSR router", async () => {
 test("publishes PG review business, terms, privacy, refund, and price information", async () => {
   const [footer, termsSource, refundSource, privacySource, productCard, soldFeed] = await Promise.all([
     source("src/components/common/BusinessFooter.tsx"),
-    source("app/terms/page.tsx"),
-    source("app/refund/page.tsx"),
-    source("app/privacy/page.tsx"),
+    source("src/app/terms/page.tsx"),
+    source("src/app/refund/page.tsx"),
+    source("src/app/privacy/page.tsx"),
     source("src/components/feed/PostCard.tsx"),
     source("src/components/feed/SoldAuctionFeed.tsx"),
   ]);
@@ -211,8 +211,8 @@ test("renders canonical product information with optional condition and legacy f
 
 test("server-renders a persistent light and dark theme selector", async () => {
   const [layout, globalStyles, toggle, toggleStyles, header, commonExports] = await Promise.all([
-    source("app/layout.tsx"),
-    source("app/globals.css"),
+    source("src/app/layout.tsx"),
+    source("src/app/globals.css"),
     source("src/components/common/ThemeToggle.tsx"),
     source("src/components/common/ThemeToggle.module.css"),
     source("src/components/common/SiteHeader.tsx"),
@@ -255,18 +255,17 @@ test("server-renders a persistent light and dark theme selector", async () => {
   );
 });
 
-test("keeps Vercel routes on the Nitro SSR output", async () => {
-  const [viteConfig, vercelSource] = await Promise.all([
-    source("vite.config.ts"),
+test("keeps Vercel routes on the Next.js SSR output", async () => {
+  const [nextConfig, vercelSource] = await Promise.all([
+    source("next.config.ts"),
     source("vercel.json"),
   ]);
   const vercel = JSON.parse(vercelSource);
 
-  assert.match(viteConfig, /process\.env\.VERCEL === "1"/);
-  assert.match(viteConfig, /nitro\(\{ renderer: false \}\)/);
-  assert.equal(vercel.framework, "nitro");
-  assert.equal(vercel.buildCommand, "pnpm exec vite build");
-  assert.equal(vercel.outputDirectory, null);
+  assert.match(nextConfig, /NextConfig/);
+  assert.equal(vercel.framework, "nextjs");
+  assert.equal(vercel.buildCommand, "pnpm build");
+  assert.equal("outputDirectory" in vercel, false);
 });
 
 test("keeps native build dependencies approved in both pnpm config locations", async () => {
@@ -288,16 +287,16 @@ test("uses console-approved Kakao OIDC consent as the only interactive login", a
     source("src/lib/supabase/auth.ts"),
     source("src/hooks/useAuthSession.ts"),
     source("src/components/auth/AuthModal.tsx"),
-    source("app/auth/callback/page.tsx"),
+    source("src/app/auth/callback/page.tsx"),
     source("src/lib/kakao/oidc.ts"),
-    source("app/api/auth/kakao/start/route.ts"),
-    source("app/api/auth/kakao/oidc/route.ts"),
-    source("app/api/auth/kakao/session/route.ts"),
-    source("app/api/auth/kakao/profile/route.ts"),
+    source("src/app/api/auth/kakao/start/route.ts"),
+    source("src/app/api/auth/kakao/oidc/route.ts"),
+    source("src/app/api/auth/kakao/session/route.ts"),
+    source("src/app/api/auth/kakao/profile/route.ts"),
     source("supabase/migrations/20260718020000_add_verified_kakao_profiles.sql"),
     source("supabase/migrations/20260718023000_gate_required_kakao_profiles.sql"),
-    source("app/privacy/page.tsx"),
-    source("app/signup/page.tsx"),
+    source("src/app/privacy/page.tsx"),
+    source("src/app/signup/page.tsx"),
     source(".env.example"),
     source("package.json"),
     source("src/components/AuctionApp.tsx"),
@@ -584,10 +583,10 @@ test("uses real member delivery data with a default-closed address panel", async
 
 test("allows verified Kakao members to delete accounts without losing required shipping history", async () => {
   const [accountRoute, accountRepository, retentionMigration, policy] = await Promise.all([
-    source("app/api/account/delete/route.ts"),
+    source("src/app/api/account/delete/route.ts"),
     source("src/lib/supabase/account.ts"),
     source("supabase/migrations/20260718022000_allow_account_deletion_with_shipping_history.sql"),
-    source("app/privacy/page.tsx"),
+    source("src/app/privacy/page.tsx"),
   ]);
   assert.match(accountRoute, /verifier\.auth\.getUser\(accessToken\)/);
   assert.match(accountRoute, /identity\.provider === "kakao"/);
@@ -662,6 +661,7 @@ test("provides a collapsible Supabase operator center with constrained product m
 test("keeps the owner publicly operator-only while providing audited private test controls", async () => {
   const [
     auctionApp,
+    editorialChrome,
     siteHeader,
     ownerServer,
     ownerClient,
@@ -674,11 +674,12 @@ test("keeps the owner publicly operator-only while providing audited private tes
     auctionPanel,
   ] = await Promise.all([
     source("src/components/AuctionApp.tsx"),
+    source("src/components/common/EditorialChrome.tsx"),
     source("src/components/common/SiteHeader.tsx"),
     source("src/lib/ownerAccess/server.ts"),
     source("src/lib/ownerAccess/client.ts"),
-    source("app/api/owner/delegation/route.ts"),
-    source("app/api/owner/test-member/route.ts"),
+    source("src/app/api/owner/delegation/route.ts"),
+    source("src/app/api/owner/test-member/route.ts"),
     source("src/components/owner/OwnerPrivatePage.tsx"),
     source("supabase/migrations/20260718060000_hidden_owner_delegation_and_test_member.sql"),
     source("src/components/owner/OwnerDelegationPanel.tsx"),
@@ -697,7 +698,7 @@ test("keeps the owner publicly operator-only while providing audited private tes
   assert.match(testMemberRoute, /get_owner_hidden_test_member/);
   assert.match(ownerClient, /Authorization: `Bearer \$\{accessToken\}`/);
   assert.match(auctionApp, /if \(role === "admin"\) return "operator"/);
-  assert.match(auctionApp, /onOpenOwnerTools=/);
+  assert.match(editorialChrome, /owner \? "\/owner" : operationsVisible \? "\/operator" : "\/account"/);
   assert.doesNotMatch(siteHeader, /관리자 메뉴|onOpenOwnerTools/);
   assert.doesNotMatch(siteHeader, /관리자 모드|PIN/);
   assert.match(delegationPanel, /감사 기록 활성/);

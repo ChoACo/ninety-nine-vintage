@@ -4,8 +4,6 @@ import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import {
   AuctionClock,
   Button,
-  Navigation,
-  SiteHeader,
   type NavigationTarget,
 } from "@/src/components/common";
 import { Toast } from "@/src/components/common/Toast";
@@ -14,7 +12,6 @@ import type { NewAuctionDraft } from "@/src/components/feed/NewAuctionModal";
 import { useAuthSession } from "@/src/hooks/useAuthSession";
 import { notifyMemberAccountChanged } from "@/src/lib/memberAccountEvents";
 import { useOnlineMembers } from "@/src/hooks/useOnlineMembers";
-import { usePublicSoldAuctions } from "@/src/hooks/usePublicSoldAuctions";
 import { useSupabaseProducts } from "@/src/hooks/useSupabaseProducts";
 import {
   canAccessOperationsCenter,
@@ -29,6 +26,7 @@ import type { SupportViewerRole } from "@/src/lib/supabase/supportChat";
 import type { createProductsBatch as CreateProductsBatch } from "@/src/lib/supabase/products";
 import type { AuctionPost } from "@/src/types/auction";
 import { formatKRW } from "@/src/utils/formatters";
+import { WorkspaceFrame } from "@/src/components/commerce/WorkspaceFrame";
 
 const AdminAccessGate = lazy(() =>
   import("@/src/components/admin/AdminAccessGate").then((module) => ({
@@ -60,10 +58,15 @@ const FloatingAdminChat = lazy(() =>
   })),
 );
 const FeedList = lazy(() => import("@/src/components/feed/FeedList"));
+const HomeLandingPage = lazy(() =>
+  import("@/src/components/home/HomeLandingPage").then((module) => ({
+    default: module.HomeLandingPage,
+  })),
+);
+const EditorialCatalogSidebar = lazy(() => import("@/src/components/feed/EditorialCatalogSidebar").then((module) => ({ default: module.EditorialCatalogSidebar })));
 const NewAuctionModal = lazy(
   () => import("@/src/components/feed/NewAuctionModal"),
 );
-const HomeLanding = lazy(() => import("@/src/components/home/HomeLanding"));
 const ShopPage = lazy(() => import("@/src/components/shop/ShopPage"));
 const AuctionOverviewSidebar = lazy(
   () => import("@/src/components/live/AuctionOverviewSidebar"),
@@ -110,27 +113,11 @@ function toSupportRole(role: AppRole): SupportViewerRole | null {
   return null;
 }
 
-function useDesktopRails() {
-  const [isDesktop, setIsDesktop] = useState(false);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width: 1536px)");
-    const sync = () => setIsDesktop(mediaQuery.matches);
-
-    sync();
-    mediaQuery.addEventListener("change", sync);
-    return () => mediaQuery.removeEventListener("change", sync);
-  }, []);
-
-  return isDesktop;
-}
-
 export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
   const [authOpen, setAuthOpen] = useState(false);
   const [newAuctionOpen, setNewAuctionOpen] = useState(false);
   const [bulkAuctionOpen, setBulkAuctionOpen] = useState(false);
   const [operationsRevision, setOperationsRevision] = useState(0);
-  const [isSigningOut, setIsSigningOut] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
   const auth = useAuthSession();
@@ -141,7 +128,9 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
   const isFeedPage = activePage === "feed";
   const isShopPage = activePage === "shop";
   const isProductSurface = isHomePage || isFeedPage;
-  const showDesktopRails = useDesktopRails();
+  // The v2 catalog owns its filtering and status surface. The former left/right
+  // rails remain intentionally disabled so the product canvas uses the full PC width.
+  const showDesktopRails = false;
   // The public feed includes authenticated members and ephemeral guest
   // Presence identities. Private owner/employee accounts remain absent from
   // the directory inside useOnlineMembers.
@@ -179,10 +168,9 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
     refreshProducts: refreshFixedPriceProducts,
     loadMoreProducts: loadMoreFixedPriceProducts,
   } = useSupabaseProducts({
-    enabled: isHomePage || isShopPage,
+    enabled: isShopPage,
     saleType: "fixed",
   });
-  const soldAuctions = usePublicSoldAuctions({ enabled: isHomePage });
 
   const showToast = useCallback((message: string) => {
     setToastMessage("");
@@ -362,7 +350,6 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
   };
 
   const handleSignOut = async () => {
-    setIsSigningOut(true);
     try {
       await auth.signOut();
       setNewAuctionOpen(false);
@@ -371,29 +358,20 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
       navigateToPage("feed");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "로그아웃하지 못했습니다.");
-    } finally {
-      setIsSigningOut(false);
     }
   };
 
   const renderPage = () => {
     if (activePage === "home") {
       return (
-        <HomeLanding
-          posts={[...posts, ...fixedPricePosts]}
-          isLoading={productsLoading || fixedPriceProductsLoading}
-          error={productsError || fixedPriceProductsError}
-          onRetry={async () => {
-            await Promise.all([
-              refreshProducts(),
-              refreshFixedPriceProducts(),
-            ]);
-          }}
-          soldAuctions={soldAuctions.auctions}
-          soldAuctionsLoading={soldAuctions.isLoading}
-          soldAuctionsError={soldAuctions.error}
-          onRetrySoldAuctions={soldAuctions.refresh}
-        />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <HomeLandingPage
+            posts={posts}
+            isLoading={productsLoading}
+            onSignIn={openAuthentication}
+            isAuthenticated={Boolean(auth.user)}
+          />
+        </Suspense>
       );
     }
 
@@ -414,62 +392,82 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
 
     if (activePage === "chat") {
       return (
-        <main className="mx-auto w-full max-w-7xl px-4 pb-28 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pb-12">
+        <WorkspaceFrame
+          eyebrow="PRIVATE SUPPORT / REALTIME"
+          title="상담 센터"
+          description="상품 문의와 결제·배송 관련 대화를 담당 운영자와 안전하게 이어갈 수 있습니다. 모든 대화는 권한에 맞게 분리됩니다."
+        >
           <ChatPage
             userId={auth.user?.id ?? null}
             role={auth.user ? toSupportRole(auth.role) : null}
             onRequestSignIn={openAuthentication}
           />
-        </main>
+        </WorkspaceFrame>
       );
     }
 
     if (activePage === "profile") {
       if (auth.user && isStaffRole(auth.role)) {
         return (
-          <StaffAccountPage
+          <WorkspaceFrame
+            eyebrow="STAFF / ACCOUNT"
+            title="업무 계정"
+            description="운영 업무와 계정 세션을 안전하게 관리합니다."
+          ><StaffAccountPage
             role={auth.role}
             displayName={publicDisplayName}
             onOpenWorkspace={() => navigateToPage("admin")}
             onSignOut={handleSignOut}
-          />
+          /></WorkspaceFrame>
         );
       }
 
-      return (
-        <AccountPage
-          userId={auth.user?.id}
-          displayName={publicDisplayName}
-          avatarUrl={auth.profile?.avatarUrl}
+        return (
+          <WorkspaceFrame
+            eyebrow="MY NINETY-NINE"
+            title="내 컬렉션과 주문"
+            description="낙찰·구매 확정 상품의 결제와 배송, 보관함과 프로필을 한 곳에서 관리합니다."
+          ><AccountPage
+            userId={auth.user?.id}
+            displayName={publicDisplayName}
+            avatarUrl={auth.profile?.avatarUrl}
           email={auth.user?.email}
           role="user"
           onSignIn={openAuthentication}
-          onSignOut={handleSignOut}
-          onProfileRefresh={auth.refreshProfile}
-        />
-      );
-    }
+            onSignOut={handleSignOut}
+            onProfileRefresh={auth.refreshProfile}
+          /></WorkspaceFrame>
+        );
+      }
 
     if (activePage === "admin") {
       if (canAccessOperationsCenter(auth.role)) {
         return (
-          <AdminPage
+          <WorkspaceFrame
+            eyebrow="OPERATIONS / LIVE"
+            title="운영 워크스페이스"
+            description="상품 등록부터 배송·입금·회원 관리를 하나의 업무 흐름으로 처리합니다."
+          ><AdminPage
             key={`${operationsRevision}-${operationsRole}`}
             role={operationsRole}
             onCreateProduct={() => setNewAuctionOpen(true)}
             onOpenBulkImport={() => setBulkAuctionOpen(true)}
             onProductsChanged={refreshProducts}
             onNotify={showToast}
-          />
+          /></WorkspaceFrame>
         );
       }
 
       if (auth.role === "employee") {
         return (
-          <EmployeeOperationsPage
+          <WorkspaceFrame
+            eyebrow="STAFF / OPERATIONS"
+            title="업무 작업대"
+            description="등록과 배송 대기 업무를 처리하는 직원 전용 화면입니다."
+          ><EmployeeOperationsPage
             onCreateProduct={() => setNewAuctionOpen(true)}
             onOpenBulkImport={() => setBulkAuctionOpen(true)}
-          />
+          /></WorkspaceFrame>
         );
       }
 
@@ -479,14 +477,8 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
     }
 
     return (
-      <main className="mx-auto w-full max-w-[1680px] px-3 pb-28 pt-4 sm:px-5 sm:pt-6 lg:px-6 lg:pb-14">
-        <div
-          className={`grid items-start gap-4 2xl:gap-5 ${
-            showOnlineMembers
-              ? "2xl:grid-cols-[220px_minmax(0,1fr)_272px]"
-              : "2xl:grid-cols-[minmax(0,1fr)_272px]"
-          }`}
-        >
+      <main className="mx-auto w-full max-w-[1760px] px-10 pb-24 pt-7">
+        <div className="min-w-0">
           {showOnlineMembers && showDesktopRails ? (
             <OnlineMembersSidebar
               members={onlineMembers}
@@ -494,7 +486,7 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
               hasMore={hasMoreOnlineMembers}
               status={onlineMembersStatus}
               error={onlineMembersError}
-              className="hidden 2xl:block"
+              className="hidden min-[1200px]:block"
             />
           ) : null}
 
@@ -514,7 +506,7 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
             {showOnlineMembers ? (
               <section
                 aria-label="현재 온라인 사용자 요약"
-                className="theme-panel mt-3 flex min-h-11 items-center gap-2 overflow-hidden rounded-xl border px-3 py-2 shadow-sm 2xl:hidden"
+                className="nn-surface mt-3 flex min-h-11 items-center gap-2 overflow-hidden px-4 py-2"
               >
                 <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-bold tracking-tight text-[var(--success-text)]">
                   <span
@@ -546,22 +538,44 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
               </section>
             ) : null}
 
-            <FeedList
-              posts={posts}
-              currentUserName={publicDisplayName}
-              currentUserId={isMember ? auth.user?.id : null}
-              onBid={handleBid}
-              onInquiry={handleProductInquiry}
-              isLoading={productsLoading}
-              hasMoreProducts={hasMoreProducts}
-              isLoadingMore={productsLoadingMore}
-              loadError={productsError}
-              onRetry={refreshProducts}
-              onLoadMore={loadMoreProducts}
-              showOperatorControls={canAccessOperationsCenter(auth.role)}
-              onDeleteProduct={handleDeleteFeedProduct}
-              description="오후 8시 56분 이후 무입찰 첫 건은 즉시 확정되며, 오후 9시 정산 후 미판매 상품은 오후 10시에 다시 열립니다."
-            />
+            {isFeedPage && showDesktopRails ? (
+              <div className="grid items-start gap-4 lg:grid-cols-[188px_minmax(0,1fr)]">
+                <Suspense fallback={null}><EditorialCatalogSidebar /></Suspense>
+                <FeedList
+                  posts={posts}
+                  currentUserName={publicDisplayName}
+                  currentUserId={isMember ? auth.user?.id : null}
+                  onBid={handleBid}
+                  onInquiry={handleProductInquiry}
+                  isLoading={productsLoading}
+                  hasMoreProducts={hasMoreProducts}
+                  isLoadingMore={productsLoadingMore}
+                  loadError={productsError}
+                  onRetry={refreshProducts}
+                  onLoadMore={loadMoreProducts}
+                  showOperatorControls={canAccessOperationsCenter(auth.role)}
+                  onDeleteProduct={handleDeleteFeedProduct}
+                  description="오후 8시 56분 이후 무입찰 첫 건은 즉시 확정되며, 오후 9시 정산 후 미판매 상품은 오후 10시에 다시 열립니다."
+                />
+              </div>
+            ) : (
+              <FeedList
+                posts={posts}
+                currentUserName={publicDisplayName}
+                currentUserId={isMember ? auth.user?.id : null}
+                onBid={handleBid}
+                onInquiry={handleProductInquiry}
+                isLoading={productsLoading}
+                hasMoreProducts={hasMoreProducts}
+                isLoadingMore={productsLoadingMore}
+                loadError={productsError}
+                onRetry={refreshProducts}
+                onLoadMore={loadMoreProducts}
+                showOperatorControls={canAccessOperationsCenter(auth.role)}
+                onDeleteProduct={handleDeleteFeedProduct}
+                description="오후 8시 56분 이후 무입찰 첫 건은 즉시 확정되며, 오후 9시 정산 후 미판매 상품은 오후 10시에 다시 열립니다."
+              />
+            )}
           </div>
 
           {showDesktopRails && isMember ? (
@@ -569,15 +583,15 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
               posts={posts}
               currentUserName={publicDisplayName}
               onBid={handleBid}
-              className="hidden 2xl:block"
+              className="hidden min-[1200px]:block"
             />
           ) : showDesktopRails && auth.user && isStaffRole(auth.role) ? (
             <AuctionOverviewSidebar
               posts={posts}
-              className="hidden 2xl:block"
+              className="hidden min-[1200px]:block"
             />
           ) : showDesktopRails ? (
-            <aside className="theme-panel sticky top-24 hidden overflow-hidden rounded-2xl border shadow-sm 2xl:block">
+            <aside className="theme-panel sticky top-24 hidden overflow-hidden rounded-2xl border shadow-sm min-[1200px]:block">
               <div className="border-b border-[var(--border)] px-4 py-3 text-left">
                 <p className="text-[10px] font-bold tracking-[0.18em] text-[var(--text-muted)]">MY AUCTIONS</p>
                 <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">내 입찰 현황</p>
@@ -613,40 +627,6 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 opacity-[0.32] [background-image:linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:linear-gradient(to_bottom,black,transparent_38%)]"
-      />
-
-      <div className="relative mx-auto w-full max-w-[1680px] px-3 pt-3 sm:px-5 sm:pt-5 md:hidden">
-        <SiteHeader
-          role={auth.role}
-          isAuthenticated={Boolean(auth.user)}
-          displayName={publicDisplayName}
-          onOpenAuth={openAuthentication}
-          isSigningOut={isSigningOut}
-          onSignOut={auth.user ? handleSignOut : undefined}
-        />
-      </div>
-
-      <Navigation
-        activePage={activePage}
-        onNavigate={(page) => {
-          if (page === "profile" && isOwnerRole(auth.role)) {
-            window.location.assign("/owner");
-            return;
-          }
-          navigateToPage(page);
-        }}
-        onOpenOwnerTools={
-          isOwnerRole(auth.role)
-            ? () => window.location.assign("/owner")
-            : undefined
-        }
-        role={auth.role}
-        isAuthenticated={Boolean(auth.user)}
-        displayName={publicDisplayName}
-        onOpenAuth={openAuthentication}
-        isSigningOut={isSigningOut}
-        onSignOut={auth.user ? handleSignOut : undefined}
-        className="mt-3"
       />
 
       <div key={activePage} className="animate-fade-in-up relative">

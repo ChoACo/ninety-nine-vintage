@@ -7,7 +7,7 @@ const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 test("exposes reusable high-end commerce primitives with accessible motion fallbacks", async () => {
   const [globals, button, modal, toast] = await Promise.all([
-    source("app/globals.css"),
+    source("src/app/globals.css"),
     source("src/components/common/Button.tsx"),
     source("src/components/common/Modal.tsx"),
     source("src/components/common/Toast.tsx"),
@@ -31,7 +31,7 @@ test("keeps auction urgency in the visual layer while preserving the policy cloc
   const [clock, auctionApp, homeLanding] = await Promise.all([
     source("src/components/common/AuctionClock.tsx"),
     source("src/components/AuctionApp.tsx"),
-    source("src/components/home/HomeLanding.tsx"),
+    source("src/components/home/HomeLandingPage.tsx"),
   ]);
 
   assert.match(clock, /displayCountdown\.totalSeconds <= 10 \* 60/);
@@ -46,8 +46,10 @@ test("keeps auction urgency in the visual layer while preserving the policy cloc
     /<AuctionClock[\s\S]*antiSnipingDeadlines=\{posts[\s\S]*antiSnipingExtensionCount/,
   );
   assert.match(auctionApp, /<FeedList[\s\S]*onBid=\{handleBid\}/);
-  assert.match(auctionApp, /const HomeLanding = lazy/);
-  assert.match(homeLanding, /<SoldAuctionFeed/);
+  assert.match(auctionApp, /const HomeLandingPage = lazy/);
+  assert.match(homeLanding, /LIVE AUCTION 입장/);
+  assert.match(homeLanding, /지금 공개된 상품/);
+  assert.match(homeLanding, /href="\/shop"/);
   assert.match(auctionApp, /commerce-skeleton/);
 });
 

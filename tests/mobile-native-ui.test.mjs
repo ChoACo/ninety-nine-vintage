@@ -11,7 +11,7 @@ test("uses a permission-aware safe-area bottom navigation and compact two-column
     source("src/components/common/AuctionClock.tsx"),
     source("src/components/feed/FeedList.tsx"),
     source("src/components/feed/SoldAuctionFeed.tsx"),
-    source("app/globals.css"),
+    source("src/app/globals.css"),
   ]);
 
   assert.match(navigation, /visibleNavigationItems = navigationItems\.filter/);
@@ -30,7 +30,7 @@ test("keeps commerce handlers while enforcing native bottom sheets and 48px acti
     source("src/components/profile/AccountPage.tsx"),
     source("src/components/feed/BidFormModal.tsx"),
     source("src/components/feed/BidConfirmModal.tsx"),
-    source("app/layout.tsx"),
+    source("src/app/layout.tsx"),
   ]);
 
   assert.match(button, /sm: "min-h-12[^"]*sm:min-h-10"/);

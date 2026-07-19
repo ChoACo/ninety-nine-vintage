@@ -43,7 +43,6 @@ function PhotoGallery({
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const thumbnails = galleryItems.slice(1, 4);
-  const hiddenCount = Math.max(cleanImages.length - 4, 0);
 
   const openAt = (index: number) => {
     setSelectedIndex(index);
@@ -80,9 +79,6 @@ function PhotoGallery({
             wrapperClassName="h-full w-full"
             className="h-full w-full object-cover group-hover:scale-[1.035]"
           />
-          <span className="absolute bottom-3 right-3 border border-white/20 bg-black/70 px-2 py-1 font-mono text-[10px] font-bold tabular-nums tracking-tight text-white backdrop-blur-md">
-            사진 {cleanImages.length}장
-          </span>
         </button>
 
         {!compact && thumbnails.length > 0 ? (
@@ -91,17 +87,13 @@ function PhotoGallery({
           >
             {thumbnails.map((item, thumbnailIndex) => {
               const actualIndex = thumbnailIndex + 1;
-              const showMore =
-                hiddenCount > 0 && thumbnailIndex === thumbnails.length - 1;
 
               return (
                 <button
                   key={`${item.image}-${actualIndex}`}
                   type="button"
                   onClick={() => openAt(actualIndex)}
-                  aria-label={`${title} ${actualIndex + 1}번째 사진 크게 보기${
-                    showMore ? `, 추가 사진 ${hiddenCount}장` : ""
-                  }`}
+                  aria-label={`${title} ${actualIndex + 1}번째 사진 크게 보기`}
                   className={`group relative overflow-hidden bg-[var(--surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-inset ${
                     compact
                       ? "aspect-[2/1] rounded-none"
@@ -115,11 +107,6 @@ function PhotoGallery({
                     wrapperClassName="h-full w-full"
                     className="h-full w-full object-cover group-hover:scale-[1.04]"
                   />
-                  {showMore ? (
-                    <span className="absolute inset-0 grid place-items-center bg-black/60 font-mono text-lg font-black tabular-nums tracking-tight text-white backdrop-blur-[1px]">
-                      +{hiddenCount}
-                    </span>
-                  ) : null}
                 </button>
               );
             })}

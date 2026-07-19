@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { BusinessFooter } from "@/src/components/common";
+import { CommerceShell } from "@/src/components/common";
 import "./globals.css";
 
 const themeInitializationScript = `
@@ -26,6 +26,10 @@ const themeInitializationScript = `
 `;
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+      "https://www.ninety-nine-vintage.store",
+  ),
   title: "나인티 나인 빈티지 | 투명한 빈티지 의류 경매",
   description: "엄선한 빈티지 의류와 투명한 실시간 입찰을 만나는 나인티 나인 빈티지",
   icons: {
@@ -76,8 +80,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} />
       </head>
       <body>
-        {children}
-        <BusinessFooter />
+        <CommerceShell>{children}</CommerceShell>
       </body>
     </html>
   );

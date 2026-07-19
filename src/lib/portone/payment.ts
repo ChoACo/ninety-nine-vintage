@@ -48,22 +48,22 @@ export class ProductPaymentError extends Error {
   }
 }
 
-const configuredStoreId = import.meta.env.VITE_PORTONE_STORE_ID?.trim();
-const fallbackChannelKey = import.meta.env.VITE_PORTONE_CHANNEL_KEY?.trim();
-const configuredWebhookUrl = import.meta.env.VITE_PORTONE_WEBHOOK_URL?.trim();
+const configuredStoreId = process.env.VITE_PORTONE_STORE_ID?.trim();
+const fallbackChannelKey = process.env.VITE_PORTONE_CHANNEL_KEY?.trim();
+const configuredWebhookUrl = process.env.VITE_PORTONE_WEBHOOK_URL?.trim();
 
 function configuredChannelKey(payMethod: ProductPaymentMethod): string | undefined {
   const cardChannelKey =
-    import.meta.env.VITE_PORTONE_CARD_CHANNEL_KEY?.trim() || fallbackChannelKey;
+    process.env.VITE_PORTONE_CARD_CHANNEL_KEY?.trim() || fallbackChannelKey;
   if (payMethod === "EASY_PAY") {
     return (
-      import.meta.env.VITE_PORTONE_KAKAOPAY_CHANNEL_KEY?.trim() ||
+      process.env.VITE_PORTONE_KAKAOPAY_CHANNEL_KEY?.trim() ||
       fallbackChannelKey
     );
   }
   if (payMethod === "VIRTUAL_ACCOUNT") {
     return (
-      import.meta.env.VITE_PORTONE_VIRTUAL_ACCOUNT_CHANNEL_KEY?.trim() ||
+      process.env.VITE_PORTONE_VIRTUAL_ACCOUNT_CHANNEL_KEY?.trim() ||
       cardChannelKey
     );
   }

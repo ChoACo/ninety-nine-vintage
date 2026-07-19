@@ -144,11 +144,11 @@ test("the UI reveals the account on a second explicit action and preserves dorma
       source("src/components/admin/ManualBankTransferPanel.tsx"),
       source("src/components/admin/AdminPage.tsx"),
       source("src/components/owner/OwnerHiddenTestPanel.tsx"),
-      source("app/api/owner/test-member/route.ts"),
+      source("src/app/api/owner/test-member/route.ts"),
       Promise.all([
-        source("app/api/payments/prepare/route.ts"),
-        source("app/api/payments/sync/route.ts"),
-        source("app/api/webhook/portone/route.ts"),
+        source("src/app/api/payments/prepare/route.ts"),
+        source("src/app/api/payments/sync/route.ts"),
+        source("src/app/api/webhook/portone/route.ts"),
       ]).then((parts) => parts.join("\n")),
     ]);
 

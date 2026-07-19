@@ -143,8 +143,9 @@ test("uses isolated realtime topics for concurrent product consumers", async () 
 
   assert.match(
     productsHook,
-    /channel\(createRealtimeChannelName\("products-feed"\)\)/,
+    /channel\(createRealtimeChannelName\(`products-\$\{saleType\}-feed`\)\)/,
   );
+  assert.match(productsHook, /saleType\?: "auction" \| "fixed"/);
   assert.match(
     soldHook,
     /channel\(createRealtimeChannelName\("public-sold-auctions"\)\)/,

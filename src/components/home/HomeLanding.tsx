@@ -3,6 +3,7 @@
 import Link from "next/link";
 import AuctionClock from "@/src/components/common/AuctionClock";
 import DeferredProductImage from "@/src/components/common/DeferredProductImage";
+import CommerceScheduleBanner from "@/src/components/commerce/CommerceScheduleBanner";
 import { SoldAuctionFeed } from "@/src/components/feed/SoldAuctionFeed";
 import { useAuctionPolicyMinuteClock } from "@/src/hooks/useAuctionPolicyClock";
 import type { PublicSoldAuction } from "@/src/lib/supabase/auctionLifecycle";
@@ -105,6 +106,48 @@ function ShowcaseSkeleton({ count }: { count: number }) {
   );
 }
 
+function FixedPriceShowcaseCard({ post }: { post: AuctionPost }) {
+  const thumbnail = getCatalogThumbnailUrl(
+    post.thumbnailUrls[0],
+    post.imageUrls[0],
+  );
+  const fixedPrice =
+    Number.isSafeInteger(post.fixedPrice) && Number(post.fixedPrice) > 0
+      ? Number(post.fixedPrice)
+      : null;
+
+  return (
+    <Link
+      href="/shop"
+      prefetch={false}
+      className="group min-w-0 overflow-hidden border border-[var(--border)] bg-[var(--surface-raised)] transition-all duration-200 ease-out hover:-translate-y-1 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+    >
+      <div className="relative aspect-square overflow-hidden bg-[var(--surface-muted)]">
+        <DeferredProductImage
+          key={thumbnail || post.id}
+          src={thumbnail}
+          alt={`${post.title} 상시 구매 상품 미리보기`}
+          sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 16vw"
+          wrapperClassName="h-full w-full"
+          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+        />
+        <span className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-black/75 px-2 py-1 text-[8px] font-black tracking-[0.09em] text-white backdrop-blur-sm sm:text-[9px]">
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-emerald-400" />
+          BUY NOW
+        </span>
+      </div>
+      <div className="p-2.5 sm:p-3">
+        <h3 className="line-clamp-1 text-xs font-black tracking-[-0.02em] text-[var(--text-strong)] sm:text-sm">
+          {post.title}
+        </h3>
+        <p className="mt-1.5 font-mono text-xs font-black tabular-nums tracking-tight text-[var(--accent-text)] sm:text-sm">
+          {fixedPrice ? formatKRW(fixedPrice) : "가격 확인 중"}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
 export default function HomeLanding({
   posts,
   isLoading,
@@ -116,10 +159,16 @@ export default function HomeLanding({
   onRetrySoldAuctions,
 }: HomeLandingProps) {
   const now = useAuctionPolicyMinuteClock();
-  const publishedPosts = posts.filter((post) => {
+  const commercePosts = posts.filter((post) => {
     const publishAt = Date.parse(post.publish_at ?? post.createdAt);
     return post.status === "active" && Number.isFinite(publishAt) && publishAt <= now.getTime();
   });
+  const publishedPosts = commercePosts.filter(
+    (post) => post.saleType === "auction",
+  );
+  const fixedPricePosts = commercePosts
+    .filter((post) => post.saleType === "fixed")
+    .slice(0, 6);
   const closingOrder = [...publishedPosts].sort(
     (left, right) => Date.parse(left.closesAt) - Date.parse(right.closesAt),
   );
@@ -185,6 +234,8 @@ export default function HomeLanding({
         </div>
       </section>
 
+      <CommerceScheduleBanner className="mt-4" />
+
       <section className="mt-12" aria-labelledby="urgent-showcase-title">
         <div className="mb-5 flex items-end justify-between gap-4 border-b border-[var(--border)] pb-4">
           <div>
@@ -221,6 +272,32 @@ export default function HomeLanding({
           </div>
           <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
             {recommendedPosts.map((post) => <ShowcaseCard key={post.id} post={post} now={now} />)}
+          </div>
+        </section>
+      ) : null}
+
+      {fixedPricePosts.length > 0 ? (
+        <section className="mt-12" aria-labelledby="fixed-price-showcase-title">
+          <div className="mb-5 flex items-end justify-between gap-4 border-b border-[var(--border)] pb-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-600">
+                Fixed price shop
+              </p>
+              <h2 id="fixed-price-showcase-title" className="mt-1.5 text-2xl font-black tracking-[-0.04em] text-[var(--text-strong)] sm:text-3xl">
+                기다림 없는 상시 구매
+              </h2>
+              <p className="mt-2 break-keep text-sm font-medium text-[var(--text-muted)]">
+                경매 마감까지 기다리지 않고 표시된 정가로 구매할 수 있습니다.
+              </p>
+            </div>
+            <Link href="/shop" prefetch={false} className="shrink-0 text-xs font-black text-[var(--text-muted)] underline-offset-4 transition-colors hover:text-[var(--text-strong)] hover:underline sm:text-sm">
+              상시 구매 전체보기
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
+            {fixedPricePosts.map((post) => (
+              <FixedPriceShowcaseCard key={post.id} post={post} />
+            ))}
           </div>
         </section>
       ) : null}

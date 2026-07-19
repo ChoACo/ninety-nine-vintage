@@ -76,6 +76,7 @@ type LoadStatus = "idle" | "loading" | "success" | "error";
 type MemberStatusFilter = "all" | MemberAccountStatus;
 type MemberGenderFilter = "all" | "female" | "male" | "unknown";
 type ProductStatusFilter = "all" | ManagedProduct["status"];
+type ProductSaleTypeFilter = "all" | ManagedProduct["saleType"];
 
 const MEMBER_PAGE_SIZE = 12;
 const PRODUCT_PAGE_SIZE = 10;
@@ -107,6 +108,33 @@ const productStatusClasses: Record<ManagedProduct["status"], string> = {
   closed:
     "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)]",
 };
+
+const productSaleTypeLabel: Record<ManagedProduct["saleType"], string> = {
+  auction: "LIVE BID",
+  fixed: "BUY NOW",
+};
+
+const productSaleTypeClasses: Record<ManagedProduct["saleType"], string> = {
+  auction:
+    "border-orange-400/30 bg-orange-500/10 text-orange-700 dark:text-orange-300",
+  fixed:
+    "border-sky-400/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+};
+
+function managedProductStatusLabel(product: ManagedProduct): string {
+  if (product.saleType !== "fixed") return productStatusLabel[product.status];
+  return {
+    pending: "판매 대기",
+    active: "판매 중",
+    closed: "구매 확정",
+  }[product.status];
+}
+
+function managedProductPrice(product: ManagedProduct): number {
+  return product.saleType === "fixed"
+    ? (product.fixedPrice ?? product.startingPrice)
+    : product.currentPrice;
+}
 
 const memberRoleLabel: Record<ManagedAccessRole, string> = {
   operator: "운영자",
@@ -316,6 +344,8 @@ export function AdminPage({
   const [productQuery, setProductQuery] = useState("");
   const [productStatusFilter, setProductStatusFilter] =
     useState<ProductStatusFilter>("pending");
+  const [productSaleTypeFilter, setProductSaleTypeFilter] =
+    useState<ProductSaleTypeFilter>("all");
   const [productPage, setProductPage] = useState(1);
   const [editingProduct, setEditingProduct] = useState<ManagedProduct | null>(
     null,
@@ -498,12 +528,18 @@ export function AdminPage({
       ) {
         return false;
       }
+      if (
+        productSaleTypeFilter !== "all" &&
+        product.saleType !== productSaleTypeFilter
+      ) {
+        return false;
+      }
       if (!query) return true;
       return [product.title, product.description, product.id].some((value) =>
         value.toLocaleLowerCase("ko-KR").includes(query),
       );
     });
-  }, [productQuery, productStatusFilter, products]);
+  }, [productQuery, productSaleTypeFilter, productStatusFilter, products]);
 
   const productTotalPages = Math.max(
     1,
@@ -930,7 +966,7 @@ export function AdminPage({
             운영자 페이지
           </h1>
           <p className="mt-1.5 max-w-3xl text-sm font-semibold leading-6 text-[var(--text-muted)]">
-            회원과 경매 상품을 실제 서버 데이터로 조회하고, 필요한 업무만 선택해서
+            회원과 판매 상품을 실제 서버 데이터로 조회하고, 필요한 업무만 선택해서
             처리합니다.
           </p>
         </div>
@@ -1495,7 +1531,7 @@ export function AdminPage({
           visited={visitedSections.has("operations-products")}
           eyebrow="PRODUCTS"
           title="상품 대기열·관리"
-          summary="일괄 등록된 공개 대기 상품을 먼저 검수하고, 잘못된 항목은 공개 전에 수정하거나 삭제합니다. 진행·마감 상품도 상태 필터로 확인할 수 있습니다."
+          summary="경매와 상시 구매 상품을 판매 방식별로 검수하고, 공개 전에 잘못된 항목을 수정하거나 삭제합니다. 진행·판매 완료 상품도 필터로 확인할 수 있습니다."
           className="order-2"
           actions={
             <Button
@@ -1508,7 +1544,7 @@ export function AdminPage({
             </Button>
           }
         >
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_190px]">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_170px_170px]">
             <label className="text-xs font-black text-[var(--text-strong)]">
               상품 검색
               <input
@@ -1521,6 +1557,23 @@ export function AdminPage({
                 placeholder="상품명, 설명 또는 상품 ID"
                 className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none transition-all duration-200 focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)]"
               />
+            </label>
+            <label className="text-xs font-black text-[var(--text-strong)]">
+              판매 방식
+              <select
+                value={productSaleTypeFilter}
+                onChange={(event) => {
+                  setProductSaleTypeFilter(
+                    event.target.value as ProductSaleTypeFilter,
+                  );
+                  setProductPage(1);
+                }}
+                className="mt-1.5 min-h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 text-sm font-semibold text-[var(--text-strong)] outline-none transition-all duration-200 focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-surface)]"
+              >
+                <option value="all">전체 방식</option>
+                <option value="auction">라이브 경매</option>
+                <option value="fixed">상시 바로구매</option>
+              </select>
             </label>
             <label className="text-xs font-black text-[var(--text-strong)]">
               공개 상태
@@ -1623,7 +1676,7 @@ export function AdminPage({
           ) : pagedProducts.length === 0 ? (
             <EmptyPanel
               title="조건에 맞는 상품이 없습니다"
-              description="검색어나 공개 상태를 바꾸면 다른 상품을 확인할 수 있습니다."
+              description="검색어, 판매 방식 또는 공개 상태를 바꾸면 다른 상품을 확인할 수 있습니다."
             />
           ) : (
             <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] shadow-sm">
@@ -1631,7 +1684,7 @@ export function AdminPage({
                 <span>선택</span>
                 <span>사진</span>
                 <span>상품 / Lot</span>
-                <span>현재가</span>
+                <span>판매 가격</span>
                 <span>상태</span>
                 <span className="text-right">작업</span>
               </div>
@@ -1668,9 +1721,16 @@ export function AdminPage({
                   )}
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-mono text-[9px] font-black uppercase tabular-nums tracking-[0.12em] text-[var(--text-muted)]" title={product.id}>
-                      LOT · {product.id.slice(0, 8)}
-                    </p>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span
+                        className={`inline-flex shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[8px] font-black uppercase tracking-[0.1em] ${productSaleTypeClasses[product.saleType]}`}
+                      >
+                        {productSaleTypeLabel[product.saleType]}
+                      </span>
+                      <p className="truncate font-mono text-[9px] font-black uppercase tabular-nums tracking-[0.12em] text-[var(--text-muted)]" title={product.id}>
+                        LOT · {product.id.slice(0, 8)}
+                      </p>
+                    </div>
                     <h3 className="mt-0.5 truncate text-sm font-black text-[var(--text-strong)]">
                       {product.title}
                     </h3>
@@ -1681,21 +1741,25 @@ export function AdminPage({
 
                   <div className="col-start-2 min-w-0 xl:col-start-auto">
                     <p className="font-mono text-sm font-black tabular-nums tracking-tight text-[var(--text-strong)]">
-                      {formatKRW(product.currentPrice)}
+                      {formatKRW(managedProductPrice(product))}
                     </p>
                     <p className="mt-0.5 font-mono text-[9px] font-bold tabular-nums text-[var(--text-muted)]">
-                      입찰 {product.participantCount}명 · {formatDateTime(product.publish_at)}
+                      {product.saleType === "fixed"
+                        ? `판매 정가 · ${formatDateTime(product.publish_at)}`
+                        : `입찰 ${product.participantCount}명 · ${formatDateTime(product.publish_at)}`}
                     </p>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-black ${productStatusClasses[product.status]}`}>
                       <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
-                      {productStatusLabel[product.status]}
+                      {managedProductStatusLabel(product)}
                     </span>
                     {product.bidLockedAt ? (
                       <span className="rounded-full border border-[var(--danger-text)]/25 bg-[var(--danger-surface)] px-2 py-1 text-[9px] font-black text-[var(--danger-text)]">
-                        첫 입찰 확정
+                        {product.saleType === "fixed"
+                          ? "구매 확정"
+                          : "첫 입찰 확정"}
                       </span>
                     ) : null}
                   </div>
@@ -1767,11 +1831,11 @@ export function AdminPage({
                 SINGLE PRODUCT
               </p>
               <h3 className="mt-2 text-lg font-black tracking-[-0.02em] text-white">
-                새 경매글 작성
+                새 상품 등록
               </h3>
               <p className="mt-2 max-w-xl text-xs font-semibold leading-5 text-zinc-400">
-                예외 상품은 설명과 사진을 확인하며 한 건씩 등록하고 공개 시각을
-                선택합니다.
+                경매 또는 상시 구매 상품을 설명과 사진을 확인하며 한 건씩
+                등록하고 공개 시각을 선택합니다.
               </p>
               <Button
                 className="mt-6 active:scale-95"
@@ -1965,15 +2029,17 @@ export function AdminPage({
           isDeletingProduct ? () => undefined : () => setDeletingProduct(null)
         }
         closeOnBackdrop={!isDeletingProduct}
-        title="경매 상품 삭제"
+        title={`${deletingProduct?.saleType === "fixed" ? "정가" : "경매"} 상품 삭제`}
         description="삭제한 상품은 피드와 운영 센터에서 사라집니다."
         size="sm"
       >
         <div className="space-y-4 p-5 sm:p-6">
           <p className="text-sm font-bold leading-6 text-[var(--text-muted)]">
             <strong className="text-[var(--text-strong)]">{deletingProduct?.title}</strong>
-            을(를) 정말 삭제할까요? 입찰 기록이 있는 상품은 서버 정책에 따라
-            삭제가 거부될 수 있습니다.
+            을(를) 정말 삭제할까요?{" "}
+            {deletingProduct?.saleType === "fixed"
+              ? "구매 기록이 있는 상품은 서버 정책에 따라 삭제가 거부될 수 있습니다."
+              : "입찰 기록이 있는 상품은 서버 정책에 따라 삭제가 거부될 수 있습니다."}
           </p>
           {deleteError ? (
             <p

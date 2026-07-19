@@ -16,7 +16,6 @@ export interface SiteHeaderProps {
   isAuthenticated: boolean;
   displayName?: string;
   onOpenAuth: () => void;
-  onOpenOwnerTools?: () => void;
   isSigningOut?: boolean;
   onSignOut?: () => void | Promise<void>;
 }
@@ -26,7 +25,6 @@ export default function SiteHeader({
   isAuthenticated,
   displayName,
   onOpenAuth,
-  onOpenOwnerTools,
   isSigningOut = false,
   onSignOut,
 }: SiteHeaderProps) {
@@ -62,14 +60,6 @@ export default function SiteHeader({
 
         <div className="flex shrink-0 items-center gap-1.5 lg:justify-end lg:gap-2">
           <ThemeToggle />
-
-          {isAuthenticated &&
-          isOwnerRole(role) &&
-          onOpenOwnerTools ? (
-            <Button className="hidden px-3 sm:inline-flex" size="sm" variant="secondary" onClick={onOpenOwnerTools}>
-              관리자 메뉴
-            </Button>
-          ) : null}
 
           {isAuthenticated ? (
             <span className="hidden min-h-10 max-w-[12rem] items-center gap-2 truncate rounded-md border border-[var(--border)] bg-[var(--success-surface)] px-3 py-2 text-xs font-bold text-[var(--success-text)] sm:inline-flex sm:max-w-[16rem]">

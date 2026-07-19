@@ -22,6 +22,7 @@ import {
   type ParsedAuctionWorkbook,
 } from "@/src/lib/import/batchAuction";
 import { PRODUCT_IMAGE_FORMAT_LABEL } from "@/src/lib/supabase/productImagePolicy";
+import type { ProductSaleType } from "@/src/types/auction";
 import { formatKRW, getNextAuctionPublishAt } from "@/src/utils/formatters";
 
 interface BatchAuctionSubmitProgress {
@@ -78,6 +79,7 @@ export default function BulkAuctionImportModal({
   const [parsedWorkbook, setParsedWorkbook] =
     useState<ParsedAuctionWorkbook | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [saleType, setSaleType] = useState<ProductSaleType>("auction");
   const [bidIncrement, setBidIncrement] = useState("1000");
   const [isParsing, setIsParsing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,6 +95,7 @@ export default function BulkAuctionImportModal({
   const directoryId = useId();
   const multipleImagesId = useId();
   const bidIncrementId = useId();
+  const saleTypeName = useId();
 
   const numericBidIncrement = Number(bidIncrement);
   const preview = useMemo<BatchAuctionPreview | null>(() => {
@@ -100,14 +103,16 @@ export default function BulkAuctionImportModal({
     return buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
       publishAt: PREVIEW_PUBLISH_AT,
       bidIncrement: numericBidIncrement,
+      saleType,
     });
-  }, [imageFiles, numericBidIncrement, parsedWorkbook]);
+  }, [imageFiles, numericBidIncrement, parsedWorkbook, saleType]);
 
   const reset = () => {
     parseRequestRef.current += 1;
     setWorkbookFileName("");
     setParsedWorkbook(null);
     setImageFiles([]);
+    setSaleType("auction");
     setBidIncrement("1000");
     setIsParsing(false);
     setIsSubmitting(false);
@@ -183,6 +188,7 @@ export default function BulkAuctionImportModal({
     return buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
       publishAt: getNextAuctionPublishAt(now).toISOString(),
       bidIncrement: Number(bidIncrement),
+      saleType,
     });
   };
 
@@ -243,7 +249,7 @@ export default function BulkAuctionImportModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Excel 경매 일괄 등록"
+      title="Excel 상품 일괄 등록"
       description="Excel의 1~5행은 양식 안내로 제외하고 6행부터 상품을 읽습니다. 선택한 사진 폴더의 이미지명을 연결한 뒤 대기열에 등록합니다."
       size="gallery"
       closeOnBackdrop={!isSubmitting}
@@ -265,7 +271,7 @@ export default function BulkAuctionImportModal({
             />
             <p className="mt-2 text-xs font-semibold leading-5 text-[#89786d]">
               .xlsx 파일의 A열 상품명, D열 사이즈·추천 사이즈, W열
-              상태점수, Y열 시작가, AH열 이미지명을 읽으며 1~5행은
+              상태점수, Y열 {saleType === "fixed" ? "정가" : "시작가"}, AH열 이미지명을 읽으며 1~5행은
               등록하지 않습니다. X열의 기존 설명은 공개 상품 본문에
               사용하지 않습니다.
             </p>
@@ -341,7 +347,7 @@ export default function BulkAuctionImportModal({
               <DetectedColumn label="상품명 (A열)" value={detected.title?.header} fallback="미탐지" />
               <DetectedColumn label="사이즈 (D열)" value={detected.size?.header} fallback="미탐지" />
               <DetectedColumn label="상태점수 (W열)" value={detected.conditionScore?.header} fallback="미탐지" />
-              <DetectedColumn label="시작가" value={detected.startingPrice?.header} fallback="미탐지" />
+              <DetectedColumn label={saleType === "fixed" ? "정가" : "시작가"} value={detected.startingPrice?.header} fallback="미탐지" />
               <DetectedColumn
                 label="이미지명"
                 value={detected.imageNames.map((column) => column.header).join(", ")}
@@ -358,6 +364,41 @@ export default function BulkAuctionImportModal({
 
         <section className="rounded-3xl border border-[#d9ded5] bg-white/80 p-4" aria-label="전체 상품 대기열 등록 옵션">
           <h3 className="text-base font-black text-[#493f38]">3. 대기열 등록 옵션</h3>
+          <fieldset className="mt-4">
+            <legend className="text-sm font-black text-[#5a4c44]">판매 방식</legend>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {(
+                [
+                  ["auction", "실시간 경매", "Y열을 시작가로 등록"],
+                  ["fixed", "정가 판매", "Y열을 정가로 등록"],
+                ] as const
+              ).map(([value, label, description]) => (
+                <label
+                  key={value}
+                  className={`cursor-pointer rounded-2xl border px-4 py-3 transition-all duration-200 ${
+                    saleType === value
+                      ? "border-[#5a4c44] bg-[#f5eee8] text-[#493f38]"
+                      : "border-[#d8cec4] bg-white text-[#86756b] hover:border-[#9b897e]"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={saleTypeName}
+                    value={value}
+                    checked={saleType === value}
+                    onChange={() => {
+                      setSaleType(value);
+                      resetResult();
+                    }}
+                    disabled={isSubmitting}
+                    className="sr-only"
+                  />
+                  <span className="block text-sm font-black">{label}</span>
+                  <span className="mt-1 block text-xs font-semibold opacity-75">{description}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_260px]">
             <div className="rounded-2xl border border-[#ead5a9] bg-[#fff7df] px-4 py-3">
               <p className="text-sm font-black text-[#735b31]">공개 대기 · 가장 가까운 오전 10시 예약</p>
@@ -365,27 +406,36 @@ export default function BulkAuctionImportModal({
                 오전 10시 전 등록분은 당일 10시, 이후 등록분은 다음 날 10시로 예약됩니다. 공개 전에 대기열에서 수정하거나 삭제할 수 있습니다.
               </p>
             </div>
-            <label htmlFor={bidIncrementId} className="text-sm font-black text-[#5a4c44]">
-              전체 입찰 단위
-              <input
-                id={bidIncrementId}
-                type="number"
-                inputMode="numeric"
-                min="1"
-                max="100000000"
-                step="1"
-                value={bidIncrement}
-                onChange={(event) => {
-                  setBidIncrement(event.target.value);
-                  resetResult();
-                }}
-                disabled={isSubmitting}
-                className="mt-2 w-full rounded-2xl border border-[#d8cec4] bg-white px-4 py-3 text-base font-bold text-[#493e37] outline-none focus:border-[#df806f] focus:ring-4 focus:ring-[#f4ddd7] disabled:opacity-60"
-              />
-              <span className="mt-1.5 block text-xs font-semibold text-[#8b7b71]">
-                {formatKRW(Number.isFinite(numericBidIncrement) ? numericBidIncrement : 0)}
-              </span>
-            </label>
+            {saleType === "auction" ? (
+              <label htmlFor={bidIncrementId} className="text-sm font-black text-[#5a4c44]">
+                전체 입찰 단위
+                <input
+                  id={bidIncrementId}
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  max="100000000"
+                  step="1"
+                  value={bidIncrement}
+                  onChange={(event) => {
+                    setBidIncrement(event.target.value);
+                    resetResult();
+                  }}
+                  disabled={isSubmitting}
+                  className="mt-2 w-full rounded-2xl border border-[#d8cec4] bg-white px-4 py-3 text-base font-bold text-[#493e37] outline-none focus:border-[#df806f] focus:ring-4 focus:ring-[#f4ddd7] disabled:opacity-60"
+                />
+                <span className="mt-1.5 block text-xs font-semibold text-[#8b7b71]">
+                  {formatKRW(Number.isFinite(numericBidIncrement) ? numericBidIncrement : 0)}
+                </span>
+              </label>
+            ) : (
+              <div className="rounded-2xl border border-[#c9dccf] bg-[#eff7f1] px-4 py-3 text-[#466553]">
+                <p className="text-sm font-black">Y열 정가 적용</p>
+                <p className="mt-1 text-xs font-semibold leading-5">
+                  각 행의 가격으로 선착순 정가 상품을 등록합니다.
+                </p>
+              </div>
+            )}
           </div>
         </section>
 
@@ -419,7 +469,7 @@ export default function BulkAuctionImportModal({
                   <tr>
                     <th className="px-3 py-3 font-black">행</th>
                     <th className="px-3 py-3 font-black">상품</th>
-                    <th className="px-3 py-3 font-black">시작가</th>
+                    <th className="px-3 py-3 font-black">{saleType === "fixed" ? "정가" : "시작가"}</th>
                     <th className="px-3 py-3 font-black">매칭 사진</th>
                     <th className="px-3 py-3 font-black">검증</th>
                   </tr>

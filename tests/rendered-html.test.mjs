@@ -621,8 +621,10 @@ test("provides a collapsible Supabase operator center with constrained product m
   assert.match(navigation, /role === "employee"/);
   assert.match(auctionApp, /canAccessOperationsCenter\(auth\.role\)/);
   assert.match(auctionApp, /isOwnerRole\(auth\.role\) \? "admin" : "operator"/);
-  assert.match(siteHeader, /isOwnerRole\(role\)[\s\S]*onOpenOwnerTools/);
-  assert.match(siteHeader, /관리자 메뉴/);
+  assert.match(navigation, /hasOperationsCenterAccess/);
+  assert.match(navigation, /onOpenOwnerTools/);
+  assert.match(navigation, /운영 관제/);
+  assert.doesNotMatch(siteHeader, /관리자 메뉴|onOpenOwnerTools/);
   assert.doesNotMatch(siteHeader, /관리자 모드|운영자 모드|PIN/);
   assert.match(auctionApp, /onOpenBulkImport=\{\(\) => setBulkAuctionOpen\(true\)\}/);
   assert.doesNotMatch(auctionApp, /emptyAdminSales|shipments=\{\[\]\}/);
@@ -695,7 +697,8 @@ test("keeps the owner publicly operator-only while providing audited private tes
   assert.match(testMemberRoute, /get_owner_hidden_test_member/);
   assert.match(ownerClient, /Authorization: `Bearer \$\{accessToken\}`/);
   assert.match(auctionApp, /if \(role === "admin"\) return "operator"/);
-  assert.match(siteHeader, /관리자 메뉴/);
+  assert.match(auctionApp, /onOpenOwnerTools=/);
+  assert.doesNotMatch(siteHeader, /관리자 메뉴|onOpenOwnerTools/);
   assert.doesNotMatch(siteHeader, /관리자 모드|PIN/);
   assert.match(delegationPanel, /감사 기록 활성/);
   assert.match(testPanel, /ownerPlaceTestBid/);

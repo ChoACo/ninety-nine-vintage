@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Button, ThemeToggle } from "@/src/components/common";
+import AuthModal from "@/src/components/auth/AuthModal";
+import { Button, Navigation, ThemeToggle } from "@/src/components/common";
 import DeferredProductImage from "@/src/components/common/DeferredProductImage";
+import { useAuthSession } from "@/src/hooks/useAuthSession";
 import { appendUniqueSoldAuctions } from "@/src/lib/soldArchivePagination";
 import {
   fetchPublicSoldAuctionsPage,
@@ -13,6 +15,7 @@ import {
 } from "@/src/lib/supabase/auctionLifecycle";
 import { getCatalogThumbnailUrl } from "@/src/utils/catalogImages";
 import { formatKRW, formatKoreanDate } from "@/src/utils/formatters";
+import { isOwnerRole } from "@/src/lib/supabase/auth";
 
 function toLoadError(error: unknown): string {
   return error instanceof Error
@@ -43,6 +46,8 @@ function SoldArchiveEmptyIcon() {
 }
 
 export function SoldArchivePage() {
+  const auth = useAuthSession();
+  const [authOpen, setAuthOpen] = useState(false);
   const [auctions, setAuctions] = useState<PublicSoldAuction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -124,10 +129,11 @@ export function SoldArchivePage() {
 
   return (
     <div className="theme-app-shell min-h-screen">
-      <header className="theme-surface-glass sticky top-0 z-30 border-b px-3 py-2.5 backdrop-blur-xl sm:px-6 sm:py-3">
+      <header className="theme-surface-glass sticky top-0 z-30 border-b px-3 py-2.5 backdrop-blur-xl sm:px-6 sm:py-3 md:hidden">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3">
           <Link
-            href="/feed"
+            href="/"
+            aria-label="나인티 나인 빈티지 홈"
             className="flex min-w-0 items-center gap-2.5 rounded-md transition-opacity duration-200 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- 검증된 로컬 브랜드 자산입니다. */}
@@ -153,11 +159,48 @@ export function SoldArchivePage() {
               href="/feed"
               className="inline-flex min-h-10 items-center rounded-md bg-[var(--accent)] px-3 text-sm font-black text-[var(--accent-contrast)] transition-all duration-200 ease-out hover:scale-[1.02] hover:bg-[var(--accent-hover)] hover:shadow-md sm:px-4"
             >
-              경매 피드
+              라이브 경매
             </Link>
           </div>
         </div>
       </header>
+
+      <Navigation
+        activePage="sold"
+        onNavigate={(page) => {
+          if (page === "profile" && isOwnerRole(auth.role)) {
+            window.location.assign("/owner");
+            return;
+          }
+          const target = {
+            feed: "/feed",
+            chat: "/chat",
+            profile: "/account",
+            admin: "/operator",
+          }[page];
+          window.location.assign(target);
+        }}
+        onOpenOwnerTools={
+          isOwnerRole(auth.role)
+            ? () => window.location.assign("/owner")
+            : undefined
+        }
+        role={auth.role}
+        isAuthenticated={Boolean(auth.user)}
+        displayName={
+          isOwnerRole(auth.role) ? "" : (auth.profile?.displayName ?? "")
+        }
+        onOpenAuth={() => setAuthOpen(true)}
+        onSignOut={
+          auth.user
+            ? async () => {
+                await auth.signOut();
+                window.location.assign("/");
+              }
+            : undefined
+        }
+        className="mt-3"
+      />
 
       <main className="mx-auto w-full max-w-7xl px-3 pb-16 pt-5 sm:px-6 sm:pt-8 lg:px-8">
         <section
@@ -251,6 +294,8 @@ export function SoldArchivePage() {
           </>
         )}
       </main>
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   );
 }

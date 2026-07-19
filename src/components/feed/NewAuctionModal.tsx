@@ -11,7 +11,11 @@ import {
 } from "react";
 import Button from "@/src/components/common/Button";
 import Modal from "@/src/components/common/Modal";
-import type { AuctionStatus, ISODateString } from "@/src/types/auction";
+import type {
+  AuctionStatus,
+  ISODateString,
+  ProductSaleType,
+} from "@/src/types/auction";
 import {
   isSupportedProductImageMimeType,
   PRODUCT_IMAGE_FORMAT_LABEL,
@@ -32,6 +36,8 @@ interface SelectedImage {
 export interface NewAuctionDraft {
   title: string;
   description: string;
+  saleType: ProductSaleType;
+  fixedPrice: number | null;
   startingPrice: number;
   bidIncrement: number;
   imageFiles: File[];
@@ -65,6 +71,7 @@ export default function NewAuctionModal({
 }: NewAuctionModalProps) {
   const [form, setForm] = useState(initialForm);
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
+  const [saleType, setSaleType] = useState<ProductSaleType>("auction");
   const [publishMode, setPublishMode] =
     useState<PublishMode>("scheduled");
   const [error, setError] = useState("");
@@ -76,6 +83,7 @@ export default function NewAuctionModal({
   const imagesId = useId();
   const imagesHelpId = useId();
   const publishModeName = useId();
+  const saleTypeName = useId();
 
   useEffect(() => {
     selectedImagesRef.current = selectedImages;
@@ -93,6 +101,7 @@ export default function NewAuctionModal({
     selectedImagesRef.current = [];
     setSelectedImages([]);
     setForm(initialForm);
+    setSaleType("auction");
     setPublishMode("scheduled");
     setError("");
     setIsSubmitting(false);
@@ -163,7 +172,9 @@ export default function NewAuctionModal({
       return;
     }
     if (!Number.isInteger(startingPrice) || startingPrice <= 0) {
-      setError("시작 가격을 1원 이상의 정수로 입력해 주세요.");
+      setError(
+        `${saleType === "fixed" ? "정가" : "시작 가격"}를 1원 이상의 정수로 입력해 주세요.`,
+      );
       return;
     }
     if (selectedImages.length === 0) {
@@ -182,6 +193,8 @@ export default function NewAuctionModal({
         // 내부 식별·사진 대체 텍스트용 이름도 본문 첫 줄에서 자동 생성합니다.
         title: form.description.trim().split(/\r?\n/)[0].trim(),
         description: form.description.trim(),
+        saleType,
+        fixedPrice: saleType === "fixed" ? startingPrice : null,
         startingPrice,
         bidIncrement,
         imageFiles: selectedImages.map((image) => image.file),
@@ -209,13 +222,53 @@ export default function NewAuctionModal({
     <Modal
       open={open}
       onClose={isSubmitting ? () => undefined : resetAndClose}
-      title="새 경매글 작성"
-      description="상품 설명과 사진을 등록한 뒤, 오전 10시 예약 또는 즉시 공개를 선택해 주세요."
+      title="새 상품 등록"
+      description="판매 방식과 상품 정보를 등록한 뒤, 오전 10시 예약 또는 즉시 공개를 선택해 주세요."
       size="lg"
       closeOnBackdrop={!isSubmitting}
       className="max-sm:absolute max-sm:bottom-0 max-sm:max-h-[94dvh] max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0"
     >
       <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
+        <fieldset>
+          <legend className="text-sm font-bold text-[var(--text-strong)]">
+            판매 방식
+          </legend>
+          <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup">
+            {(
+              [
+                ["auction", "실시간 경매", "입찰을 받아 마감가로 판매"],
+                ["fixed", "정가 판매", "표시 가격으로 선착순 판매"],
+              ] as const
+            ).map(([value, label, description]) => (
+              <label
+                key={value}
+                className={`cursor-pointer border px-4 py-3 transition-all duration-200 ${
+                  saleType === value
+                    ? "border-[var(--text-strong)] bg-[var(--surface-raised)] text-[var(--text-strong)]"
+                    : "border-[var(--border-strong)] text-[var(--text-muted)] hover:border-[var(--text-muted)]"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name={saleTypeName}
+                  value={value}
+                  checked={saleType === value}
+                  onChange={() => {
+                    setSaleType(value);
+                    setError("");
+                  }}
+                  disabled={isSubmitting}
+                  className="sr-only"
+                />
+                <span className="block text-sm font-black">{label}</span>
+                <span className="mt-1 block text-[11px] font-medium leading-4 opacity-75">
+                  {description}
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
         <label
           htmlFor={descriptionId}
           className="block text-sm font-bold text-[var(--text-strong)]"
@@ -241,7 +294,7 @@ export default function NewAuctionModal({
             htmlFor={startingPriceId}
             className="text-sm font-bold text-[var(--text-strong)]"
           >
-            시작 가격
+            {saleType === "fixed" ? "정가" : "시작 가격"}
             <input
               id={startingPriceId}
               type="number"
@@ -258,15 +311,27 @@ export default function NewAuctionModal({
               {formatKRW(Number(form.startingPrice) || 0)}
             </span>
           </label>
-          <div className="border-y border-[var(--info-border)] bg-[var(--info-surface)] px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--info-text)]">1회 입찰 단위</p>
-            <p className="mt-1 font-mono text-lg font-black tabular-nums tracking-tight text-[var(--info-text)]">
-              1,000원 고정
-            </p>
-            <p className="mt-1 text-xs font-medium leading-5 text-[var(--info-text)] opacity-80">
-              모든 상품에 같은 입찰 단위가 적용됩니다.
-            </p>
-          </div>
+          {saleType === "auction" ? (
+            <div className="border-y border-[var(--info-border)] bg-[var(--info-surface)] px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--info-text)]">1회 입찰 단위</p>
+              <p className="mt-1 font-mono text-lg font-black tabular-nums tracking-tight text-[var(--info-text)]">
+                1,000원 고정
+              </p>
+              <p className="mt-1 text-xs font-medium leading-5 text-[var(--info-text)] opacity-80">
+                모든 상품에 같은 입찰 단위가 적용됩니다.
+              </p>
+            </div>
+          ) : (
+            <div className="border-y border-[var(--success-text)]/25 bg-[var(--success-surface)] px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--success-text)]">정가 판매 안내</p>
+              <p className="mt-1 text-sm font-black text-[var(--success-text)]">
+                첫 구매 요청 1명에게 판매 확정
+              </p>
+              <p className="mt-1 text-xs font-medium leading-5 text-[var(--success-text)] opacity-80">
+                입찰 없이 입력한 정가로 결제 대기 상태가 생성됩니다.
+              </p>
+            </div>
+          )}
         </div>
 
         <div>

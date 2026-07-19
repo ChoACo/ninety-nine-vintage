@@ -20,6 +20,7 @@ import { getProductFeedDetails } from "@/src/utils/productFeedDetails";
 import BidFormModal from "./BidFormModal";
 import BidHistoryModal from "./BidHistoryModal";
 import PhotoGallery from "./PhotoGallery";
+import ProductDetailModal from "./ProductDetailModal";
 import ProductInquiryModal from "./ProductInquiryModal";
 import SizeComparisonScanner from "./SizeComparisonScanner";
 import type { FeedProductControlAction } from "./FeedProductControlModal";
@@ -138,6 +139,7 @@ export default function PostCard({
   const [bidModalOpen, setBidModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [inquiryModalOpen, setInquiryModalOpen] = useState(false);
+  const [productDetailOpen, setProductDetailOpen] = useState(false);
   const [sizeScannerOpen, setSizeScannerOpen] = useState(false);
   const [pendingBidAmount, setPendingBidAmount] = useState<number | null>(null);
   const [pendingCurrentPrice, setPendingCurrentPrice] = useState<number | null>(
@@ -169,6 +171,17 @@ export default function PostCard({
     (post.antiSnipingExtensionCount ?? 0) > 0 &&
     post.status === "active" &&
     Date.parse(post.closesAt) > auctionNow.getTime();
+  const unavailableBidLabel =
+    bidDecision.reason === "new-bid-cutoff"
+      ? "신규 입찰 마감 (기존 참여자 전용)"
+      : bidDecision.reason === "anti-sniping-participants-only"
+        ? "마감 연장 · 기존 참여자 전용"
+        : bidDecision.reason === "late-first-bid-finalized"
+          ? "확정 입찰 완료"
+          : bidDecision.reason === "auction-closed"
+            ? "정산 중 · 오후 10시 재개"
+            : "판매 완료";
+  const quickBidLabel = isFirstBid ? "입찰하기" : "+1,000원 입찰하기";
 
   useEffect(() => {
     if (bidDecision.allowed) return;
@@ -247,6 +260,19 @@ export default function PostCard({
         >
           {closingPresentation.label}
         </span>
+        <span className="pointer-events-none absolute bottom-2 left-2 inline-flex items-center gap-1.5 rounded-md border border-orange-300/30 bg-black/75 px-2 py-1 text-[9px] font-black tracking-[0.1em] text-white backdrop-blur-md sm:bottom-3 sm:left-3 sm:text-[10px]">
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-orange-400" />
+          LIVE BID
+        </span>
+        {bidDecision.reason === "auction-closed" &&
+        post.participantCount === 0 ? (
+          <span
+            role="status"
+            className="pointer-events-none absolute inset-x-2 bottom-10 z-10 rounded-md border border-amber-300/35 bg-black/82 px-2 py-1.5 text-center font-mono text-[9px] font-black tabular-nums tracking-tight text-amber-100 backdrop-blur-md sm:inset-x-3 sm:bottom-12 sm:text-[10px]"
+          >
+            ⏳ 22:00 재입찰 오픈 예정
+          </span>
+        ) : null}
         {antiSnipingActive ? (
           <span
             role="status"
@@ -284,7 +310,7 @@ export default function PostCard({
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col p-2.5 sm:p-5">
+      <div className="flex flex-1 flex-col p-2.5 sm:p-5 lg:p-4">
         <header className="mb-2.5 flex items-center justify-between gap-1.5 border-b border-[var(--border)] pb-2.5 sm:mb-4 sm:gap-3 sm:pb-3">
           <div className="min-w-0 truncate text-[9px] font-bold uppercase tracking-[0.04em] text-[var(--text-muted)] sm:text-[11px] sm:tracking-[0.08em]">
             <time dateTime={publishedAt}>
@@ -312,8 +338,15 @@ export default function PostCard({
             >
               <div>
                 <dt className="sr-only">Name:</dt>
-                <dd className="line-clamp-2 min-w-0 break-words text-sm font-black leading-5 tracking-[-0.025em] sm:text-lg sm:leading-6">
-                  {productDetails.name}
+                <dd className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setProductDetailOpen(true)}
+                    className="line-clamp-2 w-full break-words text-left text-sm font-black leading-5 tracking-[-0.025em] text-[var(--text-strong)] underline-offset-4 transition-colors hover:text-[var(--accent-text)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] sm:text-lg sm:leading-6 lg:text-base"
+                    aria-label={`${productDetails.name} 상품 상세 보기`}
+                  >
+                    {productDetails.name}
+                  </button>
                 </dd>
               </div>
               <div className="mt-1.5 flex min-w-0 items-start gap-1 text-[11px] font-medium text-[var(--text-muted)] sm:mt-2 sm:gap-2 sm:text-[13px]">
@@ -331,9 +364,14 @@ export default function PostCard({
             </dl>
           ) : (
             <div className="break-keep text-[var(--text-strong)]">
-              <p className="line-clamp-2 whitespace-pre-line text-xs font-bold leading-5 tracking-[-0.02em] sm:line-clamp-4 sm:text-base sm:leading-6">
+              <button
+                type="button"
+                onClick={() => setProductDetailOpen(true)}
+                className="line-clamp-2 w-full whitespace-pre-line text-left text-xs font-bold leading-5 tracking-[-0.02em] text-[var(--text-strong)] underline-offset-4 transition-colors hover:text-[var(--accent-text)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] sm:line-clamp-4 sm:text-base sm:leading-6 lg:text-sm"
+                aria-label={`${productLabel} 상품 상세 보기`}
+              >
                 {productDetails.legacyDescription}
-              </p>
+              </button>
             </div>
           )}
 
@@ -411,15 +449,7 @@ export default function PostCard({
                 disabled
                 className="min-h-12 rounded-lg break-keep px-3 py-2 text-sm font-bold leading-5 shadow-none"
               >
-                {bidDecision.reason === "new-bid-cutoff"
-                  ? "신규 입찰 마감 (기존 참여자 전용)"
-                  : bidDecision.reason === "anti-sniping-participants-only"
-                    ? "마감 연장 · 기존 참여자 전용"
-                  : bidDecision.reason === "late-first-bid-finalized"
-                    ? "확정 입찰 완료"
-                    : bidDecision.reason === "auction-closed"
-                      ? "정산 중 · 오후 10시 재개"
-                      : "판매 완료"}
+                {unavailableBidLabel}
               </Button>
             ) : (
               <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
@@ -438,13 +468,34 @@ export default function PostCard({
                   onClick={requestQuickBid}
                   className="min-h-12 rounded-lg break-keep px-1.5 py-2 text-xs font-black transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-md sm:px-2 sm:text-sm"
                 >
-                  {isFirstBid ? "입찰하기" : "+1,000원 입찰하기"}
+                  {quickBidLabel}
                 </Button>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      <ProductDetailModal
+        open={productDetailOpen}
+        onClose={() => setProductDetailOpen(false)}
+        post={post}
+        details={productDetails}
+        lotLabel={galleryLotLabel}
+        galleryTitle={galleryProductLabel}
+        closingLabel={closingPresentation.label}
+        priceLabel={bidPresentation.label}
+        displayedPrice={displayedPrice}
+        bidCount={post.bidHistory.length}
+        bidAllowed={bidDecision.allowed && !isSold}
+        unavailableBidLabel={unavailableBidLabel}
+        quickBidLabel={quickBidLabel}
+        onOpenInquiry={() => setInquiryModalOpen(true)}
+        onOpenSizeScanner={() => setSizeScannerOpen(true)}
+        onOpenBidHistory={() => setHistoryModalOpen(true)}
+        onOpenManualBid={() => setBidModalOpen(true)}
+        onQuickBid={requestQuickBid}
+      />
 
       <BidFormModal
         open={bidModalOpen}

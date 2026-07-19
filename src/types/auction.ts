@@ -12,6 +12,9 @@ export type PublicRoleName = "operator" | "employee" | "band_member" | "member";
 
 export type AuctionStatus = "pending" | "active" | "closed";
 
+/** 상품 판매 경로입니다. 기존 상품은 DB 기본값에 따라 auction으로 유지됩니다. */
+export type ProductSaleType = "auction" | "fixed";
+
 export type ISODateString = string;
 
 export type KoreanWeekday = "월" | "화" | "수" | "목" | "금" | "토" | "일";
@@ -70,6 +73,9 @@ export interface AuctionPost {
   publish_at?: ISODateString;
   closesAt: ISODateString;
   status: AuctionStatus;
+  saleType: ProductSaleType;
+  /** 정가 판매 금액. 경매 상품은 항상 null입니다. */
+  fixedPrice: number | null;
   participantCount: number;
   startingPrice: number;
   currentPrice: number;

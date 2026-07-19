@@ -9,6 +9,7 @@ import {
   type NavigationTarget,
 } from "@/src/components/common";
 import { Toast } from "@/src/components/common/Toast";
+import CommerceScheduleBanner from "@/src/components/commerce/CommerceScheduleBanner";
 import type { NewAuctionDraft } from "@/src/components/feed/NewAuctionModal";
 import { useAuthSession } from "@/src/hooks/useAuthSession";
 import { notifyMemberAccountChanged } from "@/src/lib/memberAccountEvents";
@@ -63,6 +64,7 @@ const NewAuctionModal = lazy(
   () => import("@/src/components/feed/NewAuctionModal"),
 );
 const HomeLanding = lazy(() => import("@/src/components/home/HomeLanding"));
+const ShopPage = lazy(() => import("@/src/components/shop/ShopPage"));
 const AuctionOverviewSidebar = lazy(
   () => import("@/src/components/live/AuctionOverviewSidebar"),
 );
@@ -93,7 +95,7 @@ const NAVIGATION_PATHS: Record<NavigationTarget, string> = {
   admin: "/operator",
 };
 
-type AuctionAppPage = NavigationTarget | "home";
+type AuctionAppPage = NavigationTarget | "home" | "shop";
 
 export interface AuctionAppProps {
   page?: AuctionAppPage;
@@ -112,7 +114,7 @@ function useDesktopRails() {
   const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width: 1280px)");
+    const mediaQuery = window.matchMedia("(min-width: 1536px)");
     const sync = () => setIsDesktop(mediaQuery.matches);
 
     sync();
@@ -137,6 +139,7 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
   const isMember = Boolean(auth.user) && isMemberRole(auth.role);
   const isHomePage = activePage === "home";
   const isFeedPage = activePage === "feed";
+  const isShopPage = activePage === "shop";
   const isProductSurface = isHomePage || isFeedPage;
   const showDesktopRails = useDesktopRails();
   // The public feed includes authenticated members and ephemeral guest
@@ -166,6 +169,19 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
     refreshProducts,
     loadMoreProducts,
   } = useSupabaseProducts({ enabled: isProductSurface });
+  const {
+    posts: fixedPricePosts,
+    setPosts: setFixedPricePosts,
+    isLoading: fixedPriceProductsLoading,
+    hasMoreProducts: hasMoreFixedPriceProducts,
+    isLoadingMore: fixedPriceProductsLoadingMore,
+    error: fixedPriceProductsError,
+    refreshProducts: refreshFixedPriceProducts,
+    loadMoreProducts: loadMoreFixedPriceProducts,
+  } = useSupabaseProducts({
+    enabled: isHomePage || isShopPage,
+    saleType: "fixed",
+  });
   const soldAuctions = usePublicSoldAuctions({ enabled: isHomePage });
 
   const showToast = useCallback((message: string) => {
@@ -267,14 +283,51 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
 
     const { createProduct } = await import("@/src/lib/supabase/products");
     await createProduct(draft);
-    await refreshProducts();
+    if (draft.saleType === "fixed") {
+      await refreshFixedPriceProducts();
+    } else {
+      await refreshProducts();
+    }
     setOperationsRevision((current) => current + 1);
-    if (draft.status === "active") navigateToPage("feed");
+    if (draft.status === "active") {
+      if (draft.saleType === "fixed") {
+        window.location.assign("/shop");
+      } else {
+        navigateToPage("feed");
+      }
+    }
     showToast(
       draft.status === "pending"
-        ? "새 경매글을 가장 가까운 오전 10시 공개로 예약했습니다."
-        : "새 경매글을 즉시 공개했습니다.",
+        ? `${draft.saleType === "fixed" ? "정가 상품" : "새 경매글"}을 가장 가까운 오전 10시 공개로 예약했습니다.`
+        : `${draft.saleType === "fixed" ? "정가 상품" : "새 경매글"}을 즉시 공개했습니다.`,
     );
+  };
+
+  const handleBuyNow = async (post: AuctionPost) => {
+    requireMember();
+    if (post.saleType !== "fixed" || !post.fixedPrice) {
+      throw new Error("바로 구매할 수 있는 정가 상품이 아닙니다.");
+    }
+
+    try {
+      const { claimFixedPriceProduct } = await import(
+        "@/src/lib/supabase/products"
+      );
+      await claimFixedPriceProduct(post.id);
+      setFixedPricePosts((current) =>
+        current.filter((item) => item.id !== post.id),
+      );
+      showToast(`${post.title} 구매가 확정되었습니다. 결제를 진행해 주세요.`);
+      window.location.assign("/account#payment");
+    } catch (error) {
+      await refreshFixedPriceProducts();
+      const message =
+        error instanceof Error
+          ? error.message
+          : "구매를 확정하지 못했습니다. 상품 상태를 다시 확인해 주세요.";
+      showToast(message);
+      throw error;
+    }
   };
 
   const handleCreateAuctionsBatch = async (
@@ -290,9 +343,22 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
       "@/src/lib/supabase/products"
     );
     await createProductsBatch(drafts, onProgress);
-    await refreshProducts();
+    const containsAuctionProducts = drafts.some(
+      (draft) => draft.saleType !== "fixed",
+    );
+    const containsFixedProducts = drafts.some(
+      (draft) => draft.saleType === "fixed",
+    );
+    await Promise.all([
+      containsAuctionProducts ? refreshProducts() : Promise.resolve(),
+      containsFixedProducts
+        ? refreshFixedPriceProducts()
+        : Promise.resolve(),
+    ]);
     setOperationsRevision((current) => current + 1);
-    showToast(`${drafts.length.toLocaleString("ko-KR")}개 경매글을 일괄 등록했습니다.`);
+    showToast(
+      `${drafts.length.toLocaleString("ko-KR")}개 상품을 일괄 등록했습니다.`,
+    );
   };
 
   const handleSignOut = async () => {
@@ -314,14 +380,34 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
     if (activePage === "home") {
       return (
         <HomeLanding
-          posts={posts}
-          isLoading={productsLoading}
-          error={productsError}
-          onRetry={refreshProducts}
+          posts={[...posts, ...fixedPricePosts]}
+          isLoading={productsLoading || fixedPriceProductsLoading}
+          error={productsError || fixedPriceProductsError}
+          onRetry={async () => {
+            await Promise.all([
+              refreshProducts(),
+              refreshFixedPriceProducts(),
+            ]);
+          }}
           soldAuctions={soldAuctions.auctions}
           soldAuctionsLoading={soldAuctions.isLoading}
           soldAuctionsError={soldAuctions.error}
           onRetrySoldAuctions={soldAuctions.refresh}
+        />
+      );
+    }
+
+    if (activePage === "shop") {
+      return (
+        <ShopPage
+          posts={fixedPricePosts}
+          isLoading={fixedPriceProductsLoading}
+          error={fixedPriceProductsError}
+          onRetry={refreshFixedPriceProducts}
+          hasMoreProducts={hasMoreFixedPriceProducts}
+          isLoadingMore={fixedPriceProductsLoadingMore}
+          onLoadMore={loadMoreFixedPriceProducts}
+          onBuyNow={handleBuyNow}
         />
       );
     }
@@ -397,8 +483,8 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
         <div
           className={`grid items-start gap-4 2xl:gap-5 ${
             showOnlineMembers
-              ? "xl:grid-cols-[200px_minmax(0,1fr)_248px] 2xl:grid-cols-[220px_minmax(0,1fr)_272px]"
-              : "xl:grid-cols-[minmax(0,1fr)_272px]"
+              ? "2xl:grid-cols-[220px_minmax(0,1fr)_272px]"
+              : "2xl:grid-cols-[minmax(0,1fr)_272px]"
           }`}
         >
           {showOnlineMembers && showDesktopRails ? (
@@ -408,7 +494,7 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
               hasMore={hasMoreOnlineMembers}
               status={onlineMembersStatus}
               error={onlineMembersError}
-              className="hidden xl:block"
+              className="hidden 2xl:block"
             />
           ) : null}
 
@@ -423,10 +509,12 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
                 .map((post) => post.closesAt)}
             />
 
+            <CommerceScheduleBanner compact className="mb-4 mt-3" />
+
             {showOnlineMembers ? (
               <section
                 aria-label="현재 온라인 사용자 요약"
-                className="theme-panel mt-3 flex min-h-11 items-center gap-2 overflow-hidden rounded-xl border px-3 py-2 shadow-sm xl:hidden"
+                className="theme-panel mt-3 flex min-h-11 items-center gap-2 overflow-hidden rounded-xl border px-3 py-2 shadow-sm 2xl:hidden"
               >
                 <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-bold tracking-tight text-[var(--success-text)]">
                   <span
@@ -481,15 +569,15 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
               posts={posts}
               currentUserName={publicDisplayName}
               onBid={handleBid}
-              className="hidden xl:block"
+              className="hidden 2xl:block"
             />
           ) : showDesktopRails && auth.user && isStaffRole(auth.role) ? (
             <AuctionOverviewSidebar
               posts={posts}
-              className="hidden xl:block"
+              className="hidden 2xl:block"
             />
           ) : showDesktopRails ? (
-            <aside className="theme-panel sticky top-24 hidden overflow-hidden rounded-2xl border shadow-sm xl:block">
+            <aside className="theme-panel sticky top-24 hidden overflow-hidden rounded-2xl border shadow-sm 2xl:block">
               <div className="border-b border-[var(--border)] px-4 py-3 text-left">
                 <p className="text-[10px] font-bold tracking-[0.18em] text-[var(--text-muted)]">MY AUCTIONS</p>
                 <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">내 입찰 현황</p>
@@ -527,33 +615,39 @@ export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
         className="pointer-events-none fixed inset-0 opacity-[0.32] [background-image:linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:linear-gradient(to_bottom,black,transparent_38%)]"
       />
 
-      <div className="relative mx-auto w-full max-w-[1680px] px-3 pt-3 sm:px-5 sm:pt-5 lg:px-6">
+      <div className="relative mx-auto w-full max-w-[1680px] px-3 pt-3 sm:px-5 sm:pt-5 md:hidden">
         <SiteHeader
           role={auth.role}
           isAuthenticated={Boolean(auth.user)}
           displayName={publicDisplayName}
           onOpenAuth={openAuthentication}
-          onOpenOwnerTools={
-            isOwnerRole(auth.role)
-              ? () => window.location.assign("/owner")
-              : undefined
-          }
           isSigningOut={isSigningOut}
           onSignOut={auth.user ? handleSignOut : undefined}
         />
-        <Navigation
-          activePage={activePage}
-          onNavigate={(page) => {
-            if (page === "profile" && isOwnerRole(auth.role)) {
-              window.location.assign("/owner");
-              return;
-            }
-            navigateToPage(page);
-          }}
-          role={auth.role}
-          className="mt-3"
-        />
       </div>
+
+      <Navigation
+        activePage={activePage}
+        onNavigate={(page) => {
+          if (page === "profile" && isOwnerRole(auth.role)) {
+            window.location.assign("/owner");
+            return;
+          }
+          navigateToPage(page);
+        }}
+        onOpenOwnerTools={
+          isOwnerRole(auth.role)
+            ? () => window.location.assign("/owner")
+            : undefined
+        }
+        role={auth.role}
+        isAuthenticated={Boolean(auth.user)}
+        displayName={publicDisplayName}
+        onOpenAuth={openAuthentication}
+        isSigningOut={isSigningOut}
+        onSignOut={auth.user ? handleSignOut : undefined}
+        className="mt-3"
+      />
 
       <div key={activePage} className="animate-fade-in-up relative">
         <Suspense fallback={<RouteLoadingFallback />}>{renderPage()}</Suspense>

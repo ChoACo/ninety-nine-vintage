@@ -286,11 +286,15 @@ test("keeps operations handlers wired through the compact product workspace", as
   );
   assert.match(
     admin,
-    /font-mono text-sm font-black tabular-nums tracking-tight[\s\S]*formatKRW\(product\.currentPrice\)/,
+    /font-mono text-sm font-black tabular-nums tracking-tight[\s\S]*formatKRW\(managedProductPrice\(product\)\)/,
   );
   assert.match(
     admin,
-    /rounded-full border px-2 py-1 text-\[10px\] font-black \$\{productStatusClasses\[product\.status\]\}[\s\S]*productStatusLabel\[product\.status\]/,
+    /function managedProductPrice\(product: ManagedProduct\)[\s\S]*product\.saleType === "fixed"[\s\S]*product\.fixedPrice \?\? product\.startingPrice[\s\S]*product\.currentPrice/,
+  );
+  assert.match(
+    admin,
+    /rounded-full border px-2 py-1 text-\[10px\] font-black \$\{productStatusClasses\[product\.status\]\}[\s\S]*managedProductStatusLabel\(product\)/,
   );
 
   const actionBarStart = admin.indexOf(

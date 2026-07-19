@@ -1,4 +1,5 @@
 import type { NewAuctionDraft } from "@/src/components/feed/NewAuctionModal";
+import type { ProductSaleType } from "@/src/types/auction";
 import { isSupportedProductImageMimeType } from "@/src/lib/supabase/productImagePolicy";
 
 export type BatchAuctionCanonicalField =
@@ -61,6 +62,8 @@ export interface ParsedAuctionWorkbook {
 export interface BatchAuctionDraftOptions {
   publishAt: string;
   bidIncrement: number;
+  /** 기존 호출부는 경매로 유지하고 운영자 UI에서 정가 일괄 등록을 선택할 수 있습니다. */
+  saleType?: ProductSaleType;
 }
 
 export type ImageMatchStrategy = "relative-path" | "basename" | "unique-stem";
@@ -998,6 +1001,14 @@ export function buildBatchAuctionPreview(
     ...imageIndex.issues,
   ];
   const publishAt = new Date(options.publishAt);
+  const saleType: ProductSaleType = options.saleType ?? "auction";
+  if (saleType !== "auction" && saleType !== "fixed") {
+    globalIssues.push({
+      code: "invalid_sale_type",
+      message: "판매 방식을 확인해 주세요.",
+      severity: "error",
+    });
+  }
   if (Number.isNaN(publishAt.getTime())) {
     globalIssues.push({
       code: "invalid_publish_at",
@@ -1095,7 +1106,7 @@ export function buildBatchAuctionPreview(
     if (startingPrice === null) {
       issues.push({
         code: "invalid_starting_price",
-        message: "시작가는 1원 이상 10억원 이하의 정수여야 합니다.",
+        message: `${saleType === "fixed" ? "정가" : "시작가"}는 1원 이상 10억원 이하의 정수여야 합니다.`,
         severity: "error",
       });
     }
@@ -1191,6 +1202,8 @@ export function buildBatchAuctionPreview(
     row.draft = {
       title: row.title,
       description: row.description,
+      saleType,
+      fixedPrice: saleType === "fixed" ? row.startingPrice : null,
       startingPrice: row.startingPrice,
       bidIncrement: options.bidIncrement,
       imageFiles: row.imageMatches.map((match) => match.file),

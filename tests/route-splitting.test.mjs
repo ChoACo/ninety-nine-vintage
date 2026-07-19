@@ -27,10 +27,11 @@ async function render(path) {
   );
 }
 
-test("exposes feed, account, chat, and operator as independent routes", async () => {
-  const [home, feed, account, chat, operator, app] = await Promise.all([
+test("exposes feed, shop, account, chat, and operator as independent routes", async () => {
+  const [home, feed, shop, account, chat, operator, app] = await Promise.all([
     source("app/page.tsx"),
     source("app/feed/page.tsx"),
+    source("app/shop/page.tsx"),
     source("app/account/page.tsx"),
     source("app/chat/page.tsx"),
     source("app/operator/page.tsx"),
@@ -39,6 +40,7 @@ test("exposes feed, account, chat, and operator as independent routes", async ()
 
   assert.match(home, /<AuctionApp page="home"/);
   assert.match(feed, /<AuctionApp page="feed"/);
+  assert.match(shop, /<AuctionApp page="shop"/);
   assert.match(account, /<AuctionApp page="profile"/);
   assert.match(chat, /<AuctionApp page="chat"/);
   assert.match(operator, /<AuctionApp page="admin"/);
@@ -48,7 +50,7 @@ test("exposes feed, account, chat, and operator as independent routes", async ()
   assert.match(app, /admin: "\/operator"/);
 });
 
-test("limits catalog realtime to home/feed and sold archive work to home", async () => {
+test("separates auction and fixed catalog realtime while keeping sold work on home", async () => {
   const [app, productsHook, soldHook] = await Promise.all([
     source("src/components/AuctionApp.tsx"),
     source("src/hooks/useSupabaseProducts.ts"),
@@ -58,6 +60,8 @@ test("limits catalog realtime to home/feed and sold archive work to home", async
   assert.match(app, /const isFeedPage = activePage === "feed"/);
   assert.match(app, /const isProductSurface = isHomePage \|\| isFeedPage/);
   assert.match(app, /useSupabaseProducts\(\{ enabled: isProductSurface \}\)/);
+  assert.match(app, /enabled: isHomePage \|\| isShopPage/);
+  assert.match(app, /saleType: "fixed"/);
   assert.match(app, /usePublicSoldAuctions\(\{ enabled: isHomePage \}\)/);
   assert.match(
     app,
@@ -151,7 +155,7 @@ test("loads heavyweight route screens and modals on demand", async () => {
 });
 
 test("server-renders every split route without a Vercel-style 404", async () => {
-  for (const path of ["/", "/feed", "/account", "/chat", "/operator"]) {
+  for (const path of ["/", "/feed", "/shop", "/account", "/chat", "/operator"]) {
     const response = await render(path);
     assert.equal(response.status, 200, path);
     assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);

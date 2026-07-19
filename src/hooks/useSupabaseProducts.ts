@@ -10,7 +10,10 @@ import {
 } from "react";
 import type { AuctionPost } from "@/src/types/auction";
 import { getSupabaseBrowserClient } from "@/src/lib/supabase/client";
-import { fetchPublishedProductsPage } from "@/src/lib/supabase/products";
+import {
+  fetchPublishedFixedProductsPage,
+  fetchPublishedProductsPage,
+} from "@/src/lib/supabase/products";
 import { createRealtimeChannelName } from "@/src/lib/supabase/realtime";
 
 const REALTIME_REFETCH_DEBOUNCE_MS = 160;
@@ -28,10 +31,12 @@ export interface SupabaseProductsState {
 
 interface UseSupabaseProductsOptions {
   enabled?: boolean;
+  saleType?: "auction" | "fixed";
 }
 
 export function useSupabaseProducts({
   enabled = true,
+  saleType = "auction",
 }: UseSupabaseProductsOptions = {}): SupabaseProductsState {
   const [posts, setPosts] = useState<AuctionPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,7 +69,9 @@ export function useSupabaseProducts({
       try {
         const refreshedPages = [];
         for (let page = 0; page < requestedPageCount; page += 1) {
-          const refreshedPage = await fetchPublishedProductsPage({
+          const refreshedPage = await (saleType === "fixed"
+            ? fetchPublishedFixedProductsPage
+            : fetchPublishedProductsPage)({
             page,
             now: pageSnapshot,
           });
@@ -98,7 +105,9 @@ export function useSupabaseProducts({
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "경매 상품을 불러오지 못했어요.",
+            : saleType === "fixed"
+              ? "상시 구매 상품을 불러오지 못했어요."
+              : "경매 상품을 불러오지 못했어요.",
         );
       } finally {
         if (
@@ -118,7 +127,7 @@ export function useSupabaseProducts({
       }
     });
     return request;
-  }, []);
+  }, [saleType]);
 
   const loadMoreProducts = useCallback(() => {
     if (
@@ -140,7 +149,9 @@ export function useSupabaseProducts({
 
     const request = (async () => {
       try {
-        const nextPage = await fetchPublishedProductsPage({
+        const nextPage = await (saleType === "fixed"
+          ? fetchPublishedFixedProductsPage
+          : fetchPublishedProductsPage)({
           page,
           now: pageSnapshot,
         });
@@ -174,7 +185,9 @@ export function useSupabaseProducts({
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "추가 경매 상품을 불러오지 못했어요.",
+            : saleType === "fixed"
+              ? "추가 상시 구매 상품을 불러오지 못했어요."
+              : "추가 경매 상품을 불러오지 못했어요.",
         );
       } finally {
         if (
@@ -194,7 +207,7 @@ export function useSupabaseProducts({
       }
     });
     return request;
-  }, []);
+  }, [saleType]);
 
   const scheduleRealtimeRefresh = useCallback(() => {
     if (!enabledRef.current) return;
@@ -286,7 +299,7 @@ export function useSupabaseProducts({
     void loadProducts(true);
 
     const channel = client
-      .channel(createRealtimeChannelName("products-feed"))
+      .channel(createRealtimeChannelName(`products-${saleType}-feed`))
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "products" },
@@ -303,7 +316,7 @@ export function useSupabaseProducts({
       stopProductRequests();
       void client.removeChannel(channel);
     };
-  }, [enabled, loadProducts, scheduleRealtimeRefresh, stopProductRequests]);
+  }, [enabled, loadProducts, saleType, scheduleRealtimeRefresh, stopProductRequests]);
 
   return {
     posts,

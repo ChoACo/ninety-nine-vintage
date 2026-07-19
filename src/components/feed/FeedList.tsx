@@ -424,7 +424,7 @@ export default function FeedList({
       {isLoading && publishedPosts.length === 0 ? (
         <div role="status">
           <span className="sr-only">Supabase에서 경매 상품을 불러오는 중이에요.</span>
-          <div className="grid grid-cols-2 gap-3.5 bg-transparent sm:gap-px sm:overflow-hidden sm:border sm:border-[var(--border)] sm:bg-[var(--border)] 2xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3.5 bg-transparent sm:gap-px sm:overflow-hidden sm:border sm:border-[var(--border)] sm:bg-[var(--border)] lg:grid-cols-4 xl:grid-cols-5">
             {Array.from({ length: 6 }, (_, index) => (
               <FeedSkeleton key={index} />
             ))}
@@ -453,14 +453,14 @@ export default function FeedList({
           ) : null}
         </div>
       ) : needsCompleteCatalog && hasMoreProducts && filteredPosts.length === 0 ? (
-        <div role="status" className="grid grid-cols-2 gap-3.5 sm:gap-px sm:overflow-hidden sm:border sm:border-[var(--border)] sm:bg-[var(--border)] 2xl:grid-cols-3">
+        <div role="status" className="grid grid-cols-2 gap-3.5 sm:gap-px sm:overflow-hidden sm:border sm:border-[var(--border)] sm:bg-[var(--border)] lg:grid-cols-4 xl:grid-cols-5">
           {Array.from({ length: 4 }, (_, index) => <FeedSkeleton key={index} />)}
         </div>
       ) : filteredPosts.length > 0 ? (
         <>
         <div
           id="auction-feed-items"
-          className="grid grid-cols-2 items-stretch gap-3.5 bg-transparent sm:gap-px sm:overflow-hidden sm:border sm:border-[var(--border)] sm:bg-[var(--border)] 2xl:grid-cols-3"
+          className="grid grid-cols-2 items-stretch gap-3.5 bg-transparent sm:gap-px sm:overflow-hidden sm:border sm:border-[var(--border)] sm:bg-[var(--border)] lg:grid-cols-4 xl:grid-cols-5"
         >
           {visiblePosts.map((post) => (
             <PostCard

@@ -4,6 +4,7 @@ import type {
   AuctionPost,
   AuctionStatus,
   BidHistoryRecord,
+  ProductSaleType,
 } from "@/src/types/auction";
 import { getNextAuctionDeadline } from "@/src/utils/formatters";
 import { canManageProducts, getUserRole, mapAccessRoleToAppRole } from "./auth";
@@ -19,6 +20,7 @@ import { compressProductImageVariantsForUpload } from "../images/productImageCom
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export const PUBLISHED_PRODUCTS_PAGE_SIZE = 24;
+const FIXED_PRODUCT_OPEN_UNTIL = "9999-12-31T23:59:59.000Z";
 const PRODUCT_COLUMNS = [
   "id",
   "title",
@@ -29,6 +31,8 @@ const PRODUCT_COLUMNS = [
   "publish_at",
   "closes_at",
   "status",
+  "sale_type",
+  "fixed_price",
   "participant_count",
   "starting_price",
   "current_price",
@@ -116,6 +120,8 @@ export function mapProductRowToAuctionPost(row: ProductRow): AuctionPost {
     publish_at: row.publish_at,
     closesAt: row.closes_at,
     status: row.status,
+    saleType: row.sale_type === "fixed" ? "fixed" : "auction",
+    fixedPrice: row.sale_type === "fixed" ? row.fixed_price : null,
     participantCount: row.participant_count,
     startingPrice: row.starting_price,
     currentPrice: row.current_price,
@@ -327,6 +333,10 @@ function prepareProductDraft(draft: NewAuctionDraft): PreparedProductDraft {
   const title = draft.title.trim();
   const description = draft.description.trim();
   const publishAt = new Date(draft.publish_at);
+  const saleType: ProductSaleType =
+    draft.saleType === "fixed" ? "fixed" : "auction";
+  const productPrice =
+    saleType === "fixed" ? draft.fixedPrice : draft.startingPrice;
 
   if (!title || title.length > 160) {
     throw new ProductRepositoryError("상품명은 160자 이내로 입력해 주세요.");
@@ -337,13 +347,21 @@ function prepareProductDraft(draft: NewAuctionDraft): PreparedProductDraft {
     );
   }
   if (
-    !Number.isSafeInteger(draft.startingPrice) ||
-    draft.startingPrice < 1 ||
-    draft.startingPrice > 1_000_000_000
+    !Number.isSafeInteger(productPrice) ||
+    productPrice === null ||
+    productPrice < 1 ||
+    productPrice > 1_000_000_000
   ) {
     throw new ProductRepositoryError(
-      "시작가는 1원 이상 10억원 이하의 정수여야 해요.",
+      `${saleType === "fixed" ? "정가" : "시작가"}는 1원 이상 10억원 이하의 정수여야 해요.`,
     );
+  }
+  if (
+    saleType === "auction" &&
+    draft.fixedPrice !== null &&
+    draft.fixedPrice !== undefined
+  ) {
+    throw new ProductRepositoryError("경매 상품에는 정가를 함께 저장할 수 없습니다.");
   }
   if (
     !Number.isSafeInteger(draft.bidIncrement) ||
@@ -365,7 +383,14 @@ function prepareProductDraft(draft: NewAuctionDraft): PreparedProductDraft {
 
   return {
     id: crypto.randomUUID(),
-    draft: { ...draft, title, description },
+    draft: {
+      ...draft,
+      title,
+      description,
+      saleType,
+      fixedPrice: saleType === "fixed" ? productPrice : null,
+      startingPrice: productPrice,
+    },
     publishAt,
   };
 }
@@ -382,8 +407,13 @@ function createProductInsert(
     description: draft.description,
     category: "구제 의류",
     publish_at: publishAt.toISOString(),
-    closes_at: getNextAuctionDeadline(publishAt).toISOString(),
+    closes_at:
+      draft.saleType === "fixed"
+        ? FIXED_PRODUCT_OPEN_UNTIL
+        : getNextAuctionDeadline(publishAt).toISOString(),
     status: draft.status,
+    sale_type: draft.saleType,
+    fixed_price: draft.fixedPrice,
     participant_count: 0,
     starting_price: draft.startingPrice,
     current_price: draft.startingPrice,
@@ -667,6 +697,7 @@ export async function fetchPublishedProductsPage({
     .from("products")
     .select(PRODUCT_COLUMNS, { count: "exact" })
     .eq("status", "active")
+    .eq("sale_type", "auction")
     .lte("publish_at", nowIso)
     .order("publish_at", { ascending: false })
     .order("id", { ascending: false })
@@ -694,6 +725,94 @@ export async function fetchPublishedProductsPage({
       typeof count === "number"
         ? rangeStart + (data?.length ?? 0) < count
         : (data?.length ?? 0) === PUBLISHED_PRODUCTS_PAGE_SIZE,
+  };
+}
+
+/** 정가 상점 전용 페이지 조회입니다. 경매 피드와 서버 범위를 분리합니다. */
+export async function fetchPublishedFixedProductsPage({
+  page = 0,
+  now = new Date(),
+}: FetchPublishedProductsPageOptions = {}): Promise<PublishedProductsPage> {
+  if (!Number.isSafeInteger(page) || page < 0) {
+    throw new ProductRepositoryError("상품 페이지 번호가 올바르지 않습니다.");
+  }
+
+  const client = getSupabaseBrowserClient();
+  const nowIso = now.toISOString();
+  const rangeStart = page * PUBLISHED_PRODUCTS_PAGE_SIZE;
+  const rangeEnd = rangeStart + PUBLISHED_PRODUCTS_PAGE_SIZE - 1;
+  const { data, error, count } = await client
+    .from("products")
+    .select(PRODUCT_COLUMNS, { count: "exact" })
+    .eq("status", "active")
+    .eq("sale_type", "fixed")
+    .lte("publish_at", nowIso)
+    .order("publish_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(rangeStart, rangeEnd);
+
+  if (error) {
+    throw new ProductRepositoryError(
+      "정가 상품을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+      { cause: error },
+    );
+  }
+
+  const posts = ((data ?? []) as unknown as ProductRow[])
+    .map(mapProductRowToAuctionPost)
+    .filter(
+      (post) =>
+        post.saleType === "fixed" &&
+        post.status === "active" &&
+        Date.parse(post.publish_at ?? post.createdAt) <= now.getTime(),
+    );
+
+  return {
+    posts,
+    page,
+    hasMore:
+      typeof count === "number"
+        ? rangeStart + (data?.length ?? 0) < count
+        : (data?.length ?? 0) === PUBLISHED_PRODUCTS_PAGE_SIZE,
+  };
+}
+
+export interface FixedPriceClaimResult {
+  productId: string;
+  bidId: string;
+  buyerId: string;
+  buyerDisplayName: string;
+  amount: number;
+  claimedAt: string;
+}
+
+/** 서버 행 잠금으로 정가 상품을 한 번만 구매 확정합니다. */
+export async function claimFixedPriceProduct(
+  productId: string,
+): Promise<FixedPriceClaimResult> {
+  if (!productId.trim()) {
+    throw new ProductRepositoryError("구매할 상품을 선택해 주세요.");
+  }
+
+  const client = getSupabaseBrowserClient();
+  const { data, error } = await client
+    .rpc("claim_fixed_price_product", { p_product_id: productId })
+    .single();
+
+  if (error || !data) {
+    throw new ProductRepositoryError(
+      error?.message ?? "정가 상품 구매를 확정하지 못했어요.",
+      error ? { cause: error } : undefined,
+    );
+  }
+
+  return {
+    productId: data.product_id,
+    bidId: data.bid_id,
+    buyerId: data.buyer_id,
+    buyerDisplayName: data.buyer_display_name,
+    amount: data.amount,
+    claimedAt: data.claimed_at,
   };
 }
 

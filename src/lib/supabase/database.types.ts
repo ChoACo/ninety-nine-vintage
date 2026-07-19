@@ -7,6 +7,7 @@ export type Json =
   | Json[];
 
 export type ProductStatus = "pending" | "active" | "closed";
+export type ProductSaleType = "auction" | "fixed";
 export type SupportConversationStatus = "open" | "closed";
 export type MemberAccountStatus = "active" | "suspended";
 export type ShippingRequestStatus = "requested" | "shipped";
@@ -573,6 +574,8 @@ export type Database = {
           publish_at: string;
           closes_at: string;
           status: ProductStatus;
+          sale_type: ProductSaleType;
+          fixed_price: number | null;
           participant_count: number;
           starting_price: number;
           current_price: number;
@@ -599,6 +602,8 @@ export type Database = {
           publish_at: string;
           closes_at: string;
           status: ProductStatus;
+          sale_type?: ProductSaleType;
+          fixed_price?: number | null;
           participant_count?: number;
           starting_price: number;
           current_price: number;
@@ -625,6 +630,8 @@ export type Database = {
           publish_at?: string;
           closes_at?: string;
           status?: ProductStatus;
+          sale_type?: ProductSaleType;
+          fixed_price?: number | null;
           participant_count?: number;
           starting_price?: number;
           current_price?: number;
@@ -1259,6 +1266,17 @@ export type Database = {
           participant_count: number;
           bid_locked_at: string | null;
           final_bid_id: string | null;
+        }[];
+      };
+      claim_fixed_price_product: {
+        Args: { p_product_id: string };
+        Returns: {
+          product_id: string;
+          bid_id: string;
+          buyer_id: string;
+          buyer_display_name: string;
+          amount: number;
+          claimed_at: string;
         }[];
       };
       prepare_portone_payment: {

@@ -1615,7 +1615,10 @@ function MemberAccountPanel({ userId }: { userId: string }) {
           </p>
         ) : null}
 
-        <section className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 sm:p-5">
+        <section
+          id="payment"
+          className="mt-6 scroll-mt-24 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 sm:p-5"
+        >
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[10px] font-bold tracking-[0.18em] text-[var(--accent-text)]">PAYMENT</p>

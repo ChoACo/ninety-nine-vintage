@@ -31,7 +31,7 @@ function kstDateParts(date: Date) {
 function atKstTime(date: Date, hours = 0, minutes = 0, seconds = 0, nextDay = false) {
   const target = new Date(`${kstDateParts(date)}T00:00:00+09:00`);
   if (nextDay) target.setUTCDate(target.getUTCDate() + 1);
-  target.setUTCHours(hours - 9, minutes, seconds, 0);
+  target.setUTCHours(target.getUTCHours() + hours, minutes, seconds, 0);
   return target;
 }
 

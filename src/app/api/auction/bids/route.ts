@@ -24,7 +24,12 @@ export async function POST(request: Request) {
     const bid = await placeBid(token, productId, amount);
     return response({ bid: { ...bid, bidderDisplayName: maskBidder(bid.bidderDisplayName) } }, 200);
   } catch (error) {
-    if (error instanceof AuctionServiceError) return response({ error: error.message, code: error.code }, 409);
+    if (error instanceof AuctionServiceError) {
+      const errorMessage = error.message.includes("카카오 회원 로그인")
+        ? "현재 계정은 운영자 계정이거나 회원 프로필이 완성되지 않았습니다. 입찰은 카카오 회원 계정으로 이용해 주세요."
+        : error.message;
+      return response({ error: errorMessage, code: error.code }, 409);
+    }
     return response({ error: "bid_failed" }, 500);
   }
 }

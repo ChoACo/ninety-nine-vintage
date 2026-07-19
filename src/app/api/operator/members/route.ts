@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const offset = Math.max(0, Number(url.searchParams.get("offset") || 0));
   const { data, error } = await auth.user.rpc("get_staff_member_directory", { p_limit: limit, p_offset: offset });
   if (error) return commerceJson({ error: errorMessage(error, "회원 목록을 불러오지 못했습니다.") }, 503);
-  return commerceJson({ members: data ?? [], limit, offset });
+  return commerceJson({ members: data ?? [], roleCode: auth.roleCode, limit, offset });
 }
 
 export async function PATCH(request: Request) {

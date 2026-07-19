@@ -4,7 +4,6 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { ProductSaleType } from "@/types/auction";
 import { AuctionCard } from "@/components/features/auction/AuctionCard";
-import { DEMO_PRODUCTS } from "@/lib/catalog";
 
 interface ProductPayload {
   id: string;
@@ -65,11 +64,11 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
         if (!response.ok) throw new Error("상품 목록을 불러오지 못했습니다.");
         return response.json() as Promise<{ products?: ProductPayload[] }>;
       })
-      .then((payload) => setProducts(Array.isArray(payload.products) && payload.products.length > 0 ? payload.products : DEMO_PRODUCTS.filter((product) => product.saleType === saleType) as unknown as ProductPayload[]))
+      .then((payload) => setProducts(Array.isArray(payload.products) ? payload.products : []))
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === "AbortError") return;
-        setError("");
-        setProducts(DEMO_PRODUCTS.filter((product) => product.saleType === saleType) as unknown as ProductPayload[]);
+        setError("상품 목록을 불러오지 못했습니다.");
+        setProducts([]);
       })
       .finally(() => setLoading(false));
     return () => controller.abort();

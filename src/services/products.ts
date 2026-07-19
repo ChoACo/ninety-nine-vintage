@@ -38,6 +38,7 @@ export interface PublishedProduct {
   saleType: ProductRow["sale_type"];
   startingPrice: number;
   currentPrice: number;
+  fixedPrice: number | null;
   bidIncrement: number;
   participantCount: number;
   imageUrls: string[];
@@ -60,6 +61,7 @@ function mapProduct(row: ProductRow): PublishedProduct {
     saleType: row.sale_type,
     startingPrice: row.starting_price,
     currentPrice: row.current_price,
+    fixedPrice: row.fixed_price,
     bidIncrement: row.bid_increment,
     participantCount: row.participant_count,
     imageUrls: row.image_urls,

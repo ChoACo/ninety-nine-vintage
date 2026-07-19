@@ -49,8 +49,8 @@ test("uses compact static live indicators instead of perpetual sidebar animation
 });
 
 test("ships the provided brand assets with responsive picture fallbacks", async () => {
-  const [auctionApp, brand, banner, profileHd] = await Promise.all([
-    source("src/components/AuctionApp.tsx"),
+  const [homeLanding, brand, banner, profileHd] = await Promise.all([
+    source("src/components/home/HomeLanding.tsx"),
     stat(new URL("public/ninety-nine-vintage-brand.jpg", rootUrl)),
     stat(new URL("public/ninety-nine-vintage-banner.png", rootUrl)),
     stat(new URL("public/ninety-nine-vintage-profile-hd.jpg", rootUrl)),
@@ -59,15 +59,15 @@ test("ships the provided brand assets with responsive picture fallbacks", async 
   assert.ok(brand.size > 0);
   assert.ok(banner.size > 0);
   assert.ok(profileHd.size > 0);
-  assert.match(auctionApp, /<picture[\s\S]*?<\/picture>/);
+  assert.match(homeLanding, /<picture[\s\S]*?<\/picture>/);
   assert.match(
-    auctionApp,
+    homeLanding,
     /media="\(min-width: 1440px\)"[\s\S]*?srcSet="\/ninety-nine-vintage-banner\.png"/,
   );
   assert.match(
-    auctionApp,
+    homeLanding,
     /media="\(min-width: 768px\)"[\s\S]*?srcSet="\/ninety-nine-vintage-profile-hd\.jpg"/,
   );
-  assert.match(auctionApp, /src="\/ninety-nine-vintage-brand\.jpg"/);
-  assert.match(auctionApp, /loading="lazy"[\s\S]*?decoding="async"/);
+  assert.match(homeLanding, /src="\/ninety-nine-vintage-brand\.jpg"/);
+  assert.match(homeLanding, /fetchPriority="high"[\s\S]*?decoding="async"/);
 });

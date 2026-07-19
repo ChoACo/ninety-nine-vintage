@@ -1,10 +1,10 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- Supabase Storage의 공개 파생 이미지를 표시합니다. */
-
 import Link from "next/link";
 import { Button } from "@/src/components/common";
+import DeferredProductImage from "@/src/components/common/DeferredProductImage";
 import type { PublicSoldAuction } from "@/src/lib/supabase/auctionLifecycle";
+import { getCatalogThumbnailUrl } from "@/src/utils/catalogImages";
 import { formatKRW, formatKoreanDate } from "@/src/utils/formatters";
 
 export interface SoldAuctionFeedProps {
@@ -124,25 +124,26 @@ export function SoldAuctionFeed({
           id="sold-auction-items"
           className="mt-4 grid grid-cols-2 gap-3.5 bg-transparent sm:gap-px sm:overflow-hidden sm:border sm:border-[var(--border)] sm:bg-[var(--border)] 2xl:grid-cols-3"
         >
-          {visibleAuctions.map((auction) => (
+          {visibleAuctions.map((auction) => {
+            const thumbnailUrl = getCatalogThumbnailUrl(
+              auction.thumbnailUrls[0],
+              auction.imageUrls[0],
+            );
+
+            return (
             <article
               key={auction.productId}
               className="render-lazy group overflow-hidden bg-[var(--surface-raised)] transition-all duration-200 ease-out hover:relative hover:z-[1] hover:shadow-[var(--shadow-hover)]"
             >
               <div className="aspect-[4/3] overflow-hidden bg-[var(--surface-muted)]">
-                {auction.thumbnailUrls[0] || auction.imageUrls[0] ? (
-                  <img
-                    src={auction.thumbnailUrls[0] || auction.imageUrls[0]}
-                    alt={`${auction.title} 판매 완료 상품`}
-                    className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.035]"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                ) : (
-                  <div className="grid h-full place-items-center text-sm font-bold text-[var(--text-muted)]">
-                    상품 사진 없음
-                  </div>
-                )}
+                <DeferredProductImage
+                  key={thumbnailUrl || auction.productId}
+                  src={thumbnailUrl}
+                  alt={`${auction.title} 판매 완료 상품 이미지`}
+                  wrapperClassName="h-full w-full"
+                  className="h-full w-full object-cover group-hover:scale-[1.035]"
+                  emptyLabel="상품 미리보기를 준비하지 못함"
+                />
               </div>
               <div className="p-2.5 sm:p-5">
                 <div className="flex items-center justify-between gap-2">
@@ -182,7 +183,8 @@ export function SoldAuctionFeed({
                 </dl>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

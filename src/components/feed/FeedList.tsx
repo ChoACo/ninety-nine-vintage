@@ -1,10 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useAuctionPolicyClock } from "@/src/hooks/useAuctionPolicyClock";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useFeedCatalogState } from "@/src/hooks/useFeedCatalogState";
+import { useAuctionPolicyMinuteClock } from "@/src/hooks/useAuctionPolicyClock";
 import type { AuctionPost } from "@/src/types/auction";
 import { getAuctionBidDecision } from "@/src/utils/auctionBidPolicy";
+import {
+  matchesCatalogSearch,
+  matchesCatalogSize,
+  sortCatalogPosts,
+  type CatalogSize,
+  type CatalogSort,
+} from "@/src/utils/catalogFilters";
 import DateFilterChips, { getKoreanDateKey } from "./DateFilterChips";
+import FeedProductControlModal, {
+  type FeedProductControlAction,
+} from "./FeedProductControlModal";
 import PostCard, {
   type BidHandler,
   type InquiryHandler,
@@ -27,6 +39,8 @@ export interface FeedListProps {
   onLoadMore?: () => void | Promise<void>;
   title?: string;
   description?: string;
+  showOperatorControls?: boolean;
+  onDeleteProduct?: (post: AuctionPost) => void | Promise<void>;
 }
 
 function FeedSkeleton() {
@@ -80,12 +94,44 @@ export default function FeedList({
   onLoadMore,
   title = "날짜별 구제 의류 경매",
   description = "날짜별 상품을 빠르게 보고, 오후 8시 56분 신규 참여 제한 전에 여유 있게 입찰하세요.",
+  showOperatorControls = false,
+  onDeleteProduct,
 }: FeedListProps) {
-  const [selectedDate, setSelectedDate] = useState("all");
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_POSTS);
-  // A single shared one-second store keeps every anti-sniping deadline exact
-  // without creating one interval per product card.
-  const auctionNow = useAuctionPolicyClock();
+  const [pendingControl, setPendingControl] = useState<{
+    post: AuctionPost;
+    action: FeedProductControlAction;
+  } | null>(null);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
+  const [productControlError, setProductControlError] = useState("");
+  const fullCatalogLoadAttemptRef = useRef(-1);
+  const {
+    query,
+    selectedDate,
+    sort,
+    size,
+    visibleCount,
+    showTopButton,
+    restorationMinHeight,
+    feedRootRef,
+    setQuery,
+    setSelectedDate,
+    setSort,
+    setSize,
+    showMore,
+    resetCatalog,
+    scrollToTop,
+  } = useFeedCatalogState({
+    initialVisibleCount: INITIAL_VISIBLE_POSTS,
+    visibleStep: VISIBLE_POST_STEP,
+    loadedProductCount: posts.length,
+    isLoading,
+    hasMoreProducts,
+    isLoadingMore,
+    onLoadMore,
+  });
+  // Catalog filtering only needs minute boundaries. The header countdown keeps
+  // its precise shared second clock without re-rendering 100+ feed cards.
+  const auctionNow = useAuctionPolicyMinuteClock();
   const publishedPosts = useMemo(
     () =>
       posts.filter((post) => {
@@ -112,17 +158,28 @@ export default function FeedList({
     selectedDate === "all" || dateKeys.includes(selectedDate)
       ? selectedDate
       : "all";
-  const filteredPosts = useMemo(
-    () =>
+  const filteredPosts = useMemo(() => {
+    const dateFiltered =
       effectiveSelectedDate === "all"
         ? publishedPosts
         : publishedPosts.filter(
             (post) =>
               getKoreanDateKey(post.publish_at ?? post.createdAt) ===
               effectiveSelectedDate,
-          ),
-    [effectiveSelectedDate, publishedPosts],
-  );
+          );
+    const refined = dateFiltered.filter(
+      (post) =>
+        matchesCatalogSize(post, size) &&
+        matchesCatalogSearch(post, query),
+    );
+    return sortCatalogPosts(refined, sort);
+  }, [
+    query,
+    size,
+    sort,
+    effectiveSelectedDate,
+    publishedPosts,
+  ]);
   const availableCount = filteredPosts.filter(
     (post) =>
       getAuctionBidDecision({ post, currentUserName, now: auctionNow }).allowed,
@@ -132,8 +189,42 @@ export default function FeedList({
 
   const selectDate = (dateKey: string) => {
     setSelectedDate(dateKey);
-    setVisibleCount(INITIAL_VISIBLE_POSTS);
   };
+
+  const needsCompleteCatalog =
+    query.trim().length > 0 ||
+    size !== "all" ||
+    sort !== "latest" ||
+    selectedDate !== "all";
+
+  useEffect(() => {
+    if (isLoading) fullCatalogLoadAttemptRef.current = -1;
+  }, [isLoading]);
+
+  useEffect(() => {
+    if (
+      !needsCompleteCatalog ||
+      !hasMoreProducts ||
+      isLoading ||
+      isLoadingMore ||
+      Boolean(loadError) ||
+      !onLoadMore ||
+      fullCatalogLoadAttemptRef.current === posts.length
+    ) {
+      return;
+    }
+
+    fullCatalogLoadAttemptRef.current = posts.length;
+    void onLoadMore();
+  }, [
+    hasMoreProducts,
+    isLoading,
+    isLoadingMore,
+    loadError,
+    needsCompleteCatalog,
+    onLoadMore,
+    posts.length,
+  ]);
 
   const showMorePosts = async () => {
     if (
@@ -143,11 +234,45 @@ export default function FeedList({
     ) {
       await onLoadMore();
     }
-    setVisibleCount((current) => current + VISIBLE_POST_STEP);
+    showMore();
+  };
+
+  const confirmDeleteProduct = async () => {
+    if (
+      pendingControl?.action !== "delete" ||
+      !onDeleteProduct ||
+      isDeletingProduct
+    ) {
+      return;
+    }
+
+    setIsDeletingProduct(true);
+    setProductControlError("");
+    try {
+      await onDeleteProduct(pendingControl.post);
+      setPendingControl(null);
+    } catch (error) {
+      setProductControlError(
+        error instanceof Error
+          ? error.message
+          : "상품을 삭제하지 못했습니다. 서버 보호 정책을 확인해 주세요.",
+      );
+    } finally {
+      setIsDeletingProduct(false);
+    }
   };
 
   return (
-    <section aria-labelledby="auction-feed-title" className="min-w-0">
+    <section
+      ref={feedRootRef}
+      aria-labelledby="auction-feed-title"
+      className="min-w-0"
+      style={
+        restorationMinHeight
+          ? { minHeight: `${restorationMinHeight}px` }
+          : undefined
+      }
+    >
       <div className="mb-5 flex flex-col gap-4 border-b border-[var(--border)] pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--accent-text)]">
@@ -173,6 +298,93 @@ export default function FeedList({
         </div>
       </div>
 
+      <div className="mb-4 grid gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3 shadow-sm sm:p-4 lg:grid-cols-[minmax(15rem,1fr)_auto] lg:items-end">
+        <label className="block min-w-0">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">
+            Catalog search
+          </span>
+          <span className="mt-1.5 flex min-h-11 items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--input-surface)] px-3 transition-colors focus-within:border-[var(--accent)]">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="size-4 shrink-0 text-[var(--text-muted)]"><path d="m20 20-4.6-4.6M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="상품명·설명·사이즈 검색"
+              maxLength={80}
+              className="min-w-0 flex-1 bg-transparent text-sm font-bold text-[var(--text-strong)] outline-none placeholder:text-[var(--text-muted)]"
+            />
+            {query ? (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="검색어 지우기"
+                className="grid min-h-9 min-w-9 place-items-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--text-strong)]"
+              >
+                ×
+              </button>
+            ) : null}
+          </span>
+        </label>
+
+        <button
+          type="button"
+          onClick={resetCatalog}
+          className="min-h-11 rounded-lg border border-[var(--border)] px-4 text-xs font-black text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--text-strong)] hover:text-[var(--text-strong)] active:scale-[0.98]"
+        >
+          검색·필터 초기화
+        </button>
+      </div>
+
+      <div className="mb-4 space-y-3 border-b border-[var(--border)] pb-4">
+        <div className="overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex min-w-max items-center gap-2" role="group" aria-label="경매 상품 정렬">
+            {(
+              [
+                ["latest", "최신 등록순"],
+                ["closing", "🔥 마감 임박순"],
+                ["price-desc", "💰 현재가 높은순"],
+                ["price-asc", "현재가 낮은순"],
+              ] as const satisfies readonly (readonly [CatalogSort, string])[]
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={sort === value}
+                onClick={() => setSort(value)}
+                className={`min-h-10 rounded-full border px-3.5 text-xs font-black transition-all duration-200 active:scale-[0.98] ${
+                  sort === value
+                    ? "border-[var(--text-strong)] bg-[var(--text-strong)] text-[var(--surface)] shadow-sm"
+                    : "border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-muted)] hover:border-[var(--text-strong)] hover:text-[var(--text-strong)]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="의류 사이즈 필터">
+          <span className="mr-1 text-[10px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">
+            Size
+          </span>
+          {(["all", "S", "M", "L", "XL"] as const satisfies readonly CatalogSize[]).map((sizeOption) => (
+            <button
+              key={sizeOption}
+              type="button"
+              aria-pressed={size === sizeOption}
+              onClick={() => setSize(sizeOption)}
+              className={`min-h-10 min-w-10 rounded-md border px-3 font-mono text-xs font-black tabular-nums transition-all duration-200 active:scale-[0.97] ${
+                size === sizeOption
+                  ? "border-[var(--accent)] bg-[var(--accent-surface)] text-[var(--accent-text)]"
+                  : "border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-muted)] hover:border-[var(--text-strong)] hover:text-[var(--text-strong)]"
+              }`}
+            >
+              {sizeOption === "all" ? "ALL" : sizeOption}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="mb-5 border-b border-[var(--border)] pb-3">
         <DateFilterChips
           dateKeys={dateKeys}
@@ -181,13 +393,32 @@ export default function FeedList({
         />
       </div>
 
-      {loadError && publishedPosts.length > 0 ? (
+      {needsCompleteCatalog && hasMoreProducts && !loadError ? (
         <p
           role="status"
-          className="mb-5 border-l-2 border-[var(--danger-text)] bg-[var(--danger-surface)] px-4 py-3 text-sm font-semibold text-[var(--danger-text)]"
+          className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--info-border)] bg-[var(--info-surface)] px-3 py-2 text-xs font-bold text-[var(--info-text)]"
         >
-          {loadError} 기존에 불러온 상품을 표시하고 있어요.
+          <span className="size-3 animate-spin rounded-full border-2 border-current border-r-transparent" aria-hidden="true" />
+          전체 상품을 불러와 검색·정렬 결과를 정확히 맞추는 중…
         </p>
+      ) : null}
+
+      {loadError && publishedPosts.length > 0 ? (
+        <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-3 border-l-2 border-[var(--danger-text)] bg-[var(--danger-surface)] px-4 py-3 text-sm font-semibold text-[var(--danger-text)]">
+          <p>{loadError} 기존에 불러온 상품을 표시하고 있어요.</p>
+          {onRetry ? (
+            <button
+              type="button"
+              onClick={() => {
+                fullCatalogLoadAttemptRef.current = -1;
+                void onRetry();
+              }}
+              className="min-h-9 rounded-md border border-current px-3 text-xs font-black transition-transform active:scale-[0.97]"
+            >
+              다시 연결
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       {isLoading && publishedPosts.length === 0 ? (
@@ -221,6 +452,10 @@ export default function FeedList({
             </button>
           ) : null}
         </div>
+      ) : needsCompleteCatalog && hasMoreProducts && filteredPosts.length === 0 ? (
+        <div role="status" className="grid grid-cols-2 gap-3.5 sm:gap-px sm:overflow-hidden sm:border sm:border-[var(--border)] sm:bg-[var(--border)] 2xl:grid-cols-3">
+          {Array.from({ length: 4 }, (_, index) => <FeedSkeleton key={index} />)}
+        </div>
       ) : filteredPosts.length > 0 ? (
         <>
         <div
@@ -236,6 +471,11 @@ export default function FeedList({
               auctionNow={auctionNow}
               onBid={onBid}
               onInquiry={onInquiry}
+              showOperatorControls={showOperatorControls}
+              onRequestProductControl={(selectedPost, action) => {
+                setProductControlError("");
+                setPendingControl({ post: selectedPost, action });
+              }}
             />
           ))}
         </div>
@@ -264,10 +504,38 @@ export default function FeedList({
             이 날짜에 등록된 상품이 없어요
           </h3>
           <p className="mt-1.5 text-sm font-medium text-[var(--text-muted)]">
-            다른 날짜 버튼이나 전체보기를 눌러 주세요.
+            검색어나 날짜·사이즈 필터를 바꾸거나 전체보기를 눌러 주세요.
           </p>
         </div>
       )}
+
+      {showTopButton && typeof document !== "undefined" ? createPortal(
+        <button
+          type="button"
+          onClick={scrollToTop}
+          aria-label="페이지 맨 위로 이동"
+          className="fixed bottom-[calc(10rem+env(safe-area-inset-bottom))] right-3 z-50 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-[var(--border-strong)] bg-[var(--surface-raised)]/95 px-3.5 font-mono text-[11px] font-black tabular-nums text-[var(--text-strong)] shadow-[0_14px_36px_rgba(0,0,0,0.24)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--text-strong)] active:scale-[0.96] md:bottom-24 md:right-6"
+        >
+          <span aria-hidden="true">↑</span> TOP
+        </button>,
+        document.body,
+      )
+      : null}
+
+      {pendingControl ? (
+        <FeedProductControlModal
+          action={pendingControl.action}
+          post={pendingControl.post}
+          isSubmitting={isDeletingProduct}
+          error={productControlError}
+          onClose={() => {
+            if (isDeletingProduct) return;
+            setPendingControl(null);
+            setProductControlError("");
+          }}
+          onConfirmDelete={confirmDeleteProduct}
+        />
+      ) : null}
     </section>
   );
 }

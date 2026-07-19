@@ -1,5 +1,5 @@
 import { AuctionApp } from "@/src/components/AuctionApp";
 
 export default function Home() {
-  return <AuctionApp page="feed" />;
+  return <AuctionApp page="home" />;
 }

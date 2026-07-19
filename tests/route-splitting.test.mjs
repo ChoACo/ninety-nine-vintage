@@ -37,7 +37,7 @@ test("exposes feed, account, chat, and operator as independent routes", async ()
     source("src/components/AuctionApp.tsx"),
   ]);
 
-  assert.match(home, /<AuctionApp page="feed"/);
+  assert.match(home, /<AuctionApp page="home"/);
   assert.match(feed, /<AuctionApp page="feed"/);
   assert.match(account, /<AuctionApp page="profile"/);
   assert.match(chat, /<AuctionApp page="chat"/);
@@ -48,7 +48,7 @@ test("exposes feed, account, chat, and operator as independent routes", async ()
   assert.match(app, /admin: "\/operator"/);
 });
 
-test("keeps feed-only realtime work disabled on the other routes", async () => {
+test("limits catalog realtime to home/feed and sold archive work to home", async () => {
   const [app, productsHook, soldHook] = await Promise.all([
     source("src/components/AuctionApp.tsx"),
     source("src/hooks/useSupabaseProducts.ts"),
@@ -56,8 +56,9 @@ test("keeps feed-only realtime work disabled on the other routes", async () => {
   ]);
 
   assert.match(app, /const isFeedPage = activePage === "feed"/);
-  assert.match(app, /useSupabaseProducts\(\{ enabled: isFeedPage \}\)/);
-  assert.match(app, /usePublicSoldAuctions\(\{ enabled: isFeedPage \}\)/);
+  assert.match(app, /const isProductSurface = isHomePage \|\| isFeedPage/);
+  assert.match(app, /useSupabaseProducts\(\{ enabled: isProductSurface \}\)/);
+  assert.match(app, /usePublicSoldAuctions\(\{ enabled: isHomePage \}\)/);
   assert.match(
     app,
     /enabled: isFeedPage && !auth\.isLoading && showOnlineMembers/,
@@ -101,7 +102,9 @@ test("pages the public product feed in stable 24-row server ranges", async () =>
   assert.match(productsHook, /hasMoreProducts: boolean/);
   assert.match(productsHook, /isLoadingMore: boolean/);
   assert.match(productsHook, /loadMoreProducts: \(\) => Promise<void>/);
-  assert.match(productsHook, /setPosts\(firstPage\.posts\)/);
+  assert.match(productsHook, /const requestedPageCount = Math\.max\(nextPageRef\.current, 1\)/);
+  assert.match(productsHook, /for \(let page = 0; page < requestedPageCount; page \+= 1\)/);
+  assert.match(productsHook, /setPosts\(uniquePosts\)/);
   assert.match(productsHook, /const pageSnapshot = pageSnapshotRef\.current/);
   assert.match(productsHook, /new Set\(currentPosts\.map\(\(post\) => post\.id\)\)/);
   assert.match(productsHook, /\[\.\.\.currentPosts, \.\.\.uniqueNextPosts\]/);
@@ -148,7 +151,7 @@ test("loads heavyweight route screens and modals on demand", async () => {
 });
 
 test("server-renders every split route without a Vercel-style 404", async () => {
-  for (const path of ["/feed", "/account", "/chat", "/operator"]) {
+  for (const path of ["/", "/feed", "/account", "/chat", "/operator"]) {
     const response = await render(path);
     assert.equal(response.status, 200, path);
     assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);

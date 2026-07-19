@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- 검증된 로컬 브랜드 자산을 작은 헤더 로고로 사용합니다. */
 
+import Link from "next/link";
 import {
   getPublicRoleLabel,
   isOwnerRole,
@@ -35,7 +36,11 @@ export default function SiteHeader({
   return (
     <header className="theme-surface-glass rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3">
       <div className="flex items-center justify-between gap-2.5 lg:gap-5">
-        <div className="flex min-w-0 items-center gap-3">
+        <Link
+          href="/"
+          aria-label="나인티 나인 빈티지 홈으로 이동"
+          className="flex min-w-0 items-center gap-3 rounded-lg transition-opacity duration-200 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+        >
           <img
             src="/ninety-nine-vintage-brand.jpg"
             alt="나인티 나인 빈티지 공식 로고"
@@ -53,7 +58,7 @@ export default function SiteHeader({
               나인티 나인 빈티지
             </h1>
           </div>
-        </div>
+        </Link>
 
         <div className="flex shrink-0 items-center gap-1.5 lg:justify-end lg:gap-2">
           <ThemeToggle />

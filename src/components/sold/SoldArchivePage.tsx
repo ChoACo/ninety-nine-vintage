@@ -1,17 +1,17 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- Supabase Storage 공개 썸네일을 지연 표시합니다. */
-
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button, ThemeToggle } from "@/src/components/common";
+import DeferredProductImage from "@/src/components/common/DeferredProductImage";
 import { appendUniqueSoldAuctions } from "@/src/lib/soldArchivePagination";
 import {
   fetchPublicSoldAuctionsPage,
   type PublicSoldAuction,
   type PublicSoldAuctionCursor,
 } from "@/src/lib/supabase/auctionLifecycle";
+import { getCatalogThumbnailUrl } from "@/src/utils/catalogImages";
 import { formatKRW, formatKoreanDate } from "@/src/utils/formatters";
 
 function toLoadError(error: unknown): string {
@@ -130,6 +130,7 @@ export function SoldArchivePage() {
             href="/feed"
             className="flex min-w-0 items-center gap-2.5 rounded-md transition-opacity duration-200 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           >
+            {/* eslint-disable-next-line @next/next/no-img-element -- 검증된 로컬 브랜드 자산입니다. */}
             <img
               src="/ninety-nine-vintage-brand.jpg"
               alt=""
@@ -255,24 +256,22 @@ export function SoldArchivePage() {
 }
 
 function SoldArchiveCard({ auction }: { auction: PublicSoldAuction }) {
-  const imageUrl = auction.thumbnailUrls[0] || auction.imageUrls[0];
+  const imageUrl = getCatalogThumbnailUrl(
+    auction.thumbnailUrls[0],
+    auction.imageUrls[0],
+  );
 
   return (
     <article className="render-lazy group overflow-hidden bg-[var(--surface-raised)] transition-all duration-200 ease-out hover:relative hover:z-[1] hover:shadow-[var(--shadow-hover)]">
       <div className="aspect-[4/3] overflow-hidden bg-[var(--surface-muted)]">
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={`${auction.title} 판매 완료 상품`}
-            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.035]"
-            loading="lazy"
-            decoding="async"
-          />
-        ) : (
-          <div className="grid h-full place-items-center text-sm font-bold text-[var(--text-muted)]">
-            상품 사진 없음
-          </div>
-        )}
+        <DeferredProductImage
+          key={imageUrl || auction.productId}
+          src={imageUrl}
+          alt={`${auction.title} 판매 완료 상품 이미지`}
+          wrapperClassName="h-full w-full"
+          className="h-full w-full object-cover group-hover:scale-[1.035]"
+          emptyLabel="상품 미리보기를 준비하지 못함"
+        />
       </div>
       <div className="p-4 sm:p-5">
         <div className="flex items-center justify-between gap-2">

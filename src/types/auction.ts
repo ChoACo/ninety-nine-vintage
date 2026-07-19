@@ -60,6 +60,8 @@ export interface BidHistoryRecord {
 
 export interface AuctionPost {
   id: string;
+  /** 충돌 없는 운영자 삭제를 위해 공개 조회와 함께 받은 서버 수정 시각 */
+  updatedAt?: ISODateString;
   title: string;
   description: string;
   category: string;

@@ -11,7 +11,7 @@ import {
 export type NavigationTarget = "feed" | "chat" | "profile" | "admin";
 
 export interface NavigationProps {
-  activePage: NavigationTarget;
+  activePage: NavigationTarget | "home";
   onNavigate: (page: NavigationTarget) => void;
   role: AppRole;
   className?: string;

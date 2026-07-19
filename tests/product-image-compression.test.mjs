@@ -294,7 +294,11 @@ test("uploads and cleans up both Storage image variants", async () => {
     migration,
     /v_product\.image_urls \|\| v_product\.thumbnail_urls/,
   );
-  assert.match(gallery, /thumbnailImages\?\.\[index\] \|\| image/);
+  assert.match(
+    gallery,
+    /getCatalogThumbnailUrl\([\s\S]*thumbnailImages\?\.\[index\],[\s\S]*image/,
+  );
+  assert.doesNotMatch(gallery, /thumbnailImages\?\.\[index\] \|\| image/);
   assert.match(gallery, /images=\{cleanImages\}/);
   assert.match(gallery, /thumbnailImages=\{cleanThumbnails\}/);
   assert.match(galleryModal, /src=\{thumbnailImages\?\.\[index\] \|\| image\}/);

@@ -97,7 +97,7 @@ test("shares one minute timer and releases it after the final subscriber", async
   }
 });
 
-test("uses the shared server-adjusted second clock on every bid deadline surface", async () => {
+test("isolates the second clock from the large catalog while keeping server authority", async () => {
   const [clock, auctionClock, feed, postCard, sidebar, countdown] = await Promise.all([
     source("src/hooks/useAuctionPolicyClock.ts"),
     source("src/hooks/useAuctionClock.ts"),
@@ -114,9 +114,9 @@ test("uses the shared server-adjusted second clock on every bid deadline surface
   assert.match(clock, /export function useAuctionPolicyMinuteClock\(\): Date/);
   assert.match(auctionClock, /const currentTime = useAuctionPolicyClock\(\)/);
   assert.doesNotMatch(auctionClock, /window\.setInterval/);
-  assert.match(feed, /const auctionNow = useAuctionPolicyClock\(\)/);
+  assert.match(feed, /const auctionNow = useAuctionPolicyMinuteClock\(\)/);
   assert.match(sidebar, /const auctionNow = useAuctionPolicyClock\(\)/);
-  assert.doesNotMatch(feed, /useAuctionPolicyMinuteClock\(\)/);
+  assert.doesNotMatch(feed, /const auctionNow = useAuctionPolicyClock\(\)/);
   assert.doesNotMatch(sidebar, /useAuctionPolicyMinuteClock\(\)/);
   assert.match(countdown, /const currentTime = useAuctionPolicyClock\(\)/);
   assert.match(postCard, /assertAuctionBidAllowed\(\{[\s\S]*now: auctionNow/);

@@ -53,27 +53,40 @@ export function useSupabaseProducts({
 
     const requestGeneration = ++requestGenerationRef.current;
     const pageSnapshot = new Date();
+    // Realtime updates must not collapse a deeply explored catalog back to the
+    // first 24 rows. Re-fetch the same number of pages with one shared snapshot.
+    const requestedPageCount = Math.max(nextPageRef.current, 1);
     isLoadingMoreRef.current = false;
     setIsLoadingMore(false);
     if (showLoading) setIsLoading(true);
 
     const request = (async () => {
       try {
-        const firstPage = await fetchPublishedProductsPage({
-          page: 0,
-          now: pageSnapshot,
-        });
+        const refreshedPages = [];
+        for (let page = 0; page < requestedPageCount; page += 1) {
+          const refreshedPage = await fetchPublishedProductsPage({
+            page,
+            now: pageSnapshot,
+          });
+          refreshedPages.push(refreshedPage);
+          if (!refreshedPage.hasMore) break;
+        }
         if (
           !enabledRef.current ||
           requestGeneration !== requestGenerationRef.current
         ) {
           return;
         }
+        const refreshedPosts = refreshedPages.flatMap((page) => page.posts);
+        const uniquePosts = Array.from(
+          new Map(refreshedPosts.map((post) => [post.id, post])).values(),
+        );
+        const lastPage = refreshedPages.at(-1);
         pageSnapshotRef.current = pageSnapshot;
-        nextPageRef.current = 1;
-        hasMoreProductsRef.current = firstPage.hasMore;
-        setPosts(firstPage.posts);
-        setHasMoreProducts(firstPage.hasMore);
+        nextPageRef.current = refreshedPages.length;
+        hasMoreProductsRef.current = lastPage?.hasMore ?? false;
+        setPosts(uniquePosts);
+        setHasMoreProducts(lastPage?.hasMore ?? false);
         setError("");
       } catch (loadError) {
         if (

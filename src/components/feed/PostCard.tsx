@@ -22,6 +22,7 @@ import BidHistoryModal from "./BidHistoryModal";
 import PhotoGallery from "./PhotoGallery";
 import ProductInquiryModal from "./ProductInquiryModal";
 import SizeComparisonScanner from "./SizeComparisonScanner";
+import type { FeedProductControlAction } from "./FeedProductControlModal";
 
 export type BidHandler = (
   postId: string,
@@ -40,6 +41,11 @@ export interface PostCardProps {
   auctionNow: Date;
   onBid?: BidHandler;
   onInquiry: InquiryHandler;
+  showOperatorControls?: boolean;
+  onRequestProductControl?: (
+    post: AuctionPost,
+    action: FeedProductControlAction,
+  ) => void;
 }
 
 const bidStatusStyles: Record<
@@ -126,6 +132,8 @@ export default function PostCard({
   auctionNow,
   onBid,
   onInquiry,
+  showOperatorControls = false,
+  onRequestProductControl,
 }: PostCardProps) {
   const [bidModalOpen, setBidModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
@@ -222,7 +230,10 @@ export default function PostCard({
   };
 
   return (
-    <article className="render-lazy group/card flex h-full min-w-0 flex-col overflow-hidden bg-[var(--surface-raised)] transition-all duration-200 ease-out hover:relative hover:z-[1] hover:shadow-[var(--shadow-hover)]">
+    <article
+      data-feed-product-id={post.id}
+      className="render-lazy group/card flex h-full min-w-0 flex-col overflow-hidden bg-[var(--surface-raised)] transition-all duration-200 ease-out hover:relative hover:z-[1] hover:shadow-[var(--shadow-hover)]"
+    >
       <div className="relative overflow-hidden">
         <PhotoGallery
           images={post.imageUrls}
@@ -244,6 +255,32 @@ export default function PostCard({
             <span aria-hidden="true">🔥</span>
             마감 연장 · +3 MIN
           </span>
+        ) : null}
+        {showOperatorControls && onRequestProductControl ? (
+          <div
+            role="toolbar"
+            aria-label={`${galleryLotLabel} 운영자 제어`}
+            className="absolute right-2 top-2 z-20 flex items-center gap-1 rounded-lg border border-red-400/20 bg-black/75 p-1 text-white shadow-lg backdrop-blur-md sm:right-3 sm:top-3"
+          >
+            <button
+              type="button"
+              aria-label={`${galleryLotLabel} 일시정지 및 미공개 전환`}
+              title="일시정지 · 서버 보호 정책 확인"
+              onClick={() => onRequestProductControl(post, "pause")}
+              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm transition-all duration-200 ease-out hover:scale-105 hover:border-amber-300/45 hover:bg-amber-500/20 active:scale-95 sm:min-h-9 sm:min-w-9"
+            >
+              <span aria-hidden="true">⏸</span>
+            </button>
+            <button
+              type="button"
+              aria-label={`${galleryLotLabel} 즉시 삭제`}
+              title="즉시 삭제"
+              onClick={() => onRequestProductControl(post, "delete")}
+              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md border border-red-400/25 bg-red-500/15 text-sm text-red-100 transition-all duration-200 ease-out hover:scale-105 hover:border-red-300/60 hover:bg-red-500/35 active:scale-95 sm:min-h-9 sm:min-w-9"
+            >
+              <span aria-hidden="true">🗑</span>
+            </button>
+          </div>
         ) : null}
       </div>
 

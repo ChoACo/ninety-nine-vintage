@@ -1,8 +1,10 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- 운영자가 입력하는 임의의 외부 목 URL을 미리 Next Image 도메인으로 제한할 수 없음 */
-import { useState } from "react";
-import PhotoGalleryModal from "./PhotoGalleryModal";
+import { lazy, memo, Suspense, useMemo, useState } from "react";
+import DeferredProductImage from "@/src/components/common/DeferredProductImage";
+import { getCatalogThumbnailUrl } from "@/src/utils/catalogImages";
+
+const PhotoGalleryModal = lazy(() => import("./PhotoGalleryModal"));
 
 export interface PhotoGalleryProps {
   images: readonly string[];
@@ -12,55 +14,29 @@ export interface PhotoGalleryProps {
   compact?: boolean;
 }
 
-interface GalleryImageProps {
-  src: string;
-  alt: string;
-  className: string;
-}
-
-function GalleryImage({ src, alt, className }: GalleryImageProps) {
-  const [failed, setFailed] = useState(false);
-
-  if (failed) {
-    return (
-      <span
-        role="img"
-        aria-label={`${alt} 이미지를 불러오지 못함`}
-        className={`${className} grid place-items-center bg-[var(--surface-muted)] text-[var(--text-muted)]`}
-      >
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-8 w-8"><path d="m4 16 4.5-4.5 3 3 2-2L20 19M7.5 8.5h.01M4 4h16v16H4V4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      </span>
-    );
-  }
-
-  return (
-    <img
-      src={src}
-      alt={alt}
-      className={className}
-      loading="lazy"
-      decoding="async"
-      onError={() => setFailed(true)}
-    />
-  );
-}
-
-export default function PhotoGallery({
+function PhotoGallery({
   images,
   thumbnailImages,
   title,
   lotLabel,
   compact = false,
 }: PhotoGalleryProps) {
-  const galleryItems = images.flatMap((image, index) =>
-    image
-      ? [
-          {
-            image,
-            thumbnail: thumbnailImages?.[index] || image,
-          },
-        ]
-      : [],
+  const galleryItems = useMemo(
+    () =>
+      images.flatMap((image, index) =>
+        image
+          ? [
+              {
+                image,
+                thumbnail: getCatalogThumbnailUrl(
+                  thumbnailImages?.[index],
+                  image,
+                ),
+              },
+            ]
+          : [],
+      ),
+    [images, thumbnailImages],
   );
   const cleanImages = galleryItems.map((item) => item.image);
   const cleanThumbnails = galleryItems.map((item) => item.thumbnail);
@@ -96,18 +72,20 @@ export default function PhotoGallery({
             compact ? "rounded-none" : "rounded-xl"
           }`}
         >
-          <GalleryImage
+          <DeferredProductImage
             key={galleryItems[0].thumbnail}
             src={galleryItems[0].thumbnail}
             alt={`${title} 메인 사진`}
-            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.035]"
+            sizes="(max-width: 639px) 50vw, (max-width: 1535px) 50vw, 33vw"
+            wrapperClassName="h-full w-full"
+            className="h-full w-full object-cover group-hover:scale-[1.035]"
           />
           <span className="absolute bottom-3 right-3 border border-white/20 bg-black/70 px-2 py-1 font-mono text-[10px] font-bold tabular-nums tracking-tight text-white backdrop-blur-md">
             사진 {cleanImages.length}장
           </span>
         </button>
 
-        {thumbnails.length > 0 ? (
+        {!compact && thumbnails.length > 0 ? (
           <div
             className={`grid grid-cols-3 ${compact ? "gap-px max-sm:hidden" : "gap-2.5"}`}
           >
@@ -130,10 +108,12 @@ export default function PhotoGallery({
                       : "aspect-[5/3] rounded-lg"
                   }`}
                 >
-                  <GalleryImage
+                  <DeferredProductImage
                     src={item.thumbnail}
                     alt=""
-                    className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+                    sizes="33vw"
+                    wrapperClassName="h-full w-full"
+                    className="h-full w-full object-cover group-hover:scale-[1.04]"
                   />
                   {showMore ? (
                     <span className="absolute inset-0 grid place-items-center bg-black/60 font-mono text-lg font-black tabular-nums tracking-tight text-white backdrop-blur-[1px]">
@@ -148,16 +128,20 @@ export default function PhotoGallery({
       </div>
 
       {modalOpen ? (
-        <PhotoGalleryModal
-          open
-          onClose={() => setModalOpen(false)}
-          images={cleanImages}
-          thumbnailImages={cleanThumbnails}
-          title={title}
-          lotLabel={lotLabel}
-          initialIndex={selectedIndex}
-        />
+        <Suspense fallback={null}>
+          <PhotoGalleryModal
+            open
+            onClose={() => setModalOpen(false)}
+            images={cleanImages}
+            thumbnailImages={cleanThumbnails}
+            title={title}
+            lotLabel={lotLabel}
+            initialIndex={selectedIndex}
+          />
+        </Suspense>
       ) : null}
     </>
   );
 }
+
+export default memo(PhotoGallery);

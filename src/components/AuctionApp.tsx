@@ -26,6 +26,7 @@ import {
 } from "@/src/lib/supabase/auth";
 import type { SupportViewerRole } from "@/src/lib/supabase/supportChat";
 import type { createProductsBatch as CreateProductsBatch } from "@/src/lib/supabase/products";
+import type { AuctionPost } from "@/src/types/auction";
 import { formatKRW } from "@/src/utils/formatters";
 
 const AdminAccessGate = lazy(() =>
@@ -61,11 +62,7 @@ const FeedList = lazy(() => import("@/src/components/feed/FeedList"));
 const NewAuctionModal = lazy(
   () => import("@/src/components/feed/NewAuctionModal"),
 );
-const SoldAuctionFeed = lazy(() =>
-  import("@/src/components/feed/SoldAuctionFeed").then((module) => ({
-    default: module.SoldAuctionFeed,
-  })),
-);
+const HomeLanding = lazy(() => import("@/src/components/home/HomeLanding"));
 const AuctionOverviewSidebar = lazy(
   () => import("@/src/components/live/AuctionOverviewSidebar"),
 );
@@ -96,8 +93,10 @@ const NAVIGATION_PATHS: Record<NavigationTarget, string> = {
   admin: "/operator",
 };
 
+type AuctionAppPage = NavigationTarget | "home";
+
 export interface AuctionAppProps {
-  page?: NavigationTarget;
+  page?: AuctionAppPage;
 }
 
 function toSupportRole(role: AppRole): SupportViewerRole | null {
@@ -124,7 +123,7 @@ function useDesktopRails() {
   return isDesktop;
 }
 
-export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
+export function AuctionApp({ page: activePage = "home" }: AuctionAppProps) {
   const [authOpen, setAuthOpen] = useState(false);
   const [newAuctionOpen, setNewAuctionOpen] = useState(false);
   const [bulkAuctionOpen, setBulkAuctionOpen] = useState(false);
@@ -136,7 +135,9 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
   const displayName = auth.profile?.displayName ?? "";
   const publicDisplayName = isOwnerRole(auth.role) ? "" : displayName;
   const isMember = Boolean(auth.user) && isMemberRole(auth.role);
+  const isHomePage = activePage === "home";
   const isFeedPage = activePage === "feed";
+  const isProductSurface = isHomePage || isFeedPage;
   const showDesktopRails = useDesktopRails();
   // The public feed includes authenticated members and ephemeral guest
   // Presence identities. Private owner/employee accounts remain absent from
@@ -157,14 +158,15 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
   });
   const {
     posts,
+    setPosts,
     isLoading: productsLoading,
     hasMoreProducts,
     isLoadingMore: productsLoadingMore,
     error: productsError,
     refreshProducts,
     loadMoreProducts,
-  } = useSupabaseProducts({ enabled: isFeedPage });
-  const soldAuctions = usePublicSoldAuctions({ enabled: isFeedPage });
+  } = useSupabaseProducts({ enabled: isProductSurface });
+  const soldAuctions = usePublicSoldAuctions({ enabled: isHomePage });
 
   const showToast = useCallback((message: string) => {
     setToastMessage("");
@@ -184,8 +186,7 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
   const navigateToPage = useCallback((target: NavigationTarget) => {
     const nextPath = NAVIGATION_PATHS[target];
     const currentPath = window.location.pathname;
-    const isCurrentFeedAlias = target === "feed" && currentPath === "/";
-    if (currentPath !== nextPath && !isCurrentFeedAlias) {
+    if (currentPath !== nextPath) {
       window.location.assign(nextPath);
     }
   }, []);
@@ -237,6 +238,25 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
     );
     await startProductInquiry(postId, message);
     showToast("운영팀에 상품 문의를 전송했습니다.");
+  };
+
+  const handleDeleteFeedProduct = async (post: AuctionPost) => {
+    if (!canAccessOperationsCenter(auth.role)) {
+      throw new Error("운영자 권한을 확인하지 못했습니다.");
+    }
+    if (!post.updatedAt) {
+      throw new Error(
+        "상품의 최신 수정 시각이 없어 안전하게 삭제할 수 없습니다. 피드를 새로고침해 주세요.",
+      );
+    }
+
+    const { deleteManagedProduct } = await import(
+      "@/src/lib/supabase/products"
+    );
+    await deleteManagedProduct(post.id, post.updatedAt);
+    setPosts((current) => current.filter((item) => item.id !== post.id));
+    setOperationsRevision((current) => current + 1);
+    showToast(`${post.title} 상품을 삭제했습니다.`);
   };
 
   const handleCreateAuction = async (draft: NewAuctionDraft) => {
@@ -291,6 +311,21 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
   };
 
   const renderPage = () => {
+    if (activePage === "home") {
+      return (
+        <HomeLanding
+          posts={posts}
+          isLoading={productsLoading}
+          error={productsError}
+          onRetry={refreshProducts}
+          soldAuctions={soldAuctions.auctions}
+          soldAuctionsLoading={soldAuctions.isLoading}
+          soldAuctionsError={soldAuctions.error}
+          onRetrySoldAuctions={soldAuctions.refresh}
+        />
+      );
+    }
+
     if (activePage === "chat") {
       return (
         <main className="mx-auto w-full max-w-7xl px-4 pb-28 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pb-12">
@@ -423,56 +458,6 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
               </section>
             ) : null}
 
-            <section className="theme-panel group relative my-4 overflow-hidden rounded-2xl border shadow-[0_18px_55px_rgba(15,23,42,0.06)] transition-all duration-200 ease-out sm:my-5 sm:rounded-[1.35rem]">
-              <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(115deg,transparent_45%,rgba(255,255,255,0.04)_55%,transparent_65%)] opacity-0 transition-opacity duration-200 group-hover:opacity-100" aria-hidden="true" />
-              <div className="grid items-stretch md:grid-cols-[minmax(0,1.12fr)_minmax(18rem,0.88fr)]">
-                <div className="relative z-20 flex flex-col justify-center px-5 py-7 sm:px-7 sm:py-9 lg:px-9 lg:py-10">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-[10px] font-bold tracking-[0.22em] text-[var(--accent-text)] sm:text-xs">
-                      NINETY-NINE VINTAGE
-                    </p>
-                    <span className="h-px w-8 bg-[var(--border-strong)]" aria-hidden="true" />
-                    <span className="text-[10px] font-semibold tracking-[0.14em] text-[var(--text-muted)] sm:text-xs">
-                      CURATED DAILY
-                    </span>
-                  </div>
-                  <h2 className="mt-3 max-w-2xl text-[1.45rem] font-semibold leading-[1.18] tracking-[-0.04em] text-[var(--text-strong)] sm:text-[2rem] lg:text-[2.35rem]">
-                    단 하나뿐인 빈티지,
-                    <span className="block">투명한 라이브 경매로.</span>
-                  </h2>
-                  <p className="mt-3 max-w-2xl break-keep text-sm font-medium leading-6 text-[var(--text-muted)] sm:text-[15px] sm:leading-7">
-                    매일 엄선한 빈티지를 공개합니다. 모든 입찰 기록과 낙찰 결과를
-                    확인하며 안심하고 참여하세요.
-                  </p>
-                  <div className="mt-5 flex w-fit items-center divide-x divide-[var(--border)] overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] text-[10px] font-semibold text-[var(--text-muted)] shadow-sm sm:text-xs">
-                    <span className="px-2.5 py-2 font-mono tabular-nums tracking-tight sm:px-3">20:56 신규 제한</span>
-                    <span className="px-2.5 py-2 font-mono tabular-nums tracking-tight sm:px-3">21:00 정산</span>
-                    <span className="px-2.5 py-2 font-mono tabular-nums tracking-tight sm:px-3">22:00 재개</span>
-                  </div>
-                </div>
-
-                <picture className="relative block min-h-48 overflow-hidden bg-black md:min-h-full">
-                  <source
-                    media="(min-width: 1440px)"
-                    srcSet="/ninety-nine-vintage-banner.png"
-                  />
-                  <source
-                    media="(min-width: 768px)"
-                    srcSet="/ninety-nine-vintage-profile-hd.jpg"
-                  />
-                  <img
-                    src="/ninety-nine-vintage-brand.jpg"
-                    alt="나인티 나인 빈티지 공식 배너"
-                    width={1024}
-                    height={1024}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full max-h-72 w-full object-contain transition-transform duration-500 ease-out group-hover:scale-[1.02] md:max-h-none"
-                  />
-                </picture>
-              </div>
-            </section>
-
             <FeedList
               posts={posts}
               currentUserName={publicDisplayName}
@@ -485,13 +470,9 @@ export function AuctionApp({ page: activePage = "feed" }: AuctionAppProps) {
               loadError={productsError}
               onRetry={refreshProducts}
               onLoadMore={loadMoreProducts}
+              showOperatorControls={canAccessOperationsCenter(auth.role)}
+              onDeleteProduct={handleDeleteFeedProduct}
               description="오후 8시 56분 이후 무입찰 첫 건은 즉시 확정되며, 오후 9시 정산 후 미판매 상품은 오후 10시에 다시 열립니다."
-            />
-            <SoldAuctionFeed
-              auctions={soldAuctions.auctions}
-              isLoading={soldAuctions.isLoading}
-              error={soldAuctions.error}
-              onRetry={soldAuctions.refresh}
             />
           </div>
 

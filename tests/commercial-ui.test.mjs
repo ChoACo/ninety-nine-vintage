@@ -28,9 +28,10 @@ test("exposes reusable high-end commerce primitives with accessible motion fallb
 });
 
 test("keeps auction urgency in the visual layer while preserving the policy clock", async () => {
-  const [clock, auctionApp] = await Promise.all([
+  const [clock, auctionApp, homeLanding] = await Promise.all([
     source("src/components/common/AuctionClock.tsx"),
     source("src/components/AuctionApp.tsx"),
+    source("src/components/home/HomeLanding.tsx"),
   ]);
 
   assert.match(clock, /displayCountdown\.totalSeconds <= 10 \* 60/);
@@ -45,7 +46,8 @@ test("keeps auction urgency in the visual layer while preserving the policy cloc
     /<AuctionClock[\s\S]*antiSnipingDeadlines=\{posts[\s\S]*antiSnipingExtensionCount/,
   );
   assert.match(auctionApp, /<FeedList[\s\S]*onBid=\{handleBid\}/);
-  assert.match(auctionApp, /<SoldAuctionFeed/);
+  assert.match(auctionApp, /const HomeLanding = lazy/);
+  assert.match(homeLanding, /<SoldAuctionFeed/);
   assert.match(auctionApp, /commerce-skeleton/);
 });
 

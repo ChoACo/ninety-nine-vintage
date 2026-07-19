@@ -39,8 +39,9 @@ test("server-renders the Supabase-backed auction application", async () => {
   );
   assert.match(html, /나인티 나인 빈티지/);
   assert.doesNotMatch(html, /다미네 구제|DAMINE VINTAGE/i);
-  assert.match(html, /무입찰 첫 건은 즉시 확정/);
-  assert.match(html, /Supabase에서 경매 상품을 불러오는 중이에요/);
+  assert.match(html, /오늘 단 한 번/);
+  assert.match(html, /전체 경매 피드 보기/);
+  assert.match(html, /commerce-skeleton/);
   assert.match(html, /카카오로 시작하기/);
   assert.doesNotMatch(html, /버버리 체크 안감|카멜 핸드메이드|Mock Data/i);
 });
@@ -455,7 +456,10 @@ test("uses a row-locked server RPC as the only bid write path", async () => {
   assert.match(hardening, /revoke all on function public\.place_bid/);
   assert.match(bidRepository, /\.rpc\("place_bid"/);
   assert.match(auctionApp, /await placeBid\(postId, amount\)/);
-  assert.doesNotMatch(auctionApp, /setPosts|bid-local-/);
+  const bidHandlerStart = auctionApp.indexOf("const handleBid = async");
+  const bidHandlerEnd = auctionApp.indexOf("const handleProductInquiry", bidHandlerStart);
+  const bidHandler = auctionApp.slice(bidHandlerStart, bidHandlerEnd);
+  assert.doesNotMatch(bidHandler, /setPosts|bid-local-/);
   assert.match(products, /bidLockedAt: row\.bid_locked_at/);
 });
 

@@ -108,6 +108,7 @@ export function mapProductRowToAuctionPost(row: ProductRow): AuctionPost {
 
   return {
     id: row.id,
+    updatedAt: row.updated_at,
     title: row.title,
     description: row.description,
     category: row.category || "구제 의류",

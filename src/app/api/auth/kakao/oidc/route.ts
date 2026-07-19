@@ -7,6 +7,7 @@ import {
   KAKAO_ID_TOKEN_COOKIE,
   KAKAO_NONCE_COOKIE,
   KAKAO_STATE_COOKIE,
+  KAKAO_RETURN_TO_COOKIE,
   KAKAO_TOKEN_ENDPOINT,
   readCookie,
   serializeHttpOnlyCookie,
@@ -24,6 +25,7 @@ function clearedOauthCookies(requestUrl: string): string[] {
     clearHttpOnlyCookie(requestUrl, KAKAO_NONCE_COOKIE),
     clearHttpOnlyCookie(requestUrl, KAKAO_ID_TOKEN_COOKIE),
     clearHttpOnlyCookie(requestUrl, KAKAO_ACCESS_TOKEN_COOKIE),
+    clearHttpOnlyCookie(requestUrl, KAKAO_RETURN_TO_COOKIE),
   ];
 }
 

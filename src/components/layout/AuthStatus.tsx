@@ -1,0 +1,19 @@
+"use client";
+
+import { LogIn, LogOut, UserRound } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+
+export function AuthStatus() {
+  const [signedIn, setSignedIn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const client = getSupabaseBrowserClient();
+    void client.auth.getSession().then(({ data }) => setSignedIn(Boolean(data.session)));
+    const { data: listener } = client.auth.onAuthStateChange((_event, session) => setSignedIn(Boolean(session)));
+    return () => listener.subscription.unsubscribe();
+  }, []);
+  if (!signedIn) return <Link aria-label="카카오 로그인" className="grid size-10 place-items-center border border-line" href="/api/auth/kakao/start?returnTo=%2Faccount"><LogIn size={17} /></Link>;
+  return <div className="flex items-center gap-1"><Link aria-label="내 정보" className="grid size-10 place-items-center border border-line" href="/account"><UserRound size={17} /></Link><button aria-label="로그아웃" className="grid size-10 place-items-center border border-line disabled:opacity-40" disabled={busy} onClick={() => { setBusy(true); void (async () => { const client = getSupabaseBrowserClient(); await client.auth.signOut(); await fetch("/api/auth/kakao/logout", { method: "POST", credentials: "include" }); setBusy(false); })(); }} type="button"><LogOut size={16} /></button></div>;
+}

@@ -1,9 +1,10 @@
 "use client";
 
-import { Headphones, Menu, Search, UserRound, X } from "lucide-react";
+import { Headphones, Menu, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { CommerceToolbar } from "@/components/features/commerce/CommerceToolbar";
+import { AuthStatus } from "@/components/layout/AuthStatus";
 
 const navigation = [
   { label: "HOME", href: "/" },
@@ -24,7 +25,7 @@ export function PcHeader() {
         </nav>
         <div className="flex items-center gap-2 md:w-[270px] md:justify-end">
           <Link aria-label="상담" className="grid size-10 place-items-center border border-line" href="/chat"><Headphones size={17} /></Link>
-          <Link aria-label="내 정보" className="grid size-10 place-items-center border border-line" href="/account"><UserRound size={17} /></Link>
+          <AuthStatus />
           <CommerceToolbar />
           <label className="hidden h-10 items-center gap-2 border border-line bg-surface px-3 text-muted lg:flex"><Search size={16} /><input aria-label="상품 검색" className="w-36 bg-transparent text-xs text-ink outline-none placeholder:text-muted" placeholder="검색" /></label>
         </div>

@@ -1,11 +1,13 @@
 "use client";
 
-import { Heart } from "lucide-react";
+import { Gavel, Heart, ShoppingBag } from "lucide-react";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { Item } from "@/types/auction";
 import { useCommerceStore } from "@/store/useCommerceStore";
-import { persistWishlist } from "@/lib/commerce/client";
+import { persistCart, persistWishlist } from "@/lib/commerce/client";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { BidModal } from "@/components/features/auction/detail/BidModal";
 
 interface AuctionCardProps { item: Item & { closesAt?: string; timeLeft?: string }; }
 
@@ -15,7 +17,19 @@ export function AuctionCard({ item }: AuctionCardProps) {
   const liked = useCommerceStore((state) => state.likedIds.includes(item.id));
   const toggleLike = useCommerceStore((state) => state.toggleLike);
   const hydrate = useCommerceStore((state) => state.hydrate);
+  const addToCart = useCommerceStore((state) => state.addToCart);
+  const [bidOpen, setBidOpen] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
   useEffect(() => hydrate(), [hydrate]);
+  const quickBid = async (amount: number) => {
+    const { data } = await getSupabaseBrowserClient().auth.getSession();
+    if (!data.session?.access_token) throw new Error("카카오 로그인 후 입찰할 수 있습니다.");
+    const response = await fetch("/api/auction/bids", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` }, body: JSON.stringify({ productId: item.id, amount }) });
+    const payload = await response.json() as { error?: string };
+    if (!response.ok) throw new Error(payload.error ?? "입찰을 저장하지 못했습니다.");
+    setActionMessage("입찰이 완료되었습니다.");
+  };
+  const addFixedToCart = () => { addToCart(item.id); void persistCart(item.id, true); setActionMessage("장바구니에 담았습니다."); };
   return (
     <article className="group min-w-0">
       <Link className="block" href={`/auction/${item.id}`}>
@@ -36,7 +50,12 @@ export function AuctionCard({ item }: AuctionCardProps) {
           <div><p className="text-[10px] text-muted">{isFixed ? "판매 정가" : "현재 입찰가"}</p><p className="font-mono text-sm font-bold tabular-nums">{price.toLocaleString("ko-KR")}원</p></div>
           <p className="text-[10px] text-muted">{isFixed ? "즉시 구매" : `입찰 ${item.bidCount}건`}</p>
         </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          {isFixed ? <><button className="flex h-9 items-center justify-center gap-1 border border-line text-[10px] font-bold transition-colors hover:border-ink" onClick={(event) => { event.preventDefault(); addFixedToCart(); }} type="button"><ShoppingBag size={13} /> 장바구니</button><Link className="flex h-9 items-center justify-center bg-ink text-[10px] font-bold text-paper" href={`/auction/${item.id}`}>바로 구매</Link></> : <><button className="flex h-9 items-center justify-center gap-1 bg-ink text-[10px] font-bold text-paper" onClick={(event) => { event.preventDefault(); setBidOpen(true); }} type="button"><Gavel size={13} /> 간편 입찰</button><button className="flex h-9 cursor-not-allowed items-center justify-center gap-1 border border-line text-[10px] font-bold text-muted" disabled title="경매 상품은 장바구니에 담을 수 없습니다." type="button"><ShoppingBag size={13} /> 장바구니</button></>}
+        </div>
+        {actionMessage && <p aria-live="polite" className="mt-2 text-[10px] font-bold text-emerald-700">{actionMessage}</p>}
       </div>
+      {!isFixed && <BidModal currentPrice={price} key={`${item.id}-${price}`} onClose={() => setBidOpen(false)} onSubmit={quickBid} open={bidOpen} />}
     </article>
   );
 }

@@ -4,6 +4,7 @@ import {
   KAKAO_ID_TOKEN_COOKIE,
   KAKAO_NONCE_COOKIE,
   KAKAO_STATE_COOKIE,
+  KAKAO_RETURN_TO_COOKIE,
   readCookie,
 } from "@/lib/kakao/oidc";
 
@@ -24,6 +25,7 @@ function sessionResponse(
       KAKAO_ID_TOKEN_COOKIE,
       KAKAO_NONCE_COOKIE,
       KAKAO_STATE_COOKIE,
+      KAKAO_RETURN_TO_COOKIE,
     ]) {
       headers.append("Set-Cookie", clearHttpOnlyCookie(requestUrl, cookieName));
     }
@@ -42,7 +44,7 @@ export async function POST(request: Request) {
     return sessionResponse(request.url, { error: "expired" }, 401);
   }
 
-  return sessionResponse(request.url, { idToken, nonce }, 200);
+  return sessionResponse(request.url, { idToken, nonce, returnTo: readCookie(request, KAKAO_RETURN_TO_COOKIE) ?? "/account" }, 200);
 }
 
 export async function GET() {

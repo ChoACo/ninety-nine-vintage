@@ -10,6 +10,7 @@ import {
   getPortOneWebhookSecret,
   PORTONE_PAY_METHODS,
 } from "@/lib/portone/server";
+import { isPortOneFeatureEnabled } from "@/lib/portone/runtimeMode";
 
 interface PaymentRuntimeRow {
   active_mode?: unknown;
@@ -37,7 +38,8 @@ async function readRuntime(context: Awaited<ReturnType<typeof authenticateOwnerA
     activeMode: row.active_mode === "portone" ? "portone" : "manual_transfer",
     bankConfigured: row.configured === true,
     updatedAt: typeof row.updated_at === "string" ? row.updated_at : null,
-    portoneReady: isPortOneReady(),
+    portoneReady: isPortOneFeatureEnabled() && isPortOneReady(),
+    portoneLocked: !isPortOneFeatureEnabled(),
   };
 }
 
@@ -58,8 +60,8 @@ export async function PATCH(request: Request) {
     if (mode !== "manual_transfer" && mode !== "portone") {
       return ownerAccessJsonResponse({ error: "invalid_payment_mode" }, 400);
     }
-    if (mode === "portone" && !isPortOneReady()) {
-      return ownerAccessJsonResponse({ error: "portone_not_ready" }, 409);
+    if (mode === "portone" && (!isPortOneFeatureEnabled() || !isPortOneReady())) {
+      return ownerAccessJsonResponse({ error: "portone_locked" }, 409);
     }
 
     const activeMode = await ownerRpc<string>(context, "set_payment_runtime_mode", {

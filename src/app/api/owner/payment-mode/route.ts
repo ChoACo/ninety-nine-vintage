@@ -56,6 +56,18 @@ export async function PATCH(request: Request) {
   try {
     const context = await authenticateOwnerAccessRequest(request);
     const body = await readSmallJsonBody(request);
+    const bankName = typeof body.bankName === "string" ? body.bankName.trim() : "";
+    const accountNumber = typeof body.accountNumber === "string" ? body.accountNumber.trim() : "";
+    if (bankName || accountNumber) {
+      if (!bankName || !accountNumber) {
+        return ownerAccessJsonResponse({ error: "invalid_bank_settings" }, 400);
+      }
+      await ownerRpc(context, "update_manual_transfer_settings", {
+        p_bank_name: bankName,
+        p_account_number: accountNumber,
+      });
+      return ownerAccessJsonResponse(await readRuntime(context));
+    }
     const mode = body.mode;
     if (mode !== "manual_transfer" && mode !== "portone") {
       return ownerAccessJsonResponse({ error: "invalid_payment_mode" }, 400);

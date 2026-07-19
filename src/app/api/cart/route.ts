@@ -14,9 +14,12 @@ export async function GET(request: Request) {
     .from("products")
     .select("*")
     .in("id", ids)
-    .eq("sale_type", "fixed");
+    .eq("sale_type", "fixed")
+    .eq("status", "active")
+    .lte("publish_at", new Date().toISOString());
   if (productError) return commerceJson({ error: "cart_unavailable" }, 503);
-  return commerceJson({ items: products ?? [], productIds: ids });
+  const liveIds = (products ?? []).map((product) => product.id);
+  return commerceJson({ items: products ?? [], productIds: liveIds, staleProductIds: ids.filter((id) => !liveIds.includes(id)) });
 }
 
 export async function POST(request: Request) {

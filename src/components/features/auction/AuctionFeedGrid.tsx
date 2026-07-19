@@ -64,8 +64,8 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
   const routeQuery = routeSearchParams.get("q") ?? "";
   const [products, setProducts] = useState<ProductPayload[]>([]);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<"latest" | "ending" | "price_asc" | "price_desc">("ending");
-  const [filters, setFilters] = useState<CatalogFilters>({ sizes: [], categories: [], liveOnly: true, closingOnly: false, sort: "ending" });
+  const [sort, setSort] = useState<"latest" | "ending" | "price_asc" | "price_desc">(saleType === "fixed" ? "latest" : "ending");
+  const [filters, setFilters] = useState<CatalogFilters>({ sizes: [], categories: [], liveOnly: true, closingOnly: false, sort: saleType === "fixed" ? "latest" : "ending" });
   const [now, setNow] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -198,7 +198,7 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
             <SlidersHorizontal size={14} />
             <select aria-label="상품 정렬" className="bg-transparent outline-none" onChange={(event) => setSort(event.target.value as typeof sort)} value={sort}>
               <option value="latest">최신 등록순</option>
-              <option value="ending">마감 임박순</option>
+            {saleType === "auction" && <option value="ending">마감 임박순</option>}
               <option value="price_desc">가격 높은순</option>
               <option value="price_asc">가격 낮은순</option>
             </select>

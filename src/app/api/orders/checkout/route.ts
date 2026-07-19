@@ -35,7 +35,7 @@ export async function POST(request: Request) {
         .eq("singleton", true)
         .maybeSingle();
       if (setting?.active_mode === "manual_transfer" && setting.bank_name && setting.account_number && typeof order.total === "number") {
-        const { data: createdTransfer } = await auth.admin
+        const { data: createdTransfer, error: transferError } = await auth.admin
           .from("commerce_order_transfers")
           .insert({
             order_id: order.id,
@@ -47,6 +47,14 @@ export async function POST(request: Request) {
           .select("*")
           .maybeSingle();
         transfer = createdTransfer;
+        if (!transfer && transferError) {
+          const { data: racedTransfer } = await auth.admin
+            .from("commerce_order_transfers")
+            .select("*")
+            .eq("order_id", order.id)
+            .maybeSingle();
+          transfer = racedTransfer;
+        }
       }
     }
   }

@@ -40,6 +40,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     })
     .select("*")
     .single();
-  if (error) return commerceJson({ error: "transfer_unavailable" }, 503);
+  if (error) {
+    const { data: racedTransfer } = await auth.admin
+      .from("commerce_order_transfers")
+      .select("*")
+      .eq("order_id", id)
+      .maybeSingle();
+    if (racedTransfer) return commerceJson({ transfer: racedTransfer }, 200);
+    return commerceJson({ error: "transfer_unavailable" }, 503);
+  }
   return commerceJson({ transfer }, 201);
 }

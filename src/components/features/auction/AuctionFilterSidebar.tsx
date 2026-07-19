@@ -8,18 +8,23 @@ const categories = ["구제 의류"];
 type Sort = "latest" | "ending" | "price_asc" | "price_desc";
 interface CatalogFilters { sizes: string[]; categories: string[]; liveOnly: boolean; closingOnly: boolean; sort: Sort; }
 
-export function AuctionFilterSidebar() {
+export function AuctionFilterSidebar({ saleType = "auction" }: { saleType?: "auction" | "fixed" }) {
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [liveOnly, setLiveOnly] = useState(true);
   const [closingOnly, setClosingOnly] = useState(false);
-  const [selectedSort, setSelectedSort] = useState<Sort>("ending");
+  const [selectedSort, setSelectedSort] = useState<Sort>(saleType === "fixed" ? "latest" : "ending");
   const notify = (next: CatalogFilters) => window.dispatchEvent(new CustomEvent<CatalogFilters>("catalog-filters", { detail: next }));
 
   const resetFilters = () => {
-    setSelectedSizes([]); setSelectedCategories([]); setLiveOnly(true); setClosingOnly(false); setSelectedSort("ending");
-    notify({ sizes: [], categories: [], liveOnly: true, closingOnly: false, sort: "ending" });
+    const nextSort = saleType === "fixed" ? "latest" : "ending";
+    setSelectedSizes([]); setSelectedCategories([]); setLiveOnly(true); setClosingOnly(false); setSelectedSort(nextSort);
+    notify({ sizes: [], categories: [], liveOnly: true, closingOnly: false, sort: nextSort });
   };
+
+  const sortOptions: Array<[string, Sort]> = saleType === "fixed"
+    ? [["최신 등록순", "latest"], ["가격 높은순", "price_desc"], ["가격 낮은순", "price_asc"]]
+    : [["마감 임박순", "ending"], ["최신 등록순", "latest"], ["현재 입찰가 높은순", "price_desc"], ["현재 입찰가 낮은순", "price_asc"]];
 
   return (
     <aside className="sticky top-[100px] w-[240px] flex-shrink-0 self-start border-t border-zinc-950">
@@ -33,7 +38,7 @@ export function AuctionFilterSidebar() {
       <section className="border-b border-zinc-200 py-5">
         <h3 className="mb-4 text-xs font-bold">정렬</h3>
         <div className="space-y-3 text-xs text-zinc-600">
-          {[["마감 임박순", "ending"], ["최신 등록순", "latest"], ["현재 입찰가 높은순", "price_desc"], ["현재 입찰가 낮은순", "price_asc"]].map(([label, value]) => (
+          {sortOptions.map(([label, value]) => (
             <label className="flex cursor-pointer items-center gap-2 hover:text-zinc-950" key={label}>
               <input checked={selectedSort === value} className="accent-zinc-950" name="sort" onChange={() => { const nextSort = value as Sort; setSelectedSort(nextSort); notify({ sizes: selectedSizes, categories: selectedCategories, liveOnly, closingOnly, sort: nextSort }); }} type="radio" />
               {label}
@@ -68,7 +73,7 @@ export function AuctionFilterSidebar() {
         </div>
       </section>
 
-      <section className="py-5">
+      {saleType === "auction" && <section className="py-5">
         <h3 className="mb-4 text-xs font-bold">경매 상태</h3>
         <div className="space-y-3 text-xs text-zinc-600">
           <label className="flex cursor-pointer items-center gap-2 hover:text-zinc-950">
@@ -80,7 +85,7 @@ export function AuctionFilterSidebar() {
             <span className="text-amber-500">●</span> CLOSING SOON (마감 임박)
           </label>
         </div>
-      </section>
+      </section>}
     </aside>
   );
 }

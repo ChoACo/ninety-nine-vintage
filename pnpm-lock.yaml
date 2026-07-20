@@ -43,7 +43,7 @@ importers:
         version: 5.0.14(@types/react@19.2.14)(react@19.2.6)
     devDependencies:
       '@opennextjs/cloudflare':
-        specifier: 1.20.1
+        specifier: ^1.20.1
         version: 1.20.1(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(wrangler@4.112.0)
       '@tailwindcss/postcss':
         specifier: 4.2.4
@@ -72,6 +72,9 @@ importers:
       typescript:
         specifier: 5.9.3
         version: 5.9.3
+      wrangler:
+        specifier: ^4.112.0
+        version: 4.112.0
 
 packages:
 

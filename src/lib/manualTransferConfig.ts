@@ -33,28 +33,11 @@ export async function syncManualTransferSettings(
   admin: SupabaseClient<Database>,
 ): Promise<ManualTransferAccount> {
   const account = getManualTransferAccount();
-  const { data, error } = await admin
-    .from("payment_runtime_settings")
-    .select("active_mode, bank_name, account_number")
-    .eq("singleton", true)
-    .maybeSingle();
-  if (error || !data) throw new Error("manual_transfer_settings_unavailable");
-
-  if (
-    data.active_mode !== "manual_transfer" ||
-    data.bank_name !== account.bankName ||
-    data.account_number !== account.accountNumber
-  ) {
-    const { error: updateError } = await admin
-      .from("payment_runtime_settings")
-      .update({
-        active_mode: "manual_transfer",
-        bank_name: account.bankName,
-        account_number: account.accountNumber,
-      })
-      .eq("singleton", true);
-    if (updateError) throw new Error("manual_transfer_settings_unavailable");
-  }
+  const { error } = await admin.rpc("sync_manual_transfer_runtime_settings", {
+    p_bank_name: account.bankName,
+    p_account_number: account.accountNumber,
+  });
+  if (error) throw new Error("manual_transfer_settings_unavailable");
 
   return account;
 }

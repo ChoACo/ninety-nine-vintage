@@ -3743,6 +3743,10 @@ export type Database = {
         Args: { p_active_mode: string }
         Returns: string
       }
+      sync_manual_transfer_runtime_settings: {
+        Args: { p_account_number: string; p_bank_name: string }
+        Returns: boolean
+      }
       start_product_inquiry: {
         Args: { p_body: string; p_client_nonce: string; p_product_id: string }
         Returns: {

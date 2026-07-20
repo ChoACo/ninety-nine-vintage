@@ -57,7 +57,10 @@ function getAuctionTimerState(now = new Date()): AuctionTimerState {
 
   if (now < opensAt) {
     status = "UPCOMING";
-    target = opensAt;
+    // The public LIVE DROP clock always points to the 21:00 KST auction
+    // close. The 10:00 KST drop opening is a status boundary, not the
+    // countdown target shown to customers.
+    target = closesAt;
   } else if (now < biddingRestrictedAt) {
     status = "OPEN";
     target = biddingRestrictedAt;

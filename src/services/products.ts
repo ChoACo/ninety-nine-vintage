@@ -108,6 +108,11 @@ export async function fetchPublishedProducts(input: {
     .eq("status", "active")
     .eq("sale_type", saleType)
     .lte("publish_at", now);
+  if (saleType === "auction") {
+    query = query
+      .gt("auction_feed_expires_at", now)
+      .is("final_bid_id", null);
+  }
   if (search.trim()) query = query.or(`title.ilike.%${search.trim()}%,description.ilike.%${search.trim()}%`);
   if (sort === "ending") query = query.order("closes_at", { ascending: true });
   else if (sort === "price_asc") query = query.order(saleType === "fixed" ? "fixed_price" : "current_price", { ascending: true, nullsFirst: false });
@@ -120,14 +125,16 @@ export async function fetchPublishedProducts(input: {
 
 export async function fetchPublishedProduct(productId: string): Promise<PublishedProduct | null> {
   const { verifier } = createSupabaseServerClients();
+  const now = new Date().toISOString();
   const { data, error } = await verifier
     .from("products")
     .select("*")
     .eq("id", productId)
     .eq("status", "active")
-    .lte("publish_at", new Date().toISOString())
+    .lte("publish_at", now)
     .maybeSingle();
   if (error) throw new Error("상품을 불러오지 못했습니다.");
+  if (data?.sale_type === "auction" && (data.final_bid_id !== null || data.auction_feed_expires_at === null || data.auction_feed_expires_at <= now)) return null;
   return data ? mapPublishedProduct(data) : null;
 }
 

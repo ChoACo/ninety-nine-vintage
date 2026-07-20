@@ -50,7 +50,7 @@ function getAuctionTimerState(now = new Date()): AuctionTimerState {
   const biddingRestrictedAt = atKstTime(now, 20, 56);
   const closesAt = atKstTime(now, 21);
   const reAuctionStartsAt = atKstTime(now, 22);
-  const endOfDay = atKstTime(now, 0, 0, 0, true);
+  const nextClose = atKstTime(now, 21, 0, 0, true);
 
   let status: AuctionClockStatus;
   let target: Date;
@@ -69,7 +69,7 @@ function getAuctionTimerState(now = new Date()): AuctionTimerState {
     target = reAuctionStartsAt;
   } else {
     status = "RE_AUCTION";
-    target = endOfDay;
+    target = nextClose;
   }
 
   const remainingSeconds = Math.max(

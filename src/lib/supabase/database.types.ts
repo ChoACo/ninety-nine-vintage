@@ -1416,6 +1416,7 @@ export type Database = {
           anti_sniping_base_closes_at: string | null
           anti_sniping_extended_at: string | null
           anti_sniping_extension_count: number
+          auction_feed_expires_at: string | null
           bid_history: Json
           bid_increment: number
           bid_locked_at: string | null
@@ -1435,6 +1436,9 @@ export type Database = {
           inspection_notes: string[]
           measurements: Json
           participant_count: number
+          past_action: string | null
+          past_at: string | null
+          past_expires_at: string | null
           publish_at: string
           sale_type: string
           size_label: string
@@ -1451,6 +1455,7 @@ export type Database = {
           anti_sniping_base_closes_at?: string | null
           anti_sniping_extended_at?: string | null
           anti_sniping_extension_count?: number
+          auction_feed_expires_at?: string | null
           bid_history?: Json
           bid_increment?: number
           bid_locked_at?: string | null
@@ -1470,6 +1475,9 @@ export type Database = {
           inspection_notes?: string[]
           measurements?: Json
           participant_count?: number
+          past_action?: string | null
+          past_at?: string | null
+          past_expires_at?: string | null
           publish_at: string
           sale_type?: string
           size_label?: string
@@ -1486,6 +1494,7 @@ export type Database = {
           anti_sniping_base_closes_at?: string | null
           anti_sniping_extended_at?: string | null
           anti_sniping_extension_count?: number
+          auction_feed_expires_at?: string | null
           bid_history?: Json
           bid_increment?: number
           bid_locked_at?: string | null
@@ -1505,6 +1514,9 @@ export type Database = {
           inspection_notes?: string[]
           measurements?: Json
           participant_count?: number
+          past_action?: string | null
+          past_at?: string | null
+          past_expires_at?: string | null
           publish_at?: string
           sale_type?: string
           size_label?: string
@@ -2434,6 +2446,7 @@ export type Database = {
       }
       assign_unrouted_products_to_operator: { Args: never; Returns: number }
       assign_unrouted_support_conversations: { Args: never; Returns: number }
+      auction_close_at: { Args: { p_publish_at: string }; Returns: string }
       auth_user_has_kakao_identity: {
         Args: { p_user_id: string }
         Returns: boolean
@@ -3069,6 +3082,15 @@ export type Database = {
           operator_id: string
         }[]
       }
+      manage_past_auction_products: {
+        Args: { p_action: string; p_product_ids: string[] }
+        Returns: {
+          processed_count: number
+          processed_ids: string[]
+          skipped_count: number
+          skipped_ids: string[]
+        }[]
+      }
       mark_shipping_request_shipped: {
         Args: {
           p_courier: string
@@ -3091,6 +3113,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      next_auction_drop_at: { Args: { p_at: string }; Returns: string }
       normalize_member_nickname: {
         Args: { p_nickname: string }
         Returns: string
@@ -3281,6 +3304,7 @@ export type Database = {
           anti_sniping_base_closes_at: string | null
           anti_sniping_extended_at: string | null
           anti_sniping_extension_count: number
+          auction_feed_expires_at: string | null
           bid_history: Json
           bid_increment: number
           bid_locked_at: string | null
@@ -3300,6 +3324,9 @@ export type Database = {
           inspection_notes: string[]
           measurements: Json
           participant_count: number
+          past_action: string | null
+          past_at: string | null
+          past_expires_at: string | null
           publish_at: string
           sale_type: string
           size_label: string
@@ -3534,10 +3561,28 @@ export type Database = {
         Args: { p_nickname: string }
         Returns: string
       }
-      request_product_shipping: {
-        Args: { p_address_id: string; p_apply_shipping_credit?: boolean; p_idempotency_key?: string | null; p_product_ids: string[] }
-        Returns: string
-      }
+      request_product_shipping:
+        | {
+            Args: { p_address_id: string; p_product_ids: string[] }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_address_id: string
+              p_apply_shipping_credit?: boolean
+              p_product_ids: string[]
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_address_id: string
+              p_apply_shipping_credit: boolean
+              p_idempotency_key: string
+              p_product_ids: string[]
+            }
+            Returns: string
+          }
       request_security_log_access: {
         Args: {
           p_reason: string
@@ -3649,6 +3694,7 @@ export type Database = {
           anti_sniping_base_closes_at: string | null
           anti_sniping_extended_at: string | null
           anti_sniping_extension_count: number
+          auction_feed_expires_at: string | null
           bid_history: Json
           bid_increment: number
           bid_locked_at: string | null
@@ -3668,6 +3714,9 @@ export type Database = {
           inspection_notes: string[]
           measurements: Json
           participant_count: number
+          past_action: string | null
+          past_at: string | null
+          past_expires_at: string | null
           publish_at: string
           sale_type: string
           size_label: string

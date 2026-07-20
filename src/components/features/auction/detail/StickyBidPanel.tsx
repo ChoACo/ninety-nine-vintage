@@ -138,7 +138,7 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
           <span className="h-2 w-2 rounded-full bg-emerald-400" />
         </div>
         <p className="mt-3 font-mono text-3xl font-bold tracking-[0.06em]">{timeLeft}</p>
-        <p className="mt-2 text-[11px] text-zinc-400">오후 8시 56분 이후 신규 참여 제한</p>
+        <p className="mt-2 text-[11px] text-zinc-400">21:00–22:00 정산 점검 · 20:56 이후 신규 참여 제한</p>
       </div>}
 
       {item.saleType === "auction" && <div className="border-b border-zinc-200 pb-5">

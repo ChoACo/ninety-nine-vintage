@@ -17,7 +17,8 @@ function normalizeProduct(body: Record<string, unknown>, ownerId: string): Produ
   return {
     title, description, category: text(body.category, "구제 의류"), store_id: storeId, sale_type: saleType, fixed_price: fixedPrice,
     starting_price: price, current_price: price, bid_increment: Number(body.bidIncrement) > 0 ? Number(body.bidIncrement) : 1000,
-    image_urls: images, thumbnail_urls: images, publish_at: publishAt, closes_at: closesAt, status: text(body.status, "pending"),
+    image_urls: images, thumbnail_urls: images, publish_at: publishAt, closes_at: closesAt,
+    status: saleType === "auction" ? "pending" : text(body.status, "pending"),
     created_by: ownerId, updated_by: ownerId, size_label: text(body.sizeLabel), condition_grade: ["S", "A+", "A", "B"].includes(text(body.conditionGrade)) ? text(body.conditionGrade) : "A",
     storage_class: text(body.storageClass) === "large" ? "large" : "small", measurements: body.measurements && typeof body.measurements === "object" ? body.measurements as Json : {},
     inspection_notes: Array.isArray(body.inspectionNotes) ? body.inspectionNotes.filter((item): item is string => typeof item === "string").slice(0, 30) : [],

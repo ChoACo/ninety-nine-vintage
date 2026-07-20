@@ -23,13 +23,23 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
-        source: "/operator/:path*",
-        destination: "/admin/operator/:path*",
+        source: "/operator",
+        destination: "/admin/operator",
         permanent: false,
       },
       {
-        source: "/owner/:path*",
-        destination: "/admin/owner/:path*",
+        source: "/operator/:path+",
+        destination: "/admin/operator/:path+",
+        permanent: false,
+      },
+      {
+        source: "/owner",
+        destination: "/admin/owner",
+        permanent: false,
+      },
+      {
+        source: "/owner/:path+",
+        destination: "/admin/owner/:path+",
         permanent: false,
       },
     ];

@@ -5,17 +5,17 @@ NINETY-NINE VINTAGE의 단일 운영 코드베이스입니다. 기존 Supabase·
 ## 로컬 실행
 
 ```bash
-pnpm install
-pnpm dev
+npm install
+npm run dev
 ```
 
 검증 명령은 다음과 같습니다.
 
 ```bash
-pnpm lint
-pnpm test
-pnpm build
-pnpm verify:integrations -- --public-only
+npm run lint
+npm test
+npm run build
+npm run verify:integrations -- --public-only
 ```
 
 `verify:integrations`는 비밀값을 출력하지 않으며 Supabase REST/RPC와 `auction_bids` Realtime 구독을 점검합니다. 서버 비밀값을 사용할 수 있는 운영 환경에서는 `--public-only` 없이 실행해 PortOne·Kakao 설정까지 확인할 수 있습니다.

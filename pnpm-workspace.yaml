@@ -1,8 +1,0 @@
-onlyBuiltDependencies:
-  - esbuild
-  - sharp
-  - unrs-resolver
-  - workerd
-  - '@tailwindcss/oxide'
-  - lightningcss
-  - napi-postinstall

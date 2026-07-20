@@ -43,6 +43,7 @@ const portOneStoreId = publicOnly
   ? ""
   : required("PORTONE_STORE_ID", ["VITE_PORTONE_STORE_ID"]);
 const portOneChannelKey = publicOnly ? "" : required("VITE_PORTONE_CHANNEL_KEY");
+const portOneChannelMode = publicOnly ? "" : required("PORTONE_CHANNEL_MODE");
 if (!publicOnly) {
   required("MANUAL_TRANSFER_BANK_NAME");
   required("MANUAL_TRANSFER_ACCOUNT_NUMBER");
@@ -54,6 +55,11 @@ if (!publicOnly) {
     "portone:public-identifiers",
     portOneStoreId.startsWith("store-") && portOneChannelKey.startsWith("channel-key-"),
     "format checked",
+  );
+  record(
+    "portone:channel-mode",
+    portOneChannelMode === "TEST" || portOneChannelMode === "LIVE",
+    "must be explicitly TEST or LIVE",
   );
 }
 
@@ -83,6 +89,14 @@ if (supabaseUrl && (serviceKey || publishableKey)) {
     "/rest/v1/commerce_orders?select=id&limit=1",
   );
   if (!publicOnly) {
+    await checkRest(
+      "supabase:commerce-payment-schema",
+      "/rest/v1/payment_orders?select=id,commerce_order_id&limit=1",
+    );
+    await checkRest(
+      "supabase:commerce-order-items-schema",
+      "/rest/v1/commerce_order_items?select=order_id,product_id&limit=1",
+    );
     await checkRest("supabase:site-status", "/rest/v1/site_status?select=status&limit=1");
   }
   await checkRest("supabase:auction-clock-rpc", "/rest/v1/rpc/get_auction_server_time", {

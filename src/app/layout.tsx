@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-import { PcLayout } from "@/components/layout/PcLayout";
 import "./globals.css";
 
 const geist = Geist({
@@ -10,16 +9,13 @@ const geist = Geist({
 
 export const metadata: Metadata = {
   title: "NINETY-NINE VINTAGE",
-  description: "오늘 단 한 번, 다시 없는 빈티지 경매",
-  alternates: { canonical: "/home" },
+  description: "선별된 한 점의 빈티지를 바로 만나는 곳",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html className={geist.variable} lang="ko">
-      <body className="font-sans antialiased">
-        <PcLayout>{children}</PcLayout>
-      </body>
+      <body className="font-sans antialiased">{children}</body>
     </html>
   );
 }

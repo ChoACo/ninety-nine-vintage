@@ -18,7 +18,11 @@
     "build": "next build",
     "start": "next start",
     "test": "node --test tests/core/*.test.mjs",
+    "verify:browser": "node scripts/verify-local-browser-happy-path.mjs",
+    "verify:checkout-browser": "node scripts/verify-local-checkout-browser.mjs",
     "verify:integrations": "node scripts/verify-integrations.mjs",
+    "verify:local": "node scripts/verify-local-happy-path.mjs",
+    "verify:migrations": "node scripts/verify-migration-parity.mjs",
     "lint": "eslint .",
     "db:generate": "drizzle-kit generate"
   },

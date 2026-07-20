@@ -1,7 +1,8 @@
 import "server-only";
 
-import { createSupabaseServerClients, createSupabaseUserClient } from "@/lib/supabase/server";
+import { createSupabasePublicClient, createSupabaseUserClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/database.types";
+import { normalizeCatalogSearch, normalizeProductLimit } from "@/lib/catalog/query";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 
@@ -99,8 +100,9 @@ export async function fetchPublishedProducts(input: {
   sort?: "latest" | "ending" | "price_asc" | "price_desc";
 } = {}): Promise<PublishedProduct[]> {
   const { limit = 24, saleType = "auction", search = "", sort = "latest" } = input;
-  const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 100);
-  const { verifier } = createSupabaseServerClients();
+  const safeLimit = normalizeProductLimit(limit);
+  const safeSearch = normalizeCatalogSearch(search);
+  const verifier = createSupabasePublicClient();
   const now = new Date().toISOString();
   let query = verifier
     .from("products")
@@ -113,7 +115,7 @@ export async function fetchPublishedProducts(input: {
       .gt("auction_feed_expires_at", now)
       .is("final_bid_id", null);
   }
-  if (search.trim()) query = query.or(`title.ilike.%${search.trim()}%,description.ilike.%${search.trim()}%`);
+  if (safeSearch) query = query.or(`title.ilike.%${safeSearch}%,description.ilike.%${safeSearch}%`);
   if (sort === "ending") query = query.order("closes_at", { ascending: true });
   else if (sort === "price_asc") query = query.order(saleType === "fixed" ? "fixed_price" : "current_price", { ascending: true, nullsFirst: false });
   else if (sort === "price_desc") query = query.order(saleType === "fixed" ? "fixed_price" : "current_price", { ascending: false, nullsFirst: false });
@@ -124,7 +126,7 @@ export async function fetchPublishedProducts(input: {
 }
 
 export async function fetchPublishedProduct(productId: string): Promise<PublishedProduct | null> {
-  const { verifier } = createSupabaseServerClients();
+  const verifier = createSupabasePublicClient();
   const now = new Date().toISOString();
   const { data, error } = await verifier
     .from("products")

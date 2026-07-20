@@ -1,7 +1,7 @@
-import { authenticateMemberCommerceRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateMemberRlsRequest, commerceJson } from "@/lib/commerce/server";
 
 export async function GET(request: Request) {
-  const auth = await authenticateMemberCommerceRequest(request);
+  const auth = await authenticateMemberRlsRequest(request);
   if (!auth.ok) return auth.response;
   const { data, error } = await auth.user
     .from("wishlist_items")
@@ -12,11 +12,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateMemberCommerceRequest(request, true);
+  const auth = await authenticateMemberRlsRequest(request, true);
   if (!auth.ok) return auth.response;
   const body = await request.json().catch(() => null) as { productId?: string } | null;
   if (!body?.productId) return commerceJson({ error: "상품을 선택해 주세요." }, 400);
-  const { data: product } = await auth.admin
+  const { data: product } = await auth.user
     .from("products")
     .select("id")
     .eq("id", body.productId)
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const auth = await authenticateMemberCommerceRequest(request, true);
+  const auth = await authenticateMemberRlsRequest(request, true);
   if (!auth.ok) return auth.response;
   const body = await request.json().catch(() => null) as { productId?: string } | null;
   if (!body?.productId) return commerceJson({ error: "상품을 선택해 주세요." }, 400);

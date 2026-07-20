@@ -3,12 +3,14 @@ import {
   createAuthCallbackUrl,
   createRedirectResponse,
   getKakaoOidcConfiguration,
+  getKakaoFlowCookieName,
   KAKAO_ACCESS_TOKEN_COOKIE,
   KAKAO_ID_TOKEN_COOKIE,
   KAKAO_NONCE_COOKIE,
   KAKAO_RETURN_TO_COOKIE,
   KAKAO_STATE_COOKIE,
   KAKAO_TOKEN_ENDPOINT,
+  normalizeKakaoFlowId,
   readCookie,
   serializeHttpOnlyCookie,
   timingSafeStringEqual,
@@ -19,20 +21,42 @@ interface KakaoTokenPayload {
   access_token?: unknown;
 }
 
-function clearedOauthCookies(requestUrl: string): string[] {
+function clearedOauthCookies(
+  requestUrl: string,
+  flowId: string | null,
+): string[] {
   return [
-    clearHttpOnlyCookie(requestUrl, KAKAO_STATE_COOKIE),
-    clearHttpOnlyCookie(requestUrl, KAKAO_NONCE_COOKIE),
-    clearHttpOnlyCookie(requestUrl, KAKAO_ID_TOKEN_COOKIE),
-    clearHttpOnlyCookie(requestUrl, KAKAO_ACCESS_TOKEN_COOKIE),
-    clearHttpOnlyCookie(requestUrl, KAKAO_RETURN_TO_COOKIE),
+    clearHttpOnlyCookie(
+      requestUrl,
+      getKakaoFlowCookieName(KAKAO_STATE_COOKIE, flowId),
+    ),
+    clearHttpOnlyCookie(
+      requestUrl,
+      getKakaoFlowCookieName(KAKAO_NONCE_COOKIE, flowId),
+    ),
+    clearHttpOnlyCookie(
+      requestUrl,
+      getKakaoFlowCookieName(KAKAO_ID_TOKEN_COOKIE, flowId),
+    ),
+    clearHttpOnlyCookie(
+      requestUrl,
+      getKakaoFlowCookieName(KAKAO_ACCESS_TOKEN_COOKIE, flowId),
+    ),
+    clearHttpOnlyCookie(
+      requestUrl,
+      getKakaoFlowCookieName(KAKAO_RETURN_TO_COOKIE, flowId),
+    ),
   ];
 }
 
-function oauthFailure(requestUrl: string, code: string): Response {
+function oauthFailure(
+  requestUrl: string,
+  code: string,
+  flowId: string | null = null,
+): Response {
   return createRedirectResponse(
     createAuthCallbackUrl(requestUrl, code),
-    clearedOauthCookies(requestUrl),
+    flowId ? clearedOauthCookies(requestUrl, flowId) : [],
   );
 }
 
@@ -40,16 +64,30 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const authorizationCode = requestUrl.searchParams.get("code");
   const returnedState = requestUrl.searchParams.get("state");
+  const flowId = normalizeKakaoFlowId(returnedState);
   const providerError = requestUrl.searchParams.get("error");
-  const storedState = readCookie(request, KAKAO_STATE_COOKIE);
-  const nonce = readCookie(request, KAKAO_NONCE_COOKIE);
+  if (!flowId) return oauthFailure(request.url, "kakao_state");
+  const stateCookieName = getKakaoFlowCookieName(KAKAO_STATE_COOKIE, flowId);
+  const nonceCookieName = getKakaoFlowCookieName(KAKAO_NONCE_COOKIE, flowId);
+  const idTokenCookieName = getKakaoFlowCookieName(
+    KAKAO_ID_TOKEN_COOKIE,
+    flowId,
+  );
+  const accessTokenCookieName = getKakaoFlowCookieName(
+    KAKAO_ACCESS_TOKEN_COOKIE,
+    flowId,
+  );
+  const storedState = readCookie(request, stateCookieName);
+  const nonce = readCookie(request, nonceCookieName);
 
   if (!timingSafeStringEqual(returnedState, storedState)) {
-    return oauthFailure(request.url, "kakao_state");
+    return oauthFailure(request.url, "kakao_state", flowId);
   }
-  if (providerError) return oauthFailure(request.url, "kakao_cancelled");
+  if (providerError) {
+    return oauthFailure(request.url, "kakao_cancelled", flowId);
+  }
   if (!authorizationCode || !nonce) {
-    return oauthFailure(request.url, "kakao_state");
+    return oauthFailure(request.url, "kakao_state", flowId);
   }
 
   try {
@@ -77,34 +115,35 @@ export async function GET(request: Request) {
       typeof payload.id_token !== "string" ||
       typeof payload.access_token !== "string"
     ) {
-      return oauthFailure(request.url, "kakao_token");
+      return oauthFailure(request.url, "kakao_token", flowId);
     }
 
     const callbackUrl = createAuthCallbackUrl(request.url);
     callbackUrl.searchParams.set("kakao_oidc", "1");
+    callbackUrl.searchParams.set("flow", flowId);
 
     return createRedirectResponse(callbackUrl, [
-      clearHttpOnlyCookie(request.url, KAKAO_STATE_COOKIE),
+      clearHttpOnlyCookie(request.url, stateCookieName),
       serializeHttpOnlyCookie(
         request.url,
-        KAKAO_NONCE_COOKIE,
+        nonceCookieName,
         nonce,
         2 * 60,
       ),
       serializeHttpOnlyCookie(
         request.url,
-        KAKAO_ID_TOKEN_COOKIE,
+        idTokenCookieName,
         payload.id_token,
         2 * 60,
       ),
       serializeHttpOnlyCookie(
         request.url,
-        KAKAO_ACCESS_TOKEN_COOKIE,
+        accessTokenCookieName,
         payload.access_token,
         2 * 60,
       ),
     ]);
   } catch {
-    return oauthFailure(request.url, "kakao_token");
+    return oauthFailure(request.url, "kakao_token", flowId);
   }
 }

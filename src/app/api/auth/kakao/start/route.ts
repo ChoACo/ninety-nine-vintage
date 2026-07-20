@@ -3,6 +3,7 @@ import {
   createRandomToken,
   createRedirectResponse,
   getKakaoOidcConfiguration,
+  getKakaoFlowCookieName,
   hashTokenSha256,
   KAKAO_NONCE_COOKIE,
   KAKAO_RETURN_TO_COOKIE,
@@ -10,21 +11,16 @@ import {
   serializeHttpOnlyCookie,
   createAuthCallbackUrl,
 } from "@/src/lib/kakao/oidc";
-
-function safeReturnTo(value: string | null): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/account";
-  }
-  return value.slice(0, 200);
-}
+import { safeSameOriginReturnTo } from "@/src/lib/kakao/returnTo";
 
 export async function GET(request: Request) {
   try {
     const configuration = getKakaoOidcConfiguration(request.url);
     const callbackOrigin = new URL(configuration.redirectUri).origin;
     const requestOrigin = new URL(request.url).origin;
-    const returnTo = safeReturnTo(
+    const returnTo = safeSameOriginReturnTo(
       new URL(request.url).searchParams.get("returnTo"),
+      requestOrigin,
     );
 
     // Keep the transient cookies on the same origin that Kakao redirects to.
@@ -34,14 +30,7 @@ export async function GET(request: Request) {
           `/api/auth/kakao/start?returnTo=${encodeURIComponent(returnTo)}`,
           callbackOrigin,
         ),
-        [
-          serializeHttpOnlyCookie(
-            request.url,
-            KAKAO_RETURN_TO_COOKIE,
-            returnTo,
-            10 * 60,
-          ),
-        ],
+        [],
         307,
       );
     }
@@ -58,19 +47,19 @@ export async function GET(request: Request) {
     return createRedirectResponse(authorizeUrl, [
       serializeHttpOnlyCookie(
         request.url,
-        KAKAO_RETURN_TO_COOKIE,
+        getKakaoFlowCookieName(KAKAO_RETURN_TO_COOKIE, state),
         returnTo,
         10 * 60,
       ),
       serializeHttpOnlyCookie(
         request.url,
-        KAKAO_STATE_COOKIE,
+        getKakaoFlowCookieName(KAKAO_STATE_COOKIE, state),
         state,
         10 * 60,
       ),
       serializeHttpOnlyCookie(
         request.url,
-        KAKAO_NONCE_COOKIE,
+        getKakaoFlowCookieName(KAKAO_NONCE_COOKIE, state),
         rawNonce,
         10 * 60,
       ),

@@ -10,10 +10,17 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { BidModal } from "@/components/features/auction/detail/BidModal";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { isEntryReadOnly, useEntryReadOnly } from "@/lib/entryMode";
+import { rememberFixedPurchaseIntent } from "@/lib/commerce/purchaseIntent";
+import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 
 interface AuctionCardProps { item: Item & { closesAt?: string; timeLeft?: string }; }
 
-export function AuctionCard({ item }: AuctionCardProps) {
+export function AuctionCard(props: AuctionCardProps) {
+  if (props.item.saleType === "auction" && !LIVE_AUCTION_ENABLED) return null;
+  return <EnabledAuctionCard {...props} />;
+}
+
+function EnabledAuctionCard({ item }: AuctionCardProps) {
   const isFixed = item.saleType === "fixed";
   const price = isFixed ? (item.fixedPrice ?? item.currentBid) : item.currentBid;
   const liked = useCommerceStore((state) => state.likedIds.includes(item.id));
@@ -42,9 +49,16 @@ export function AuctionCard({ item }: AuctionCardProps) {
     setActionMessage("");
     try {
       const { data } = await getSupabaseBrowserClient().auth.getSession();
-      if (!data.session?.access_token) throw new Error("카카오 로그인 후 장바구니를 이용할 수 있습니다.");
+      const session = data.session;
+      if (!session?.access_token) {
+        rememberFixedPurchaseIntent(item.id, "cart");
+        window.location.assign(
+          `/api/auth/kakao/start?returnTo=${encodeURIComponent(`/auction/${item.id}?purchaseIntent=cart`)}`,
+        );
+        return;
+      }
       addToCart(item.id);
-      if (!await persistCart(item.id, true)) {
+      if (!await persistCart(item.id, true, session.user.id)) {
         removeFromCart(item.id);
         throw new Error("현재 구매할 수 없는 상품입니다.");
       }
@@ -55,13 +69,34 @@ export function AuctionCard({ item }: AuctionCardProps) {
       setCartBusy(false);
     }
   };
+  const updateWishlist = async () => {
+    if (isEntryReadOnly()) {
+      setActionMessage("사이트 연결이 복구될 때까지 읽기 전용입니다.");
+      return;
+    }
+    try {
+      const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
+      const nextLiked = !liked;
+      if (!session) {
+        toggleLike(item.id);
+        return;
+      }
+      if (await persistWishlist(item.id, nextLiked, session.user.id)) {
+        toggleLike(item.id);
+      } else {
+        setActionMessage("로그인 계정이 변경되었거나 찜을 저장하지 못했습니다.");
+      }
+    } catch {
+      setActionMessage("로그인 상태를 확인하지 못했습니다.");
+    }
+  };
   return (
     <article className="group min-w-0">
       <Link className="block" href={`/auction/${item.id}`}>
         <div className="relative aspect-[4/5] overflow-hidden bg-surface">
           {item.imageUrl ? <CatalogImage alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
           <span className="absolute left-2 top-2 bg-paper px-2 py-1 font-mono text-[9px] font-bold tracking-[0.1em]">{isFixed ? "BUY NOW" : "LIVE BID"}</span>
-          <button aria-label={liked ? "찜 해제" : "찜하기"} className={`absolute right-2 top-2 grid size-8 place-items-center bg-paper/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${liked ? "text-red-700" : "text-ink"}`} disabled={readOnly} onClick={(event) => { event.preventDefault(); if (isEntryReadOnly()) { setActionMessage("사이트 연결이 복구될 때까지 읽기 전용입니다."); return; } const nextLiked = !liked; toggleLike(item.id); void persistWishlist(item.id, nextLiked); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>
+          <button aria-label={liked ? "찜 해제" : "찜하기"} className={`absolute right-2 top-2 grid size-8 place-items-center bg-paper/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${liked ? "text-red-700" : "text-ink"}`} disabled={readOnly} onClick={(event) => { event.preventDefault(); void updateWishlist(); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>
           <div className="absolute inset-x-0 bottom-0 translate-y-full bg-ink/95 px-3 py-3 text-paper opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
             <p className="text-[10px] text-zinc-400">{isFixed ? "정가 바로구매" : "경매 참여"}</p>
             <p className="mt-1 text-xs font-bold">{isFixed ? "상세에서 구매 절차를 확인하세요." : "상세에서 입찰가를 확인하세요."}</p>

@@ -1,7 +1,11 @@
 import "server-only";
 
 import { hasTrustedRequestOrigin } from "@/lib/kakao/oidc";
-import { createSupabaseServerClients, createSupabaseUserClient } from "@/lib/supabase/server";
+import {
+  createSupabasePublicClient,
+  createSupabaseServerClients,
+  createSupabaseUserClient,
+} from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -55,6 +59,37 @@ export async function authenticateMemberCommerceRequest(request: Request, mutati
   if (error) return { ok: false as const, response: commerceJson({ error: "member_unavailable" }, 503) };
   if (!account) return { ok: false as const, response: commerceJson({ error: "member_required", message: "카카오 회원 계정으로 이용해 주세요." }, 403) };
   return auth;
+}
+
+export async function authenticateMemberRlsRequest(request: Request, mutation = false) {
+  if (mutation && !hasTrustedRequestOrigin(request)) {
+    return { ok: false as const, response: commerceJson({ error: "forbidden" }, 403) };
+  }
+  const token = readCommerceBearerToken(request);
+  if (!token) return { ok: false as const, response: commerceJson({ error: "unauthorized" }, 401) };
+
+  try {
+    const { data, error } = await createSupabasePublicClient().auth.getUser(token);
+    if (error || !data.user) {
+      return { ok: false as const, response: commerceJson({ error: "unauthorized" }, 401) };
+    }
+    const user = createSupabaseUserClient(token);
+    const { data: account, error: accountError } = await user
+      .from("member_accounts")
+      .select("member_id, account_status")
+      .eq("member_id", data.user.id)
+      .eq("account_status", "active")
+      .maybeSingle();
+    if (accountError) {
+      return { ok: false as const, response: commerceJson({ error: "member_unavailable" }, 503) };
+    }
+    if (!account) {
+      return { ok: false as const, response: commerceJson({ error: "member_required", message: "카카오 회원 계정으로 이용해 주세요." }, 403) };
+    }
+    return { ok: true as const, userId: data.user.id, token, user };
+  } catch {
+    return { ok: false as const, response: commerceJson({ error: "service_unavailable" }, 503) };
+  }
 }
 
 export function normalizeIds(value: unknown): string[] {

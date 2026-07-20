@@ -20,6 +20,20 @@ const nextConfig: NextConfig = {
       process.env.NEXT_PUBLIC_PORTONE_WEBHOOK_URL ??
       process.env.VITE_PORTONE_WEBHOOK_URL,
   },
+  async redirects() {
+    return [
+      {
+        source: "/operator/:path*",
+        destination: "/admin/operator/:path*",
+        permanent: false,
+      },
+      {
+        source: "/owner/:path*",
+        destination: "/admin/owner/:path*",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

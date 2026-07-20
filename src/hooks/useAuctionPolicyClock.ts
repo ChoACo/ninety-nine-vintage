@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 
 type ClockSubscriber = () => void;
 
@@ -32,6 +33,7 @@ function publishClockSnapshots() {
 }
 
 export function synchronizeAuctionServerClock(force = false): Promise<void> {
+  if (!LIVE_AUCTION_ENABLED) return Promise.resolve();
   const localNow = Date.now();
   if (
     !force &&
@@ -134,6 +136,10 @@ function getServerSnapshot() {
   return serverSnapshot;
 }
 
+function subscribeToDisabledClock() {
+  return () => {};
+}
+
 /** 다음 분의 00초를 놓치지 않도록 한 프레임보다 짧은 여유 뒤에 갱신합니다. */
 export function getMillisecondsUntilNextMinute(nowMs: number): number {
   const elapsedInMinute = ((nowMs % MINUTE_MS) + MINUTE_MS) % MINUTE_MS;
@@ -185,7 +191,11 @@ function getMinuteSnapshot() {
  * 카드 수가 늘어도 상품마다 별도 setInterval을 만들지 않습니다.
  */
 export function useAuctionPolicyClock(): Date {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  return useSyncExternalStore(
+    LIVE_AUCTION_ENABLED ? subscribe : subscribeToDisabledClock,
+    LIVE_AUCTION_ENABLED ? getSnapshot : getServerSnapshot,
+    getServerSnapshot,
+  );
 }
 
 /**
@@ -194,8 +204,8 @@ export function useAuctionPolicyClock(): Date {
  */
 export function useAuctionPolicyMinuteClock(): Date {
   return useSyncExternalStore(
-    subscribeToMinuteClock,
-    getMinuteSnapshot,
+    LIVE_AUCTION_ENABLED ? subscribeToMinuteClock : subscribeToDisabledClock,
+    LIVE_AUCTION_ENABLED ? getMinuteSnapshot : getServerSnapshot,
     getServerSnapshot,
   );
 }

@@ -9,13 +9,11 @@ import {
   PortOneIntegrationError,
   verifyAndSyncPortOnePayment,
 } from "@/src/lib/portone/server";
-import { requirePortOneRuntimeMode } from "@/src/lib/portone/runtimeMode";
 
 export async function POST(request: Request) {
   try {
     const authentication = await authenticatePaymentRequest(request);
     if (!authentication.ok) return authentication.response;
-    await requirePortOneRuntimeMode(authentication.admin);
 
     let body: unknown;
     try {
@@ -44,6 +42,10 @@ export async function POST(request: Request) {
       {
         paymentStatus: synced.payment_status,
         portoneStatus: synced.portone_status,
+        canRetryPayment:
+          synced.paid_at === null &&
+          (synced.portone_status === "FAILED" ||
+            synced.portone_status === "CANCELLED"),
       },
       200,
     );

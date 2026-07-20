@@ -2,8 +2,14 @@
 
 import { CircleDot } from "lucide-react";
 import { useAuctionTimer } from "@/hooks/useAuctionTimer";
+import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 
 export function LiveTickerBar() {
+  if (!LIVE_AUCTION_ENABLED) return null;
+  return <EnabledLiveTickerBar />;
+}
+
+function EnabledLiveTickerBar() {
   const { timeLeft } = useAuctionTimer();
 
   return (

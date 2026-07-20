@@ -8,6 +8,7 @@ export const KAKAO_NONCE_COOKIE = "dami_kakao_oauth_nonce";
 export const KAKAO_ID_TOKEN_COOKIE = "dami_kakao_id_token";
 export const KAKAO_ACCESS_TOKEN_COOKIE = "dami_kakao_access_token";
 export const KAKAO_RETURN_TO_COOKIE = "dami_kakao_return_to";
+const KAKAO_FLOW_ID_PATTERN = /^[a-f0-9]{64}$/;
 
 export interface KakaoOidcConfiguration {
   clientId: string;
@@ -78,6 +79,19 @@ export async function hashTokenSha256(value: string): Promise<string> {
   ).join("");
 }
 
+export function normalizeKakaoFlowId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  return KAKAO_FLOW_ID_PATTERN.test(normalized) ? normalized : null;
+}
+
+export function getKakaoFlowCookieName(
+  baseName: string,
+  flowId: string | null,
+): string {
+  return flowId ? `${baseName}_${flowId}` : baseName;
+}
+
 export function buildKakaoAuthorizeUrl(
   configuration: KakaoOidcConfiguration,
   state: string,
@@ -96,8 +110,18 @@ export function buildKakaoAuthorizeUrl(
 }
 
 export function getKakaoCookiePath(name: string): string {
-  if (name === KAKAO_ID_TOKEN_COOKIE) return "/api/auth/kakao/session";
-  if (name === KAKAO_ACCESS_TOKEN_COOKIE) return "/api/auth/kakao/profile";
+  if (
+    name === KAKAO_ID_TOKEN_COOKIE ||
+    name.startsWith(`${KAKAO_ID_TOKEN_COOKIE}_`)
+  ) {
+    return "/api/auth/kakao/session";
+  }
+  if (
+    name === KAKAO_ACCESS_TOKEN_COOKIE ||
+    name.startsWith(`${KAKAO_ACCESS_TOKEN_COOKIE}_`)
+  ) {
+    return "/api/auth/kakao/profile";
+  }
   return "/api/auth/kakao";
 }
 

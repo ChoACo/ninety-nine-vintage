@@ -2,7 +2,7 @@
 
 import { Heart, LockKeyhole, ShoppingBag } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuctionTimer } from "@/hooks/useAuctionTimer";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useBidStore } from "@/store/useBidStore";
@@ -12,6 +12,12 @@ import { SettlementActions } from "@/components/features/auction/detail/Settleme
 import { useCommerceStore } from "@/store/useCommerceStore";
 import { persistCart, persistWishlist } from "@/lib/commerce/client";
 import { isEntryReadOnly, useEntryReadOnly } from "@/lib/entryMode";
+import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
+import {
+  consumeFixedPurchaseIntent,
+  rememberFixedPurchaseIntent,
+  type FixedPurchaseIntent,
+} from "@/lib/commerce/purchaseIntent";
 
 interface StickyBidPanelProps {
   item: ItemDetail;
@@ -20,11 +26,13 @@ interface StickyBidPanelProps {
 export function StickyBidPanel({ item }: StickyBidPanelProps) {
   const { timeLeft } = useAuctionTimer();
   const router = useRouter();
+  const resumedPurchaseIntent = useRef(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [buying, setBuying] = useState(false);
   const [buyNotice, setBuyNotice] = useState("");
   const readOnly = useEntryReadOnly();
   const bids = useBidStore((state) => state.bids);
+  const bidStoreItemId = useBidStore((state) => state.itemId);
   const currentPrice = useBidStore((state) => state.currentPrice);
   const hydrate = useBidStore((state) => state.hydrate);
   const addBid = useBidStore((state) => state.addBid);
@@ -42,6 +50,57 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
   useEffect(() => hydrateCommerce(), [hydrateCommerce]);
 
   useEffect(() => {
+    const requestedIntent = new URLSearchParams(window.location.search).get(
+      "purchaseIntent",
+    );
+    if (
+      resumedPurchaseIntent.current ||
+      item.saleType !== "fixed" ||
+      (requestedIntent !== "cart" && requestedIntent !== "buy")
+    ) {
+      return;
+    }
+    resumedPurchaseIntent.current = true;
+    router.replace(`/auction/${item.id}`, { scroll: false });
+    const intent: FixedPurchaseIntent = requestedIntent;
+    if (!consumeFixedPurchaseIntent(item.id, intent)) {
+      queueMicrotask(() =>
+        setBuyNotice("로그인 후 구매 버튼을 다시 눌러 주세요."),
+      );
+      return;
+    }
+
+    void (async () => {
+      setBuying(true);
+      setBuyNotice("");
+      try {
+        const { data } = await getSupabaseBrowserClient().auth.getSession();
+        const session = data.session;
+        if (!session?.access_token) {
+          throw new Error("로그인 세션을 확인하지 못했습니다. 다시 로그인해 주세요.");
+        }
+        addToCart(item.id);
+        if (!await persistCart(item.id, true, session.user.id)) {
+          removeFromCart(item.id);
+          throw new Error("현재 구매할 수 없는 상품입니다.");
+        }
+        if (intent === "buy") {
+          router.push("/cart");
+        } else {
+          setBuyNotice("로그인 후 장바구니에 담았습니다.");
+        }
+      } catch (error) {
+        setBuyNotice(
+          error instanceof Error ? error.message : "구매 준비에 실패했습니다.",
+        );
+      } finally {
+        setBuying(false);
+      }
+    })();
+  }, [addToCart, item.id, item.saleType, removeFromCart, router]);
+
+  useEffect(() => {
+    if (!LIVE_AUCTION_ENABLED || item.saleType !== "auction") return;
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.id)) return;
     let channel: ReturnType<ReturnType<typeof getSupabaseBrowserClient>["channel"]> | null = null;
     try {
@@ -71,7 +130,7 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
     return () => {
       if (channel) void getSupabaseBrowserClient().removeChannel(channel);
     };
-  }, [item.id, receiveBid]);
+  }, [item.id, item.saleType, receiveBid]);
 
   const addFixedToCart = async () => {
     if (buying) return;
@@ -80,9 +139,14 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
     setBuyNotice("");
     try {
       const { data } = await getSupabaseBrowserClient().auth.getSession();
-      if (!data.session?.access_token) throw new Error("카카오 로그인 후 장바구니를 이용할 수 있습니다.");
+      const session = data.session;
+      if (!session?.access_token) {
+        rememberFixedPurchaseIntent(item.id, "cart");
+        window.location.assign(`/api/auth/kakao/start?returnTo=${encodeURIComponent(`/auction/${item.id}?purchaseIntent=cart`)}`);
+        return;
+      }
       addToCart(item.id);
-      if (!await persistCart(item.id, true)) {
+      if (!await persistCart(item.id, true, session.user.id)) {
         removeFromCart(item.id);
         throw new Error("현재 구매할 수 없는 상품입니다.");
       }
@@ -101,9 +165,14 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
     setBuyNotice("");
     try {
       const { data } = await getSupabaseBrowserClient().auth.getSession();
-      if (!data.session?.access_token) throw new Error("카카오 로그인 후 구매할 수 있습니다.");
+      const session = data.session;
+      if (!session?.access_token) {
+        rememberFixedPurchaseIntent(item.id, "buy");
+        window.location.assign(`/api/auth/kakao/start?returnTo=${encodeURIComponent(`/auction/${item.id}?purchaseIntent=buy`)}`);
+        return;
+      }
       addToCart(item.id);
-      if (!await persistCart(item.id, true)) {
+      if (!await persistCart(item.id, true, session.user.id)) {
         removeFromCart(item.id);
         throw new Error("현재 구매할 수 없는 상품입니다.");
       }
@@ -113,9 +182,36 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
       setBuying(false);
     }
   };
+  const updateWishlist = async () => {
+    if (isEntryReadOnly()) {
+      setBuyNotice("사이트 연결이 복구될 때까지 읽기 전용입니다.");
+      return;
+    }
+    try {
+      const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
+      const nextLiked = !liked;
+      if (!session) {
+        toggleLike(item.id);
+        return;
+      }
+      if (await persistWishlist(item.id, nextLiked, session.user.id)) {
+        toggleLike(item.id);
+      } else {
+        setBuyNotice("로그인 계정이 변경되었거나 찜을 저장하지 못했습니다.");
+      }
+    } catch {
+      setBuyNotice("로그인 상태를 확인하지 못했습니다.");
+    }
+  };
 
-  const visibleBids = bids.length > 0 ? bids : item.bidHistory;
-  const displayPrice = currentPrice > 0 ? currentPrice : item.currentBid;
+  const visibleBids = bidStoreItemId === item.id && bids.length > 0
+    ? bids
+    : item.bidHistory;
+  const displayPrice = item.saleType === "fixed"
+    ? item.fixedPrice ?? item.currentBid
+    : bidStoreItemId === item.id && currentPrice > 0
+      ? currentPrice
+      : item.currentBid;
   const submitBid = async (amount: number) => {
     if (isEntryReadOnly()) throw new Error("현재 사이트 연결이 불안정해 읽기 전용 모드입니다.");
     return addBid(amount);
@@ -140,7 +236,7 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
         </div>
       </div>
 
-      {item.saleType === "auction" && <div className="my-6 border border-zinc-950 bg-zinc-950 px-5 py-5 text-white">
+      {LIVE_AUCTION_ENABLED && item.saleType === "auction" && <div className="my-6 border border-zinc-950 bg-zinc-950 px-5 py-5 text-white">
         <div className="flex items-center justify-between">
           <span className="text-xs text-zinc-400">LIVE DROP COUNTDOWN</span>
           <span className="h-2 w-2 rounded-full bg-emerald-400" />
@@ -149,7 +245,7 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
         <p className="mt-2 text-[11px] text-zinc-400">21:00–22:00 정산 점검 · 20:56 이후 신규 참여 제한</p>
       </div>}
 
-      {item.saleType === "auction" && <div className="border-b border-zinc-200 pb-5">
+      {LIVE_AUCTION_ENABLED && item.saleType === "auction" && <div className="border-b border-zinc-200 pb-5">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xs font-bold tracking-[0.08em]">REAL-TIME BIDS</h2>
           <span className="text-[10px] text-zinc-400">최근 5건</span>
@@ -164,11 +260,11 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
         </div>
       </div>}
 
-      {item.saleType === "auction" ? <button className="mobile-detail-cta mt-6 flex h-14 w-full items-center justify-center gap-2 bg-zinc-950 text-sm font-bold text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300" disabled={readOnly} onClick={() => setModalOpen(true)} type="button"><LockKeyhole size={15} /> {readOnly ? "읽기 전용" : "실시간 경매 입찰하기"}</button> : <div className="mobile-detail-cta mt-6 grid grid-cols-2 gap-2"><button className="flex h-14 items-center justify-center gap-2 border border-zinc-950 text-sm font-bold text-zinc-950 disabled:opacity-50" disabled={buying || readOnly} onClick={() => void addFixedToCart()} type="button"><ShoppingBag size={15} /> {readOnly ? "읽기 전용" : "장바구니"}</button><button className="flex h-14 items-center justify-center bg-zinc-950 text-sm font-bold text-white disabled:opacity-50" disabled={buying || readOnly} onClick={() => void buyNow()} type="button">{readOnly ? "읽기 전용" : buying ? "장바구니 준비 중..." : "바로 구매"}</button></div>}
+      {item.saleType === "auction" ? LIVE_AUCTION_ENABLED ? <button className="mobile-detail-cta mt-6 flex h-14 w-full items-center justify-center gap-2 bg-zinc-950 text-sm font-bold text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300" disabled={readOnly} onClick={() => setModalOpen(true)} type="button"><LockKeyhole size={15} /> {readOnly ? "읽기 전용" : "실시간 경매 입찰하기"}</button> : <div className="mt-6 border border-zinc-200 bg-zinc-50 p-4 text-xs leading-5 text-zinc-600">라이브 경매는 현재 점검 중입니다. 바로 구매 상품은 정상적으로 이용할 수 있습니다.</div> : <div className="mobile-detail-cta mt-6 grid grid-cols-2 gap-2"><button className="flex h-14 items-center justify-center gap-2 border border-zinc-950 text-sm font-bold text-zinc-950 disabled:opacity-50" disabled={buying || readOnly} onClick={() => void addFixedToCart()} type="button"><ShoppingBag size={15} /> {readOnly ? "읽기 전용" : "장바구니"}</button><button className="flex h-14 items-center justify-center bg-zinc-950 text-sm font-bold text-white disabled:opacity-50" disabled={buying || readOnly} onClick={() => void buyNow()} type="button">{readOnly ? "읽기 전용" : buying ? "장바구니 준비 중..." : "바로 구매"}</button></div>}
       {buyNotice && <p aria-live="polite" className="mt-3 text-xs font-bold text-emerald-700">{buyNotice}</p>}
-      <button className="mt-2 flex h-12 w-full items-center justify-center gap-2 border border-zinc-200 text-xs font-bold text-zinc-950 transition-colors hover:border-zinc-950 disabled:opacity-50" disabled={readOnly} onClick={() => { if (isEntryReadOnly()) { setBuyNotice("사이트 연결이 복구될 때까지 읽기 전용입니다."); return; } const nextLiked = !liked; toggleLike(item.id); void persistWishlist(item.id, nextLiked); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} /> {readOnly ? "읽기 전용" : liked ? "찜 해제" : "관심 상품 담기"}</button>
-      {item.saleType === "auction" && <SettlementActions productId={item.id} readOnly={readOnly} />}
-      {item.saleType === "auction" && <BidModal currentPrice={displayPrice} key={`${modalOpen}-${displayPrice}`} onClose={() => setModalOpen(false)} onSubmit={submitBid} open={modalOpen} />}
+      <button className="mt-2 flex h-12 w-full items-center justify-center gap-2 border border-zinc-200 text-xs font-bold text-zinc-950 transition-colors hover:border-zinc-950 disabled:opacity-50" disabled={readOnly} onClick={() => void updateWishlist()} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} /> {readOnly ? "읽기 전용" : liked ? "찜 해제" : "관심 상품 담기"}</button>
+      {LIVE_AUCTION_ENABLED && item.saleType === "auction" && <SettlementActions productId={item.id} readOnly={readOnly} />}
+      {LIVE_AUCTION_ENABLED && item.saleType === "auction" && <BidModal currentPrice={displayPrice} key={`${modalOpen}-${displayPrice}`} onClose={() => setModalOpen(false)} onSubmit={submitBid} open={modalOpen} />}
     </aside>
   );
 }

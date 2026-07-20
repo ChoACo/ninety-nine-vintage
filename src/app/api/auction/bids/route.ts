@@ -1,4 +1,5 @@
 import { hasTrustedRequestOrigin } from "@/lib/kakao/oidc";
+import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 import { placeBid, AuctionServiceError } from "@/services/auction";
 
 function response(body: Record<string, unknown>, status = 200) {
@@ -12,6 +13,9 @@ function maskBidder(value: string): string {
 }
 
 export async function POST(request: Request) {
+  if (!LIVE_AUCTION_ENABLED) {
+    return response({ error: "auction_disabled" }, 503);
+  }
   if (!hasTrustedRequestOrigin(request)) return response({ error: "forbidden" }, 403);
   const authorization = request.headers.get("authorization")?.trim();
   const token = authorization?.startsWith("Bearer ") ? authorization.slice(7).trim() : null;

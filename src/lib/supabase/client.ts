@@ -32,7 +32,9 @@ export function getSupabaseBrowserClient(): SupabaseClient<Database> {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true,
+      // Authentication is completed only through the verified Kakao ID-token
+      // callback. Never let URL fragments inject an unrelated Supabase session.
+      detectSessionInUrl: false,
     },
   });
 

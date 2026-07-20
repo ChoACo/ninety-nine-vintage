@@ -3,6 +3,7 @@ import {
   getEntryGateCookieName,
   verifyEntryPass,
 } from "@/lib/entryGateCookie";
+import { ENTRY_GATE_ENABLED } from "@/lib/featureFlags";
 
 const SKIPPED_PATHS = [
   "/api/security/session",
@@ -93,6 +94,8 @@ export async function proxy(request: NextRequest) {
   if (ipAddress && (await isBlockedIp(ipAddress))) {
     return blockedResponse(request);
   }
+
+  if (!ENTRY_GATE_ENABLED) return NextResponse.next();
 
   const { pathname, search } = request.nextUrl;
   if (pathname === "/" || pathname.startsWith("/auth/callback")) {

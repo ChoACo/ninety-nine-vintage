@@ -10,6 +10,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { persistWishlist } from "@/lib/commerce/client";
 import { useCommerceStore } from "@/store/useCommerceStore";
 import { isEntryReadOnly, useEntryReadOnly } from "@/lib/entryMode";
+import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 
 export type AuctionFeedPhase = "OPEN" | "CLOSING_SOON" | "CLOSED" | "UPCOMING";
 
@@ -30,7 +31,12 @@ function bidErrorMessage(message: string) {
   return message;
 }
 
-export function AuctionFeedCard({ item }: AuctionFeedCardProps) {
+export function AuctionFeedCard(props: AuctionFeedCardProps) {
+  if (!LIVE_AUCTION_ENABLED) return null;
+  return <EnabledAuctionFeedCard {...props} />;
+}
+
+function EnabledAuctionFeedCard({ item }: AuctionFeedCardProps) {
   const liked = useCommerceStore((state) => state.likedIds.includes(item.id));
   const toggleLike = useCommerceStore((state) => state.toggleLike);
   const [bidOpen, setBidOpen] = useState(false);
@@ -60,6 +66,27 @@ export function AuctionFeedCard({ item }: AuctionFeedCardProps) {
     setOptimisticBid({ amount: payload.bid.amount, bidCount: bidCount + 1, participantCount: payload.bid.participantCount });
     setActionMessage("입찰이 완료되었습니다. 현재 입찰가를 갱신했습니다.");
   };
+  const updateWishlist = async () => {
+    if (isEntryReadOnly()) {
+      setActionMessage("사이트 연결이 복구될 때까지 읽기 전용입니다.");
+      return;
+    }
+    try {
+      const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
+      const nextLiked = !liked;
+      if (!session) {
+        toggleLike(item.id);
+        return;
+      }
+      if (await persistWishlist(item.id, nextLiked, session.user.id)) {
+        toggleLike(item.id);
+      } else {
+        setActionMessage("로그인 계정이 변경되었거나 찜을 저장하지 못했습니다.");
+      }
+    } catch {
+      setActionMessage("로그인 상태를 확인하지 못했습니다.");
+    }
+  };
 
   return (
     <article className="group min-w-0 border-b border-line pb-5">
@@ -72,7 +99,7 @@ export function AuctionFeedCard({ item }: AuctionFeedCardProps) {
             <p className="mt-1 text-xs font-bold">현재가와 입찰 현황을 확인하세요.</p>
           </div>
         </Link>
-        <button aria-label={liked ? "찜 해제" : "찜하기"} className={`absolute right-2 top-2 grid size-8 place-items-center bg-paper/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${liked ? "text-red-700" : "text-ink"}`} disabled={readOnly} onClick={() => { if (isEntryReadOnly()) { setActionMessage("사이트 연결이 복구될 때까지 읽기 전용입니다."); return; } const nextLiked = !liked; toggleLike(item.id); void persistWishlist(item.id, nextLiked); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>
+        <button aria-label={liked ? "찜 해제" : "찜하기"} className={`absolute right-2 top-2 grid size-8 place-items-center bg-paper/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${liked ? "text-red-700" : "text-ink"}`} disabled={readOnly} onClick={() => void updateWishlist()} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>
       </div>
       <div className="pt-3">
         <div className="flex items-center justify-between gap-2 text-[10px] text-muted"><span className="truncate">{item.brand}</span><span className={`shrink-0 font-mono tabular-nums ${phase === "CLOSING_SOON" ? "text-amber-700" : phase === "CLOSED" ? "text-red-700" : ""}`}>{item.timeLeft ?? "LIVE"}</span></div>

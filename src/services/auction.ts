@@ -1,5 +1,6 @@
 import "server-only";
 
+import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 import { createSupabaseUserClient } from "@/lib/supabase/server";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -33,6 +34,12 @@ export async function placeBid(
   productId: string,
   amount: number,
 ): Promise<PlacedBidResult> {
+  if (!LIVE_AUCTION_ENABLED) {
+    throw new AuctionServiceError(
+      "라이브 경매는 현재 점검 중입니다.",
+      "auction_disabled",
+    );
+  }
   if (!UUID_PATTERN.test(productId)) {
     throw new AuctionServiceError("입찰 상품 정보가 올바르지 않습니다.");
   }

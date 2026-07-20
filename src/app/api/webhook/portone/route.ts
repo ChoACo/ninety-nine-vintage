@@ -1,7 +1,6 @@
 import * as PortOne from "@portone/server-sdk";
 
 import { paymentJsonResponse } from "@/src/lib/portone/http";
-import { getPaymentRuntimeMode } from "@/src/lib/portone/runtimeMode";
 import {
   getPortOneWebhookSecret,
   isValidPaymentId,
@@ -58,12 +57,6 @@ export async function POST(request: Request) {
 
   try {
     const { admin } = createSupabaseServerClients();
-    if ((await getPaymentRuntimeMode(admin)) === "manual_transfer") {
-      return paymentJsonResponse(
-        { received: true, ignored: true, reason: "manual_transfer_active" },
-        200,
-      );
-    }
     const synced = await verifyAndSyncPortOnePayment(admin, paymentId);
     return paymentJsonResponse(
       {

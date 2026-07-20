@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { AuctionStatus } from "@/types/auction";
+import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 
 type AuctionClockStatus = AuctionStatus | "UPCOMING" | "OPEN" | "CLOSING_SOON" | "CLOSED" | "RE_AUCTION";
 
@@ -91,6 +92,7 @@ export function useAuctionTimer(): AuctionTimerState {
   const [timer, setTimer] = useState<AuctionTimerState>(INITIAL_STATE);
 
   useEffect(() => {
+    if (!LIVE_AUCTION_ENABLED) return;
     const updateTimer = () => setTimer(getAuctionTimerState());
     updateTimer();
 

@@ -18,6 +18,9 @@ export async function GET(request: Request) {
       })),
     }, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    return Response.json({ products: [], dbConnected: false }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json(
+      { products: [], dbConnected: false, error: "상품 목록을 불러오지 못했습니다." },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

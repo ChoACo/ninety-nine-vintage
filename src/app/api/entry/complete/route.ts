@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createEntryPass, getEntryGateCookieName, getEntryGateMaxAge } from "@/lib/entryGateCookie";
+import { ENTRY_GATE_ENABLED } from "@/lib/featureFlags";
 import { createSupabaseServerClients } from "@/lib/supabase/server";
 
 const allowedConsent = new Set(["accepted", "declined", "unknown"]);
@@ -19,6 +20,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as { nextPath?: unknown; deviceType?: unknown; cacheConsent?: unknown };
     const target = normalizeTarget(body.nextPath);
+    if (!ENTRY_GATE_ENABLED) {
+      return NextResponse.json({ ok: true, target, disabled: true });
+    }
     const deviceType = typeof body.deviceType === "string" && body.deviceType.length <= 32 ? body.deviceType : "unknown";
     const cacheConsent = allowedConsent.has(String(body.cacheConsent)) ? String(body.cacheConsent) : "unknown";
     const { admin } = createSupabaseServerClients();

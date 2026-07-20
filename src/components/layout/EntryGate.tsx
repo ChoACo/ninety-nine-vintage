@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { readCacheConsent } from "@/lib/cacheConsent";
 import { ENTRY_READONLY_KEY } from "@/lib/entryMode";
+import { ENTRY_GATE_ENABLED } from "@/lib/featureFlags";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const CACHE_KEY = "ninetynine-entry-cache";
@@ -56,6 +57,11 @@ async function completeEntry(nextPath: string, deviceType: string) {
 }
 
 export function EntryGate() {
+  if (!ENTRY_GATE_ENABLED) return null;
+  return <EnabledEntryGate />;
+}
+
+function EnabledEntryGate() {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("DEVICE");
   const [result, setResult] = useState<GateResult>("checking");
@@ -74,13 +80,7 @@ export function EntryGate() {
       const sessionCheck = withTimeout((async () => {
         try {
           const client = getSupabaseBrowserClient();
-          const { data } = await withTimeout(client.auth.getSession(), 1500);
-          if (data.session) {
-            await withTimeout(fetch("/api/account/session", { headers: { Authorization: `Bearer ${data.session.access_token}` }, cache: "no-store" }).then(async (response) => {
-              if (!response.ok) throw new Error("session-role-unavailable");
-              return response.json();
-            }), 1500);
-          }
+          await withTimeout(client.auth.getSession(), 1500);
         } catch {
           // Guests and unavailable auth services can still browse the public catalog.
         }

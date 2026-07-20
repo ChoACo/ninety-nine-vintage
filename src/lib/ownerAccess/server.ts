@@ -105,8 +105,18 @@ export async function ownerRpc<T>(
 ): Promise<T> {
   const { data, error } = await context.userClient.rpc(functionName, parameters);
   if (error) {
-    const status = error.code === "42501" ? 403 : error.code === "P0002" ? 404 : 400;
-    throw new OwnerAccessRequestError(status, "owner_rpc_failed");
+    const status =
+      error.code === "42501"
+        ? 403
+        : error.code === "P0002"
+          ? 404
+          : error.code === "55000"
+            ? 409
+            : 400;
+    throw new OwnerAccessRequestError(
+      status,
+      error.code === "55000" ? "owner_rpc_conflict" : "owner_rpc_failed",
+    );
   }
   return data as T;
 }

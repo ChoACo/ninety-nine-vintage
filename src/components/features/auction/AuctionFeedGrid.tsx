@@ -9,8 +9,9 @@ import { AuctionBidSummary } from "@/components/features/auction/AuctionBidSumma
 import { AuctionFeedCard, type AuctionFeedPhase } from "@/components/features/auction/AuctionFeedCard";
 import { getCatalogImageUrl } from "@/lib/images";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 
-interface ProductPayload {
+export interface ProductPayload {
   id: string;
   title: string;
   description: string;
@@ -40,7 +41,8 @@ interface CatalogFilters {
 
 interface AuctionFeedGridProps {
   className?: string;
-  saleType?: ProductSaleType;
+  initialProducts?: ProductPayload[];
+  saleType: ProductSaleType;
   title?: string;
 }
 
@@ -60,16 +62,23 @@ function auctionPhase(closesAt: string, now: number): AuctionFeedPhase {
   return "OPEN";
 }
 
-export function AuctionFeedGrid({ className = "", saleType = "auction", title }: AuctionFeedGridProps) {
+export function AuctionFeedGrid(props: AuctionFeedGridProps) {
+  if (props.saleType === "auction" && !LIVE_AUCTION_ENABLED) {
+    return <section className={`grid min-h-64 place-items-center border border-dashed border-line bg-surface px-6 text-center ${props.className ?? ""}`}><div><p className="text-sm font-bold">라이브 경매 점검 중</p><p className="mt-2 text-xs text-muted">일반 바로 구매 상품은 정상적으로 이용할 수 있습니다.</p></div></section>;
+  }
+  return <EnabledAuctionFeedGrid {...props} />;
+}
+
+function EnabledAuctionFeedGrid({ className = "", initialProducts, saleType, title }: AuctionFeedGridProps) {
   const routeSearchParams = useSearchParams();
   const routeQuery = routeSearchParams.get("q") ?? "";
-  const [products, setProducts] = useState<ProductPayload[]>([]);
+  const [products, setProducts] = useState<ProductPayload[]>(initialProducts ?? []);
   const [query, setQuery] = useState(routeQuery);
   const [sort, setSort] = useState<"latest" | "ending" | "price_asc" | "price_desc">(saleType === "fixed" ? "latest" : "ending");
   const [filters, setFilters] = useState<CatalogFilters>({ sizes: [], categories: [], liveOnly: true, closingOnly: false, sort: saleType === "fixed" ? "latest" : "ending" });
   const [now, setNow] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(initialProducts === undefined);
   const [error, setError] = useState("");
 
   const lastRouteQuery = useRef(routeQuery);
@@ -105,11 +114,12 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
   }, []);
 
   useEffect(() => {
+    if (!LIVE_AUCTION_ENABLED || saleType !== "auction") return;
     const updateNow = () => setNow(Date.now());
     updateNow();
     const interval = window.setInterval(updateNow, 1_000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [saleType]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -124,14 +134,13 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === "AbortError") return;
         setError("상품 목록을 불러오지 못했습니다.");
-        setProducts([]);
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [query, refreshNonce, saleType, sort]);
 
   useEffect(() => {
-    if (saleType !== "auction") return;
+    if (!LIVE_AUCTION_ENABLED || saleType !== "auction") return;
     let client: ReturnType<typeof getSupabaseBrowserClient>;
     try {
       client = getSupabaseBrowserClient();
@@ -161,7 +170,7 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
   }, [saleType]);
 
   useEffect(() => {
-    if (saleType !== "auction") return;
+    if (!LIVE_AUCTION_ENABLED || saleType !== "auction") return;
     const refresh = window.setInterval(() => setRefreshNonce((value) => value + 1), 30_000);
     return () => window.clearInterval(refresh);
   }, [saleType]);

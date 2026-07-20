@@ -10,7 +10,7 @@ export type ProductStatus = "pending" | "active" | "closed"
 export type ProductSaleType = "auction" | "fixed"
 export type SupportConversationStatus = "open" | "closed"
 export type MemberAccountStatus = "active" | "suspended"
-export type ShippingRequestStatus = "requested" | "shipped"
+export type ShippingRequestStatus = "requested" | "shipped" | "cancelled"
 export type PortOnePayMethod = "CARD" | "EASY_PAY" | "VIRTUAL_ACCOUNT"
 export type ProductPaymentStatus = "대기중" | "가상계좌발급" | "결제완료"
 export type ActivePaymentMode = "manual_transfer" | "portone"
@@ -1411,6 +1411,7 @@ export type Database = {
         Row: {
           buyer_deleted_at: string | null
           buyer_id: string | null
+          commerce_order_id: string | null
           created_at: string
           currency: string
           expected_amount: number
@@ -1422,7 +1423,7 @@ export type Database = {
           payment_status: string
           portone_status: string | null
           portone_status_changed_at: string | null
-          product_id: string
+          product_id: string | null
           requested_method: string
           store_id: string
           updated_at: string
@@ -1433,6 +1434,7 @@ export type Database = {
         Insert: {
           buyer_deleted_at?: string | null
           buyer_id?: string | null
+          commerce_order_id?: string | null
           created_at?: string
           currency?: string
           expected_amount: number
@@ -1444,7 +1446,7 @@ export type Database = {
           payment_status?: string
           portone_status?: string | null
           portone_status_changed_at?: string | null
-          product_id: string
+          product_id?: string | null
           requested_method: string
           store_id: string
           updated_at?: string
@@ -1455,6 +1457,7 @@ export type Database = {
         Update: {
           buyer_deleted_at?: string | null
           buyer_id?: string | null
+          commerce_order_id?: string | null
           created_at?: string
           currency?: string
           expected_amount?: number
@@ -1466,7 +1469,7 @@ export type Database = {
           payment_status?: string
           portone_status?: string | null
           portone_status_changed_at?: string | null
-          product_id?: string
+          product_id?: string | null
           requested_method?: string
           store_id?: string
           updated_at?: string
@@ -1480,6 +1483,13 @@ export type Database = {
             columns: ["buyer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_orders_commerce_order_id_fkey"
+            columns: ["commerce_order_id"]
+            isOneToOne: true
+            referencedRelation: "commerce_orders"
             referencedColumns: ["id"]
           },
           {
@@ -2255,6 +2265,8 @@ export type Database = {
         Row: {
           address_id: string | null
           address_snapshot: Json
+          cancellation_reason: string | null
+          cancelled_at: string | null
           courier: string | null
           created_at: string
           id: string
@@ -2270,6 +2282,8 @@ export type Database = {
         Insert: {
           address_id?: string | null
           address_snapshot: Json
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
           courier?: string | null
           created_at?: string
           id?: string
@@ -2285,6 +2299,8 @@ export type Database = {
         Update: {
           address_id?: string | null
           address_snapshot?: Json
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
           courier?: string | null
           created_at?: string
           id?: string
@@ -3596,6 +3612,25 @@ export type Database = {
         Args: { p_status: string }
         Returns: number
       }
+      prepare_commerce_portone_checkout: {
+        Args: {
+          p_idempotency_key: string
+          p_member_id: string
+          p_payment_id: string
+          p_product_ids: string[]
+          p_requested_method: string
+          p_store_id: string
+        }
+        Returns: {
+          commerce_order_id: string
+          expected_amount: number
+          order_name: string
+          payment_id: string
+          payment_status: string
+          portone_status: string | null
+          can_retry_payment: boolean
+        }[]
+      }
       prepare_portone_payment: {
         Args: {
           p_member_id: string
@@ -3823,8 +3858,9 @@ export type Database = {
           p_vbank_num: string
         }
         Returns: {
+          paid_at: string | null
           payment_status: string
-          portone_status: string
+          portone_status: string | null
         }[]
       }
       touch_my_last_seen: { Args: never; Returns: string }

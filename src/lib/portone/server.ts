@@ -8,13 +8,16 @@ export const PORTONE_PAY_METHODS = [
 ] as const;
 
 export type PortOnePayMethod = (typeof PORTONE_PAY_METHODS)[number];
+export type PortOneChannelMode = "TEST" | "LIVE";
 
 interface PaymentOrderRow {
   buyer_id: string | null;
-  product_id: string;
+  product_id: string | null;
+  commerce_order_id: string | null;
   currency: string;
   expected_amount: number;
   payment_status: string;
+  paid_at: string | null;
 }
 
 interface PaymentAttemptRow {
@@ -26,10 +29,13 @@ interface PaymentAttemptRow {
   payment_orders: PaymentOrderRow | PaymentOrderRow[];
 }
 
-interface SyncedPaymentRow {
+interface SyncedPaymentRpcRow {
   payment_status: string;
-  portone_status: string;
+  portone_status: string | null;
+  paid_at: string | null;
 }
+
+type SyncedPaymentRow = SyncedPaymentRpcRow;
 
 export class PortOneIntegrationError extends Error {
   readonly code: string;
@@ -111,18 +117,22 @@ export function getPortOnePublicConfiguration(
   return { storeId, channelKey };
 }
 
-export function getAllowedPortOneChannelKeys(): ReadonlySet<string> {
-  return new Set(
-    PORTONE_PAY_METHODS.map(
-      (payMethod) => getPortOnePublicConfiguration(payMethod).channelKey,
-    ),
-  );
-}
-
 export function getPortOneClient(): ReturnType<typeof PortOne.PortOneClient> {
   return PortOne.PortOneClient({
     secret: readRequiredEnvironment("PORTONE_API_SECRET"),
   });
+}
+
+export function getPortOneChannelMode(): PortOneChannelMode {
+  const mode = readRequiredEnvironment("PORTONE_CHANNEL_MODE");
+  if (mode !== "TEST" && mode !== "LIVE") {
+    throw new PortOneIntegrationError(
+      "portone_channel_mode_invalid",
+      "PORTONE_CHANNEL_MODE must be explicitly set to TEST or LIVE.",
+      503,
+    );
+  }
+  return mode;
 }
 
 export function isPortOnePayMethod(value: unknown): value is PortOnePayMethod {
@@ -139,6 +149,14 @@ export function isValidPaymentId(value: unknown): value is string {
     value.length <= 40 &&
     /^[A-Za-z0-9]+$/.test(value)
   );
+}
+
+/**
+ * Commerce checkout never accepts a PortOne payment ID from the browser. The
+ * database RPC resolves idempotent retries to the current persisted attempt.
+ */
+export function createCommercePortOnePaymentId(): string {
+  return `C${crypto.randomUUID().replaceAll("-", "")}`;
 }
 
 /**
@@ -210,6 +228,65 @@ function readPaymentMethod(method: PortOne.Payment.PaymentMethod | undefined): {
   }
 }
 
+type PortOnePaymentStatus = PortOne.Payment.Payment["status"];
+
+const METHOD_REQUIRED_STATUSES = new Set<PortOnePaymentStatus>([
+  "PAID",
+  "VIRTUAL_ACCOUNT_ISSUED",
+  "PARTIAL_CANCELLED",
+  "CANCELLED",
+]);
+
+/**
+ * READY/PAY_PENDING responses can precede payment-method selection, and a
+ * FAILED response can also be emitted before PortOne has method details. When
+ * a method is present, however, it must always match the immutable attempt.
+ */
+export function readVerifiedPortOnePaymentMethod(
+  status: PortOnePaymentStatus,
+  method: PortOne.Payment.PaymentMethod | undefined,
+  requestedMethod: PortOnePayMethod,
+): ReturnType<typeof readPaymentMethod> {
+  const parsed = readPaymentMethod(method);
+  const methodBase = parsed.paymentMethod?.split(":", 1)[0] ?? null;
+  const missingRequiredMethod =
+    methodBase === null && METHOD_REQUIRED_STATUSES.has(status);
+  const easyPayProviderInvalid =
+    requestedMethod === "EASY_PAY" &&
+    method !== undefined &&
+    (method.type !== "PaymentMethodEasyPay" ||
+      method.provider !== "KAKAOPAY");
+
+  if (
+    missingRequiredMethod ||
+    (methodBase !== null && methodBase !== requestedMethod) ||
+    easyPayProviderInvalid
+  ) {
+    throw new PortOneIntegrationError(
+      "payment_method_verification_failed",
+      "PortOne payment method did not match the server-side attempt.",
+      409,
+    );
+  }
+
+  return parsed;
+}
+
+/**
+ * READY and pre-selection FAILED responses may not have a selected channel.
+ * Once present, the channel must be the exact mode/key prepared for this
+ * attempt rather than merely another channel configured for the same store.
+ */
+export function isExpectedPortOnePaymentChannel(
+  status: PortOnePaymentStatus,
+  channel: { type: string; key?: string } | undefined,
+  expectedMode: PortOneChannelMode,
+  expectedKey: string,
+): boolean {
+  if (!channel) return status === "READY" || status === "FAILED";
+  return channel.type === expectedMode && channel.key === expectedKey;
+}
+
 function firstRpcRow<T>(data: unknown): T | null {
   if (Array.isArray(data)) return (data[0] as T | undefined) ?? null;
   return data && typeof data === "object" ? (data as T) : null;
@@ -267,7 +344,7 @@ export async function verifyAndSyncPortOnePayment(
   const { data: rawAttempt, error: orderError } = await admin
     .from("payment_attempts")
     .select(
-      "payment_id, requested_method, store_id, expected_amount, currency, payment_orders!payment_attempts_order_id_fkey!inner(buyer_id, product_id, expected_amount, currency, payment_status)",
+      "payment_id, requested_method, store_id, expected_amount, currency, payment_orders!payment_attempts_order_id_fkey!inner(buyer_id, product_id, commerce_order_id, expected_amount, currency, payment_status, paid_at)",
     )
     .eq("payment_id", paymentId)
     .maybeSingle();
@@ -311,7 +388,18 @@ export async function verifyAndSyncPortOnePayment(
     );
   }
 
-  await requireProductAvailableForPortOne(admin, order.product_id);
+  // Manual settlement is an auction-product invariant. Fixed-price commerce
+  // attempts are tied to commerce_order_id and have no product_id.
+  if (Boolean(order.product_id) === Boolean(order.commerce_order_id)) {
+    throw new PortOneIntegrationError(
+      "payment_order_reference_invalid",
+      "The payment order is not linked to exactly one purchasable order.",
+      500,
+    );
+  }
+  if (order.product_id) {
+    await requireProductAvailableForPortOne(admin, order.product_id);
+  }
 
   let payment: PortOne.Payment.Payment;
   try {
@@ -336,20 +424,16 @@ export async function verifyAndSyncPortOnePayment(
     );
   }
 
-  const configuredStoreId = getPortOnePublicConfiguration(
+  const configuredPayment = getPortOnePublicConfiguration(
     attempt.requested_method,
-  ).storeId;
-  const allowedChannelKeys = getAllowedPortOneChannelKeys();
-  const expectedChannelType =
-    process.env.PORTONE_CHANNEL_MODE?.trim().toUpperCase() || "TEST";
-  const channelRequired = !(
-    payment.status === "READY" || payment.status === "FAILED"
   );
-  const channelInvalid = payment.channel
-    ? payment.channel.type !== expectedChannelType ||
-      typeof payment.channel.key !== "string" ||
-      !allowedChannelKeys.has(payment.channel.key)
-    : channelRequired;
+  const expectedChannelType = getPortOneChannelMode();
+  const channelInvalid = !isExpectedPortOnePaymentChannel(
+    payment.status,
+    payment.channel,
+    expectedChannelType,
+    configuredPayment.channelKey,
+  );
   const amount = Number(payment.amount.total);
   const attemptAmount = Number(attempt.expected_amount);
   const orderAmount = Number(order.expected_amount);
@@ -357,7 +441,7 @@ export async function verifyAndSyncPortOnePayment(
     payment.id !== paymentId ||
     payment.version !== "V2" ||
     payment.storeId !== attempt.store_id ||
-    payment.storeId !== configuredStoreId ||
+    payment.storeId !== configuredPayment.storeId ||
     channelInvalid ||
     !Number.isSafeInteger(amount) ||
     amount !== attemptAmount ||
@@ -373,20 +457,11 @@ export async function verifyAndSyncPortOnePayment(
     );
   }
 
-  const method = readPaymentMethod(payment.method);
-  const methodBase = method.paymentMethod?.split(":", 1)[0] ?? null;
-  if (
-    (methodBase !== null && !isPortOnePayMethod(methodBase)) ||
-    ((payment.status === "PAID" ||
-      payment.status === "VIRTUAL_ACCOUNT_ISSUED") &&
-      methodBase === null)
-  ) {
-    throw new PortOneIntegrationError(
-      "payment_method_verification_failed",
-      "PortOne returned an unsupported payment method.",
-      409,
-    );
-  }
+  const method = readVerifiedPortOnePaymentMethod(
+    payment.status,
+    payment.method,
+    attempt.requested_method,
+  );
   const paidAt =
     "paidAt" in payment && typeof payment.paidAt === "string"
       ? payment.paidAt
@@ -414,14 +489,20 @@ export async function verifyAndSyncPortOnePayment(
     );
   }
 
-  const synced = firstRpcRow<SyncedPaymentRow>(data);
-  if (!synced) {
+  const synced = firstRpcRow<SyncedPaymentRpcRow>(data);
+  if (
+    !synced ||
+    (synced.paid_at !== null && typeof synced.paid_at !== "string")
+  ) {
     throw new PortOneIntegrationError(
       "payment_sync_invalid_response",
       "The payment synchronization result was invalid.",
       500,
     );
   }
+  // paid_at is returned from the same row lock and transaction that selected
+  // the status. Do not reconstruct it from the pre-RPC lookup: a concurrent
+  // paid-then-cancelled webhook may have advanced the persisted audit trail.
   return synced;
 }
 

@@ -2,9 +2,11 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 import {
   clearHttpOnlyCookie,
+  getKakaoFlowCookieName,
   hasTrustedRequestOrigin,
   KAKAO_ACCESS_TOKEN_COOKIE,
   KAKAO_USERINFO_ENDPOINT,
+  normalizeKakaoFlowId,
   readCookie,
 } from "@/src/lib/kakao/oidc";
 import { createSupabaseServerClients } from "@/src/lib/supabase/server";
@@ -20,6 +22,7 @@ function jsonResponse(
   requestUrl: string,
   body: Record<string, unknown>,
   status: number,
+  accessTokenCookieName: string | null = KAKAO_ACCESS_TOKEN_COOKIE,
   clearAccessToken = true,
 ): Response {
   const headers = new Headers({
@@ -28,10 +31,10 @@ function jsonResponse(
     Pragma: "no-cache",
     "X-Content-Type-Options": "nosniff",
   });
-  if (clearAccessToken) {
+  if (clearAccessToken && accessTokenCookieName) {
     headers.append(
       "Set-Cookie",
-      clearHttpOnlyCookie(requestUrl, KAKAO_ACCESS_TOKEN_COOKIE),
+      clearHttpOnlyCookie(requestUrl, accessTokenCookieName),
     );
   }
   return new Response(JSON.stringify(body), { status, headers });
@@ -73,13 +76,34 @@ function userHasKakaoSubject(user: User, subject: string): boolean {
 
 export async function POST(request: Request) {
   if (!hasTrustedRequestOrigin(request)) {
-    return jsonResponse(request.url, { error: "forbidden" }, 403, false);
+    return jsonResponse(request.url, { error: "forbidden" }, 403, null, false);
   }
 
-  const accessToken = readCookie(request, KAKAO_ACCESS_TOKEN_COOKIE);
+  const rawFlowId = new URL(request.url).searchParams.get("flow");
+  const flowId = normalizeKakaoFlowId(rawFlowId);
+  if (rawFlowId !== null && !flowId) {
+    return jsonResponse(request.url, { error: "expired" }, 401, null, false);
+  }
+  const accessTokenCookieName = getKakaoFlowCookieName(
+    KAKAO_ACCESS_TOKEN_COOKIE,
+    flowId,
+  );
+  const respond = (
+    body: Record<string, unknown>,
+    status: number,
+    clearAccessToken = true,
+  ) =>
+    jsonResponse(
+      request.url,
+      body,
+      status,
+      accessTokenCookieName,
+      clearAccessToken,
+    );
+  const accessToken = readCookie(request, accessTokenCookieName);
   const supabaseAccessToken = readBearerToken(request);
   if (!accessToken || !supabaseAccessToken) {
-    return jsonResponse(request.url, { error: "expired" }, 401);
+    return respond({ error: "expired" }, 401);
   }
 
   try {
@@ -107,7 +131,7 @@ export async function POST(request: Request) {
       !subject ||
       !userHasKakaoSubject(userData.user, subject)
     ) {
-      return jsonResponse(request.url, { error: "identity_mismatch" }, 403);
+      return respond({ error: "identity_mismatch" }, 403);
     }
 
     const fullName = normalizeString(userInfo.name, 80);
@@ -157,31 +181,29 @@ export async function POST(request: Request) {
 
     if (profileError) {
       const duplicateIdentity = profileError.code === "23505";
-      return jsonResponse(
-        request.url,
+      return respond(
         { error: duplicateIdentity ? "duplicate_identity" : "profile_sync" },
         duplicateIdentity ? 409 : 500,
       );
     }
 
     if (requirementError || accessRoleError) {
-      return jsonResponse(request.url, { error: "profile_sync" }, 500);
+      return respond({ error: "profile_sync" }, 500);
     }
 
     if (requirements?.enforce_verified_profile && !profileComplete) {
-      return jsonResponse(
-        request.url,
+      return respond(
         { error: "required_profile_incomplete", consentItems },
         422,
       );
     }
 
-    return jsonResponse(request.url, {
+    return respond({
       profileComplete,
       consentItems,
     }, 200);
   } catch {
-    return jsonResponse(request.url, { error: "profile_sync" }, 500);
+    return respond({ error: "profile_sync" }, 500);
   }
 }
 

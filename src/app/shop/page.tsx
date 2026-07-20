@@ -1,12 +1,5 @@
-import type { Metadata } from "next";
+import { Suspense } from "react";
+import { AuctionFeedGrid } from "@/components/features/auction/AuctionFeedGrid";
+import { AuctionFilterSidebar } from "@/components/features/auction/AuctionFilterSidebar";
 
-import { AuctionApp } from "@/src/components/AuctionApp";
-
-export const metadata: Metadata = {
-  title: "상시 구매 | 나인티 나인 빈티지",
-  description: "표시된 정가로 바로 구매할 수 있는 나인티 나인 빈티지 상시 구매 상품을 확인하세요.",
-};
-
-export default function ShopRoutePage() {
-  return <AuctionApp page="shop" />;
-}
+export default function ShopPage() { return <div className="flex flex-col items-stretch gap-8 flex-row items-start gap-10"><AuctionFilterSidebar saleType="fixed" /><Suspense fallback={<div className="min-w-0 flex-1" />}><AuctionFeedGrid className="min-w-0 flex-1" saleType="fixed" title="상시 바로구매" /></Suspense></div>; }

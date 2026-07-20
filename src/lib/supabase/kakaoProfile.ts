@@ -26,7 +26,10 @@ export async function fetchMyKakaoProfile(
   return {
     memberId: data.member_id,
     fullName: data.full_name,
-    gender: data.gender,
+    gender:
+      data.gender === "female" || data.gender === "male"
+        ? data.gender
+        : null,
     birthYear: data.birth_year,
     profileComplete: data.profile_complete,
     consentItems: data.consent_items,

@@ -1,12 +1,7 @@
-import type { Metadata } from "next";
+import { AccountDashboard } from "@/components/features/account/AccountDashboard";
+import { BidHistory } from "@/components/features/account/BidHistory";
+import { OrderHistory } from "@/components/features/account/OrderHistory";
+import { AccountSessionPanel } from "@/components/features/account/AccountSessionPanel";
 
-import { AuctionApp } from "@/src/components/AuctionApp";
-
-export const metadata: Metadata = {
-  title: "내 정보 | 나인티 나인 빈티지",
-  robots: { index: false, follow: false, nocache: true },
-};
-
-export default function AccountRoutePage() {
-  return <AuctionApp page="profile" />;
-}
+export const dynamic = "force-dynamic";
+export default function AccountPage() { return <><AccountDashboard /><AccountSessionPanel /><BidHistory /><OrderHistory /></>; }

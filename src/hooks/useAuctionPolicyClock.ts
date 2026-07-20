@@ -43,7 +43,7 @@ export function synchronizeAuctionServerClock(force = false): Promise<void> {
 
   lastServerSyncAttemptMs = localNow;
   const requestedAt = Date.now();
-  serverSyncPromise = import("@/src/lib/supabase/client")
+  serverSyncPromise = import("@/lib/supabase/client")
     .then(({ getSupabaseBrowserClient }) =>
       getSupabaseBrowserClient().rpc("get_auction_server_time"),
     )
@@ -199,3 +199,4 @@ export function useAuctionPolicyMinuteClock(): Date {
     getServerSnapshot,
   );
 }
+

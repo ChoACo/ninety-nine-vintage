@@ -1,4 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  getEntryGateCookieName,
+  verifyEntryPass,
+} from "@/lib/entryGateCookie";
 
 const SKIPPED_PATHS = [
   "/api/security/session",
@@ -86,10 +90,22 @@ export async function proxy(request: NextRequest) {
   if (shouldSkip(request.nextUrl.pathname)) return NextResponse.next();
 
   const ipAddress = getTrustedClientIp(request);
-  if (!ipAddress || !(await isBlockedIp(ipAddress))) {
+  if (ipAddress && (await isBlockedIp(ipAddress))) {
+    return blockedResponse(request);
+  }
+
+  const { pathname, search } = request.nextUrl;
+  if (pathname === "/" || pathname.startsWith("/auth/callback")) {
     return NextResponse.next();
   }
-  return blockedResponse(request);
+  const pass = request.cookies.get(getEntryGateCookieName())?.value;
+  if (await verifyEntryPass(pass)) return NextResponse.next();
+
+  const redirectUrl = request.nextUrl.clone();
+  redirectUrl.pathname = "/";
+  redirectUrl.search = "";
+  redirectUrl.searchParams.set("next", `${pathname}${search}`);
+  return NextResponse.redirect(redirectUrl);
 }
 
 export const config = {

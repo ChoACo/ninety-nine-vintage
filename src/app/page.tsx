@@ -1,5 +1,5 @@
-import { AuctionApp } from "@/src/components/AuctionApp";
+import { EntryGate } from "@/components/layout/EntryGate";
 
-export default function Home() {
-  return <AuctionApp page="home" />;
+export default function EntryPage() {
+  return <EntryGate />;
 }

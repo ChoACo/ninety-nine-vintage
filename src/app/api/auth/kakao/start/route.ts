@@ -5,22 +5,43 @@ import {
   getKakaoOidcConfiguration,
   hashTokenSha256,
   KAKAO_NONCE_COOKIE,
+  KAKAO_RETURN_TO_COOKIE,
   KAKAO_STATE_COOKIE,
   serializeHttpOnlyCookie,
   createAuthCallbackUrl,
 } from "@/src/lib/kakao/oidc";
+
+function safeReturnTo(value: string | null): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "/account";
+  }
+  return value.slice(0, 200);
+}
 
 export async function GET(request: Request) {
   try {
     const configuration = getKakaoOidcConfiguration(request.url);
     const callbackOrigin = new URL(configuration.redirectUri).origin;
     const requestOrigin = new URL(request.url).origin;
+    const returnTo = safeReturnTo(
+      new URL(request.url).searchParams.get("returnTo"),
+    );
 
     // Keep the transient cookies on the same origin that Kakao redirects to.
     if (callbackOrigin !== requestOrigin) {
       return createRedirectResponse(
-        new URL("/api/auth/kakao/start", callbackOrigin),
-        [],
+        new URL(
+          `/api/auth/kakao/start?returnTo=${encodeURIComponent(returnTo)}`,
+          callbackOrigin,
+        ),
+        [
+          serializeHttpOnlyCookie(
+            request.url,
+            KAKAO_RETURN_TO_COOKIE,
+            returnTo,
+            10 * 60,
+          ),
+        ],
         307,
       );
     }
@@ -35,6 +56,12 @@ export async function GET(request: Request) {
     );
 
     return createRedirectResponse(authorizeUrl, [
+      serializeHttpOnlyCookie(
+        request.url,
+        KAKAO_RETURN_TO_COOKIE,
+        returnTo,
+        10 * 60,
+      ),
       serializeHttpOnlyCookie(
         request.url,
         KAKAO_STATE_COOKIE,

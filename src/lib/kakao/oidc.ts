@@ -7,6 +7,7 @@ export const KAKAO_STATE_COOKIE = "dami_kakao_oauth_state";
 export const KAKAO_NONCE_COOKIE = "dami_kakao_oauth_nonce";
 export const KAKAO_ID_TOKEN_COOKIE = "dami_kakao_id_token";
 export const KAKAO_ACCESS_TOKEN_COOKIE = "dami_kakao_access_token";
+export const KAKAO_RETURN_TO_COOKIE = "dami_kakao_return_to";
 
 export interface KakaoOidcConfiguration {
   clientId: string;

@@ -1,12 +1,5 @@
-import type { Metadata } from "next";
+import { ChatPanel } from "@/components/features/chat/ChatPanel";
 
-import { AuctionApp } from "@/src/components/AuctionApp";
+export const dynamic = "force-dynamic";
+export default function ChatPage() { return <div className="space-y-8"><div><p className="eyebrow text-muted">SUPPORT / DIRECT CHAT</p><h1 className="mt-3 text-4xl font-black tracking-[-.08em]">운영자와 상담</h1></div><ChatPanel /></div>; }
 
-export const metadata: Metadata = {
-  title: "채팅 | 나인티 나인 빈티지",
-  robots: { index: false, follow: false, nocache: true },
-};
-
-export default function ChatRoutePage() {
-  return <AuctionApp page="chat" />;
-}

@@ -1,11 +1,5 @@
-import type { Metadata } from "next";
-import { OwnerPrivatePage } from "@/src/components/owner/OwnerPrivatePage";
+import { OwnerDashboard } from "@/components/features/owner/OwnerDashboard";
 
-export const metadata: Metadata = {
-  title: "NINETY-NINE VINTAGE",
-  robots: { index: false, follow: false, nocache: true },
-};
+export const dynamic = "force-dynamic";
 
-export default function OwnerPage() {
-  return <OwnerPrivatePage />;
-}
+export default function OwnerPage() { return <OwnerDashboard />; }

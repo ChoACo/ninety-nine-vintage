@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "./database.types";
@@ -46,4 +48,21 @@ export function createSupabaseServerClients(): {
       auth: serverAuthOptions,
     }),
   };
+}
+
+export function createSupabaseUserClient(
+  accessToken: string,
+): SupabaseClient<Database> {
+  const { url, publishableKey } = getServerConfiguration();
+  return createClient<Database>(url, publishableKey, {
+    auth: serverAuthOptions,
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+  });
+}
+
+export async function requireSupabaseUser(accessToken: string) {
+  const { verifier } = createSupabaseServerClients();
+  const { data, error } = await verifier.auth.getUser(accessToken);
+  if (error || !data.user) throw new Error("unauthorized");
+  return data.user;
 }

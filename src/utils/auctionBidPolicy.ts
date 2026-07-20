@@ -1,5 +1,3 @@
-import type { AuctionPost } from "@/src/types/auction";
-
 export const AUCTION_TIME_ZONE = "Asia/Seoul";
 export const NEW_BID_CUTOFF_SECONDS = 20 * 60 * 60 + 56 * 60;
 export const AUCTION_CLOSE_SECONDS = 21 * 60 * 60;
@@ -40,16 +38,17 @@ export interface AuctionBidDecision {
   message: string;
 }
 
+export interface AuctionPolicyPost {
+  status: "pending" | "active" | "closed";
+  bidHistory: readonly { bidderName: string }[];
+  bidLockedAt?: string | null;
+  closesAt: string;
+  antiSnipingBaseClosesAt?: string | null;
+  antiSnipingExtensionCount?: number;
+}
+
 export interface AuctionBidPolicyInput {
-  post: Pick<
-    AuctionPost,
-    | "status"
-    | "bidHistory"
-    | "bidLockedAt"
-    | "closesAt"
-    | "antiSnipingBaseClosesAt"
-    | "antiSnipingExtensionCount"
-  >;
+  post: AuctionPolicyPost;
   currentUserName: string;
   now?: Date | string | number;
 }
@@ -121,7 +120,7 @@ function normalizeIdentity(name: string): string {
  */
 export function isAntiSnipingOvertime(
   post: Pick<
-    AuctionPost,
+    AuctionPolicyPost,
     "closesAt" | "antiSnipingBaseClosesAt" | "antiSnipingExtensionCount"
   >,
   now: Date | string | number = new Date(),

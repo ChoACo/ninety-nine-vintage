@@ -1,11 +1,5 @@
-import type { Metadata } from "next";
+import { Suspense } from "react";
+import { AuctionFeedGrid } from "@/components/features/auction/AuctionFeedGrid";
+import { AuctionFilterSidebar } from "@/components/features/auction/AuctionFilterSidebar";
 
-import { AuctionApp } from "@/src/components/AuctionApp";
-
-export const metadata: Metadata = {
-  title: "경매 피드 | 나인티 나인 빈티지",
-};
-
-export default function FeedPage() {
-  return <AuctionApp page="feed" />;
-}
+export default function FeedPage() { return <div className="flex flex-col items-stretch gap-8 flex-row items-start gap-10"><AuctionFilterSidebar saleType="auction" /><Suspense fallback={<div className="min-w-0 flex-1" />}><AuctionFeedGrid className="min-w-0 flex-1" saleType="auction" title="LIVE DROP" /></Suspense></div>; }

@@ -17,7 +17,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "next build && node --test tests/auction-lifecycle.test.mjs tests/auction-overview-sidebar.test.mjs tests/auction-policy-clock.test.mjs tests/auction-sidebar-and-bidder-transparency.test.mjs tests/batch-auction.test.mjs tests/chat-mobile-navigation.test.mjs tests/chat-premium-ui.test.mjs tests/commercial-ui.test.mjs tests/feed-catalog-performance.test.mjs tests/fixed-price-shop.test.mjs tests/fixed-price-products.test.mjs tests/guest-online-presence.test.mjs tests/kakao-oidc.test.mjs tests/live-auction-revenue-defense.test.mjs tests/manual-bank-transfer.test.mjs tests/mobile-native-ui.test.mjs tests/owner-access.test.mjs tests/owner-control-plane-ui.test.mjs tests/photo-gallery-lightbox.test.mjs tests/portone-payment.test.mjs tests/product-image-compression.test.mjs tests/rendered-html.test.mjs tests/responsive-shell.test.mjs tests/route-splitting.test.mjs tests/security-audit.test.mjs tests/shipping-excel.test.mjs tests/sold-archive.test.mjs tests/sold-auction-feed.test.mjs",
+    "test": "node --test tests/core/*.test.mjs",
+    "verify:integrations": "node scripts/verify-integrations.mjs",
     "lint": "eslint .",
     "db:generate": "drizzle-kit generate"
   },
@@ -25,11 +26,16 @@
     "@portone/browser-sdk": "0.1.9",
     "@portone/server-sdk": "0.19.0",
     "@supabase/supabase-js": "2.110.6",
+    "clsx": "2.1.1",
     "drizzle-orm": "0.45.2",
     "exceljs": "4.4.0",
+    "lucide-react": "1.25.0",
     "next": "16.2.6",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "server-only": "0.0.1",
+    "tailwind-merge": "3.6.0",
+    "zustand": "5.0.14"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.2.4",

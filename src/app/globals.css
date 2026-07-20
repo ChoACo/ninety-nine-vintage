@@ -1,784 +1,129 @@
 @import "tailwindcss";
+@config "../../tailwind.config.ts";
 
-:root {
-  --background: #ffffff;
-  --foreground: #09090b;
-  --coral: #a54a3c;
-  --cream: #ffffff;
-  --sky: #d4d4d8;
-  --surface: #ffffff;
-  --surface-raised: #ffffff;
-  --surface-muted: #f4f4f5;
-  --surface-glass: rgba(255, 255, 255, 0.95);
-  --input-surface: #ffffff;
-  --text-strong: #09090b;
-  --text-muted: #71717a;
-  --border: #e4e4e7;
-  --border-strong: #a1a1aa;
-  --accent: #09090b;
-  --accent-hover: #18181b;
-  --accent-contrast: #ffffff;
-  --accent-text: #852f25;
-  --accent-surface: #f1e3df;
-  --info-surface: #e7ebe9;
-  --info-text: #34423e;
-  --info-border: #c9cfcc;
-  --success-surface: #e2ebe5;
-  --success-text: #28563d;
-  --warning-surface: #f2e8d4;
-  --warning-text: #755018;
-  --danger-surface: #f3dfdc;
-  --danger-text: #9b302a;
-  --app-gradient: linear-gradient(180deg, #ffffff 0%, #fafafa 55%, #f4f4f5 100%);
-  --coral-glow: rgba(133, 47, 37, 0.06);
-  --sky-glow: rgba(38, 52, 48, 0.05);
-  --header-shadow: 0 10px 32px rgba(9, 9, 11, 0.07);
-  --panel-shadow: 0 18px 48px rgba(9, 9, 11, 0.08);
-  --shadow-hover: 0 22px 54px rgba(9, 9, 11, 0.13);
-  --focus-ring: #8f3b30;
-  --live-surface: #181817;
-  --live-foreground: #fafafa;
-  --live-muted: #aaa69d;
-  --live-border: rgba(255, 255, 255, 0.14);
-  --urgency-soon: #d77a28;
-  --urgency-critical: #e64b42;
-  color-scheme: light;
-}
-
-:root[data-theme="dark"] {
-  --background: #0d0d0d;
-  --foreground: #e9e6df;
-  --coral: #c36556;
-  --cream: #171716;
-  --sky: #7e8985;
-  --surface: #171716;
-  --surface-raised: #20201f;
-  --surface-muted: #121211;
-  --surface-glass: rgba(23, 23, 22, 0.93);
-  --input-surface: #222220;
-  --text-strong: #faf7ef;
-  --text-muted: #aaa69e;
-  --border: #343431;
-  --border-strong: #54514c;
-  --accent: #f0ede5;
-  --accent-hover: #ffffff;
-  --accent-contrast: #111110;
-  --accent-text: #e89a8d;
-  --accent-surface: #352321;
-  --info-surface: #1b2422;
-  --info-text: #a9bdb6;
-  --info-border: #394a45;
-  --success-surface: #1a2a21;
-  --success-text: #9bc8ad;
-  --warning-surface: #302719;
-  --warning-text: #e2b96f;
-  --danger-surface: #34201f;
-  --danger-text: #f2948d;
-  --app-gradient: linear-gradient(180deg, #111110 0%, #0d0d0d 58%, #10100f 100%);
-  --coral-glow: rgba(195, 101, 86, 0.08);
-  --sky-glow: rgba(126, 137, 133, 0.06);
-  --header-shadow: 0 12px 38px rgba(0, 0, 0, 0.34);
-  --panel-shadow: 0 22px 58px rgba(0, 0, 0, 0.3);
-  --shadow-hover: 0 26px 64px rgba(0, 0, 0, 0.42);
-  --focus-ring: #d98173;
-  --live-surface: #080808;
-  --live-foreground: #faf7ef;
-  --live-muted: #aaa69e;
-  --live-border: rgba(255, 255, 255, 0.14);
-  --urgency-soon: #ef9b45;
-  --urgency-critical: #ff6259;
-  color-scheme: dark;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-raised);
-  --color-surface-muted: var(--surface-muted);
-  --color-text-strong: var(--text-strong);
-  --color-text-muted: var(--text-muted);
-  --color-theme-border: var(--border);
-  --color-theme-accent: var(--accent);
-  --font-sans: "Pretendard Variable", Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
-  --font-mono: "SFMono-Regular", "Roboto Mono", "Cascadia Code", Consolas, "Liberation Mono", monospace;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-html {
-  min-width: 1200px;
-  scroll-behavior: smooth;
-  background: var(--background);
-  font-size: 16px;
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
-
-body {
-  min-width: 1200px;
-  min-height: 100vh;
-  min-height: 100dvh;
-  margin: 0;
-  background: var(--background);
-  color: var(--foreground);
-  font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", Arial, sans-serif;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  line-height: 1.55;
-  overscroll-behavior-y: none;
-}
-
-.theme-app-shell {
-  background: var(--app-gradient);
-  color: var(--foreground);
-}
-
-/* The v2 desktop commerce system intentionally lives beside legacy utility
-   classes while routes are migrated. It is token-only: commerce modules do
-   not own credentials, data transport, or authorization state. */
-.nn-site {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--surface-muted) 58%, transparent) 1px, transparent 1px) 0 0 / 96px 96px,
-    var(--background);
-}
-
-.nn-page::before {
-  position: fixed;
-  inset: 9rem 0 auto;
-  z-index: -1;
-  height: 22rem;
-  content: "";
-  pointer-events: none;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-muted) 68%, transparent), transparent);
-}
-
-.nn-ribbon {
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-.nn-header {
-  box-shadow: 0 8px 28px color-mix(in srgb, var(--text-strong) 5%, transparent);
-}
-
-.nn-kicker {
-  font-size: 0.625rem;
-  font-weight: 900;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.nn-display {
-  font-weight: 900;
-  letter-spacing: -0.075em;
-  line-height: 0.94;
-  color: var(--text-strong);
-}
-
-.nn-surface {
-  border: 1px solid var(--border);
-  background: var(--surface-raised);
-}
-
-.nn-surface:hover {
-  border-color: var(--border-strong);
-}
-
-.nn-data-label {
-  font-family: "SFMono-Regular", "Roboto Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 0.625rem;
-  font-weight: 800;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.nn-page-title {
-  font-size: clamp(3rem, 5vw, 5.8rem);
-  font-weight: 900;
-  letter-spacing: -0.085em;
-  line-height: 0.88;
-  color: var(--text-strong);
-}
-
-.nn-action {
-  display: inline-flex;
-  min-height: 3rem;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  border: 1px solid var(--text-strong);
-  background: var(--text-strong);
-  padding: 0.65rem 1rem;
-  font-size: 0.75rem;
-  font-weight: 900;
-  letter-spacing: 0.02em;
-  color: var(--surface);
-  transition: transform 180ms ease-out, box-shadow 180ms ease-out, background 180ms ease-out;
-}
-
-.nn-action:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 20px color-mix(in srgb, var(--text-strong) 18%, transparent);
-}
-
-.nn-action:active {
-  transform: translateY(0) scale(0.98);
-}
-
-.nn-action-secondary {
-  border-color: var(--border-strong);
-  background: transparent;
-  color: var(--text-strong);
-}
-
-.theme-coral-glow {
-  background: var(--coral-glow);
-}
-
-.theme-sky-glow {
-  background: var(--sky-glow);
-}
-
-.theme-surface-glass {
-  border-color: var(--border);
-  background: var(--surface-glass);
-  box-shadow: var(--header-shadow);
-}
-
-.theme-panel {
-  border-color: var(--border);
-  background: var(--surface);
-  box-shadow: var(--panel-shadow);
-}
-
-/* High-end commerce primitives shared by route-level workspaces. */
-.commerce-numeric {
-  font-family: "SFMono-Regular", "Roboto Mono", "Cascadia Code", Consolas, monospace;
-  font-variant-numeric: tabular-nums lining-nums;
-  letter-spacing: -0.035em;
-}
-
-.commerce-card {
-  border: 1px solid var(--border);
-  border-radius: 0.875rem;
-  background: var(--surface);
-  box-shadow: var(--panel-shadow);
-  transition:
-    transform 200ms ease-out,
-    border-color 200ms ease-out,
-    box-shadow 200ms ease-out;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .commerce-card:hover {
-    border-color: var(--border-strong);
-    box-shadow: var(--shadow-hover);
-    transform: translateY(-2px);
-  }
-}
-
-.commerce-skeleton {
-  position: relative;
-  overflow: hidden;
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--surface-muted) 84%, var(--surface));
-  color: transparent;
-  user-select: none;
-}
-
-.commerce-skeleton::after {
-  position: absolute;
-  inset: 0;
-  content: "";
-  background: linear-gradient(
-    100deg,
-    transparent 12%,
-    color-mix(in srgb, var(--surface-raised) 76%, transparent) 48%,
-    transparent 84%
-  );
-  transform: translateX(-100%);
-  animation: commerce-shimmer 1.45s ease-in-out infinite;
-}
-
-.commerce-empty-state {
-  display: grid;
-  min-height: 12rem;
-  place-items: center;
-  gap: 0.75rem;
-  border: 1px dashed var(--border-strong);
-  border-radius: 0.875rem;
-  padding: clamp(2rem, 7vw, 4rem) 1.25rem;
-  background: color-mix(in srgb, var(--surface) 88%, var(--surface-muted));
-  color: var(--text-muted);
-  text-align: center;
-}
-
-.commerce-empty-icon {
-  display: grid;
-  width: 2.75rem;
-  height: 2.75rem;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--surface-raised);
-  color: var(--text-strong);
-  box-shadow: 0 8px 22px rgba(24, 24, 22, 0.08);
-}
-
-.auction-urgency-soon {
-  color: var(--urgency-soon);
-}
-
-.auction-urgency-critical {
-  color: var(--urgency-critical);
-  animation: urgency-breathe 1.35s ease-in-out infinite;
-}
-
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
-
-input,
-textarea,
-select {
-  color-scheme: inherit;
-}
-
-button,
-[role="button"] {
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-
-img,
-video {
-  max-width: 100%;
-}
-
-::selection {
-  background: color-mix(in srgb, var(--accent) 42%, var(--surface));
-  color: var(--text-strong);
-}
-
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--surface-muted);
-}
-
-::-webkit-scrollbar-thumb {
-  border: 3px solid var(--surface-muted);
-  border-radius: 999px;
-  background: var(--border-strong);
-}
-
-:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--focus-ring) 72%, transparent);
-  outline-offset: 3px;
-}
-
-/*
- * Legacy palette bridge
- *
- * The application predates semantic color tokens and still contains many
- * warm off-white utility colors. These selectors keep every existing page,
- * portal and form readable in dark mode while components are progressively
- * migrated to the tokens above. Brand-yellow Kakao controls and gallery
- * images are intentionally not transformed.
- */
-:root[data-theme="dark"] :where(
-  [class~="bg-white"],
-  [class~="bg-white/45"],
-  [class~="bg-white/55"],
-  [class~="bg-white/60"],
-  [class~="bg-white/65"],
-  [class~="bg-white/70"],
-  [class~="bg-white/75"],
-  [class~="bg-white/80"],
-  [class~="bg-white/85"],
-  [class~="bg-white/90"],
-  [class*="bg-[#fff"],
-  [class*="bg-[#ffe"],
-  [class*="bg-[#faf"],
-  [class*="bg-[#f9"],
-  [class*="bg-[#f8"],
-  [class*="bg-[#f7"],
-  [class*="bg-[#f6"],
-  [class*="bg-[#f5"],
-  [class*="bg-[#f4e"],
-  [class*="bg-[#f3e"],
-  [class*="bg-[#f2e"],
-  [class*="bg-[#f1e"],
-  [class*="bg-[#eee"],
-  [class*="bg-[#ece"],
-  [class*="bg-[#eadf"]
-) {
-  background-color: var(--surface-raised) !important;
-}
-
-:root[data-theme="dark"] :where(
-  [class*="bg-[#ffe2"],
-  [class*="bg-[#ffe3"],
-  [class*="bg-[#ffe5"],
-  [class*="bg-[#ffe7"],
-  [class*="bg-[#ffec"],
-  [class*="bg-[#fff0"],
-  [class*="bg-[#fff1"],
-  [class*="bg-[#fff2"],
-  [class*="bg-[#fff3e"],
-  [class*="bg-[#fff4"]
-) {
-  background-color: var(--accent-surface) !important;
-}
-
-:root[data-theme="dark"] :where(
-  [class*="bg-[#dcebed"],
-  [class*="bg-[#deeff4"],
-  [class*="bg-[#e4f0f3"],
-  [class*="bg-[#e5f1f4"],
-  [class*="bg-[#e6f3f7"],
-  [class*="bg-[#e7f3f5"],
-  [class*="bg-[#eaf6fa"],
-  [class*="bg-[#edf6f7"],
-  [class*="bg-[#edf7f9"],
-  [class*="bg-[#edf7fa"],
-  [class*="bg-[#eef7f8"],
-  [class*="bg-[#eef8fa"],
-  [class*="bg-[#f2f9fa"],
-  [class*="bg-[#f4fafb"],
-  [class*="bg-[#f4fbfc"]
-) {
-  background-color: var(--info-surface) !important;
-}
-
-:root[data-theme="dark"] :where(
-  [class*="bg-[#dff1e8"],
-  [class*="bg-[#e1f3e6"],
-  [class*="bg-[#e3f6ed"],
-  [class*="bg-[#e4f1e8"],
-  [class*="bg-[#e4f2e9"],
-  [class*="bg-[#e5f4eb"],
-  [class*="bg-[#e7f5eb"],
-  [class*="bg-[#e8f5ee"],
-  [class*="bg-[#e9f8ef"],
-  [class*="bg-[#eaf5ed"],
-  [class*="bg-[#edf8f1"],
-  [class*="bg-[#f3faf4"],
-  [class*="bg-[#f3faf5"],
-  [class*="bg-[#f6fbf7"]
-) {
-  background-color: var(--success-surface) !important;
-}
-
-:root[data-theme="dark"] :where(
-  [class*="bg-[#fff3dc"],
-  [class*="bg-[#fff6df"],
-  [class*="bg-[#fff7df"],
-  [class*="bg-[#fff8df"],
-  [class*="bg-[#fff8e8"]
-) {
-  background-color: var(--warning-surface) !important;
-}
-
-/* Kakao yellow is a fixed brand color in both themes. */
-:root[data-theme="dark"] [class~="bg-[#fee500]"] {
-  background-color: #fee500 !important;
-  color: #191919 !important;
-}
-
-:root[data-theme="dark"] [class~="bg-[#fee500]"]:hover {
-  background-color: #f5dc00 !important;
-}
-
-:root[data-theme="dark"] :where(
-  [class*="text-[#2"],
-  [class*="text-[#3"],
-  [class*="text-[#4"]
-) {
-  color: var(--text-strong) !important;
-}
-
-:root[data-theme="dark"] :where(
-  [class*="text-[#5"],
-  [class*="text-[#6"],
-  [class*="text-[#7"],
-  [class*="text-[#8"],
-  [class*="text-[#9"]
-) {
-  color: var(--text-muted) !important;
-}
-
-:root[data-theme="dark"] :where(
-  [class*="text-[#a"],
-  [class*="text-[#b"],
-  [class*="text-[#c"]
-) {
-  color: var(--accent-text) !important;
-}
-
-:root[data-theme="dark"] :where(
-  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
-  textarea,
-  select
-) {
-  border-color: var(--border-strong) !important;
-  background-color: var(--input-surface) !important;
-  color: var(--text-strong) !important;
-}
-
-:root[data-theme="dark"] :where(input, textarea)::placeholder {
-  color: #a99487 !important;
-  opacity: 1;
-}
-
-:root[data-theme="dark"] input[type="file"]::file-selector-button {
-  border: 1px solid var(--border);
-  background: var(--surface-raised);
-  color: var(--text-strong);
-}
-
-:root[data-theme="dark"] option {
-  background: var(--input-surface);
-  color: var(--text-strong);
-}
-
-@media (max-width: 420px) {
-  html {
-    font-size: 15px;
-  }
-
-  input,
-  textarea,
-  select {
-    /* iOS가 작은 폼 글자를 확대하면서 레이아웃을 흔드는 현상을 막습니다. */
-    font-size: 16px;
-  }
-}
-
-/*
- * Responsive application shell
- *
- * Feed, account, chat and operator workspaces use separate route-level shells.
- * The same compact responsive system adapts each route from 320px phones to
- * foldables, tablets and small laptops without maintaining a duplicate app.
- */
-.app-primary-navigation {
-  bottom: max(0.5rem, env(safe-area-inset-bottom));
-}
-
-@supports (content-visibility: auto) {
-  .render-lazy {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 680px;
-  }
-}
-
-@media (max-width: 767px) {
-  .theme-app-shell {
-    background: linear-gradient(180deg, var(--background) 0%, var(--surface-muted) 100%);
-  }
-
-  .theme-coral-glow,
-  .theme-sky-glow {
-    display: none;
-  }
-
-  .theme-surface-glass {
-    background: color-mix(in srgb, var(--surface) 96%, transparent);
-    box-shadow: 0 8px 24px rgba(79, 57, 42, 0.08);
-  }
-
-  .theme-panel {
-    box-shadow: 0 10px 28px rgba(79, 57, 42, 0.08);
-  }
-
-  [class*="backdrop-blur"] {
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
-  }
-
-  main {
-    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
-  }
-
-  main article {
-    content-visibility: auto;
-    contain-intrinsic-size: 1px 640px;
-  }
-}
-
-@media (hover: none), (pointer: coarse) {
-  button,
-  a,
-  [role="button"] {
-    transition-duration: 100ms !important;
-  }
-}
-
-@media (min-width: 768px) and (max-width: 1180px) {
-  /* 폴드 펼침 화면, 태블릿, 작은 노트북에서 지나치게 넓은 UI를 제한합니다. */
-  body {
-    line-height: 1.58;
-  }
-
-  .theme-panel {
-    box-shadow: 0 12px 34px rgba(79, 57, 42, 0.085);
-  }
-}
-
-@media (max-width: 340px) {
-  /* 320px급 소형 iPhone/Android에서도 하단 메뉴 네 칸을 안전하게 유지합니다. */
-  .app-primary-navigation {
-    inset-inline: 0.35rem;
-    padding-inline: 0.25rem;
-  }
-}
-
-@media (prefers-reduced-data: reduce) {
-  .theme-coral-glow,
-  .theme-sky-glow {
-    display: none;
-  }
-
-  .theme-panel,
-  .theme-surface-glass {
-    box-shadow: none;
-  }
-}
-
-@media (prefers-reduced-transparency: reduce) {
-  .theme-surface-glass {
-    background: var(--surface);
-    backdrop-filter: none !important;
-  }
-}
-
-/* Editorial catalog language shared by every route. Functional components
-   continue to own their state and handlers; these rules only unify the shell,
-   dense grids, borders, and typography imported from the new prototype. */
-.editorial-site {
-  font-family: var(--font-sans);
-  letter-spacing: -0.012em;
-}
-
-.editorial-site .theme-panel,
-.editorial-site .theme-surface-glass {
-  border-radius: 0.18rem;
-  box-shadow: 0 1px 2px rgba(9, 9, 11, 0.04);
-}
-
-.editorial-site .theme-panel:hover,
-.editorial-site .theme-surface-glass:hover {
-  border-color: var(--border-strong);
-}
-
-.editorial-site .editorial-header a,
-.editorial-site .editorial-header button {
-  -webkit-tap-highlight-color: transparent;
-}
-
-.editorial-site .render-lazy {
-  border-radius: 0.12rem;
-}
-
-.editorial-site .commerce-skeleton {
-  background-color: var(--surface-muted);
-}
-
-.editorial-site .editorial-content {
-  min-height: calc(100vh - 7rem);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .editorial-site .theme-panel,
-  :root:not([data-theme="light"]) .editorial-site .theme-surface-glass {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
-  }
-}
-
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes soft-pulse {
-  0%,
-  100% {
-    opacity: 0.72;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.06);
-  }
-}
-
-@keyframes commerce-shimmer {
-  to {
-    transform: translateX(100%);
-  }
-}
-
-@keyframes urgency-breathe {
-  0%,
-  100% {
-    opacity: 0.78;
-    text-shadow: 0 0 0 color-mix(in srgb, var(--urgency-critical) 0%, transparent);
-  }
-  50% {
-    opacity: 1;
-    text-shadow: 0 0 16px color-mix(in srgb, var(--urgency-critical) 34%, transparent);
-  }
-}
-
-@keyframes anti-sniping-pulse {
-  0%,
-  100% {
-    opacity: 0.9;
-    box-shadow: 0 0 14px rgba(249, 115, 22, 0.34);
-  }
-  50% {
-    opacity: 1;
-    box-shadow: 0 0 24px rgba(239, 68, 68, 0.56);
-  }
-}
-
-.animate-fade-in-up {
-  animation: fade-in-up 0.45s ease both;
-}
-
-.animate-soft-pulse {
-  animation: soft-pulse 2.4s ease-in-out infinite;
-}
-
-.anti-sniping-pulse {
-  animation: anti-sniping-pulse 1.35s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
+@layer base {
   *,
   *::before,
   *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    box-sizing: border-box;
+  }
+
+  html {
+    min-width: 320px;
+    background-color: #fbfaf7;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: #fbfaf7;
+    color: #09090b;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection { background: #09090b; color: #ffffff; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  figure,
+  blockquote,
+  dl,
+  dd {
+    margin: 0;
+  }
+
+  ul,
+  ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: #fbfaf7; }
+  ::-webkit-scrollbar-thumb { background: #d4d0c8; border: 3px solid #fbfaf7; border-radius: 999px; }
+
+  img,
+  svg,
+  video,
+  canvas {
+    display: block;
+    max-width: 100%;
+  }
+}
+
+@layer components {
+  .eyebrow { font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+  .focus-ring:focus-visible { outline: 2px solid #09090b; outline-offset: 3px; }
+}
+
+/* Legacy console rows are intentionally compact on desktop, but become stacked
+   work cards on narrow screens. Data tables keep their own horizontal scroller. */
+@media (max-width: 767px) {
+  form.grid-cols-2 { grid-template-columns: minmax(0, 1fr) !important; }
+  form.grid-cols-2 > .col-span-2 { grid-column: auto !important; }
+  form[class~="md:grid-cols-2"] { grid-template-columns: minmax(0, 1fr) !important; }
+  form[class~="md:grid-cols-2"] > [class~="md:col-span-2"] { grid-column: auto !important; }
+  form[class~="md:grid-cols-2"] > div[class~="flex"][class~="gap-2"] > input[class~="flex-1"] { min-width: 0; }
+  form[class~="md:grid-cols-2"] > div[class~="flex"][class~="gap-2"] > input[class~="w-40"] { width: 40%; min-width: 0; }
+  form[class~="md:grid-cols-2"] > div[class~="flex"][class~="gap-2"] > select { width: 40%; min-width: 0; }
+  [class~="grid-cols-4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  [class~="grid-cols-3"]:not(.md\:grid-cols-3) { grid-template-columns: minmax(0, 1fr) !important; }
+  [class~="grid-cols-[1fr_360px]"],
+  [class~="grid-cols-[300px_1fr]"],
+  [class~="grid-cols-[1.25fr_.75fr]"] { grid-template-columns: minmax(0, 1fr) !important; }
+  [class~="grid-cols-[300px_1fr]"] > aside { border-right-width: 0 !important; border-bottom: 1px solid #d4d0c8; }
+}
+
+@media (max-width: 479px) {
+  [class~="grid-cols-4"],
+  [class~="grid-cols-3"]:not(.md\:grid-cols-3) { grid-template-columns: minmax(0, 1fr) !important; }
+}
+
+@media (max-width: 1023px) {
+  .mobile-detail-cta {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(4rem + env(safe-area-inset-bottom));
+    z-index: 20;
+    margin-inline: 0;
+    padding: 0.5rem max(0.5rem, env(safe-area-inset-right)) 0.5rem max(0.5rem, env(safe-area-inset-left));
+    background: rgb(255 255 255 / 0.96);
+    box-shadow: 0 -8px 20px rgb(255 255 255 / 0.8);
   }
 }

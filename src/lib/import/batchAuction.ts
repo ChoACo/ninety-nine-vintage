@@ -1,4 +1,4 @@
-import type { NewAuctionDraft } from "@/src/components/feed/NewAuctionModal";
+import type { NewAuctionDraft } from "@/src/core/contracts/productDraft";
 import type { ProductSaleType } from "@/src/types/auction";
 import { isSupportedProductImageMimeType } from "@/src/lib/supabase/productImagePolicy";
 

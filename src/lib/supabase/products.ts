@@ -1,4 +1,4 @@
-import type { NewAuctionDraft } from "@/src/components/feed";
+import type { NewAuctionDraft } from "@/src/core/contracts/productDraft";
 import type { BatchAuctionProgressReporter } from "@/src/lib/import/batchAuction";
 import type {
   AuctionPost,

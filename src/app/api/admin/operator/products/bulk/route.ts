@@ -1,5 +1,6 @@
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
 import type { Database, Json } from "@/lib/supabase/database.types";
+import { normalizeProductBrand } from "@/lib/catalog/brand";
 
 type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
 
@@ -17,6 +18,7 @@ function normalizeProduct(body: Record<string, unknown>, userId: string): Produc
   const title = text(body.title);
   const description = text(body.description);
   const storeId = text(body.storeId);
+  const normalizedBrand = normalizeProductBrand(body.brand);
   const saleType = body.saleType === "fixed" ? "fixed" : "auction";
   const imageUrls = images(body.imageUrls);
   const startingPrice = Number(body.startingPrice ?? body.price);
@@ -25,6 +27,7 @@ function normalizeProduct(body: Record<string, unknown>, userId: string): Produc
     !title ||
     !description ||
     !storeId ||
+    !normalizedBrand ||
     imageUrls.length === 0 ||
     !Number.isSafeInteger(startingPrice) ||
     startingPrice <= 0 ||
@@ -38,6 +41,9 @@ function normalizeProduct(body: Record<string, unknown>, userId: string): Produc
     title,
     description,
     category: text(body.category, "구제 의류"),
+    brand: normalizedBrand.brand,
+    brand_slug: normalizedBrand.brandSlug,
+    brand_source: "explicit",
     store_id: storeId,
     sale_type: saleType,
     fixed_price: fixedPrice,

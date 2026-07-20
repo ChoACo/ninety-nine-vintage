@@ -216,6 +216,11 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
     if (isEntryReadOnly()) throw new Error("현재 사이트 연결이 불안정해 읽기 전용 모드입니다.");
     return addBid(amount);
   };
+  const measurementChips = [
+    ["어깨", item.measurements.shoulder],
+    ["가슴", item.measurements.chest],
+    ["총장", item.measurements.length],
+  ].filter((measurement): measurement is [string, number] => typeof measurement[1] === "number" && measurement[1] > 0);
 
   return (
     <aside className="z-30 self-start border-t-2 border-zinc-950 bg-white pb-28 sticky top-[100px] col-span-5 pb-0">
@@ -229,11 +234,7 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
           </div>
           <p className="text-xs text-zinc-500">{item.saleType === "fixed" ? "즉시 구매 가능" : `입찰 ${item.bidCount}건`}</p>
         </div>
-        <div className="mt-5 flex flex-wrap gap-2 text-[11px] text-zinc-600">
-          <span className="border border-zinc-200 px-3 py-2">어깨 {item.measurements.shoulder > 0 ? item.measurements.shoulder : "미등록"}</span>
-          <span className="border border-zinc-200 px-3 py-2">가슴 {item.measurements.chest > 0 ? item.measurements.chest : "미등록"}</span>
-          <span className="border border-zinc-200 px-3 py-2">총장 {item.measurements.length > 0 ? item.measurements.length : "미등록"}</span>
-        </div>
+        {measurementChips.length > 0 && <div className="mt-5 flex flex-wrap gap-2 text-[11px] text-zinc-600">{measurementChips.map(([label, value]) => <span className="border border-zinc-200 px-3 py-2" key={label}>{label} {value} cm</span>)}</div>}
       </div>
 
       {LIVE_AUCTION_ENABLED && item.saleType === "auction" && <div className="my-6 border border-zinc-950 bg-zinc-950 px-5 py-5 text-white">
@@ -260,7 +261,7 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
         </div>
       </div>}
 
-      {item.saleType === "auction" ? LIVE_AUCTION_ENABLED ? <button className="mobile-detail-cta mt-6 flex h-14 w-full items-center justify-center gap-2 bg-zinc-950 text-sm font-bold text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300" disabled={readOnly} onClick={() => setModalOpen(true)} type="button"><LockKeyhole size={15} /> {readOnly ? "읽기 전용" : "실시간 경매 입찰하기"}</button> : <div className="mt-6 border border-zinc-200 bg-zinc-50 p-4 text-xs leading-5 text-zinc-600">라이브 경매는 현재 점검 중입니다. 바로 구매 상품은 정상적으로 이용할 수 있습니다.</div> : <div className="mobile-detail-cta mt-6 grid grid-cols-2 gap-2"><button className="flex h-14 items-center justify-center gap-2 border border-zinc-950 text-sm font-bold text-zinc-950 disabled:opacity-50" disabled={buying || readOnly} onClick={() => void addFixedToCart()} type="button"><ShoppingBag size={15} /> {readOnly ? "읽기 전용" : "장바구니"}</button><button className="flex h-14 items-center justify-center bg-zinc-950 text-sm font-bold text-white disabled:opacity-50" disabled={buying || readOnly} onClick={() => void buyNow()} type="button">{readOnly ? "읽기 전용" : buying ? "장바구니 준비 중..." : "바로 구매"}</button></div>}
+      {item.saleType === "auction" ? LIVE_AUCTION_ENABLED ? <><button aria-describedby="auction-settlement-summary" className="mobile-detail-cta mt-6 flex h-14 w-full items-center justify-center gap-2 bg-zinc-950 text-sm font-bold text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300" disabled={readOnly} onClick={() => setModalOpen(true)} type="button"><LockKeyhole size={15} /> {readOnly ? "읽기 전용" : "실시간 경매 입찰하기"}</button><p className="mt-3 text-[11px] leading-5 text-zinc-500" id="auction-settlement-summary">낙찰 후 다음 날 11:59까지 결제 · 미결제 시 낙찰 취소·경고 및 차순위 전환</p></> : <div className="mt-6 border border-zinc-200 bg-zinc-50 p-4 text-xs leading-5 text-zinc-600">라이브 경매는 현재 점검 중입니다. 바로 구매 상품은 정상적으로 이용할 수 있습니다.</div> : <div className="mobile-detail-cta mt-6 grid grid-cols-2 gap-2"><button className="flex h-14 items-center justify-center gap-2 border border-zinc-950 text-sm font-bold text-zinc-950 disabled:opacity-50" disabled={buying || readOnly} onClick={() => void addFixedToCart()} type="button"><ShoppingBag size={15} /> {readOnly ? "읽기 전용" : "장바구니"}</button><button className="flex h-14 items-center justify-center bg-zinc-950 text-sm font-bold text-white disabled:opacity-50" disabled={buying || readOnly} onClick={() => void buyNow()} type="button">{readOnly ? "읽기 전용" : buying ? "장바구니 준비 중..." : "바로 구매"}</button></div>}
       {buyNotice && <p aria-live="polite" className="mt-3 text-xs font-bold text-emerald-700">{buyNotice}</p>}
       <button className="mt-2 flex h-12 w-full items-center justify-center gap-2 border border-zinc-200 text-xs font-bold text-zinc-950 transition-colors hover:border-zinc-950 disabled:opacity-50" disabled={readOnly} onClick={() => void updateWishlist()} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} /> {readOnly ? "읽기 전용" : liked ? "찜 해제" : "관심 상품 담기"}</button>
       {LIVE_AUCTION_ENABLED && item.saleType === "auction" && <SettlementActions productId={item.id} readOnly={readOnly} />}

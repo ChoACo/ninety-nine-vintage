@@ -67,6 +67,8 @@ export interface AuctionPost {
   updatedAt?: ISODateString;
   title: string;
   description: string;
+  brand?: string;
+  brandSlug?: string;
   category: string;
   createdAt: ISODateString;
   /** 예약 공개 시각. 기존 데이터는 createdAt을 공개 시각으로 사용합니다. */

@@ -1,6 +1,7 @@
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
 import type { Json } from "@/lib/supabase/database.types";
 import { getCatalogImageUrl } from "@/lib/images";
+import { normalizeProductBrand } from "@/lib/catalog/brand";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
   const title = text(body?.title);
   const description = text(body?.description);
   const category = text(body?.category, "구제 의류");
+  const normalizedBrand = normalizeProductBrand(body?.brand);
   const storeId = text(body?.storeId);
   const saleType = body?.saleType === "fixed" ? "fixed" : "auction";
   const imageUrls = Array.isArray(body?.imageUrls) ? body?.imageUrls.filter((value): value is string => typeof value === "string" && value.startsWith("http")) : [];
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
   const fixedPrice = saleType === "fixed" ? Number(body?.fixedPrice ?? body?.startingPrice) : null;
   const publishAt = text(body?.publishAt, new Date().toISOString());
   const closesAt = text(body?.closesAt, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
-  if (!title || !description || !storeId || imageUrls.length === 0 || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
+  if (!title || !description || !normalizedBrand || !storeId || imageUrls.length === 0 || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
     return commerceJson({ error: "상품 입력값을 확인해 주세요." }, 400);
   }
   const storeQuery = auth.admin.from("stores").select("id, operator_id").eq("id", storeId);
@@ -47,6 +49,9 @@ export async function POST(request: Request) {
     title,
     description,
     category,
+    brand: normalizedBrand.brand,
+    brand_slug: normalizedBrand.brandSlug,
+    brand_source: "explicit",
     store_id: storeId,
     sale_type: saleType,
     fixed_price: fixedPrice,

@@ -1,9 +1,20 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ProductRail } from "@/components/features/catalog/ProductRail";
 import { fetchStoreBySlug, fetchStoreProducts } from "@/services/stores";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const store = await fetchStoreBySlug(slug).catch(() => null);
+  if (!store) return {};
+  const title = `${store.name} | NINETY-NINE VINTAGE`;
+  const description = store.description.slice(0, 160);
+  const url = `/stores/${encodeURIComponent(slug)}`;
+  return { title, description, alternates: { canonical: url }, openGraph: { title, description, url, type: "website" } };
+}
 
 export default async function StorePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

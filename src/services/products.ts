@@ -40,6 +40,8 @@ export interface PublishedProduct {
   title: string;
   description: string;
   category: string;
+  brand: string;
+  brandSlug: string;
   publishAt: string;
   closesAt: string;
   status: ProductRow["status"];
@@ -69,6 +71,8 @@ export function mapPublishedProduct(row: ProductRow): PublishedProduct {
     title: row.title,
     description: row.description,
     category: row.category,
+    brand: row.brand,
+    brandSlug: row.brand_slug,
     publishAt: row.publish_at,
     closesAt: row.closes_at,
     status: row.status,

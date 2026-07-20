@@ -16,6 +16,8 @@ export interface ProductPayload {
   title: string;
   description: string;
   category: string;
+  brand: string;
+  brandSlug: string;
   publishAt: string;
   closesAt: string;
   status: "pending" | "active" | "closed";
@@ -179,7 +181,7 @@ function EnabledAuctionFeedGrid({ className = "", initialProducts, saleType, tit
     id: product.id,
     auctionId: product.id,
     name: product.title,
-    brand: "NINETY-NINE VINTAGE",
+    brand: product.brand,
     category: product.category,
     description: product.description,
     imageUrl: getCatalogImageUrl(product.thumbnailUrls[0] ?? product.imageUrls[0] ?? ""),

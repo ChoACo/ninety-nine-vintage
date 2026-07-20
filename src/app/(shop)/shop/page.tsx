@@ -1,9 +1,11 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { AuctionFeedGrid, type ProductPayload } from "@/components/features/auction/AuctionFeedGrid";
 import { AuctionFilterSidebar } from "@/components/features/auction/AuctionFilterSidebar";
 import { fetchPublishedProducts } from "@/services/products";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "BUY NOW | NINETY-NINE VINTAGE", alternates: { canonical: "/shop" } };
 
 function toPayload(products: Awaited<ReturnType<typeof fetchPublishedProducts>>): ProductPayload[] {
   return products.map((product) => ({
@@ -11,6 +13,8 @@ function toPayload(products: Awaited<ReturnType<typeof fetchPublishedProducts>>)
     title: product.title,
     description: product.description,
     category: product.category,
+    brand: product.brand,
+    brandSlug: product.brandSlug,
     publishAt: product.publishAt,
     closesAt: product.closesAt,
     status: "active",

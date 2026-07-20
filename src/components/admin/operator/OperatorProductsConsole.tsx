@@ -15,6 +15,8 @@ interface Product {
   id: string;
   title: string;
   description: string;
+  brand: string;
+  brand_source: "explicit" | "inferred";
   sale_type: string;
   fixed_price: number | null;
   current_price: number;
@@ -31,6 +33,7 @@ interface Product {
 type FormState = {
   title: string;
   description: string;
+  brand: string;
   category: string;
   storeId: string;
   saleType: "fixed" | "auction";
@@ -46,7 +49,7 @@ type FormState = {
 };
 
 const emptyForm: FormState = {
-  title: "", description: "", category: "구제 의류", storeId: "", saleType: "fixed", price: "", imageUrls: "",
+  title: "", description: "", brand: "", category: "구제 의류", storeId: "", saleType: "fixed", price: "", imageUrls: "",
   sizeLabel: "", conditionGrade: "A", storageClass: "small", status: "pending", bidIncrement: "1000", publishAt: "", closesAt: "",
 };
 
@@ -68,7 +71,7 @@ function parseBulkCsv(value: string) {
   const lines = value.split(/\r?\n/).filter((line) => line.trim());
   if (lines.length < 2) throw new Error("헤더와 상품 행을 함께 입력해 주세요.");
   const headers = parseCsvLine(lines[0]).map((item) => item.trim());
-  if (!headers.includes("title") || !headers.includes("storeId") || !headers.includes("imageUrls")) throw new Error("title, storeId, imageUrls 헤더가 필요합니다.");
+  if (!headers.includes("title") || !headers.includes("brand") || !headers.includes("storeId") || !headers.includes("imageUrls")) throw new Error("title, brand, storeId, imageUrls 헤더가 필요합니다.");
   return lines.slice(1).map((line) => {
     const cells = parseCsvLine(line);
     const row = Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? ""]));
@@ -89,7 +92,7 @@ export function OperatorProductsConsole() {
   const [products, setProducts] = useState<Product[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [bulkText, setBulkText] = useState("title,description,storeId,saleType,startingPrice,imageUrls,sizeLabel,conditionGrade,storageClass\n예시 상품,상세 설명,스토어 UUID,fixed,25900,https://example.com/image.jpg,M,A,small");
+  const [bulkText, setBulkText] = useState("title,brand,description,storeId,saleType,startingPrice,imageUrls,sizeLabel,conditionGrade,storageClass\n예시 상품,Nike,상세 설명,스토어 UUID,fixed,25900,https://example.com/image.jpg,M,A,small");
   const [filter, setFilter] = useState({ search: "", status: "all", saleType: "all" });
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -122,7 +125,7 @@ export function OperatorProductsConsole() {
 
   const visibleProducts = useMemo(() => products.filter((product) => {
     const query = filter.search.trim().toLowerCase();
-    return (!query || product.title.toLowerCase().includes(query) || (product.stores?.name ?? "").toLowerCase().includes(query))
+    return (!query || product.title.toLowerCase().includes(query) || product.brand.toLowerCase().includes(query) || (product.stores?.name ?? "").toLowerCase().includes(query))
       && (filter.status === "all" || product.status === filter.status)
       && (filter.saleType === "all" || product.sale_type === filter.saleType);
   }), [filter, products]);
@@ -136,7 +139,7 @@ export function OperatorProductsConsole() {
     setBusy(true); setNotice("");
     try {
       const body = {
-        title: form.title, description: form.description, category: form.category, storeId: form.storeId, saleType: form.saleType,
+        title: form.title, brand: form.brand, description: form.description, category: form.category, storeId: form.storeId, saleType: form.saleType,
         startingPrice: Number(form.price), fixedPrice: form.saleType === "fixed" ? Number(form.price) : undefined,
         imageUrls: splitImages(form.imageUrls), sizeLabel: form.sizeLabel, conditionGrade: form.conditionGrade,
         storageClass: form.storageClass, status: form.status, bidIncrement: Number(form.bidIncrement), publishAt: form.publishAt || undefined, closesAt: form.closesAt || undefined,
@@ -154,7 +157,7 @@ export function OperatorProductsConsole() {
 
   const edit = (product: Product) => {
     setEditingId(product.id);
-    setForm({ title: product.title, description: product.description ?? "", category: "구제 의류", storeId: product.store_id ?? stores[0]?.id ?? "", saleType: product.sale_type === "fixed" ? "fixed" : "auction", price: String(product.fixed_price ?? product.current_price), imageUrls: product.image_urls?.join("\n") ?? "", sizeLabel: product.size_label ?? "", conditionGrade: product.condition_grade ?? "A", storageClass: product.storage_class === "large" ? "large" : "small", status: ["pending", "active", "closed"].includes(product.status) ? product.status as FormState["status"] : "pending", bidIncrement: "1000", publishAt: "", closesAt: "" });
+    setForm({ title: product.title, brand: product.brand, description: product.description ?? "", category: "구제 의류", storeId: product.store_id ?? stores[0]?.id ?? "", saleType: product.sale_type === "fixed" ? "fixed" : "auction", price: String(product.fixed_price ?? product.current_price), imageUrls: product.image_urls?.join("\n") ?? "", sizeLabel: product.size_label ?? "", conditionGrade: product.condition_grade ?? "A", storageClass: product.storage_class === "large" ? "large" : "small", status: ["pending", "active", "closed"].includes(product.status) ? product.status as FormState["status"] : "pending", bidIncrement: "1000", publishAt: "", closesAt: "" });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -191,9 +194,12 @@ export function OperatorProductsConsole() {
   return <div className="space-y-8">
     <SectionHeading action={<Button className="flex items-center gap-2" disabled={!token} variant="primary" onClick={() => { resetForm(); window.scrollTo({ top: 0, behavior: "smooth" }); }} type="button"><Plus size={15} /> 새 상품</Button>} description="내 숍의 판매글을 등록하고 공개 상태·상품 정보·입찰 방식을 관리합니다." eyebrow="OPERATOR / PRODUCT MANAGEMENT" title="상품 등록·관리" variant="page" />
     {notice && <StatusNotice>{notice}</StatusNotice>}
+    {products.some((product) => product.brand_source === "inferred") && <StatusNotice>제목에서 임시 추론한 브랜드가 있습니다. 해당 상품을 수정 저장하면 확인된 브랜드로 전환됩니다.</StatusNotice>}
+    {products.some((product) => product.brand_source === "inferred") && <section className="border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-bold text-amber-900">브랜드 확인 필요</p><div className="mt-3 flex flex-wrap gap-2">{products.filter((product) => product.brand_source === "inferred").map((product) => <button className="border border-amber-300 bg-paper px-3 py-2 text-left text-[11px] text-amber-900" key={product.id} onClick={() => edit(product)} type="button"><span className="font-bold">{product.brand}</span> · {product.title}</button>)}</div></section>}
     <form className="grid grid-cols-2 gap-3 border border-ink bg-surface p-6" onSubmit={submit}>
       <div className="col-span-2 flex items-center justify-between"><p className="text-sm font-bold">{editingId ? "상품 수정" : "상품 등록"}</p>{editingId && <Button size="compact" variant="ghost" onClick={resetForm} type="button">수정 취소</Button>}</div>
       <TextInput aria-label="상품명" onChange={(event) => update("title", event.target.value)} placeholder="상품명" required value={form.title} />
+      <TextInput aria-label="브랜드" onChange={(event) => update("brand", event.target.value)} placeholder="브랜드" required value={form.brand} />
       <SelectInput aria-label="숍" onChange={(event) => update("storeId", event.target.value)} required value={form.storeId}>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</SelectInput>
       <TextArea aria-label="상품 설명" className="col-span-2 min-h-24" onChange={(event) => update("description", event.target.value)} placeholder="상품 설명" required value={form.description} />
       <TextInput aria-label="카테고리" onChange={(event) => update("category", event.target.value)} placeholder="카테고리" value={form.category} />
@@ -204,7 +210,7 @@ export function OperatorProductsConsole() {
       <div className="flex gap-2"><TextInput aria-label="입찰 단위" min="1" onChange={(event) => update("bidIncrement", event.target.value)} placeholder="입찰 단위" type="number" value={form.bidIncrement} /><SelectInput aria-label="상태" onChange={(event) => update("status", event.target.value)} value={form.status}><option value="pending">공개 대기</option><option value="active">공개</option><option value="closed">마감</option></SelectInput></div>
       <div className="col-span-2 flex gap-2"><Button className="px-5" disabled={busy || !token} variant="primary" type="submit">{editingId ? "수정 저장" : "등록하기"}</Button><Button className="px-5" onClick={resetForm} type="button">초기화</Button></div>
     </form>
-    <section className="border border-line bg-surface p-6"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><Upload size={15} /><div><p className="text-sm font-bold">상품 일괄등록</p><p className="mt-1 text-[11px] text-muted">CSV 헤더: title, description, storeId, saleType, startingPrice, imageUrls. 이미지 URL은 | 로 구분합니다.</p></div></div><button className="flex items-center gap-2 text-xs underline" onClick={downloadTemplate} type="button"><Download size={13} /> 템플릿 저장</button></div><textarea aria-label="일괄등록 CSV" className="mt-4 min-h-32 w-full border border-line bg-paper p-3 font-mono text-[11px]" onChange={(event) => setBulkText(event.target.value)} value={bulkText} /><button className="mt-3 bg-ink px-5 py-3 text-xs font-bold text-paper disabled:opacity-40" disabled={busy || !token} onClick={() => void bulk()} type="button">CSV 일괄등록 실행</button></section>
+    <section className="border border-line bg-surface p-6"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><Upload size={15} /><div><p className="text-sm font-bold">상품 일괄등록</p><p className="mt-1 text-[11px] text-muted">CSV 필수 헤더: title, brand, description, storeId, saleType, startingPrice, imageUrls. 이미지 URL은 | 로 구분합니다.</p></div></div><button className="flex items-center gap-2 text-xs underline" onClick={downloadTemplate} type="button"><Download size={13} /> 템플릿 저장</button></div><textarea aria-label="일괄등록 CSV" className="mt-4 min-h-32 w-full border border-line bg-paper p-3 font-mono text-[11px]" onChange={(event) => setBulkText(event.target.value)} value={bulkText} /><button className="mt-3 bg-ink px-5 py-3 text-xs font-bold text-paper disabled:opacity-40" disabled={busy || !token} onClick={() => void bulk()} type="button">CSV 일괄등록 실행</button></section>
     <div className="flex items-center justify-between text-xs text-muted"><span>{loading ? "상품을 불러오는 중…" : `${visibleProducts.length} / ${products.length} PRODUCTS · LIVE DATABASE`}</span><div className="flex items-center gap-4"><button className="flex items-center gap-2 underline" disabled={loading} onClick={() => void load(token).catch((error) => setNotice(error instanceof Error ? error.message : "새로고침에 실패했습니다."))} type="button"><RefreshCw size={13} /> 새로고침</button></div></div>
     <div className="grid grid-cols-3 gap-3"><input aria-label="상품 검색" className="border border-line bg-paper px-3 py-3 text-xs" onChange={(event) => setFilter({ ...filter, search: event.target.value })} placeholder="상품명·숍 검색" value={filter.search} /><select aria-label="상품 상태 필터" className="border border-line bg-paper px-3 py-3 text-xs" onChange={(event) => setFilter({ ...filter, status: event.target.value })} value={filter.status}><option value="all">전체 상태</option><option value="pending">공개 대기</option><option value="active">공개</option><option value="closed">마감</option></select><select aria-label="판매 방식 필터" className="border border-line bg-paper px-3 py-3 text-xs" onChange={(event) => setFilter({ ...filter, saleType: event.target.value })} value={filter.saleType}><option value="all">전체 판매 방식</option><option value="fixed">즉시구매</option><option value="auction">경매</option></select></div>
     <div className="overflow-x-auto border-y border-line"><table className="w-full min-w-[1060px] text-left text-xs"><thead className="border-b border-line bg-surface text-[10px] uppercase tracking-[.12em] text-muted"><tr><th className="px-4 py-4">상품</th><th className="px-4 py-4">숍</th><th className="px-4 py-4">판매 방식</th><th className="px-4 py-4">가격</th><th className="px-4 py-4">보관</th><th className="px-4 py-4">상태</th><th className="px-4 py-4" /></tr></thead><tbody className="divide-y divide-line">{visibleProducts.map((product) => <tr key={product.id}><td className="px-4 py-4"><div className="flex items-center gap-3"><CatalogImage alt="" className="size-12 object-cover" src={product.image_urls?.[0] ?? ""} /><span className="font-bold">{product.title}</span></div></td><td className="px-4 py-4 text-muted">{product.stores?.name ?? "미지정"}</td><td className="px-4 py-4">{product.sale_type === "fixed" ? "BUY NOW" : "AUCTION"}</td><td className="px-4 py-4 font-mono">{(product.fixed_price ?? product.current_price).toLocaleString("ko-KR")}원</td><td className="px-4 py-4">{product.storage_class === "large" ? "대형 · 7일" : "소형 · 14일"}</td><td className="px-4 py-4"><span className="border border-line px-2 py-1 text-[10px] font-bold">{product.status}</span></td><td className="px-4 py-4 text-right"><div className="flex justify-end gap-3"><button aria-label={`${product.title} 수정`} className="inline-flex items-center gap-1 underline" onClick={() => edit(product)} type="button"><Edit3 size={13} /> 수정</button><button aria-label={`${product.title} 삭제`} className="inline-flex items-center gap-1 text-red-700 underline" disabled={busy} onClick={() => void remove(product)} type="button"><Trash2 size={13} /> 삭제</button>{product.status === "active" && <Link className="underline" href={`/auction/${product.id}`}>보기</Link>}</div></td></tr>)}{visibleProducts.length === 0 && <tr><td className="px-4 py-16 text-center text-muted" colSpan={7}>조건에 맞는 상품이 없습니다.</td></tr>}</tbody></table></div>

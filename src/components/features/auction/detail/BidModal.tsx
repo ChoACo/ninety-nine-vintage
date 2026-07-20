@@ -81,6 +81,7 @@ export function BidModal({ open, currentPrice, onClose, onSubmit }: BidModalProp
               <LockKeyhole size={14} /> {submitting ? "입찰 저장 중..." : "최종 입찰하기"}
             </button>
             <p className="mt-3 text-center text-[10px] text-zinc-400">입찰 확정 후에는 취소 및 변경이 제한됩니다.</p>
+            <p className="mt-1 text-center text-[10px] text-zinc-400">미결제 경고가 누적되면 입찰이 제한될 수 있습니다.</p>
           </div>
         )}
       </div>

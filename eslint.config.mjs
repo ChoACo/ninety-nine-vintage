@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
     // Generated output from vinext, Vercel and Cloudflare tooling.
     ".vercel/**",
     ".vinext/**",
+    ".open-next/**",
     ".wrangler/**",
     "dist/**",
   ]),

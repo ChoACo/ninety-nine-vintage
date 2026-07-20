@@ -1,5 +1,6 @@
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
 import type { Database, Json } from "@/lib/supabase/database.types";
+import { normalizeProductBrand } from "@/lib/catalog/brand";
 
 type ProductUpdate = Database["public"]["Tables"]["products"]["Update"];
 function text(value: unknown) { return typeof value === "string" ? value.trim() : ""; }
@@ -9,6 +10,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { id } = await params; const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   if (!body) return commerceJson({ error: "수정 내용을 확인해 주세요." }, 400);
   const update: ProductUpdate = { updated_by: auth.userId };
+  if (Object.hasOwn(body, "brand")) {
+    const normalizedBrand = normalizeProductBrand(body.brand);
+    if (!normalizedBrand) return commerceJson({ error: "브랜드를 입력해 주세요." }, 400);
+    update.brand = normalizedBrand.brand; update.brand_slug = normalizedBrand.brandSlug; update.brand_source = "explicit";
+  }
   if (typeof body.title === "string") update.title = text(body.title);
   if (typeof body.description === "string") update.description = text(body.description);
   if (typeof body.category === "string") update.category = text(body.category);

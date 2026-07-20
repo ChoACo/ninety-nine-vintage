@@ -1,5 +1,6 @@
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
 import type { Database } from "@/lib/supabase/database.types";
+import { normalizeProductBrand } from "@/lib/catalog/brand";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await authenticateStaffRequest(request, true);
@@ -13,6 +14,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (auth.roleCode !== "owner" && store?.operator_id !== auth.userId) return commerceJson({ error: "forbidden" }, 403);
   const updates: Database["public"]["Tables"]["products"]["Update"] = { updated_by: auth.userId };
   const writable = updates as Record<string, unknown>;
+  if (Object.hasOwn(body ?? {}, "brand")) {
+    const normalizedBrand = normalizeProductBrand(body?.brand);
+    if (!normalizedBrand) return commerceJson({ error: "브랜드를 입력해 주세요." }, 400);
+    updates.brand = normalizedBrand.brand;
+    updates.brand_slug = normalizedBrand.brandSlug;
+    updates.brand_source = "explicit";
+  }
   for (const key of ["title", "description", "category", "size_label", "storage_class", "condition_grade", "publish_at", "closes_at"]) {
     if (typeof body?.[key] === "string") writable[key] = body[key];
   }

@@ -88,6 +88,8 @@ export function getCatalogCategory(post: AuctionPost): Exclude<CatalogCategory, 
 }
 
 export function getCatalogBrand(post: AuctionPost): string {
+  const structuredBrand = post.brand?.normalize("NFKC").trim();
+  if (structuredBrand) return structuredBrand;
   const details = getProductFeedDetails(post);
   const firstToken = details.name
     .replace(/^\[[^\]]+\]\s*/u, "")

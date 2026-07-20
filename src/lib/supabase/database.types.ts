@@ -43,32 +43,33 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
-      site_status: {
-        Row: {
-          singleton: boolean
-          status: string
-          message: string
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          singleton?: boolean
-          status?: string
-          message?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          singleton?: boolean
-          status?: string
-          message?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: []
-      }
       account_access_roles: {
         Row: {
           created_at: string
@@ -829,6 +830,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "manual_transfer_payment_ledger_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_transfer_payment_ledger_reversal_of_fkey"
+            columns: ["reversal_of"]
+            isOneToOne: false
+            referencedRelation: "manual_transfer_payment_ledger"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "manual_transfer_payment_ledger_shipping_fee_payment_id_fkey"
             columns: ["shipping_fee_payment_id"]
             isOneToOne: false
@@ -1552,6 +1567,9 @@ export type Database = {
           bid_history: Json
           bid_increment: number
           bid_locked_at: string | null
+          brand: string
+          brand_slug: string
+          brand_source: string
           category: string
           closes_at: string
           condition_grade: string
@@ -1591,6 +1609,9 @@ export type Database = {
           bid_history?: Json
           bid_increment?: number
           bid_locked_at?: string | null
+          brand?: string
+          brand_slug?: string
+          brand_source?: string
           category?: string
           closes_at: string
           condition_grade?: string
@@ -1630,6 +1651,9 @@ export type Database = {
           bid_history?: Json
           bid_increment?: number
           bid_locked_at?: string | null
+          brand?: string
+          brand_slug?: string
+          brand_source?: string
           category?: string
           closes_at?: string
           condition_grade?: string
@@ -2330,6 +2354,30 @@ export type Database = {
           },
         ]
       }
+      site_status: {
+        Row: {
+          message: string
+          singleton: boolean
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          message?: string
+          singleton?: boolean
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          message?: string
+          singleton?: boolean
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       stores: {
         Row: {
           created_at: string
@@ -2674,33 +2722,6 @@ export type Database = {
           status: string
           updated_at: string
         }[]
-      }
-      record_manual_transfer_payment: {
-        Args: {
-          p_amount: number
-          p_depositor_name: string
-          p_memo?: string
-          p_transfer_id: string
-          p_transfer_kind: string
-        }
-        Returns: Json
-      }
-      record_shipping_fee_payment: {
-        Args: {
-          p_amount: number
-          p_depositor_name: string
-          p_memo?: string
-          p_payment_id: string
-        }
-        Returns: Json
-      }
-      reverse_manual_transfer_payment: {
-        Args: { p_ledger_id: string; p_reason: string }
-        Returns: Json
-      }
-      reverse_shipping_fee_payment: {
-        Args: { p_ledger_id: string; p_reason: string }
-        Returns: Json
       }
       count_shipping_work: {
         Args: { p_include_shipped?: boolean }
@@ -3094,13 +3115,57 @@ export type Database = {
         }[]
       }
       get_public_sold_auctions: {
-        Args: { p_before?: string; p_before_id?: string; p_limit?: number }
+        Args: {
+          p_before?: string
+          p_before_id?: string
+          p_brand_slug?: string
+          p_limit?: number
+        }
         Returns: {
+          brand: string
+          brand_slug: string
+          brand_source: string
+          category: string
+          condition_grade: string
           description: string
           image_urls: string[]
+          inspection_notes: string[]
+          measurements: Json
           participant_count: number
           product_id: string
+          size_label: string
           sold_at: string
+          status: string
+          thumbnail_urls: string[]
+          title: string
+          winner_display_name: string
+          winning_amount: number
+        }[]
+      }
+      get_public_sold_brands: {
+        Args: never
+        Returns: {
+          brand: string
+          brand_slug: string
+          sold_count: number
+        }[]
+      }
+      get_public_sold_product: {
+        Args: { p_product_id: string }
+        Returns: {
+          brand: string
+          brand_slug: string
+          category: string
+          condition_grade: string
+          description: string
+          image_urls: string[]
+          inspection_notes: string[]
+          measurements: Json
+          participant_count: number
+          product_id: string
+          size_label: string
+          sold_at: string
+          status: string
           thumbnail_urls: string[]
           title: string
           winner_display_name: string
@@ -3473,6 +3538,9 @@ export type Database = {
           bid_history: Json
           bid_increment: number
           bid_locked_at: string | null
+          brand: string
+          brand_slug: string
+          brand_source: string
           category: string
           closes_at: string
           condition_grade: string
@@ -3622,13 +3690,13 @@ export type Database = {
           p_store_id: string
         }
         Returns: {
+          can_retry_payment: boolean
           commerce_order_id: string
           expected_amount: number
           order_name: string
           payment_id: string
           payment_status: string
-          portone_status: string | null
-          can_retry_payment: boolean
+          portone_status: string
         }[]
       }
       prepare_portone_payment: {
@@ -3671,6 +3739,16 @@ export type Database = {
           skipped_ids: string[]
         }[]
       }
+      record_manual_transfer_payment: {
+        Args: {
+          p_amount: number
+          p_depositor_name: string
+          p_memo?: string
+          p_transfer_id: string
+          p_transfer_kind: string
+        }
+        Returns: Json
+      }
       record_owner_operator_delegated_action: {
         Args: { p_action: string; p_payload?: Json; p_session_id: string }
         Returns: string
@@ -3690,6 +3768,15 @@ export type Database = {
           recorded: boolean
           session_record_id: string
         }[]
+      }
+      record_shipping_fee_payment: {
+        Args: {
+          p_amount: number
+          p_depositor_name: string
+          p_memo?: string
+          p_payment_id: string
+        }
+        Returns: Json
       }
       reopen_my_support_conversation: {
         Args: never
@@ -3784,6 +3871,14 @@ export type Database = {
         Args: { p_actor_owner_id: string; p_test_user_id: string }
         Returns: boolean
       }
+      reverse_manual_transfer_payment: {
+        Args: { p_ledger_id: string; p_reason: string }
+        Returns: Json
+      }
+      reverse_shipping_fee_payment: {
+        Args: { p_ledger_id: string; p_reason: string }
+        Returns: Json
+      }
       review_nickname_change_request: {
         Args: {
           p_approve: boolean
@@ -3808,10 +3903,6 @@ export type Database = {
       set_payment_runtime_mode: {
         Args: { p_active_mode: string }
         Returns: string
-      }
-      sync_manual_transfer_runtime_settings: {
-        Args: { p_account_number: string; p_bank_name: string }
-        Returns: boolean
       }
       start_product_inquiry: {
         Args: { p_body: string; p_client_nonce: string; p_product_id: string }
@@ -3843,6 +3934,10 @@ export type Database = {
         Args: { p_employee_id: string }
         Returns: string
       }
+      sync_manual_transfer_runtime_settings: {
+        Args: { p_account_number: string; p_bank_name: string }
+        Returns: boolean
+      }
       sync_portone_payment: {
         Args: {
           p_amount: number
@@ -3858,9 +3953,9 @@ export type Database = {
           p_vbank_num: string
         }
         Returns: {
-          paid_at: string | null
+          paid_at: string
           payment_status: string
-          portone_status: string | null
+          portone_status: string
         }[]
       }
       touch_my_last_seen: { Args: never; Returns: string }
@@ -3887,6 +3982,9 @@ export type Database = {
           bid_history: Json
           bid_increment: number
           bid_locked_at: string | null
+          brand: string
+          brand_slug: string
+          brand_source: string
           category: string
           closes_at: string
           condition_grade: string
@@ -4116,6 +4214,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

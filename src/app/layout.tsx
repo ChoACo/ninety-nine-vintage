@@ -8,6 +8,7 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.ninety-nine-vintage.store"),
   title: "NINETY-NINE VINTAGE",
   description: "선별된 한 점의 빈티지를 바로 만나는 곳",
 };

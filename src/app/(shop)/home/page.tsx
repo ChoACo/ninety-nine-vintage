@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ArrowDownRight, ArrowUpRight, Clock3 } from "lucide-react";
 import { ProductRail } from "@/components/features/catalog/ProductRail";
 import { CatalogImage } from "@/components/ui/CatalogImage";
@@ -10,6 +11,7 @@ import { ReadOnlyHomeNotice } from "@/components/layout/ReadOnlyHomeNotice";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { alternates: { canonical: "/home" } };
 
 async function loadHomeData() {
   const [auctionResult, fixedResult, storesResult] = await Promise.allSettled([

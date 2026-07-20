@@ -1,8 +1,11 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AuctionFeedGrid } from "@/components/features/auction/AuctionFeedGrid";
 import { AuctionFilterSidebar } from "@/components/features/auction/AuctionFilterSidebar";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
+
+export const metadata: Metadata = { title: "라이브 경매 | NINETY-NINE VINTAGE", alternates: { canonical: "/feed" } };
 
 export default function FeedPage() {
   if (!LIVE_AUCTION_ENABLED) {

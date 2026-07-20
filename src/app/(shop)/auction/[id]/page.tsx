@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { ConditionReport } from "@/components/features/auction/detail/ConditionReport";
 import { ItemGallery } from "@/components/features/auction/detail/ItemGallery";
 import { StickyBidPanel } from "@/components/features/auction/detail/StickyBidPanel";
@@ -6,6 +7,18 @@ import { fetchPublishedProduct } from "@/services/products";
 import type { ItemDetail, ItemMeasurements, ConditionGrade } from "@/types/detail";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) return {};
+  const product = await fetchPublishedProduct(id).catch(() => null);
+  if (!product) return {};
+  const title = `${product.title} | ${product.brand}`;
+  const description = product.description.slice(0, 160);
+  const url = `/auction/${id}`;
+  const images = product.imageUrls[0] ? [{ url: product.imageUrls[0], alt: product.title }] : undefined;
+  return { title, description, alternates: { canonical: url }, openGraph: { title, description, url, type: "website", images } };
+}
 
 function measurements(value: unknown): ItemMeasurements {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { shoulder: 0, chest: 0, sleeve: 0, length: 0 };
@@ -32,7 +45,7 @@ function mapPublishedProductToDetail(product: Awaited<ReturnType<typeof fetchPub
     id: product.id,
     auctionId: product.id,
     name: product.title,
-    brand: "NINETY-NINE VINTAGE",
+    brand: product.brand,
     category: product.category,
     description: product.description,
     imageUrl: product.imageUrls[0] ?? product.thumbnailUrls[0] ?? "",

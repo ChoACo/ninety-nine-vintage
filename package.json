@@ -4,7 +4,10 @@
       "esbuild",
       "sharp",
       "unrs-resolver",
-      "workerd"
+      "workerd",
+      "@tailwindcss/oxide",
+      "lightningcss",
+      "napi-postinstall"
     ]
   },
   "name": "site-creator-vinext-starter",

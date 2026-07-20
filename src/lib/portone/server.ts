@@ -58,8 +58,10 @@ export function logPortOneServerError(
   });
 }
 
-function readRequiredEnvironment(name: string): string {
-  const value = process.env[name]?.trim();
+function readRequiredEnvironment(name: string, aliases: string[] = []): string {
+  const value = [name, ...aliases]
+    .map((environmentName) => process.env[environmentName]?.trim())
+    .find((candidate): candidate is string => Boolean(candidate));
   if (!value) {
     throw new PortOneIntegrationError(
       "portone_configuration_missing",
@@ -76,10 +78,25 @@ export function getPortOnePublicConfiguration(
   storeId: string;
   channelKey: string;
 } {
-  void payMethod;
-  const storeId = readRequiredEnvironment("NEXT_PUBLIC_PORTONE_STORE_ID");
+  const storeId = readRequiredEnvironment("NEXT_PUBLIC_PORTONE_STORE_ID", [
+    "PORTONE_STORE_ID",
+    "VITE_PORTONE_STORE_ID",
+  ]);
+  const methodSpecificChannelAliases =
+    payMethod === "EASY_PAY"
+      ? [
+          "NEXT_PUBLIC_PORTONE_KAKAOPAY_CHANNEL_KEY",
+          "VITE_PORTONE_KAKAOPAY_CHANNEL_KEY",
+        ]
+      : payMethod === "VIRTUAL_ACCOUNT"
+        ? [
+            "NEXT_PUBLIC_PORTONE_VIRTUAL_ACCOUNT_CHANNEL_KEY",
+            "VITE_PORTONE_VIRTUAL_ACCOUNT_CHANNEL_KEY",
+          ]
+        : ["NEXT_PUBLIC_PORTONE_CARD_CHANNEL_KEY", "VITE_PORTONE_CARD_CHANNEL_KEY"];
   const channelKey = readRequiredEnvironment(
-    "NEXT_PUBLIC_PORTONE_CHANNEL_KEY",
+    `NEXT_PUBLIC_PORTONE_${payMethod}_CHANNEL_KEY`,
+    [...methodSpecificChannelAliases, "NEXT_PUBLIC_PORTONE_CHANNEL_KEY", "VITE_PORTONE_CHANNEL_KEY"],
   );
 
   // PortOne V2 Store IDs are issued separately from a PG merchant ID (MID).

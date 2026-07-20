@@ -30,10 +30,10 @@ export function AuctionFilterSidebar({ saleType = "auction" }: { saleType?: "auc
   const filterContent = (
     <>
       <div className="flex items-center justify-between border-b border-zinc-200 py-4">
-        <h2 className="text-xs font-bold tracking-[0.12em]">FILTER &amp; SORT <span className="font-normal text-muted lg:hidden">· 모바일 필터</span></h2>
+        <h2 className="text-xs font-bold tracking-[0.12em]">FILTER &amp; SORT <span className="font-normal text-muted hidden">· 모바일 필터</span></h2>
         <div className="flex items-center gap-3">
           <button className="flex items-center gap-1 text-[11px] text-zinc-500 transition-colors hover:text-zinc-950" onClick={resetFilters} type="button"><RotateCcw size={12} /> 초기화</button>
-          <button aria-label="모바일 필터 닫기" className="lg:hidden" onClick={() => setMobileOpen(false)} type="button"><X size={18} /></button>
+          <button aria-label="모바일 필터 닫기" className="hidden" onClick={() => setMobileOpen(false)} type="button"><X size={18} /></button>
         </div>
       </div>
 
@@ -78,9 +78,9 @@ export function AuctionFilterSidebar({ saleType = "auction" }: { saleType?: "auc
 
   return (
     <>
-      <button aria-expanded={mobileOpen} className="mb-4 flex h-12 w-full items-center justify-between border-y border-zinc-950 px-1 text-xs font-bold lg:hidden" onClick={() => setMobileOpen(true)} type="button"><span className="flex items-center gap-2"><SlidersHorizontal size={15} /> FILTER &amp; SORT</span><span className="text-[10px] text-muted">{selectedSizes.length + selectedCategories.length}개 선택</span></button>
-      <aside className="hidden w-full flex-shrink-0 self-start border-t border-zinc-950 lg:sticky lg:top-[100px] lg:block lg:w-[240px]">{filterContent}</aside>
-      {mobileOpen && <div aria-label="모바일 필터 바텀시트" aria-modal="true" className="fixed inset-0 z-[70] bg-ink/40 lg:hidden" role="dialog" onClick={() => setMobileOpen(false)}><aside className="absolute inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto rounded-t-2xl bg-paper px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-ink shadow-2xl" onClick={(event) => event.stopPropagation()}>{filterContent}</aside></div>}
+      <button aria-expanded={mobileOpen} className="mb-4 flex h-12 w-full items-center justify-between border-y border-zinc-950 px-1 text-xs font-bold hidden" onClick={() => setMobileOpen(true)} type="button"><span className="flex items-center gap-2"><SlidersHorizontal size={15} /> FILTER &amp; SORT</span><span className="text-[10px] text-muted">{selectedSizes.length + selectedCategories.length}개 선택</span></button>
+      <aside className="w-[240px] flex-shrink-0 self-start border-t border-zinc-950 sticky top-[100px]">{filterContent}</aside>
+      {mobileOpen && <div aria-label="모바일 필터 바텀시트" aria-modal="true" className="fixed inset-0 z-[70] bg-ink/40 hidden" role="dialog" onClick={() => setMobileOpen(false)}><aside className="absolute inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto rounded-t-2xl bg-paper px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-ink shadow-2xl" onClick={(event) => event.stopPropagation()}>{filterContent}</aside></div>}
     </>
   );
 }

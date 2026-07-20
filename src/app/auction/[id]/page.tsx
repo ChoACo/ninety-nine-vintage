@@ -61,5 +61,5 @@ export default async function AuctionDetailPage({ params }: { params: Promise<{ 
   let item: ItemDetail | null = null;
   try { item = mapPublishedProductToDetail(await fetchPublishedProduct(id)); } catch { item = null; }
   if (!item) notFound();
-  return <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-12"><div className="min-w-0 lg:col-span-7"><ItemGallery item={item} /><ConditionReport item={item} /></div><StickyBidPanel item={item} /></div>;
+  return <div className="grid grid-cols-1 gap-8 grid-cols-12 gap-12"><div className="min-w-0 col-span-7"><ItemGallery item={item} /><ConditionReport item={item} /></div><StickyBidPanel item={item} /></div>;
 }

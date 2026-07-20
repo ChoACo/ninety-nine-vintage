@@ -18,7 +18,7 @@ export function ItemGallery({ item }: ItemGalleryProps) {
         <span className="absolute left-5 top-5 bg-white px-3 py-2 text-xs font-bold tracking-[0.12em] text-zinc-950">LOT #{item.id}</span>
         <span className="absolute right-5 top-5 bg-zinc-950 px-3 py-2 text-xs font-bold tracking-[0.08em] text-white">Condition {item.conditionGrade}</span>
       </div>
-      <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-6 sm:gap-3">
+      <div className="mt-4 grid grid-cols-4 gap-2  ">
         {item.images.map((image, index) => (
           <button
             aria-label={`${item.name} 이미지 ${index + 1} 보기`}

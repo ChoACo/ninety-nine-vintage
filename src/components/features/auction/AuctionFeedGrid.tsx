@@ -208,7 +208,7 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
           </div>
           <span className="font-mono text-xs font-bold tabular-nums text-muted">{loading ? "—" : `${visibleCards.length} ITEMS`}</span>
         </div>
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+        <div className="mt-5 flex flex-col gap-2 ">
           <label className="flex h-11 min-w-0 flex-1 items-center gap-2 border border-line bg-surface px-3 focus-within:border-ink">
             <Search size={16} className="shrink-0 text-muted" />
             <input aria-label="상품 검색" className="min-w-0 flex-1 bg-transparent text-sm outline-none" onChange={(event) => setQuery(event.target.value)} placeholder="상품명·설명 검색" value={query} />
@@ -228,9 +228,9 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
       {saleType === "auction" && <AuctionBidSummary />}
 
       {error && <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      {loading && <div className="grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{Array.from({ length: 10 }).map((_, index) => <div aria-hidden="true" className="aspect-[4/5] animate-pulse bg-surface" key={index} />)}</div>}
+      {loading && <div className="grid grid-cols-2 gap-x-3 gap-y-8  grid-cols-4 xl:grid-cols-5">{Array.from({ length: 10 }).map((_, index) => <div aria-hidden="true" className="aspect-[4/5] animate-pulse bg-surface" key={index} />)}</div>}
       {!loading && !error && visibleCards.length === 0 && <div className="grid min-h-64 place-items-center border border-dashed border-line px-6 text-center"><div><p className="text-sm font-bold">현재 조건에 맞는 상품이 없습니다.</p><p className="mt-2 text-xs text-muted">필터를 초기화하거나 새로운 드롭을 기다려 주세요.</p></div></div>}
-      {!loading && visibleCards.length > 0 && <div className="grid grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3 lg:grid-cols-4 lg:gap-x-5 xl:grid-cols-5">{visibleCards.map((item) => saleType === "auction" ? <AuctionFeedCard item={item} key={item.id} /> : <AuctionCard item={item} key={item.id} />)}</div>}
+      {!loading && visibleCards.length > 0 && <div className="grid grid-cols-2 gap-x-3 gap-y-9  grid-cols-4 gap-x-5 xl:grid-cols-5">{visibleCards.map((item) => saleType === "auction" ? <AuctionFeedCard item={item} key={item.id} /> : <AuctionCard item={item} key={item.id} />)}</div>}
     </section>
   );
 }

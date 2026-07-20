@@ -122,7 +122,7 @@ export function StickyBidPanel({ item }: StickyBidPanelProps) {
   };
 
   return (
-    <aside className="z-30 self-start border-t-2 border-zinc-950 bg-white pb-28 lg:sticky lg:top-[100px] lg:col-span-5 lg:pb-0">
+    <aside className="z-30 self-start border-t-2 border-zinc-950 bg-white pb-28 sticky top-[100px] col-span-5 pb-0">
       <div className="border-b border-zinc-200 py-6">
         <p className="mb-3 text-xs font-medium tracking-[0.1em] text-zinc-500">{item.brand}</p>
         <h1 className="text-3xl font-black leading-tight tracking-[-0.05em] text-zinc-950">{item.name}</h1>

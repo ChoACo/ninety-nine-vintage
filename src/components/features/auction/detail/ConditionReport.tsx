@@ -15,8 +15,8 @@ export function ConditionReport({ item }: ConditionReportProps) {
   ];
 
   return (
-    <section className="mt-10 border-t border-zinc-950 pt-6 sm:mt-14">
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
+    <section className="mt-10 border-t border-zinc-950 pt-6 ">
+      <div className="flex flex-col items-start justify-between gap-4 ">
         <div>
           <p className="mb-2 text-[11px] font-bold tracking-[0.15em] text-zinc-500">AUTHENTICITY / CONDITION</p>
           <h2 className="text-lg font-black tracking-[-0.04em]">VINTAGE INSPECTION REPORT</h2>
@@ -26,7 +26,7 @@ export function ConditionReport({ item }: ConditionReportProps) {
         </span>
       </div>
 
-      <div className="mt-8 grid gap-6 sm:grid-cols-2 sm:gap-8">
+      <div className="mt-8 grid gap-6  ">
         <div className="border-y border-zinc-200">
           <div className="flex items-center gap-2 border-b border-zinc-200 py-4 text-xs font-bold"><Ruler size={14} /> 실측 사이즈</div>
           {rows.map(([label, value]) => (

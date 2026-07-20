@@ -14,7 +14,7 @@ export function PcLayout({ children }: PcLayoutProps) {
     <div className="min-h-screen bg-paper text-ink">
       <LiveTickerBar />
       <PcHeader />
-      <main className="mx-auto min-h-[calc(100vh-7rem)] max-w-[1680px] px-4 py-7 pb-28 sm:px-6 md:px-8 lg:px-10 lg:pb-7 xl:px-12">{children}</main>
+      <main className="mx-auto min-h-[calc(100vh-7rem)] max-w-[1680px] px-4 py-7 pb-28   px-10 pb-7 xl:px-12">{children}</main>
       <PcFooter />
       <MobileBottomNav />
       <CacheConsentBanner />

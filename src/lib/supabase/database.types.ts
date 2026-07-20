@@ -739,6 +739,73 @@ export type Database = {
           },
         ]
       }
+      manual_transfer_payment_ledger: {
+        Row: {
+          amount: number
+          commerce_order_transfer_id: string | null
+          created_at: string
+          depositor_name: string | null
+          entry_type: string
+          id: string
+          manual_transfer_order_id: string | null
+          memo: string
+          recorded_by: string
+          reversal_of: string | null
+          shipping_fee_payment_id: string | null
+          transfer_kind: string
+        }
+        Insert: {
+          amount: number
+          commerce_order_transfer_id?: string | null
+          created_at?: string
+          depositor_name?: string | null
+          entry_type: string
+          id?: string
+          manual_transfer_order_id?: string | null
+          memo?: string
+          recorded_by: string
+          reversal_of?: string | null
+          shipping_fee_payment_id?: string | null
+          transfer_kind: string
+        }
+        Update: {
+          amount?: number
+          commerce_order_transfer_id?: string | null
+          created_at?: string
+          depositor_name?: string | null
+          entry_type?: string
+          id?: string
+          manual_transfer_order_id?: string | null
+          memo?: string
+          recorded_by?: string
+          reversal_of?: string | null
+          shipping_fee_payment_id?: string | null
+          transfer_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manual_transfer_payment_ledger_commerce_order_transfer_id_fkey"
+            columns: ["commerce_order_transfer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_order_transfers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_transfer_payment_ledger_manual_transfer_order_id_fkey"
+            columns: ["manual_transfer_order_id"]
+            isOneToOne: false
+            referencedRelation: "manual_transfer_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_transfer_payment_ledger_shipping_fee_payment_id_fkey"
+            columns: ["shipping_fee_payment_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_fee_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_accounts: {
         Row: {
           account_status: string
@@ -2560,6 +2627,33 @@ export type Database = {
           status: string
           updated_at: string
         }[]
+      }
+      record_manual_transfer_payment: {
+        Args: {
+          p_amount: number
+          p_depositor_name: string
+          p_memo?: string
+          p_transfer_id: string
+          p_transfer_kind: string
+        }
+        Returns: Json
+      }
+      record_shipping_fee_payment: {
+        Args: {
+          p_amount: number
+          p_depositor_name: string
+          p_memo?: string
+          p_payment_id: string
+        }
+        Returns: Json
+      }
+      reverse_manual_transfer_payment: {
+        Args: { p_ledger_id: string; p_reason: string }
+        Returns: Json
+      }
+      reverse_shipping_fee_payment: {
+        Args: { p_ledger_id: string; p_reason: string }
+        Returns: Json
       }
       count_shipping_work: {
         Args: { p_include_shipped?: boolean }

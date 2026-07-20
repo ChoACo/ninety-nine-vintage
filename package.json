@@ -33,6 +33,11 @@
     "tailwindcss": "^4",
     "typescript": "^5"
   },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.20"
+    }
+  },
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",

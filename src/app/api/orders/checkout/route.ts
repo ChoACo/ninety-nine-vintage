@@ -1,4 +1,5 @@
 import { authenticateMemberCommerceRequest, commerceJson, normalizeIds } from "@/lib/commerce/server";
+import { syncManualTransferSettings } from "@/lib/manualTransferConfig";
 
 export async function POST(request: Request) {
   const auth = await authenticateMemberCommerceRequest(request, true);
@@ -8,6 +9,12 @@ export async function POST(request: Request) {
   const idempotencyKey = body?.idempotencyKey?.trim();
   if (productIds.length === 0 || !idempotencyKey || idempotencyKey.length > 128) {
     return commerceJson({ error: "상품과 주문 요청 키가 필요합니다." }, 400);
+  }
+
+  try {
+    await syncManualTransferSettings(auth.admin);
+  } catch {
+    return commerceJson({ error: "운영자가 입금 계좌를 설정한 후 주문할 수 있습니다." }, 503);
   }
 
   // Do not create an order that the member cannot actually pay. The current

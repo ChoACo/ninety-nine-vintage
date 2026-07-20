@@ -1,4 +1,5 @@
 import { authenticateMemberCommerceRequest, commerceJson } from "@/lib/commerce/server";
+import { syncManualTransferSettings } from "@/lib/manualTransferConfig";
 
 export async function GET(request: Request) {
   const auth = await authenticateMemberCommerceRequest(request);
@@ -19,12 +20,8 @@ export async function POST(request: Request) {
   if (!idempotencyKey || idempotencyKey.length > 128) return commerceJson({ error: "배송비 요청 키가 올바르지 않습니다." }, 400);
   const amount = Number(process.env.SHIPPING_FEE_AMOUNT ?? "3500");
   if (!Number.isSafeInteger(amount) || amount <= 0) return commerceJson({ error: "배송비 설정이 없습니다." }, 503);
-  const { data: setting } = await auth.admin
-    .from("payment_runtime_settings")
-    .select("active_mode, bank_name, account_number")
-    .eq("singleton", true)
-    .maybeSingle();
-  if (setting?.active_mode !== "manual_transfer" || !setting.bank_name || !setting.account_number) return commerceJson({ error: "manual_transfer_unavailable" }, 503);
+  let account;
+  try { account = await syncManualTransferSettings(auth.admin); } catch { return commerceJson({ error: "manual_transfer_unavailable" }, 503); }
   const { data: existingPayment } = await auth.admin
     .from("shipping_fee_payments")
     .select("*")
@@ -38,8 +35,8 @@ export async function POST(request: Request) {
       member_id: auth.userId,
       shipping_request_id: body?.shippingRequestId ?? null,
       expected_amount: amount,
-      bank_name_snapshot: setting.bank_name,
-      account_number_snapshot: setting.account_number,
+      bank_name_snapshot: account.bankName,
+      account_number_snapshot: account.accountNumber,
       idempotency_key: idempotencyKey,
     })
     .select("*")

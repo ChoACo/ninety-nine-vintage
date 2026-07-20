@@ -1,5 +1,7 @@
 import { hasTrustedRequestOrigin } from "@/lib/kakao/oidc";
-import { beginManualBankTransfer, confirmManualBankTransfer } from "@/services/manualPayments";
+import { createSupabaseServerClients } from "@/lib/supabase/server";
+import { syncManualTransferSettings } from "@/lib/manualTransferConfig";
+import { beginManualBankTransfer } from "@/services/manualPayments";
 
 function json(body: Record<string, unknown>, status = 200) {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
@@ -16,12 +18,13 @@ export async function POST(request: Request) {
   if (!token) return json({ error: "unauthorized" }, 401);
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   try {
+    const { admin } = createSupabaseServerClients();
+    await syncManualTransferSettings(admin);
     if (body?.action === "begin" && typeof body.productId === "string") {
       return json({ transfer: await beginManualBankTransfer(token, body.productId) });
     }
-    if (body?.action === "confirm" && typeof body.orderId === "string" && typeof body.expectedUpdatedAt === "string") {
-      await confirmManualBankTransfer(token, body.orderId, body.expectedUpdatedAt);
-      return json({ confirmed: true });
+    if (body?.action === "confirm") {
+      return json({ error: "manual_transfer_ledger_required" }, 409);
     }
     return json({ error: "invalid_request" }, 400);
   } catch {

@@ -2,89 +2,31 @@ import {
   authenticateOwnerAccessRequest,
   ownerAccessErrorResponse,
   ownerAccessJsonResponse,
-  ownerRpc,
-  readSmallJsonBody,
 } from "@/lib/ownerAccess/server";
-import {
-  getPortOnePublicConfiguration,
-  getPortOneWebhookSecret,
-  PORTONE_PAY_METHODS,
-} from "@/lib/portone/server";
-import { isPortOneFeatureEnabled } from "@/lib/portone/runtimeMode";
-
-interface PaymentRuntimeRow {
-  active_mode?: unknown;
-  bank_name?: unknown;
-  account_number?: unknown;
-  configured?: unknown;
-  updated_at?: unknown;
-}
-
-function isPortOneReady(): boolean {
-  try {
-    for (const method of PORTONE_PAY_METHODS) getPortOnePublicConfiguration(method);
-    getPortOneWebhookSecret();
-    if (!process.env.PORTONE_API_SECRET?.trim()) return false;
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function readRuntime(context: Awaited<ReturnType<typeof authenticateOwnerAccessRequest>>) {
-  const rows = await ownerRpc<PaymentRuntimeRow[]>(context, "get_manual_transfer_settings");
-  const row = rows?.[0] ?? {};
-  return {
-    activeMode: row.active_mode === "portone" ? "portone" : "manual_transfer",
-    bankConfigured: row.configured === true,
-    updatedAt: typeof row.updated_at === "string" ? row.updated_at : null,
-    portoneReady: isPortOneFeatureEnabled() && isPortOneReady(),
-    portoneLocked: !isPortOneFeatureEnabled(),
-  };
-}
+import { syncManualTransferSettings } from "@/lib/manualTransferConfig";
 
 export async function GET(request: Request) {
   try {
     const context = await authenticateOwnerAccessRequest(request);
-    return ownerAccessJsonResponse(await readRuntime(context));
+    await syncManualTransferSettings(context.admin);
+    return ownerAccessJsonResponse({
+      activeMode: "manual_transfer",
+      bankConfigured: true,
+      configurationSource: "server_environment",
+      portoneReady: false,
+      portoneLocked: true,
+    });
   } catch (error) {
     return ownerAccessErrorResponse(error);
   }
 }
 
+/** Payment mode and bank details are deployment configuration, not UI input. */
 export async function PATCH(request: Request) {
   try {
-    const context = await authenticateOwnerAccessRequest(request);
-    const body = await readSmallJsonBody(request);
-    const bankName = typeof body.bankName === "string" ? body.bankName.trim() : "";
-    const accountNumber = typeof body.accountNumber === "string" ? body.accountNumber.trim() : "";
-    if (bankName || accountNumber) {
-      if (!bankName || !accountNumber) {
-        return ownerAccessJsonResponse({ error: "invalid_bank_settings" }, 400);
-      }
-      await ownerRpc(context, "update_manual_transfer_settings", {
-        p_bank_name: bankName,
-        p_account_number: accountNumber,
-      });
-      return ownerAccessJsonResponse(await readRuntime(context));
-    }
-    const mode = body.mode;
-    if (mode !== "manual_transfer" && mode !== "portone") {
-      return ownerAccessJsonResponse({ error: "invalid_payment_mode" }, 400);
-    }
-    if (mode === "portone" && (!isPortOneFeatureEnabled() || !isPortOneReady())) {
-      return ownerAccessJsonResponse({ error: "portone_locked" }, 409);
-    }
-
-    const activeMode = await ownerRpc<string>(context, "set_payment_runtime_mode", {
-      p_active_mode: mode,
-    });
-    return ownerAccessJsonResponse({
-      ...(await readRuntime(context)),
-      activeMode,
-    });
+    await authenticateOwnerAccessRequest(request);
+    return ownerAccessJsonResponse({ error: "payment_configuration_managed_by_environment" }, 405);
   } catch (error) {
     return ownerAccessErrorResponse(error);
   }
 }
-

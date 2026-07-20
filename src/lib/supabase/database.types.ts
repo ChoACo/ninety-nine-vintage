@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      site_status: {
+        Row: {
+          singleton: boolean
+          status: string
+          message: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          singleton?: boolean
+          status?: string
+          message?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          singleton?: boolean
+          status?: string
+          message?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       account_access_roles: {
         Row: {
           created_at: string

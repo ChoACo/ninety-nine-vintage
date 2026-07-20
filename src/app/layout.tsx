@@ -11,6 +11,7 @@ const geist = Geist({
 export const metadata: Metadata = {
   title: "NINETY-NINE VINTAGE",
   description: "오늘 단 한 번, 다시 없는 빈티지 경매",
+  alternates: { canonical: "/home" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

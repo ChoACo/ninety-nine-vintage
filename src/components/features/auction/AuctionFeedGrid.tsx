@@ -132,7 +132,12 @@ export function AuctionFeedGrid({ className = "", saleType = "auction", title }:
 
   useEffect(() => {
     if (saleType !== "auction") return;
-    const client = getSupabaseBrowserClient();
+    let client: ReturnType<typeof getSupabaseBrowserClient>;
+    try {
+      client = getSupabaseBrowserClient();
+    } catch {
+      return;
+    }
     const channel = client
       .channel("live-auction-feed-bids")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "auction_bids" }, (payload) => {

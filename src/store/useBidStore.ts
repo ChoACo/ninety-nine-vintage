@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { isEntryReadOnly } from "@/lib/entryMode";
 import type { BidHistoryEntry } from "@/types/detail";
 
 interface BidStore {
@@ -22,6 +23,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
     set({ itemId, bids, currentPrice });
   },
   addBid: async (amount) => {
+    if (isEntryReadOnly()) throw new Error("현재 사이트 연결이 불안정해 읽기 전용 모드입니다.");
     const state = get();
     if (!state.itemId) throw new Error("입찰 상품을 확인하지 못했습니다.");
 

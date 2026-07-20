@@ -9,6 +9,7 @@ import { persistCart, persistWishlist } from "@/lib/commerce/client";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { BidModal } from "@/components/features/auction/detail/BidModal";
 import { CatalogImage } from "@/components/ui/CatalogImage";
+import { isEntryReadOnly, useEntryReadOnly } from "@/lib/entryMode";
 
 interface AuctionCardProps { item: Item & { closesAt?: string; timeLeft?: string }; }
 
@@ -24,7 +25,9 @@ export function AuctionCard({ item }: AuctionCardProps) {
   const [actionMessage, setActionMessage] = useState("");
   const [cartBusy, setCartBusy] = useState(false);
   useEffect(() => hydrate(), [hydrate]);
+  const readOnly = useEntryReadOnly();
   const quickBid = async (amount: number) => {
+    if (isEntryReadOnly()) throw new Error("현재 사이트 연결이 불안정해 읽기 전용 모드입니다.");
     const { data } = await getSupabaseBrowserClient().auth.getSession();
     if (!data.session?.access_token) throw new Error("카카오 로그인 후 입찰할 수 있습니다.");
     const response = await fetch("/api/auction/bids", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` }, body: JSON.stringify({ productId: item.id, amount }) });
@@ -34,6 +37,7 @@ export function AuctionCard({ item }: AuctionCardProps) {
   };
   const addFixedToCart = async () => {
     if (cartBusy) return;
+    if (isEntryReadOnly()) { setActionMessage("사이트 연결이 복구될 때까지 읽기 전용입니다."); return; }
     setCartBusy(true);
     setActionMessage("");
     try {
@@ -57,7 +61,7 @@ export function AuctionCard({ item }: AuctionCardProps) {
         <div className="relative aspect-[4/5] overflow-hidden bg-surface">
           {item.imageUrl ? <CatalogImage alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
           <span className="absolute left-2 top-2 bg-paper px-2 py-1 font-mono text-[9px] font-bold tracking-[0.1em]">{isFixed ? "BUY NOW" : "LIVE BID"}</span>
-          <button aria-label={liked ? "찜 해제" : "찜하기"} className={`absolute right-2 top-2 grid size-8 place-items-center bg-paper/90 transition-colors ${liked ? "text-red-700" : "text-ink"}`} onClick={(event) => { event.preventDefault(); const nextLiked = !liked; toggleLike(item.id); void persistWishlist(item.id, nextLiked); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>
+          <button aria-label={liked ? "찜 해제" : "찜하기"} className={`absolute right-2 top-2 grid size-8 place-items-center bg-paper/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${liked ? "text-red-700" : "text-ink"}`} disabled={readOnly} onClick={(event) => { event.preventDefault(); if (isEntryReadOnly()) { setActionMessage("사이트 연결이 복구될 때까지 읽기 전용입니다."); return; } const nextLiked = !liked; toggleLike(item.id); void persistWishlist(item.id, nextLiked); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>
           <div className="absolute inset-x-0 bottom-0 translate-y-full bg-ink/95 px-3 py-3 text-paper opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
             <p className="text-[10px] text-zinc-400">{isFixed ? "정가 바로구매" : "경매 참여"}</p>
             <p className="mt-1 text-xs font-bold">{isFixed ? "상세에서 구매 절차를 확인하세요." : "상세에서 입찰가를 확인하세요."}</p>
@@ -72,7 +76,7 @@ export function AuctionCard({ item }: AuctionCardProps) {
           <p className="text-[10px] text-muted">{isFixed ? "즉시 구매" : `입찰 ${item.bidCount}건`}</p>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2">
-          {isFixed ? <><button className="flex h-9 items-center justify-center gap-1 border border-line text-[10px] font-bold transition-colors hover:border-ink disabled:opacity-50" disabled={cartBusy} onClick={(event) => { event.preventDefault(); void addFixedToCart(); }} type="button"><ShoppingBag size={13} /> {cartBusy ? "저장 중" : "장바구니"}</button><Link className="flex h-9 items-center justify-center bg-ink text-[10px] font-bold text-paper" href={`/auction/${item.id}`}>바로 구매</Link></> : <><button className="flex h-9 items-center justify-center gap-1 bg-ink text-[10px] font-bold text-paper" onClick={(event) => { event.preventDefault(); setBidOpen(true); }} type="button"><Gavel size={13} /> 간편 입찰</button><button className="flex h-9 cursor-not-allowed items-center justify-center gap-1 border border-line text-[10px] font-bold text-muted" disabled title="경매 상품은 장바구니에 담을 수 없습니다." type="button"><ShoppingBag size={13} /> 장바구니</button></>}
+          {isFixed ? <><button className="flex h-9 items-center justify-center gap-1 border border-line text-[10px] font-bold transition-colors hover:border-ink disabled:opacity-50" disabled={cartBusy || readOnly} onClick={(event) => { event.preventDefault(); void addFixedToCart(); }} type="button"><ShoppingBag size={13} /> {cartBusy ? "저장 중" : readOnly ? "읽기 전용" : "장바구니"}</button><Link className="flex h-9 items-center justify-center bg-ink text-[10px] font-bold text-paper" href={`/auction/${item.id}`}>바로 구매</Link></> : <><button className="flex h-9 items-center justify-center gap-1 bg-ink text-[10px] font-bold text-paper disabled:cursor-not-allowed disabled:bg-zinc-300" disabled={readOnly} onClick={(event) => { event.preventDefault(); setBidOpen(true); }} type="button"><Gavel size={13} /> {readOnly ? "읽기 전용" : "간편 입찰"}</button><button className="flex h-9 cursor-not-allowed items-center justify-center gap-1 border border-line text-[10px] font-bold text-muted" disabled title="경매 상품은 장바구니에 담을 수 없습니다." type="button"><ShoppingBag size={13} /> 장바구니</button></>}
         </div>
         {actionMessage && <p aria-live="polite" className="mt-2 text-[10px] font-bold text-emerald-700">{actionMessage}</p>}
       </div>

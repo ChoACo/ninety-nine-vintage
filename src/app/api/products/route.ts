@@ -18,6 +18,6 @@ export async function GET(request: Request) {
       })),
     }, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    return Response.json({ error: "products_unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    return Response.json({ products: [], dbConnected: false }, { headers: { "Cache-Control": "no-store" } });
   }
 }

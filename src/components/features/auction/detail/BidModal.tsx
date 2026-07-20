@@ -46,7 +46,7 @@ export function BidModal({ open, currentPrice, onClose, onSubmit }: BidModalProp
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-950/60" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div aria-labelledby="bid-modal-title" aria-modal="true" className="w-[440px] border border-zinc-200 bg-white p-7 text-zinc-950 shadow-2xl" role="dialog">
+      <div aria-labelledby="bid-modal-title" aria-modal="true" className="w-[min(440px,calc(100vw-2rem))] border border-zinc-200 bg-white p-7 text-zinc-950 shadow-2xl" role="dialog">
         <div className="flex items-start justify-between border-b border-zinc-200 pb-5">
           <div>
             <p className="mb-2 text-[10px] font-bold tracking-[0.14em] text-zinc-500">LIVE AUCTION / LOT</p>

@@ -16,7 +16,7 @@ export function LiveTickerBar() {
           </span>
           <span className="truncate text-zinc-300">오늘의 빈티지 드롭 · 21:00 KST 마감 · 21:00–22:00 점검</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           <strong className="shrink-0 font-mono text-xs tracking-[0.08em] sm:text-sm">
             {timeLeft} 남음
           </strong>

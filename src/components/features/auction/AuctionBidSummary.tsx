@@ -13,12 +13,16 @@ export function AuctionBidSummary() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const { data } = await getSupabaseBrowserClient().auth.getSession();
-      if (!data.session?.access_token) return;
-      const response = await fetch("/api/account/bids", { headers: { Authorization: `Bearer ${data.session.access_token}` }, cache: "no-store" });
-      if (!response.ok || cancelled) return;
-      const payload = await response.json() as { summary?: Summary };
-      if (!cancelled) { setSignedIn(true); setSummary(payload.summary ?? { total: 0, leading: 0, final: 0, outbid: 0 }); }
+      try {
+        const { data } = await getSupabaseBrowserClient().auth.getSession();
+        if (!data.session?.access_token) return;
+        const response = await fetch("/api/account/bids", { headers: { Authorization: `Bearer ${data.session.access_token}` }, cache: "no-store" });
+        if (!response.ok || cancelled) return;
+        const payload = await response.json() as { summary?: Summary };
+        if (!cancelled) { setSignedIn(true); setSummary(payload.summary ?? { total: 0, leading: 0, final: 0, outbid: 0 }); }
+      } catch {
+        // Public visitors and local builds without Supabase can still browse the feed.
+      }
     })();
     return () => { cancelled = true; };
   }, []);

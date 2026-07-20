@@ -9,6 +9,7 @@ import { CatalogImage } from "@/components/ui/CatalogImage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { persistWishlist } from "@/lib/commerce/client";
 import { useCommerceStore } from "@/store/useCommerceStore";
+import { isEntryReadOnly, useEntryReadOnly } from "@/lib/entryMode";
 
 export type AuctionFeedPhase = "OPEN" | "CLOSING_SOON" | "CLOSED" | "UPCOMING";
 
@@ -35,6 +36,7 @@ export function AuctionFeedCard({ item }: AuctionFeedCardProps) {
   const [bidOpen, setBidOpen] = useState(false);
   const [optimisticBid, setOptimisticBid] = useState<{ amount: number; bidCount: number; participantCount: number } | null>(null);
   const [actionMessage, setActionMessage] = useState("");
+  const readOnly = useEntryReadOnly();
 
   const currentPrice = Math.max(item.currentBid, optimisticBid?.amount ?? 0);
   const bidCount = Math.max(item.bidCount, optimisticBid?.bidCount ?? 0);
@@ -45,6 +47,7 @@ export function AuctionFeedCard({ item }: AuctionFeedCardProps) {
   const bidLabel = phase === "CLOSING_SOON" ? "기존 참여자 입찰" : phase === "CLOSED" ? "경매 마감" : phase === "UPCOMING" ? "오픈 예정" : "간편 입찰";
 
   const submitBid = async (amount: number) => {
+    if (isEntryReadOnly()) throw new Error("현재 사이트 연결이 불안정해 읽기 전용 모드입니다.");
     const { data } = await getSupabaseBrowserClient().auth.getSession();
     if (!data.session?.access_token) throw new Error("카카오 로그인 후 입찰할 수 있습니다.");
     const response = await fetch("/api/auction/bids", {
@@ -69,7 +72,7 @@ export function AuctionFeedCard({ item }: AuctionFeedCardProps) {
             <p className="mt-1 text-xs font-bold">현재가와 입찰 현황을 확인하세요.</p>
           </div>
         </Link>
-        <button aria-label={liked ? "찜 해제" : "찜하기"} className={`absolute right-2 top-2 grid size-8 place-items-center bg-paper/90 transition-colors ${liked ? "text-red-700" : "text-ink"}`} onClick={() => { const nextLiked = !liked; toggleLike(item.id); void persistWishlist(item.id, nextLiked); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>
+        <button aria-label={liked ? "찜 해제" : "찜하기"} className={`absolute right-2 top-2 grid size-8 place-items-center bg-paper/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${liked ? "text-red-700" : "text-ink"}`} disabled={readOnly} onClick={() => { if (isEntryReadOnly()) { setActionMessage("사이트 연결이 복구될 때까지 읽기 전용입니다."); return; } const nextLiked = !liked; toggleLike(item.id); void persistWishlist(item.id, nextLiked); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>
       </div>
       <div className="pt-3">
         <div className="flex items-center justify-between gap-2 text-[10px] text-muted"><span className="truncate">{item.brand}</span><span className={`shrink-0 font-mono tabular-nums ${phase === "CLOSING_SOON" ? "text-amber-700" : phase === "CLOSED" ? "text-red-700" : ""}`}>{item.timeLeft ?? "LIVE"}</span></div>
@@ -77,7 +80,7 @@ export function AuctionFeedCard({ item }: AuctionFeedCardProps) {
         <div className="mt-3 border-y border-line py-3">
           <div className="flex items-end justify-between gap-2"><div><p className="text-[10px] text-muted">현재 최고 입찰가</p><p className="font-mono text-base font-bold tabular-nums">{currentPrice.toLocaleString("ko-KR")}원</p></div><span className="text-right text-[10px] text-muted">입찰 {bidCount}건<br />참여 {participantCount}명</span></div>
         </div>
-        <div className="mt-4 grid grid-cols-[1fr_auto] gap-2"><button className="flex h-9 items-center justify-center gap-1 bg-ink text-[10px] font-bold text-paper disabled:cursor-not-allowed disabled:bg-zinc-300" disabled={!canBid} onClick={() => setBidOpen(true)} type="button"><Gavel size={13} /> {bidLabel}</button><Link className="flex h-9 items-center justify-center border border-line px-3 text-[10px] font-bold" href={`/auction/${item.id}`}>상세</Link></div>
+        <div className="mt-4 grid grid-cols-[1fr_auto] gap-2"><button className="flex h-9 items-center justify-center gap-1 bg-ink text-[10px] font-bold text-paper disabled:cursor-not-allowed disabled:bg-zinc-300" disabled={!canBid || readOnly} onClick={() => setBidOpen(true)} type="button"><Gavel size={13} /> {readOnly ? "읽기 전용" : bidLabel}</button><Link className="flex h-9 items-center justify-center border border-line px-3 text-[10px] font-bold" href={`/auction/${item.id}`}>상세</Link></div>
         {phase === "CLOSING_SOON" && <p className="mt-2 text-[10px] text-amber-700">20:56 이후 신규 참여가 제한되고 기존 참여자만 입찰할 수 있습니다.</p>}
         {actionMessage && <p aria-live="polite" className="mt-2 text-[10px] font-bold text-emerald-700">{actionMessage}</p>}
       </div>

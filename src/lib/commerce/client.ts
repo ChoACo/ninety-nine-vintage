@@ -1,8 +1,10 @@
 "use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { isEntryReadOnly } from "@/lib/entryMode";
 
 export async function persistWishlist(productId: string, liked: boolean) {
+  if (isEntryReadOnly()) return;
   try {
     const { data } = await getSupabaseBrowserClient().auth.getSession();
     const token = data.session?.access_token;
@@ -18,6 +20,7 @@ export async function persistWishlist(productId: string, liked: boolean) {
 }
 
 export async function persistCart(productId: string, inCart: boolean): Promise<boolean> {
+  if (isEntryReadOnly()) return false;
   try {
     const { data } = await getSupabaseBrowserClient().auth.getSession();
     const token = data.session?.access_token;

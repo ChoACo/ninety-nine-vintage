@@ -22,10 +22,12 @@ export function AuthStatus() {
   }, []);
 
   useEffect(() => {
-    const client = getSupabaseBrowserClient();
-    void client.auth.getSession().then(({ data }) => void loadAccess(data.session?.access_token ?? null));
-    const { data: listener } = client.auth.onAuthStateChange((_event, session) => void loadAccess(session?.access_token ?? null));
-    return () => listener.subscription.unsubscribe();
+    try {
+      const client = getSupabaseBrowserClient();
+      void client.auth.getSession().then(({ data }) => void loadAccess(data.session?.access_token ?? null));
+      const { data: listener } = client.auth.onAuthStateChange((_event, session) => void loadAccess(session?.access_token ?? null));
+      return () => listener.subscription.unsubscribe();
+    } catch { queueMicrotask(() => { setSignedIn(false); setAccess(null); }); return undefined; }
   }, [loadAccess]);
 
   if (!signedIn) return <a aria-label="카카오 로그인" className="inline-flex h-10 shrink-0 items-center gap-2 border border-line px-3 text-[11px] font-bold whitespace-nowrap transition-colors hover:border-ink hover:bg-surface" href="/api/auth/kakao/start?returnTo=%2Faccount"><LogIn size={15} /> 카카오 로그인</a>;

@@ -19,7 +19,8 @@ export function AccountSessionPanel() {
         if (!data.session?.access_token) return;
         const response = await fetch("/api/account/session", { headers: { Authorization: `Bearer ${data.session.access_token}` }, cache: "no-store" });
         if (response.ok) setAccess(((await response.json()) as { session?: AccessSession }).session ?? null);
-      } finally { setLoaded(true); }
+      } catch { /* Guests and local builds without Supabase do not have a session panel. */ }
+      finally { setLoaded(true); }
     })();
   }, []);
   if (!loaded || !access) return null;

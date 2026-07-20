@@ -47,7 +47,8 @@ export function BidHistory() {
           setItems(payload.items ?? []);
           setSummary(payload.summary);
         }
-      } finally { setLoaded(true); }
+      } catch { /* Guests and local builds without Supabase do not have bid history. */ }
+      finally { setLoaded(true); }
     })();
   }, []);
 

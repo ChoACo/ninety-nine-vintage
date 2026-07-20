@@ -18,7 +18,8 @@ export function CommerceToolbar() {
   useEffect(() => {
     hydrate();
     void syncWithServer();
-    const client = getSupabaseBrowserClient();
+    let client: ReturnType<typeof getSupabaseBrowserClient>;
+    try { client = getSupabaseBrowserClient(); } catch { return undefined; }
     const syncSoon = () => window.setTimeout(() => void syncWithServer(), 0);
     const { data: listener } = client.auth.onAuthStateChange(syncSoon);
     const interval = window.setInterval(() => void syncWithServer(), 15_000);

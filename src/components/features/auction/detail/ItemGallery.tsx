@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ItemDetail } from "@/types/detail";
+import { CatalogImage } from "@/components/ui/CatalogImage";
 
 interface ItemGalleryProps {
   item: ItemDetail;
@@ -11,13 +12,13 @@ export function ItemGallery({ item }: ItemGalleryProps) {
   const [activeImage, setActiveImage] = useState(0);
 
   return (
-    <section className="col-span-7">
+    <section>
       <div className="relative aspect-[4/5] overflow-hidden bg-zinc-100">
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${item.images[activeImage]})` }} />
+        <CatalogImage alt={`${item.name} 대표 이미지`} className="absolute inset-0 h-full w-full object-cover" decoding="async" fetchPriority="high" loading="eager" sizes="(max-width: 1023px) 100vw, 58vw" src={item.images[activeImage] ?? ""} />
         <span className="absolute left-5 top-5 bg-white px-3 py-2 text-xs font-bold tracking-[0.12em] text-zinc-950">LOT #{item.id}</span>
         <span className="absolute right-5 top-5 bg-zinc-950 px-3 py-2 text-xs font-bold tracking-[0.08em] text-white">Condition {item.conditionGrade}</span>
       </div>
-      <div className="mt-4 grid grid-cols-6 gap-3">
+      <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-6 sm:gap-3">
         {item.images.map((image, index) => (
           <button
             aria-label={`${item.name} 이미지 ${index + 1} 보기`}
@@ -26,7 +27,7 @@ export function ItemGallery({ item }: ItemGalleryProps) {
             onClick={() => setActiveImage(index)}
             type="button"
           >
-            <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${image})` }} />
+            <CatalogImage alt={`${item.name} 이미지 ${index + 1}`} className="absolute inset-0 h-full w-full object-cover" loading="lazy" sizes="(max-width: 767px) 25vw, 120px" src={image} />
           </button>
         ))}
       </div>

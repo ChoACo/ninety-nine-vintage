@@ -1,5 +1,6 @@
 import * as PortOne from "@portone/server-sdk";
 
+import { PORTONE_COMMERCE_ENABLED } from "@/lib/commerce/paymentMode";
 import { paymentJsonResponse } from "@/src/lib/portone/http";
 import {
   getPortOneWebhookSecret,
@@ -13,6 +14,13 @@ import { createSupabaseServerClients } from "@/src/lib/supabase/server";
 const PAYMENT_EVENT_PREFIX = "Transaction.";
 
 export async function POST(request: Request) {
+  if (!PORTONE_COMMERCE_ENABLED) {
+    return paymentJsonResponse(
+      { received: true, ignored: true, reason: "portone_archived" },
+      200,
+    );
+  }
+
   let rawBody: string;
   try {
     rawBody = await request.text();

@@ -19,9 +19,7 @@ export type {
   ProductPaymentStatus,
 } from "@/src/lib/supabase/memberAccount";
 export type { ProductPaymentMethod } from "./paymentInvocation";
-
-export const COMMERCE_CHECKOUT_STORAGE_KEY =
-  "ninetynine-commerce-checkout-request";
+export { COMMERCE_CHECKOUT_STORAGE_KEY } from "@/lib/commerce/checkoutStorage";
 
 export interface ProductPaymentResult {
   paymentId: string;

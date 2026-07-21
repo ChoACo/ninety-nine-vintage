@@ -294,12 +294,10 @@ export function OrderHistory() {
                 </p>
               )}
               {order.portonePayment?.canResume && (
-                <Link
-                  className="mt-4 inline-flex border border-ink px-4 py-2 text-[11px] font-bold"
-                  href={`/cart?resumeOrder=${encodeURIComponent(order.id)}`}
-                >
-                  동일 결제 번호로 결제 재개
-                </Link>
+                <p className="mt-4 border border-line bg-surface px-3 py-3 text-[11px] leading-5 text-muted">
+                  이 주문은 과거 PortOne 테스트 기록입니다. 결제 재개는 중단되어
+                  있으며 추가 처리가 필요하면 운영자에게 문의해 주세요.
+                </p>
               )}
             </article>
           );

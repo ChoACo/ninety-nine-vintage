@@ -631,15 +631,18 @@ test("commerce toolbar counts appear only for the resolved current owner", async
   );
 });
 
-test("payment mode controls fail closed across database capability, owner session, and cart UI", async () => {
+test("manual transfer is the only live checkout mode while PortOne stays archived", async () => {
   const [
     ownerRoute,
     ownerConsole,
     cartRoute,
     checkoutRoute,
     cartView,
+    runtimeMode,
+    paymentSyncRoute,
+    webhookRoute,
     commerceClient,
-    commerceMigration,
+    policyMigration,
   ] =
     await Promise.all([
       readFile(
@@ -662,58 +665,57 @@ test("payment mode controls fail closed across database capability, owner sessio
         new URL("src/components/features/commerce/CartView.tsx", rootUrl),
         "utf8",
       ),
+      readFile(new URL("src/lib/portone/runtimeMode.ts", rootUrl), "utf8"),
+      readFile(new URL("src/app/api/payments/sync/route.ts", rootUrl), "utf8"),
+      readFile(new URL("src/app/api/webhook/portone/route.ts", rootUrl), "utf8"),
       readFile(new URL("src/lib/commerce/client.ts", rootUrl), "utf8"),
       readFile(
         new URL(
-          "supabase/migrations/20260720180000_add_commerce_portone_checkout.sql",
+          "supabase/migrations/20260721120000_lock_manual_transfer_payment_mode.sql",
           rootUrl,
         ),
         "utf8",
       ),
     ]);
 
-  assert.match(ownerRoute, /select\("commerce_order_id"\)[\s\S]*?limit\(0\)/);
-  assert.match(ownerRoute, /"portone_schema_not_ready"/);
-  assert.match(ownerRoute, /updated\.activeMode\s*!==\s*mode/);
+  assert.match(ownerRoute, /getManualTransferAccount\(\)/);
+  assert.match(ownerRoute, /mode\s*===\s*"portone"[\s\S]*?"portone_archived"/);
+  assert.doesNotMatch(ownerRoute, /set_payment_runtime_mode/);
   assert.match(ownerConsole, /useSupabaseSession\(\)/);
   assert.match(ownerConsole, /ownerSnapshotMatchesSession\(/);
   assert.match(ownerConsole, /snapshotIsCurrent\s*\?\s*runtime\s*:\s*null/);
-  assert.match(ownerConsole, /window\.confirm\(/);
-  assert.match(ownerConsole, /parseRuntime\(payload\)/);
-  assert.match(cartRoute, /rpc\(\s*"get_commerce_payment_status"/);
-  assert.match(cartRoute, /paymentMode/);
-  assert.match(cartView, /paymentMode\s*===\s*"portone"/);
+  assert.match(ownerConsole, /parseRuntime\(paymentPayload\)/);
+  assert.match(ownerConsole, /PortOne 코드는 향후 재도입을 위해 보관 중/);
+  assert.doesNotMatch(ownerConsole, /changePaymentMode/);
+  assert.doesNotMatch(ownerConsole, /window\.confirm\(/);
+  assert.match(cartRoute, /getManualTransferAccount\(\)/);
+  assert.match(cartRoute, /ACTIVE_COMMERCE_PAYMENT_MODE/);
+  assert.doesNotMatch(cartRoute, /get_commerce_payment_status/);
   assert.match(cartView, /주문하고 입금계좌 확인/);
+  assert.doesNotMatch(cartView, /id="cart-pay-method"/);
   assert.match(cartView, /expectedPaymentMode/);
   assert.match(cartView, /checkout\.mode\s*!==\s*expectedPaymentMode/);
   assert.match(
     checkoutRoute,
-    /paymentModeMatches\(expectedPaymentMode,\s*mode\)/,
+    /expectedPaymentMode\s*!==\s*ACTIVE_COMMERCE_PAYMENT_MODE[\s\S]*?"portone_archived"/,
   );
   assert.match(
     checkoutRoute,
-    /error\.code\s*===\s*"PT409"[\s\S]*?paymentModeChangedResponse/,
+    /if\s*\(PORTONE_COMMERCE_ENABLED\)[\s\S]*?checkoutWithPortOne/,
   );
+  assert.match(runtimeMode, /if\s*\(!PORTONE_COMMERCE_ENABLED\)/);
+  assert.match(runtimeMode, /"portone_archived"/);
+  assert.match(paymentSyncRoute, /requirePortOneRuntimeMode\(authentication\.admin\)/);
   assert.match(
-    checkoutRoute,
-    /error:\s*"payment_mode_changed"[\s\S]*?409/,
+    webhookRoute,
+    /if\s*\(!PORTONE_COMMERCE_ENABLED\)[\s\S]*?reason:\s*"portone_archived"/,
   );
-  const portoneLock = commerceMigration.indexOf(
-    "v_settings.active_mode <> 'portone'",
+  assert.match(policyMigration, /set active_mode = 'manual_transfer'/);
+  assert.match(
+    policyMigration,
+    /p_active_mode = 'portone'[\s\S]*?별도 재활성화 마이그레이션/,
   );
-  const manualLock = commerceMigration.indexOf(
-    "v_settings.active_mode <> 'manual_transfer'",
-  );
-  const firstOrderInsert = commerceMigration.indexOf(
-    "insert into public.commerce_orders",
-  );
-  const manualOrderInsert = commerceMigration.indexOf(
-    "insert into public.commerce_orders",
-    manualLock,
-  );
-  assert.ok(portoneLock >= 0 && portoneLock < firstOrderInsert);
-  assert.ok(manualLock >= 0 && manualLock < manualOrderInsert);
-  assert.match(commerceMigration, /errcode = 'PT409'/);
+  assert.doesNotMatch(policyMigration, /drop table|drop function/i);
   assert.match(
     commerceClient,
     /latest\?\.user\.id\s*===\s*expectedUserId\s*&&\s*latest\.access_token\s*===\s*token/,

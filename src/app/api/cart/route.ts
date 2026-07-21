@@ -1,5 +1,7 @@
 import { authenticateMemberRlsRequest, commerceJson } from "@/lib/commerce/server";
+import { ACTIVE_COMMERCE_PAYMENT_MODE } from "@/lib/commerce/paymentMode";
 import { getCatalogImageUrl } from "@/lib/images";
+import { getManualTransferAccount } from "@/lib/manualTransferConfig";
 import { mapPublishedProduct } from "@/services/products";
 
 export async function GET(request: Request) {
@@ -7,21 +9,12 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
   const { data, error } = await auth.user.rpc("get_my_cart_reservations");
   if (error) return commerceJson({ error: "cart_unavailable" }, 503);
-  const { data: paymentRows, error: paymentStatusError } = await auth.user.rpc(
-    "get_commerce_payment_status",
-  );
-  const paymentStatus = Array.isArray(paymentRows)
-    ? paymentRows[0]
-    : paymentRows;
-  if (
-    paymentStatusError ||
-    !paymentStatus ||
-    (paymentStatus.active_mode !== "manual_transfer" &&
-      paymentStatus.active_mode !== "portone")
-  ) {
+  try {
+    getManualTransferAccount();
+  } catch {
     return commerceJson({ error: "payment_status_unavailable" }, 503);
   }
-  const paymentMode = paymentStatus.active_mode;
+  const paymentMode = ACTIVE_COMMERCE_PAYMENT_MODE;
   const reservations = data ?? [];
   const ids = reservations.map((item) => item.product_id);
   if (ids.length === 0) {

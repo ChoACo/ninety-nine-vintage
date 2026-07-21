@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { PORTONE_COMMERCE_ENABLED } from "@/lib/commerce/paymentMode";
 import { PortOneIntegrationError } from "./server";
 
 export type PaymentRuntimeMode = "manual_transfer" | "portone";
@@ -40,6 +41,13 @@ export async function getPaymentRuntimeMode(
 export async function requirePortOneRuntimeMode(
   admin: SupabaseClient,
 ): Promise<void> {
+  if (!PORTONE_COMMERCE_ENABLED) {
+    throw new PortOneIntegrationError(
+      "portone_archived",
+      "PortOne is archived while bank transfer is the only live payment path.",
+      410,
+    );
+  }
   if ((await getPaymentRuntimeMode(admin)) !== "portone") {
     throw new PortOneIntegrationError(
       "portone_temporarily_disabled",

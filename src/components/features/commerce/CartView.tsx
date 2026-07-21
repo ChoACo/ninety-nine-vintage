@@ -6,19 +6,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { persistCart } from "@/lib/commerce/client";
+import { COMMERCE_CHECKOUT_STORAGE_KEY } from "@/lib/commerce/checkoutStorage";
 import {
   readCommercePaymentMode,
   type CommercePaymentMode,
 } from "@/lib/commerce/paymentMode";
 import { useCommerceStore } from "@/store/useCommerceStore";
 import { CatalogImage } from "@/components/ui/CatalogImage";
-import {
-  COMMERCE_CHECKOUT_STORAGE_KEY,
-  isConfirmedProductPayment,
-  ProductPaymentError,
-  requestPreparedProductPayment,
-  type ProductPaymentMethod,
-} from "@/lib/portone/payment";
 
 interface PublishedFixedProduct {
   id: string;
@@ -75,12 +69,9 @@ interface CheckoutTransfer {
 interface StoredCheckoutRequest {
   idempotencyKey: string;
   buyerId: string;
-  payMethod: ProductPaymentMethod;
   productSignature: string;
   productIds: string[];
   productSnapshots: CartProduct[];
-  commerceOrderId?: string;
-  paymentId?: string;
   ledgerMayExist: boolean;
 }
 
@@ -88,17 +79,12 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const IDEMPOTENCY_KEY_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const PAYMENT_ID_PATTERN = /^[A-Za-z0-9]{6,40}$/;
 const DEFINITELY_PRE_LEDGER_ERRORS = new Set([
   "unauthorized",
   "forbidden",
   "member_required",
   "member_unavailable",
   "service_unavailable",
-  "portone_configuration_missing",
-  "portone_store_id_invalid",
-  "portone_channel_key_invalid",
-  "portone_channel_mode_invalid",
   "manual_transfer_configuration_missing",
   "payment_status_unavailable",
   "invalid_expected_payment_mode",
@@ -114,12 +100,6 @@ const conditionLabels: Record<CartProduct["condition"], string> = {
 
 function createProductSignature(productIds: readonly string[]): string {
   return [...productIds].sort().join(",");
-}
-
-function isProductPaymentMethod(value: unknown): value is ProductPaymentMethod {
-  return (
-    value === "CARD" || value === "EASY_PAY" || value === "VIRTUAL_ACCOUNT"
-  );
 }
 
 function isSafeImageUrl(value: unknown): value is string {
@@ -210,19 +190,6 @@ const checkoutErrorMessages: Record<string, string> = {
     "카카오 회원 상태와 필수 프로필을 확인한 뒤 다시 시도해 주세요.",
   payment_not_available:
     "현재 장바구니 상품을 결제할 수 없습니다. 상품 상태를 다시 확인해 주세요.",
-  portone_configuration_missing:
-    "결제 서버 설정이 아직 완료되지 않았습니다. 운영팀에 문의해 주세요.",
-  portone_store_id_invalid:
-    "PortOne 상점 설정을 확인 중입니다. 운영팀에 문의해 주세요.",
-  portone_channel_key_invalid:
-    "PortOne 결제 채널 설정을 확인 중입니다. 운영팀에 문의해 주세요.",
-  portone_channel_mode_invalid:
-    "PortOne 결제 채널 모드 설정을 확인 중입니다. 운영팀에 문의해 주세요.",
-  portone_preregister_failed:
-    "결제 금액 사전 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-  prepare_failed: "결제를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.",
-  prepare_invalid_response:
-    "결제 준비 결과를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   checkout_failed: "주문을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   order_creation_failed:
     "주문 원장을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -276,14 +243,6 @@ function readCheckoutErrorCode(value: unknown): string | null {
     : null;
 }
 
-function readPreparedPaymentId(value: unknown): string | null {
-  if (!value || typeof value !== "object") return null;
-  const paymentId = (value as Record<string, unknown>).paymentId;
-  return typeof paymentId === "string" && PAYMENT_ID_PATTERN.test(paymentId)
-    ? paymentId
-    : null;
-}
-
 function readStoredCheckoutRequest(options?: {
   buyerId?: string;
   productSignature?: string;
@@ -302,7 +261,8 @@ function readStoredCheckoutRequest(options?: {
       typeof parsed.buyerId === "string" &&
       UUID_PATTERN.test(parsed.buyerId) &&
       (!options?.buyerId || parsed.buyerId === options.buyerId) &&
-      isProductPaymentMethod(parsed.payMethod) &&
+      parsed.paymentId === undefined &&
+      parsed.commerceOrderId === undefined &&
       typeof parsed.idempotencyKey === "string" &&
       IDEMPOTENCY_KEY_PATTERN.test(parsed.idempotencyKey) &&
       Array.isArray(productIds) &&
@@ -326,19 +286,10 @@ function readStoredCheckoutRequest(options?: {
     ) {
       return {
         buyerId: parsed.buyerId,
-        payMethod: parsed.payMethod,
         idempotencyKey: parsed.idempotencyKey,
         productSignature: parsed.productSignature,
         productIds: [...productIds],
         productSnapshots: snapshots,
-        ...(typeof parsed.commerceOrderId === "string" &&
-        UUID_PATTERN.test(parsed.commerceOrderId)
-          ? { commerceOrderId: parsed.commerceOrderId }
-          : {}),
-        ...(typeof parsed.paymentId === "string" &&
-        PAYMENT_ID_PATTERN.test(parsed.paymentId)
-          ? { paymentId: parsed.paymentId }
-          : {}),
         // Older saved requests may already have reached the server. Treat an
         // absent marker as ambiguous and only permit an explicit resume.
         ledgerMayExist: parsed.ledgerMayExist !== false,
@@ -348,60 +299,6 @@ function readStoredCheckoutRequest(options?: {
     // Session storage is an optimization; the in-memory key still protects a retry.
   }
   return null;
-}
-
-function normalizeRecoveredCheckoutRequest(
-  value: unknown,
-  buyerId: string,
-  commerceOrderId: string,
-): StoredCheckoutRequest | null {
-  if (!value || typeof value !== "object") return null;
-  const recovery = (value as Record<string, unknown>).recovery;
-  if (!recovery || typeof recovery !== "object") return null;
-  const candidate = recovery as Record<string, unknown>;
-  const productIds = candidate.productIds;
-  const rawSnapshots = candidate.productSnapshots;
-  const snapshots = Array.isArray(rawSnapshots)
-    ? rawSnapshots.map(normalizeProductSnapshot)
-    : [];
-  if (
-    candidate.buyerId !== buyerId ||
-    typeof candidate.idempotencyKey !== "string" ||
-    !IDEMPOTENCY_KEY_PATTERN.test(candidate.idempotencyKey) ||
-    typeof candidate.paymentId !== "string" ||
-    !PAYMENT_ID_PATTERN.test(candidate.paymentId) ||
-    !isProductPaymentMethod(candidate.payMethod) ||
-    !Array.isArray(productIds) ||
-    productIds.length < 1 ||
-    productIds.length > 50 ||
-    !productIds.every(
-      (productId): productId is string =>
-        typeof productId === "string" && UUID_PATTERN.test(productId),
-    ) ||
-    new Set(productIds).size !== productIds.length ||
-    snapshots.length !== productIds.length ||
-    !snapshots.every((snapshot): snapshot is CartProduct => snapshot !== null)
-  ) {
-    return null;
-  }
-  const productSignature = createProductSignature(productIds);
-  if (
-    createProductSignature(snapshots.map((snapshot) => snapshot.id)) !==
-    productSignature
-  ) {
-    return null;
-  }
-  return {
-    buyerId,
-    commerceOrderId,
-    idempotencyKey: candidate.idempotencyKey,
-    paymentId: candidate.paymentId,
-    payMethod: candidate.payMethod,
-    productIds: [...productIds],
-    productSnapshots: snapshots,
-    productSignature,
-    ledgerMayExist: true,
-  };
 }
 
 function storeCheckoutRequest(request: StoredCheckoutRequest): void {
@@ -480,7 +377,6 @@ export function CartView() {
   const [staleCount, setStaleCount] = useState(0);
   const [serverClockOffset, setServerClockOffset] = useState(0);
   const [reservationClock, setReservationClock] = useState(() => Date.now());
-  const [payMethod, setPayMethod] = useState<ProductPaymentMethod>("CARD");
   const [paymentMode, setPaymentMode] = useState<CartPaymentMode>("loading");
   const [heldCheckoutIds, setHeldCheckoutIds] = useState<string[]>([]);
   const [releaseCheckoutAllowed, setReleaseCheckoutAllowed] = useState(false);
@@ -533,7 +429,6 @@ export function CartView() {
       replaceCart([]);
       setStaleCount(0);
       setServerClockOffset(0);
-      setPayMethod("CARD");
       setPaymentMode("loading");
       setMessage("");
       setMessageKind("success");
@@ -572,10 +467,9 @@ export function CartView() {
 
       try {
         const stored = readStoredCheckoutRequest({ buyerId });
-        let activeRequest = stored;
+        const activeRequest = stored;
         if (activeRequest) {
           checkoutRequest.current = activeRequest;
-          setPayMethod(activeRequest.payMethod);
           setHeldCheckoutIds(activeRequest.productIds);
           setRestoredCheckoutProducts(activeRequest.productSnapshots);
           setReleaseCheckoutAllowed(!activeRequest.ledgerMayExist);
@@ -590,70 +484,11 @@ export function CartView() {
         const requestedResumeOrder = new URLSearchParams(
           window.location.search,
         ).get("resumeOrder");
-        const resumeOrderId =
-          requestedResumeOrder && UUID_PATTERN.test(requestedResumeOrder)
-            ? requestedResumeOrder
-            : null;
-        if (requestedResumeOrder && !resumeOrderId) {
-          setMessageKind("error");
-          setMessage("복구할 주문 번호가 올바르지 않습니다.");
-        } else if (
-          resumeOrderId &&
-          activeRequest &&
-          activeRequest.commerceOrderId !== resumeOrderId
-        ) {
+        if (requestedResumeOrder) {
           setMessageKind("error");
           setMessage(
-            "이미 저장된 다른 결제 요청이 있습니다. 해당 요청을 먼저 재개하거나 주문 상태를 확인해 주세요.",
+            "PortOne 테스트 결제 재개는 중단되었습니다. 내 주문에서 기존 주문 상태를 확인해 주세요.",
           );
-        } else if (resumeOrderId && !activeRequest) {
-          try {
-            const recoveryResponse = await fetch(
-              `/api/orders/${encodeURIComponent(resumeOrderId)}`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-                cache: "no-store",
-              },
-            );
-            if (!isCurrent()) return;
-            const recoveryPayload = await recoveryResponse
-              .json()
-              .catch(() => null);
-            if (!isCurrent()) return;
-            const recovered = recoveryResponse.ok
-              ? normalizeRecoveredCheckoutRequest(
-                  recoveryPayload,
-                  buyerId,
-                  resumeOrderId,
-                )
-              : null;
-            if (!recovered) {
-              throw new Error(
-                recoveryResponse.status === 404
-                  ? "복구할 주문을 찾지 못했습니다."
-                  : "이 주문은 결제를 재개할 수 없습니다. 주문 상태를 확인해 주세요.",
-              );
-            }
-            activeRequest = recovered;
-            checkoutRequest.current = recovered;
-            setPayMethod(recovered.payMethod);
-            setHeldCheckoutIds(recovered.productIds);
-            setRestoredCheckoutProducts(recovered.productSnapshots);
-            setReleaseCheckoutAllowed(false);
-            storeCheckoutRequest(recovered);
-            setMessageKind("success");
-            setMessage(
-              "서버 주문 원장에서 기존 결제 번호를 복원했습니다. 결제 재개를 눌러 주세요.",
-            );
-          } catch (error) {
-            if (!isCurrent()) return;
-            setMessageKind("error");
-            setMessage(
-              error instanceof Error
-                ? error.message
-                : "주문 복구 정보를 확인하지 못했습니다.",
-            );
-          }
         }
         if (!isCurrent()) return;
         setAccess("member");
@@ -687,10 +522,7 @@ export function CartView() {
           items?: PublishedFixedProduct[];
         };
         if (!isCurrent()) return;
-        if (
-          payload.paymentMode !== "manual_transfer" &&
-          payload.paymentMode !== "portone"
-        ) {
+        if (payload.paymentMode !== "manual_transfer") {
           setPaymentMode("unavailable");
           setMessageKind("error");
           setMessage(
@@ -819,10 +651,10 @@ export function CartView() {
       products.length === 0
     )
       return;
-    if (paymentMode !== "manual_transfer" && paymentMode !== "portone") {
+    if (paymentMode !== "manual_transfer") {
       setMessageKind("error");
       setMessage(
-        "결제 운영 모드를 확인하지 못했습니다. 잠시 후 새로고침해 주세요.",
+        "수동 계좌이체 설정을 확인하지 못했습니다. 잠시 후 새로고침해 주세요.",
       );
       return;
     }
@@ -856,7 +688,6 @@ export function CartView() {
         pendingRequest?.productIds ??
         checkoutProducts.map((product) => product.id);
       const productSnapshots = checkoutProducts.map(createProductSnapshot);
-      const effectivePayMethod = pendingRequest?.payMethod ?? payMethod;
       // The order RPC reserves products and removes the server cart. Retain the
       // current rows locally until payment is actually verified or abandoned.
       setHeldCheckoutIds(productIds);
@@ -865,7 +696,6 @@ export function CartView() {
       const currentRequest: StoredCheckoutRequest = {
         ...(pendingRequest ?? {
           buyerId,
-          payMethod: effectivePayMethod,
           productSignature,
           idempotencyKey: crypto.randomUUID(),
           ledgerMayExist: false,
@@ -887,7 +717,6 @@ export function CartView() {
         body: JSON.stringify({
           productIds,
           idempotencyKey: currentRequest.idempotencyKey,
-          payMethod: effectivePayMethod,
           expectedPaymentMode,
         }),
       });
@@ -913,9 +742,7 @@ export function CartView() {
           setMessageKind("error");
           setMessage(
             refreshedMode
-              ? `결제 방식이 ${
-                  refreshedMode === "portone" ? "PortOne 결제" : "수동 계좌이체"
-                }로 변경되었습니다. 변경된 내용을 확인한 뒤 결제 버튼을 다시 눌러 주세요.`
+              ? "결제 방식은 수동 계좌이체로 고정되어 있습니다. 새로고침 후 다시 주문해 주세요."
               : checkoutErrorMessages.payment_mode_changed,
           );
           return;
@@ -947,92 +774,6 @@ export function CartView() {
       }
       if (!isCheckoutOrder(checkout.order)) {
         throw new Error("주문 서버의 주문 정보를 확인하지 못했습니다.");
-      }
-
-      if (checkout.mode === "portone") {
-        const preparedPaymentId = readPreparedPaymentId(checkout.payment);
-        if (
-          currentRequest.paymentId &&
-          preparedPaymentId !== currentRequest.paymentId
-        ) {
-          throw new Error(
-            "저장된 결제 번호와 서버 결제 번호가 일치하지 않습니다. 주문 내역을 확인해 주세요.",
-          );
-        }
-        if (
-          currentRequest.commerceOrderId &&
-          checkout.order.id !== currentRequest.commerceOrderId
-        ) {
-          throw new Error(
-            "저장된 주문과 서버 주문이 일치하지 않습니다. 주문 내역을 확인해 주세요.",
-          );
-        }
-        if (preparedPaymentId) {
-          const preparedRequest = {
-            ...dispatchedRequest,
-            commerceOrderId: checkout.order.id,
-            paymentId: preparedPaymentId,
-          };
-          checkoutRequest.current = preparedRequest;
-          storeCheckoutRequest(preparedRequest);
-        }
-        let result: Awaited<ReturnType<typeof requestPreparedProductPayment>>;
-        try {
-          result = await requestPreparedProductPayment({
-            payment: checkout.payment,
-            payMethod: effectivePayMethod,
-          });
-          if (
-            authGeneration.current !== checkoutGeneration ||
-            authUserId.current !== buyerId
-          ) {
-            throw new CheckoutSessionChangedError();
-          }
-        } catch (error) {
-          if (
-            authGeneration.current !== checkoutGeneration ||
-            authUserId.current !== buyerId
-          ) {
-            throw new CheckoutSessionChangedError();
-          }
-          if (
-            error instanceof ProductPaymentError &&
-            error.code === "payment_terminal"
-          ) {
-            removePurchasedFromCart(productIds);
-            productIds.forEach((productId) => {
-              void persistCart(productId, false, buyerId);
-            });
-            invalidateCheckoutRequest();
-            setMessageKind("success");
-            setMessage(
-              `주문 ${checkout.order.id}은 이미 취소 또는 환불 상태입니다. 추가 결제창을 열지 않았습니다.`,
-            );
-            return;
-          }
-          throw error;
-        }
-        if (!isConfirmedProductPayment(result)) {
-          setMessage(
-            `주문 ${checkout.order.id}의 결제 상태를 확인 중입니다. 같은 결제 버튼으로 다시 확인하거나 내 주문에서 상태를 확인해 주세요.`,
-          );
-          return;
-        }
-
-        removePurchasedFromCart(productIds);
-        productIds.forEach(
-          (productId) => void persistCart(productId, false, buyerId),
-        );
-        setHeldCheckoutIds([]);
-        setRestoredCheckoutProducts([]);
-        checkoutRequest.current = null;
-        clearStoredCheckoutRequest();
-        setMessage(
-          result.paymentStatus === "가상계좌발급"
-            ? `주문 ${checkout.order.id}의 가상계좌가 발급되었습니다. 내 주문에서 입금 정보를 확인해 주세요.`
-            : `주문 ${checkout.order.id}의 결제가 완료되었습니다.`,
-        );
-        return;
       }
 
       if (checkout.mode !== "manual_transfer") {
@@ -1101,16 +842,14 @@ export function CartView() {
   const checkoutDisabled =
     busy ||
     reservationExpired ||
-    (paymentMode !== "manual_transfer" && paymentMode !== "portone");
+    paymentMode !== "manual_transfer";
   const checkoutButtonLabel = busy
     ? "결제 준비 중..."
     : reservationExpired
       ? "재고 점유 만료"
       : paymentMode === "manual_transfer"
         ? "주문하고 입금계좌 확인"
-        : paymentMode === "portone"
-          ? "결제하기"
-          : "결제 설정 확인 중";
+        : "결제 설정 확인 중";
 
   return (
     <div className="space-y-10">
@@ -1307,29 +1046,7 @@ export function CartView() {
                 {total.toLocaleString("ko-KR")}원
               </strong>
             </div>
-            {paymentMode === "portone" ? (
-              <>
-                <label
-                  className="mt-6 block text-[11px] font-bold"
-                  htmlFor="cart-pay-method"
-                >
-                  결제 방법
-                </label>
-                <select
-                  className="mt-2 h-11 w-full border border-line bg-paper px-3 text-xs"
-                  disabled={busy || hasPendingCheckout}
-                  id="cart-pay-method"
-                  onChange={(event) =>
-                    setPayMethod(event.target.value as ProductPaymentMethod)
-                  }
-                  value={payMethod}
-                >
-                  <option value="CARD">신용·체크카드</option>
-                  <option value="EASY_PAY">카카오페이</option>
-                  <option value="VIRTUAL_ACCOUNT">가상계좌</option>
-                </select>
-              </>
-            ) : paymentMode === "manual_transfer" ? (
+            {paymentMode === "manual_transfer" ? (
               <div className="mt-6 border border-line bg-paper px-3 py-3 text-xs">
                 <p className="font-bold">수동 계좌이체</p>
                 <p className="mt-1 text-[11px] text-muted">

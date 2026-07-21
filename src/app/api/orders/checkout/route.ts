@@ -4,7 +4,9 @@ import {
   normalizeIds,
 } from "@/lib/commerce/server";
 import {
+  ACTIVE_COMMERCE_PAYMENT_MODE,
   paymentModeMatches,
+  PORTONE_COMMERCE_ENABLED,
   readCommercePaymentMode,
   type CommercePaymentMode,
 } from "@/lib/commerce/paymentMode";
@@ -403,27 +405,38 @@ export async function POST(request: Request) {
   if (!expectedPaymentMode) {
     return commerceJson({ error: "invalid_expected_payment_mode" }, 400);
   }
+  if (expectedPaymentMode !== ACTIVE_COMMERCE_PAYMENT_MODE) {
+    return commerceJson(
+      {
+        error: "portone_archived",
+        paymentMode: ACTIVE_COMMERCE_PAYMENT_MODE,
+      },
+      409,
+    );
+  }
 
   try {
-    const mode = await getPaymentRuntimeMode(auth.admin);
-    if (!paymentModeMatches(expectedPaymentMode, mode)) {
-      return paymentModeChangedResponse(auth, mode);
+    if (PORTONE_COMMERCE_ENABLED) {
+      const mode = await getPaymentRuntimeMode(auth.admin);
+      if (!paymentModeMatches(expectedPaymentMode, mode)) {
+        return paymentModeChangedResponse(auth, mode);
+      }
+      if (mode === "portone") {
+        if (!isPortOnePayMethod(body?.payMethod)) {
+          return commerceJson({ error: "지원하지 않는 결제수단입니다." }, 400);
+        }
+        return checkoutWithPortOne(
+          auth,
+          productIds,
+          idempotencyKey,
+          body.payMethod,
+        );
+      }
     }
-    if (expectedPaymentMode === "manual_transfer") {
-      return checkoutWithManualTransfer(
-        auth,
-        productIds,
-        idempotencyKey,
-      );
-    }
-    if (!isPortOnePayMethod(body?.payMethod)) {
-      return commerceJson({ error: "지원하지 않는 결제수단입니다." }, 400);
-    }
-    return checkoutWithPortOne(
+    return checkoutWithManualTransfer(
       auth,
       productIds,
       idempotencyKey,
-      body.payMethod,
     );
   } catch (error) {
     logPortOneServerError("commerce_checkout", error);

@@ -34,7 +34,9 @@ begin
       message = '경매 cron 드레인 검증을 위해 cron.log_run=on이 필요합니다.';
   end if;
 
-  lock table cron.job in share row exclusive mode nowait;
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('ninety-nine:manual-transfer-cron-rollout', 0)
+  );
 
   select count(*)::integer
   into v_snapshot_count
@@ -93,8 +95,7 @@ begin
     v_current_username,
     v_current_active
   from cron.job as jobs
-  where jobs.jobname = v_snapshot_job_name
-  for update;
+  where jobs.jobname = v_snapshot_job_name;
 
   if v_job_id is distinct from v_snapshot_job_id
      or v_current_schedule is distinct from v_original_schedule

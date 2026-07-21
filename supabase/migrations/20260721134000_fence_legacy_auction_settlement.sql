@@ -132,7 +132,13 @@ begin
       message = '경매 cron 드레인 검증을 위해 cron.log_run=on이 필요합니다.';
   end if;
 
-  lock table cron.job in share row exclusive mode nowait;
+  -- Supabase's migration role may call cron.alter_job but cannot lock the
+  -- extension-owned cron.job table directly. Serialize every rollout phase
+  -- with one transaction advisory lock and fail closed on the exact contract
+  -- checks below if an out-of-band cron edit races this deployment.
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('ninety-nine:manual-transfer-cron-rollout', 0)
+  );
 
   select count(*)::integer, min(jobs.jobid)
   into v_job_count, v_job_id
@@ -161,8 +167,7 @@ begin
     v_original_active
   from cron.job as jobs
   where jobs.jobid = v_job_id
-    and jobs.jobname = 'process-auction-purchase-offers'
-  for update;
+    and jobs.jobname = 'process-auction-purchase-offers';
 
   if v_job_name is null then
     raise exception using

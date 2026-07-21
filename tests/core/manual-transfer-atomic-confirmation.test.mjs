@@ -221,14 +221,26 @@ test("phase one disables every legacy settlement mutation until phase two succee
   }
 
   for (const [label, phase] of [
+    ["phase zero", fenceMigration],
     ["phase one", revokeMigration],
     ["phase two", migration],
   ]) {
     expectMatch(
       phase,
-      /lock\s+table\s+cron\.job\s+in\s+share\s+row\s+exclusive\s+mode\s+nowait/i,
-      `${label} must fence concurrent cron metadata writers`,
+      /pg_catalog\.pg_advisory_xact_lock\s*\(\s*pg_catalog\.hashtextextended\s*\(\s*'ninety-nine:manual-transfer-cron-rollout'\s*,\s*0\s*\)\s*\)/i,
+      `${label} must serialize cron rollout metadata changes`,
     );
+    assert.doesNotMatch(
+      phase,
+      /lock\s+table\s+cron\.job/i,
+      `${label} must not require extension-table privileges unavailable to Supabase migrations`,
+    );
+  }
+
+  for (const [label, phase] of [
+    ["phase one", revokeMigration],
+    ["phase two", migration],
+  ]) {
     expectMatch(
       phase,
       /from\s+app_private\.manual_transfer_cron_rollout_state[\s\S]{0,180}restored_at\s+is\s+null/i,

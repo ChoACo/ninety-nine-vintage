@@ -44,6 +44,17 @@ interface PreparedCommercePaymentRow {
   can_retry_payment: boolean;
 }
 
+interface ManualTransferCheckoutResult {
+  order: Record<string, unknown> & { id: string; total: number };
+  transfer: Record<string, unknown> & {
+    order_id: string;
+    expected_amount: number;
+    bank_name_snapshot: string;
+    account_number_snapshot: string;
+    status: "awaiting_transfer" | "partially_paid" | "confirmed";
+  };
+}
+
 type MemberCommerceAuth = Extract<
   Awaited<ReturnType<typeof authenticateMemberCommerceRequest>>,
   { ok: true }
@@ -89,6 +100,35 @@ function isConsistentPreparedPaymentState(
     prepared.portone_status === "CANCELLED" &&
     prepared.payment_status === "대기중"
   );
+}
+
+function readManualTransferCheckout(
+  value: unknown,
+): ManualTransferCheckoutResult | null {
+  if (!value || typeof value !== "object") return null;
+  const checkout = value as Record<string, unknown>;
+  if (!checkout.order || typeof checkout.order !== "object") return null;
+  if (!checkout.transfer || typeof checkout.transfer !== "object") return null;
+  const order = checkout.order as Record<string, unknown>;
+  const transfer = checkout.transfer as Record<string, unknown>;
+  if (
+    typeof order.id !== "string" ||
+    !order.id ||
+    !Number.isSafeInteger(order.total) ||
+    (order.total as number) < 1 ||
+    transfer.order_id !== order.id ||
+    transfer.expected_amount !== order.total ||
+    typeof transfer.bank_name_snapshot !== "string" ||
+    !transfer.bank_name_snapshot.trim() ||
+    typeof transfer.account_number_snapshot !== "string" ||
+    !transfer.account_number_snapshot.trim() ||
+    !["awaiting_transfer", "partially_paid", "confirmed"].includes(
+      transfer.status as string,
+    )
+  ) {
+    return null;
+  }
+  return { order, transfer } as ManualTransferCheckoutResult;
 }
 
 function rpcFailureStatus(code: string | undefined): number {
@@ -189,11 +229,14 @@ async function checkoutWithManualTransfer(
     );
   }
 
-  const { data, error } = await auth.user.rpc("create_commerce_order", {
-    p_product_ids: productIds,
-    p_idempotency_key: idempotencyKey,
-    p_apply_shipping_credit: false,
-  });
+  const { data, error } = await auth.user.rpc(
+    "create_commerce_manual_transfer_checkout",
+    {
+      p_product_ids: productIds,
+      p_idempotency_key: idempotencyKey,
+      p_apply_shipping_credit: false,
+    },
+  );
   if (error) {
     if (error.code === "PT409") {
       return paymentModeChangedResponse(auth);
@@ -207,23 +250,16 @@ async function checkoutWithManualTransfer(
     );
   }
 
-  const order = data as { id?: string; total?: number } | null;
-  let transfer: Record<string, unknown> | null = null;
-  if (order?.id) {
-    const { data: createdTransfer, error: transferError } =
-      await auth.user.rpc("create_commerce_order_transfer", {
-        p_order_id: order.id,
-      });
-    if (transferError || !createdTransfer) {
-      return commerceJson(
-        { error: "transfer_creation_failed" },
-        503,
-      );
-    }
-    transfer = createdTransfer as Record<string, unknown>;
+  const checkout = readManualTransferCheckout(data);
+  if (!checkout) {
+    return commerceJson({ error: "checkout_invalid_response" }, 500);
   }
   return commerceJson(
-    { mode: "manual_transfer", order: data, transfer },
+    {
+      mode: "manual_transfer",
+      order: checkout.order,
+      transfer: checkout.transfer,
+    },
     201,
   );
 }

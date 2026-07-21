@@ -1,71 +1,78 @@
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
-import type { Database } from "@/lib/supabase/database.types";
 
 export async function GET(request: Request) {
   const auth = await authenticateStaffRequest(request); if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner") return commerceJson({ error: "forbidden" }, 403);
-  const [{ data: shipping }, { data: transfers }, { data: orders }, { data: attempts }, { data: feePayments }, { data: auctionTransfers }] = await Promise.all([
+  const [{ data: shipping, error: shippingError }, { data: transfers, error: transferError }, { data: orders, error: orderError }, { data: attempts, error: attemptError }, { data: feePayments, error: feePaymentError }, { data: auctionTransfers, error: auctionTransferError }] = await Promise.all([
     auth.admin.from("shipping_requests").select("*").order("requested_at", { ascending: false }).limit(200),
-    auth.admin.from("commerce_order_transfers").select("*").order("requested_at", { ascending: false }).limit(200),
+    auth.admin.from("commerce_order_transfers").select("*").in("status", ["awaiting_transfer", "partially_paid"]).order("requested_at", { ascending: false }).limit(501),
     auth.admin.from("commerce_orders").select("*").order("created_at", { ascending: false }).limit(200),
     auth.admin.from("payment_attempts").select("*").order("created_at", { ascending: false }).limit(200),
-    auth.admin.from("shipping_fee_payments").select("*").order("requested_at", { ascending: false }).limit(200),
-    auth.admin.from("manual_transfer_orders").select("id, product_id, order_name, expected_amount, status, requested_at, confirmed_at").order("requested_at", { ascending: false }).limit(200),
+    auth.admin.from("shipping_fee_payments").select("*").in("status", ["awaiting_transfer", "partially_paid"]).order("requested_at", { ascending: false }).limit(501),
+    auth.admin.from("manual_transfer_orders").select("id, product_id, order_name, expected_amount, status, requested_at, confirmed_at").eq("status", "awaiting_manual_transfer").order("requested_at", { ascending: false }).limit(501),
   ]);
+  if (shippingError || transferError || orderError || attemptError || feePaymentError || auctionTransferError) {
+    return commerceJson({ error: "owner_operations_unavailable" }, 503);
+  }
+  if (
+    (transfers ?? []).length > 500 ||
+    (feePayments ?? []).length > 500 ||
+    (auctionTransfers ?? []).length > 500
+  ) {
+    return commerceJson({ error: "owner_operations_queue_limit_exceeded" }, 503);
+  }
   const transferIds = (transfers ?? []).map((transfer) => transfer.id);
   const auctionTransferIds = (auctionTransfers ?? []).map((transfer) => transfer.id);
   const feePaymentIds = (feePayments ?? []).map((payment) => payment.id);
-  type LedgerEntry = Database["public"]["Tables"]["manual_transfer_payment_ledger"]["Row"];
-  let ledger: LedgerEntry[] = [];
-  const ledgerFilters = [
-    transferIds.length > 0 ? `commerce_order_transfer_id.in.(${transferIds.join(",")})` : null,
-    auctionTransferIds.length > 0 ? `manual_transfer_order_id.in.(${auctionTransferIds.join(",")})` : null,
-    feePaymentIds.length > 0 ? `shipping_fee_payment_id.in.(${feePaymentIds.join(",")})` : null,
-  ].filter((filter): filter is string => Boolean(filter));
-  if (ledgerFilters.length > 0) {
-    const { data } = await auth.admin.from("manual_transfer_payment_ledger").select("*")
-      .or(ledgerFilters.join(","))
-      .order("created_at", { ascending: false });
-    ledger = data ?? [];
+  const [commerceBalanceResult, auctionBalanceResult, feeBalanceResult] = await Promise.all([
+    transferIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : auth.user.rpc("get_manual_transfer_ledger_balances", { p_transfer_kind: "commerce", p_transfer_ids: transferIds }),
+    auctionTransferIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : auth.user.rpc("get_manual_transfer_ledger_balances", { p_transfer_kind: "auction", p_transfer_ids: auctionTransferIds }),
+    feePaymentIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : auth.user.rpc("get_manual_transfer_ledger_balances", { p_transfer_kind: "shipping", p_transfer_ids: feePaymentIds }),
+  ]);
+  if (commerceBalanceResult.error || auctionBalanceResult.error || feeBalanceResult.error) {
+    return commerceJson({ error: "owner_operations_unavailable" }, 503);
   }
-  const ledgerByTransfer = new Map<string, typeof ledger>();
-  for (const entry of ledger ?? []) {
-    if (!entry.commerce_order_transfer_id) continue;
-    ledgerByTransfer.set(entry.commerce_order_transfer_id, [
-      ...(ledgerByTransfer.get(entry.commerce_order_transfer_id) ?? []),
-      entry,
-    ]);
+  const commerceBalances = new Map((commerceBalanceResult.data ?? []).map((balance) => [balance.transfer_id, balance]));
+  const auctionBalances = new Map((auctionBalanceResult.data ?? []).map((balance) => [balance.transfer_id, balance]));
+  const feeBalances = new Map((feeBalanceResult.data ?? []).map((balance) => [balance.transfer_id, balance]));
+  const validBalance = (balance: { received_amount: number; ledger_entry_count: number } | undefined, expectedAmount: number) => Boolean(
+    balance &&
+    Number.isSafeInteger(balance.received_amount) &&
+    balance.received_amount >= 0 &&
+    balance.received_amount <= expectedAmount &&
+    Number.isSafeInteger(balance.ledger_entry_count) &&
+    balance.ledger_entry_count >= 0
+  );
+  if (
+    (commerceBalanceResult.data ?? []).length !== transferIds.length ||
+    commerceBalances.size !== transferIds.length ||
+    (auctionBalanceResult.data ?? []).length !== auctionTransferIds.length ||
+    auctionBalances.size !== auctionTransferIds.length ||
+    (feeBalanceResult.data ?? []).length !== feePaymentIds.length ||
+    feeBalances.size !== feePaymentIds.length ||
+    (transfers ?? []).some((transfer) => !validBalance(commerceBalances.get(transfer.id), transfer.expected_amount)) ||
+    (auctionTransfers ?? []).some((transfer) => !validBalance(auctionBalances.get(transfer.id), transfer.expected_amount)) ||
+    (feePayments ?? []).some((payment) => !validBalance(feeBalances.get(payment.id), payment.expected_amount))
+  ) {
+    return commerceJson({ error: "owner_operations_unavailable" }, 503);
   }
   const transfersWithBalance = (transfers ?? []).map((transfer) => {
-    const entries = ledgerByTransfer.get(transfer.id) ?? [];
-    const receivedAmount = entries.reduce((sum, entry) => sum + (entry.entry_type === "receipt" ? entry.amount : -entry.amount), 0);
-    return { ...transfer, receivedAmount, remainingAmount: Math.max(0, transfer.expected_amount - receivedAmount), ledger: entries };
+    const balance = commerceBalances.get(transfer.id)!;
+    return { ...transfer, receivedAmount: balance.received_amount, ledgerEntryCount: balance.ledger_entry_count, remainingAmount: transfer.expected_amount - balance.received_amount };
   });
-  const auctionLedgerByTransfer = new Map<string, typeof ledger>();
-  for (const entry of ledger ?? []) {
-    if (!entry.manual_transfer_order_id) continue;
-    auctionLedgerByTransfer.set(entry.manual_transfer_order_id, [
-      ...(auctionLedgerByTransfer.get(entry.manual_transfer_order_id) ?? []),
-      entry,
-    ]);
-  }
   const auctionTransfersWithBalance = (auctionTransfers ?? []).map((transfer) => {
-    const entries = auctionLedgerByTransfer.get(transfer.id) ?? [];
-    const receivedAmount = entries.reduce((sum, entry) => sum + (entry.entry_type === "receipt" ? entry.amount : -entry.amount), 0);
-    return { ...transfer, receivedAmount, remainingAmount: Math.max(0, transfer.expected_amount - receivedAmount), ledger: entries };
+    const balance = auctionBalances.get(transfer.id)!;
+    return { ...transfer, receivedAmount: balance.received_amount, ledgerEntryCount: balance.ledger_entry_count, remainingAmount: transfer.expected_amount - balance.received_amount };
   });
-  const feeLedgerByPayment = new Map<string, typeof ledger>();
-  for (const entry of ledger ?? []) {
-    if (!entry.shipping_fee_payment_id) continue;
-    feeLedgerByPayment.set(entry.shipping_fee_payment_id, [
-      ...(feeLedgerByPayment.get(entry.shipping_fee_payment_id) ?? []),
-      entry,
-    ]);
-  }
   const feePaymentsWithBalance = (feePayments ?? []).map((payment) => {
-    const entries = feeLedgerByPayment.get(payment.id) ?? [];
-    const receivedAmount = entries.reduce((sum, entry) => sum + (entry.entry_type === "receipt" ? entry.amount : -entry.amount), 0);
-    return { ...payment, receivedAmount, remainingAmount: Math.max(0, payment.expected_amount - receivedAmount), ledger: entries };
+    const balance = feeBalances.get(payment.id)!;
+    return { ...payment, receivedAmount: balance.received_amount, ledgerEntryCount: balance.ledger_entry_count, remainingAmount: payment.expected_amount - balance.received_amount };
   });
   return commerceJson({ shipping: shipping ?? [], transfers: transfersWithBalance, auctionTransfers: auctionTransfersWithBalance, orders: orders ?? [], attempts: attempts ?? [], feePayments: feePaymentsWithBalance });
 }

@@ -692,9 +692,12 @@ export type Database = {
           created_at: string
           currency: string
           due_at: string | null
+          due_at_before_payment_hold: string | null
           expected_amount: number
           id: string
+          offer_due_at_before_payment_hold: string | null
           order_name: string
+          payment_deadline_held_at: string | null
           product_id: string
           purchase_offer_id: string | null
           requested_at: string
@@ -713,9 +716,12 @@ export type Database = {
           created_at?: string
           currency?: string
           due_at?: string | null
+          due_at_before_payment_hold?: string | null
           expected_amount: number
           id?: string
+          offer_due_at_before_payment_hold?: string | null
           order_name: string
+          payment_deadline_held_at?: string | null
           product_id: string
           purchase_offer_id?: string | null
           requested_at?: string
@@ -734,9 +740,12 @@ export type Database = {
           created_at?: string
           currency?: string
           due_at?: string | null
+          due_at_before_payment_hold?: string | null
           expected_amount?: number
           id?: string
+          offer_due_at_before_payment_hold?: string | null
           order_name?: string
+          payment_deadline_held_at?: string | null
           product_id?: string
           purchase_offer_id?: string | null
           requested_at?: string
@@ -782,6 +791,7 @@ export type Database = {
           depositor_name: string | null
           entry_type: string
           id: string
+          idempotency_key: string | null
           manual_transfer_order_id: string | null
           memo: string
           recorded_by: string
@@ -796,6 +806,7 @@ export type Database = {
           depositor_name?: string | null
           entry_type: string
           id?: string
+          idempotency_key?: string | null
           manual_transfer_order_id?: string | null
           memo?: string
           recorded_by: string
@@ -810,6 +821,7 @@ export type Database = {
           depositor_name?: string | null
           entry_type?: string
           id?: string
+          idempotency_key?: string | null
           manual_transfer_order_id?: string | null
           memo?: string
           recorded_by?: string
@@ -2734,6 +2746,14 @@ export type Database = {
         Args: { p_include_shipped?: boolean }
         Returns: number
       }
+      create_commerce_manual_transfer_checkout: {
+        Args: {
+          p_apply_shipping_credit?: boolean
+          p_idempotency_key: string
+          p_product_ids: string[]
+        }
+        Returns: Json
+      }
       create_commerce_order: {
         Args: {
           p_apply_shipping_credit?: boolean
@@ -2822,6 +2842,26 @@ export type Database = {
           account_number: string | null
           bank_name: string | null
           updated_at: string | null
+        }[]
+      }
+      get_manual_transfer_ledger_balances: {
+        Args: { p_transfer_ids: string[]; p_transfer_kind: string }
+        Returns: {
+          ledger_entry_count: number
+          received_amount: number
+          transfer_id: string
+        }[]
+      }
+      get_shared_commerce_payment_order_summaries: {
+        Args: { p_order_ids: string[] }
+        Returns: {
+          created_at: string
+          item_count: number
+          items: Json
+          member_id: string
+          order_id: string
+          order_status: string
+          total: number
         }[]
       }
       get_manual_transfer_settings: {
@@ -3801,6 +3841,9 @@ export type Database = {
         Args: {
           p_amount: number
           p_depositor_name: string
+          p_expected_received_amount: number
+          p_expected_ledger_entry_count: number
+          p_idempotency_key: string
           p_memo?: string
           p_transfer_id: string
           p_transfer_kind: string
@@ -3843,6 +3886,9 @@ export type Database = {
         Args: {
           p_amount: number
           p_depositor_name: string
+          p_expected_received_amount: number
+          p_expected_ledger_entry_count: number
+          p_idempotency_key: string
           p_memo?: string
           p_payment_id: string
         }

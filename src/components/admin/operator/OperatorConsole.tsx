@@ -83,6 +83,7 @@ export function OperatorConsole() {
         const pastProductData =
           await pastProductResponse.json() as PastProductResponse;
         const orderData = await orderResponse.json() as {
+          error?: string;
           transfers?: { status: string }[];
         };
         const shippingData = await shippingResponse.json() as {
@@ -94,6 +95,11 @@ export function OperatorConsole() {
         if (!productResponse.ok) {
           throw new Error("운영자 권한을 확인할 수 없습니다.");
         }
+        if (!orderResponse.ok) {
+          throw new Error(
+            orderData.error ?? "공용 입금 큐를 불러오지 못했습니다.",
+          );
+        }
         setProducts(productData.products ?? []);
         setCanMutate(productData.permissions?.canMutate === true);
         setPaymentMode(
@@ -101,7 +107,9 @@ export function OperatorConsole() {
         );
         setOrders(
           orderData.transfers?.filter(
-            (transfer) => transfer.status === "awaiting_transfer",
+            (transfer) =>
+              transfer.status === "awaiting_transfer" ||
+              transfer.status === "partially_paid",
           ).length ?? 0,
         );
         setShipping(shippingData.requests?.length ?? 0);
@@ -122,7 +130,7 @@ export function OperatorConsole() {
       products.filter((product) => product.status === "active").length,
       Package,
     ],
-    ["입금 확인 대기", orders, Clock3],
+    ["공용 입금 확인 대기", orders, Clock3],
     ["배송 요청", shipping, Truck],
     ["회원 디렉터리", members, Users],
   ] as const;
@@ -136,7 +144,7 @@ export function OperatorConsole() {
             운영자 센터
           </h1>
           <p className="mt-3 text-sm text-muted">
-            내 숍의 실제 상품·회원·주문·배송을 확인합니다.
+            담당 숍의 상품·회원·배송과 전체 매장의 공용 입금 큐를 확인합니다.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex">
@@ -253,7 +261,7 @@ export function OperatorConsole() {
               className="flex gap-3 underline"
               href="/admin/operator/orders"
             >
-              입금 확인 업무 열기 <ArrowUpRight size={14} />
+              공용 입금 확인 업무 열기 <ArrowUpRight size={14} />
             </Link>
             <Link
               className="flex gap-3 underline"

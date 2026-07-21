@@ -61,9 +61,11 @@ interface CheckoutOrder {
 }
 
 interface CheckoutTransfer {
+  order_id: string;
   bank_name_snapshot: string;
   account_number_snapshot: string;
   expected_amount: number;
+  status: "awaiting_transfer" | "partially_paid" | "confirmed";
 }
 
 interface StoredCheckoutRequest {
@@ -215,6 +217,25 @@ function isCheckoutOrder(value: unknown): value is CheckoutOrder {
     order.id.length > 0 &&
     Number.isSafeInteger(order.total) &&
     (order.total as number) > 0
+  );
+}
+
+function isCheckoutTransfer(
+  value: unknown,
+  order: CheckoutOrder,
+): value is CheckoutTransfer {
+  if (!value || typeof value !== "object") return false;
+  const transfer = value as Record<string, unknown>;
+  return (
+    transfer.order_id === order.id &&
+    transfer.expected_amount === order.total &&
+    typeof transfer.bank_name_snapshot === "string" &&
+    transfer.bank_name_snapshot.trim().length > 0 &&
+    typeof transfer.account_number_snapshot === "string" &&
+    transfer.account_number_snapshot.trim().length > 0 &&
+    ["awaiting_transfer", "partially_paid", "confirmed"].includes(
+      transfer.status as string,
+    )
   );
 }
 
@@ -780,10 +801,10 @@ export function CartView() {
         throw new Error("현재 지원하지 않는 결제 응답입니다.");
       }
 
-      const transfer =
-        checkout.transfer && typeof checkout.transfer === "object"
-          ? (checkout.transfer as Partial<CheckoutTransfer>)
-          : null;
+      if (!isCheckoutTransfer(checkout.transfer, checkout.order)) {
+        throw new Error("주문 서버의 입금 요청 정보를 확인하지 못했습니다.");
+      }
+      const transfer = checkout.transfer;
       removePurchasedFromCart(productIds);
       productIds.forEach(
         (productId) => void persistCart(productId, false, buyerId),
@@ -793,12 +814,11 @@ export function CartView() {
       checkoutRequest.current = null;
       clearStoredCheckoutRequest();
       setMessage(
-        transfer &&
-          Number.isSafeInteger(transfer.expected_amount) &&
-          typeof transfer.bank_name_snapshot === "string" &&
-          typeof transfer.account_number_snapshot === "string"
-          ? `주문 ${checkout.order.id} 생성 완료 · ${(transfer.expected_amount as number).toLocaleString("ko-KR")}원 · ${transfer.bank_name_snapshot} ${transfer.account_number_snapshot}로 입금해 주세요.`
-          : `주문 ${checkout.order.id} 생성 완료 · ${checkout.order.total.toLocaleString("ko-KR")}원. 내 정보에서 입금 상태를 확인해 주세요.`,
+        transfer.status === "confirmed"
+          ? `주문 ${checkout.order.id}의 입금 확인이 완료되었습니다.`
+          : transfer.status === "partially_paid"
+            ? `주문 ${checkout.order.id}의 일부 입금이 확인되었습니다. 내 정보에서 남은 금액을 확인해 주세요.`
+            : `주문 ${checkout.order.id} 생성 완료 · ${transfer.expected_amount.toLocaleString("ko-KR")}원 · ${transfer.bank_name_snapshot} ${transfer.account_number_snapshot}로 입금해 주세요.`,
       );
     } catch (error) {
       if (

@@ -1,31 +1,37 @@
+import { ACTIVE_COMMERCE_PAYMENT_MODE } from "@/lib/commerce/paymentMode";
+import { getManualTransferAccount } from "@/lib/manualTransferConfig";
 import {
   authenticateOwnerAccessRequest,
   ownerAccessErrorResponse,
   ownerAccessJsonResponse,
   readSmallJsonBody,
-} from "@/src/lib/ownerAccess/server";
-import { ACTIVE_COMMERCE_PAYMENT_MODE } from "@/lib/commerce/paymentMode";
-import { getManualTransferAccount } from "@/lib/manualTransferConfig";
+} from "@/lib/ownerAccess/server";
 
-function readRuntime() {
-  let bankConfigured = true;
+async function readRuntime(
+  admin: Awaited<ReturnType<typeof authenticateOwnerAccessRequest>>["admin"],
+) {
   try {
-    getManualTransferAccount();
+    const account = await getManualTransferAccount(admin);
+    return {
+      activeMode: ACTIVE_COMMERCE_PAYMENT_MODE,
+      bankConfigured: true,
+      portoneArchived: true,
+      updatedAt: account.updatedAt,
+    } as const;
   } catch {
-    bankConfigured = false;
+    return {
+      activeMode: ACTIVE_COMMERCE_PAYMENT_MODE,
+      bankConfigured: false,
+      portoneArchived: true,
+      updatedAt: null,
+    } as const;
   }
-  return {
-    activeMode: ACTIVE_COMMERCE_PAYMENT_MODE,
-    bankConfigured,
-    portoneArchived: true,
-    updatedAt: null,
-  };
 }
 
 export async function GET(request: Request) {
   try {
-    await authenticateOwnerAccessRequest(request);
-    return ownerAccessJsonResponse(readRuntime());
+    const access = await authenticateOwnerAccessRequest(request);
+    return ownerAccessJsonResponse(await readRuntime(access.admin));
   } catch (error) {
     return ownerAccessErrorResponse(error);
   }
@@ -33,7 +39,7 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    await authenticateOwnerAccessRequest(request);
+    const access = await authenticateOwnerAccessRequest(request);
     const body = await readSmallJsonBody(request);
     const mode = body.mode;
     if (mode === "portone") {
@@ -45,7 +51,7 @@ export async function PATCH(request: Request) {
     if (mode !== ACTIVE_COMMERCE_PAYMENT_MODE) {
       return ownerAccessJsonResponse({ error: "invalid_payment_mode" }, 400);
     }
-    const runtime = readRuntime();
+    const runtime = await readRuntime(access.admin);
     if (!runtime.bankConfigured) {
       return ownerAccessJsonResponse(
         { error: "manual_transfer_not_ready" },

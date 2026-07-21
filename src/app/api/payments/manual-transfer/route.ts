@@ -1,6 +1,6 @@
 import { hasTrustedRequestOrigin } from "@/lib/kakao/oidc";
 import { createSupabaseServerClients } from "@/lib/supabase/server";
-import { syncManualTransferSettings } from "@/lib/manualTransferConfig";
+import { getManualTransferAccount } from "@/lib/manualTransferConfig";
 import { beginManualBankTransfer } from "@/services/manualPayments";
 
 function json(body: Record<string, unknown>, status = 200) {
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   try {
     const { admin } = createSupabaseServerClients();
-    await syncManualTransferSettings(admin);
+    await getManualTransferAccount(admin);
     if (body?.action === "begin" && typeof body.productId === "string") {
       return json({ transfer: await beginManualBankTransfer(token, body.productId) });
     }

@@ -45,12 +45,6 @@ const portOneStoreId = publicOnly
 const portOneChannelKey = publicOnly ? "" : required("VITE_PORTONE_CHANNEL_KEY");
 const portOneChannelMode = publicOnly ? "" : required("PORTONE_CHANNEL_MODE");
 if (!publicOnly) {
-  required("MANUAL_TRANSFER_BANK_NAME");
-  required("MANUAL_TRANSFER_ACCOUNT_NUMBER");
-  required("MANUAL_TRANSFER_ACCOUNT_HOLDER");
-}
-
-if (!publicOnly) {
   record(
     "portone:public-identifiers",
     portOneStoreId.startsWith("store-") && portOneChannelKey.startsWith("channel-key-"),
@@ -107,6 +101,11 @@ if (supabaseUrl && (serviceKey || publishableKey)) {
     await checkRest(
       "supabase:payment-mode-rpc",
       "/rest/v1/rpc/get_payment_runtime_mode_for_service",
+      { method: "POST", body: "{}" },
+    );
+    await checkRest(
+      "supabase:manual-transfer-account-rpc",
+      "/rest/v1/rpc/get_manual_transfer_account_for_service",
       { method: "POST", body: "{}" },
     );
   }

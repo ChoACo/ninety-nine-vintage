@@ -68,7 +68,10 @@ test("operator XLSX UI parses in the browser, highlights Korean row errors, and 
   assert.match(modal, /검증 결과와 저장 대상을 확인했다는 항목에 체크해 주세요/);
   assert.match(modal, /disabled=\{!confirmed \|\| !preview\?\.canSubmit/);
   assert.match(modal, /이제 데이터베이스 저장을 허용합니다/);
-  assert.match(modal, /className="fixed inset-0[^"]*p-2[^"]*sm:p-4"/);
+  assert.match(modal, /<PremiumDialog/);
+  assert.match(modal, /closeDisabled=\{isSubmitting\}/);
+  assert.match(modal, /panelClassName="max-w-\[1180px\]"/);
+  assert.match(modal, /panelViewportClassName="max-h-\[calc\(100dvh-2rem\)\]"/);
   assert.match(modal, /className="grid grid-cols-1 gap-4 lg:grid-cols-2"/);
   assert.match(modal, /확인 브랜드/);
   assert.match(modal, /inferBrandFromTitle\(row\.title\)\.brand/);

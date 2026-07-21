@@ -2,7 +2,6 @@
 
 import { FileSpreadsheet, X } from "lucide-react";
 import {
-  useEffect,
   useId,
   useCallback,
   useMemo,
@@ -13,6 +12,7 @@ import {
   type InputHTMLAttributes,
 } from "react";
 import { Button } from "@/components/ui/Button";
+import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { inferBrandFromTitle } from "@/lib/catalog/brand";
 import {
   buildBatchAuctionPreview,
@@ -28,7 +28,11 @@ import {
   type ProductImageCompressionMeasurement,
   type ProductImageCompressionReporter,
 } from "@/lib/images/productImageCompression";
-import { PRODUCT_IMAGE_FORMAT_LABEL } from "@/lib/supabase/productImagePolicy";
+import {
+  PRODUCT_IMAGE_FORMAT_LABEL,
+  PRODUCT_IMAGE_HEIC_CONVERSION_NOTE,
+  PRODUCT_IMAGE_INPUT_ACCEPT,
+} from "@/lib/supabase/productImagePolicy";
 import type { ProductSaleType } from "@/types/auction";
 import { formatKRW, getNextAuctionPublishAt } from "@/utils/formatters";
 
@@ -191,22 +195,6 @@ export function OperatorXlsxImportModal({
     onClose();
   }, [isSubmitting, onClose, reset]);
 
-  useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") handleClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [handleClose, open]);
-
-  if (!open) return null;
-
   const handleWorkbookSelection = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
     const requestId = ++parseRequestRef.current;
@@ -312,16 +300,15 @@ export function OperatorXlsxImportModal({
   const completed = submittedCount > 0;
 
   return (
-    <div
-      aria-label="엑셀 상품 일괄 등록"
-      aria-modal="true"
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-2 backdrop-blur-md sm:p-4"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) handleClose();
-      }}
-      role="dialog"
+    <PremiumDialog
+      ariaLabel="엑셀 상품 일괄 등록"
+      closeDisabled={isSubmitting}
+      onClose={handleClose}
+      open={open}
+      panelClassName="max-w-[1180px]"
+      panelViewportClassName="max-h-[calc(100dvh-2rem)]"
+      zIndexClassName="z-[100]"
     >
-      <div className="max-h-[calc(100vh-2rem)] w-full max-w-[1180px] overflow-y-auto border border-line bg-paper shadow-2xl">
         <header className="sticky top-0 z-20 flex items-start justify-between gap-4 border-b border-line bg-paper px-4 py-4 sm:px-6 sm:py-5">
           <div>
             <p className="eyebrow text-muted">운영자 / 엑셀 일괄 등록</p>
@@ -332,7 +319,7 @@ export function OperatorXlsxImportModal({
           </div>
           <button
             aria-label="엑셀 일괄 등록 닫기"
-            className="border border-line p-2 disabled:opacity-40"
+            className="rounded-xl border border-line p-2 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 disabled:opacity-40"
             disabled={isSubmitting}
             onClick={handleClose}
             type="button"
@@ -367,7 +354,7 @@ export function OperatorXlsxImportModal({
               <label className="mt-3 block text-xs font-bold" htmlFor={directoryId}>사진 폴더 선택</label>
               <input
                 {...directoryPickerAttributes}
-                accept="image/*"
+                accept={PRODUCT_IMAGE_INPUT_ACCEPT}
                 className="mt-2 block w-full text-xs file:mr-3 file:border file:border-ink file:bg-paper file:px-3 file:py-2 file:text-xs file:font-bold"
                 disabled={isSubmitting || completed}
                 id={directoryId}
@@ -378,7 +365,7 @@ export function OperatorXlsxImportModal({
               />
               <label className="mt-3 block text-xs font-bold" htmlFor={multipleImagesId}>또는 여러 사진 선택</label>
               <input
-                accept="image/*"
+                accept={PRODUCT_IMAGE_INPUT_ACCEPT}
                 className="mt-2 block w-full text-xs file:mr-3 file:border file:border-ink file:bg-paper file:px-3 file:py-2 file:text-xs file:font-bold"
                 disabled={isSubmitting || completed}
                 id={multipleImagesId}
@@ -389,6 +376,9 @@ export function OperatorXlsxImportModal({
               />
               <p className="mt-3 text-[11px] leading-5 text-muted">
                 {imageFiles.length.toLocaleString("ko-KR")}개 선택 · {PRODUCT_IMAGE_FORMAT_LABEL}
+              </p>
+              <p className="mt-1 text-[11px] leading-5 text-amber-800">
+                {PRODUCT_IMAGE_HEIC_CONVERSION_NOTE}
               </p>
             </div>
           </section>
@@ -554,7 +544,7 @@ export function OperatorXlsxImportModal({
                 <div>
                   <h3 className="text-sm font-bold">사진 압축 기기 실측</h3>
                   <p className="mt-1 text-[11px] leading-5 text-muted">
-                    720p·360p를 동시에 인코딩한 뒤 두 파일을 동시에 업로드합니다. {PRODUCT_IMAGE_COMPRESSION_TARGET_MS}ms는 성능 목표이며, 느린 기기에서 초과해도 업로드는 계속됩니다.
+                    2560px 고해상도 검수본·360p 미리보기를 동시에 인코딩한 뒤 두 파일을 동시에 업로드합니다. {PRODUCT_IMAGE_COMPRESSION_TARGET_MS}ms는 성능 목표이며, 느린 기기에서 초과해도 업로드는 계속됩니다.
                   </p>
                 </div>
                 <span className="shrink-0 border border-line bg-paper px-3 py-2 text-xs font-bold">
@@ -618,7 +608,6 @@ export function OperatorXlsxImportModal({
             )}
           </div>
         </form>
-      </div>
-    </div>
+    </PremiumDialog>
   );
 }

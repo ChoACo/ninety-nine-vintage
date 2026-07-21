@@ -209,7 +209,11 @@ try {
   ]);
 
   client.on("Runtime.exceptionThrown", (event) => {
-    browserErrors.push(event.exceptionDetails?.text || "Uncaught browser error");
+    browserErrors.push(
+      event.exceptionDetails?.exception?.description ||
+        event.exceptionDetails?.text ||
+        "Uncaught browser error",
+    );
   });
   client.on("Fetch.requestPaused", (event) => {
     const isKakaoStart = new URL(event.request.url).pathname === "/api/auth/kakao/start";
@@ -236,33 +240,72 @@ try {
   );
   const homeText = await evaluate(client, "document.body.innerText");
   assert.doesNotMatch(homeText, /DEVICE CHECKING|SESSION WAITING/);
+  // `document.readyState=complete` can precede App Router hydration in a cold
+  // production start. Clicking before delegated Link handlers attach performs
+  // a direct document navigation and cannot exercise the intercepted modal.
+  await new Promise((resolveWait) => setTimeout(resolveWait, 1_000));
 
   const fixedHref = await evaluate(
     client,
     `(() => {
       const link = [...document.querySelectorAll('a[href^="/auction/"]')]
-        .find((element) => element.innerText.includes("즉시 구매"));
+        .find((element) =>
+          element.innerText.includes("즉시 구매") &&
+          element.getClientRects().length > 0 &&
+          getComputedStyle(element).visibility !== "hidden"
+        );
       return link?.getAttribute("href") ?? null;
     })()`,
   );
   assert.match(fixedHref ?? "", /^\/auction\/[0-9a-f-]+$/i);
 
-  const clickedProduct = await evaluate(
+  const productPoint = await evaluate(
     client,
     `(() => {
       const href = ${JSON.stringify(fixedHref)};
       const link = [...document.querySelectorAll('a[href^="/auction/"]')]
-        .find((element) => element.getAttribute("href") === href);
-      link?.click();
-      return Boolean(link);
+        .find((element) =>
+          element.getAttribute("href") === href &&
+          element.getClientRects().length > 0 &&
+          getComputedStyle(element).visibility !== "hidden"
+        );
+      if (!link) return null;
+      link.scrollIntoView({ block: "center", inline: "center" });
+      const rect = link.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
     })()`,
   );
-  assert.equal(clickedProduct, true, "Could not click a fixed-price product");
-  await waitForExpression(
-    client,
-    `location.pathname === ${JSON.stringify(fixedHref)} && document.body?.innerText.includes("즉시 구매") && Boolean(document.querySelector('[role="dialog"]'))`,
-    "Fixed-price intercepted modal did not render after the product click",
-  );
+  assert(productPoint, "Could not locate a visible fixed-price product");
+  await client.send("Input.dispatchMouseEvent", {
+    type: "mousePressed",
+    x: productPoint.x,
+    y: productPoint.y,
+    button: "left",
+    clickCount: 1,
+  });
+  await client.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased",
+    x: productPoint.x,
+    y: productPoint.y,
+    button: "left",
+    clickCount: 1,
+  });
+  try {
+    await waitForExpression(
+      client,
+      `location.pathname === ${JSON.stringify(fixedHref)} && document.body?.innerText.includes("즉시 구매") && Boolean(document.querySelector('[role="dialog"]'))`,
+      "Fixed-price intercepted modal did not render after the product click",
+    );
+  } catch (error) {
+    const state = await evaluate(
+      client,
+      `({ path: location.pathname, dialogs: document.querySelectorAll('[role="dialog"]').length, text: document.body?.innerText.slice(0, 120) })`,
+    );
+    throw new Error(
+      `Fixed-price intercepted modal did not render after the product click: ${JSON.stringify({ ...state, browserErrors })}`,
+      { cause: error },
+    );
+  }
 
   const detailState = await evaluate(
     client,
@@ -290,6 +333,25 @@ try {
     })()`,
   );
   assert.equal(clickedCart, true, "Could not click the detail cart action");
+  await waitForExpression(
+    client,
+    `Boolean([...document.querySelectorAll('[data-premium-modal-layer="nested"]')]
+      .find((dialog) => dialog.innerText.includes("간편 장바구니") && dialog.innerText.includes("장바구니에 담기")))`,
+    "Quick-cart confirmation modal did not render",
+  );
+
+  const confirmedCart = await evaluate(
+    client,
+    `(() => {
+      const dialog = [...document.querySelectorAll('[data-premium-modal-layer="nested"]')]
+        .find((element) => element.innerText.includes("간편 장바구니"));
+      const button = [...(dialog?.querySelectorAll("button") ?? [])]
+        .find((element) => element.innerText.trim() === "장바구니에 담기");
+      button?.click();
+      return Boolean(button);
+    })()`,
+  );
+  assert.equal(confirmedCart, true, "Could not confirm the quick-cart action");
   await waitForExpression(
     client,
     `location.pathname === "/account/login" && document.body?.innerText.includes("카카오로 계속하기")`,

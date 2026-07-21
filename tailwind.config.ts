@@ -14,6 +14,17 @@ const config: Config = {
       wide: "1440px",
     },
     extend: {
+      fontFamily: {
+        sans: [
+          "var(--font-geist-sans)",
+          "Pretendard Variable",
+          "Pretendard",
+          "Noto Sans KR",
+          "Apple SD Gothic Neo",
+          "Malgun Gothic",
+          "sans-serif",
+        ],
+      },
       colors: {
         ink: "#09090B",
         paper: "#FBFAF7",

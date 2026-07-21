@@ -3,5 +3,5 @@ import { ModalShell } from "@/components/layout/ModalShell";
 
 export default async function InterceptedAuctionDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <ModalShell label="상품 상세"><AuctionDetailView compact id={id} /></ModalShell>;
+  return <ModalShell label="상품 상세" size="wide"><AuctionDetailView compact id={id} /></ModalShell>;
 }

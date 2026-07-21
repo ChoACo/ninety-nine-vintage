@@ -1,9 +1,9 @@
-const PRODUCT_IMAGE_MAX_WIDTH = 1280;
-const PRODUCT_IMAGE_MAX_HEIGHT = 720;
+const PRODUCT_IMAGE_MAX_WIDTH = 2560;
+const PRODUCT_IMAGE_MAX_HEIGHT = 2560;
 const PRODUCT_THUMBNAIL_MAX_WIDTH = 640;
 const PRODUCT_THUMBNAIL_MAX_HEIGHT = 360;
-const PRODUCT_IMAGE_WEBP_QUALITY = 0.82;
-const PRODUCT_IMAGE_JPEG_QUALITY = 0.86;
+const PRODUCT_IMAGE_WEBP_QUALITY = 0.9;
+const PRODUCT_IMAGE_JPEG_QUALITY = 0.92;
 const PRODUCT_THUMBNAIL_WEBP_QUALITY = 0.76;
 const PRODUCT_THUMBNAIL_JPEG_QUALITY = 0.8;
 
@@ -27,7 +27,9 @@ export class ProductImageCompressionError extends Error {
 }
 
 /**
- * Fit an image inside a 1280x720 box without cropping or enlarging it.
+ * Fit an image inside a 2560px inspection master without cropping or
+ * enlarging it. Feed surfaces request a transformed 720/800px rendition while
+ * the lightbox receives this higher-resolution storage object directly.
  * Keeping this calculation independent of browser APIs makes the boundary
  * policy easy to verify and reuse.
  */
@@ -307,7 +309,7 @@ function elapsedMilliseconds(startedAt: number, finishedAt: number): number {
 }
 
 /**
- * Build the feed and thumbnail variants from a single decoded source. This
+ * Build the inspection master and thumbnail variants from a single decoded source. This
  * keeps EXIF orientation identical and avoids decoding large phone photos
  * twice during batch registration.
  */
@@ -346,7 +348,7 @@ export async function compressProductImageVariantsForUpload(
   } catch (error) {
     if (error instanceof ProductImageCompressionError) throw error;
     throw new ProductImageCompressionError(
-      `\"${file.name}\" 사진을 720p와 360p로 압축하지 못했어요. 다른 사진으로 다시 시도해 주세요.`,
+      `\"${file.name}\" 사진의 2560px 검수본과 360p 미리보기를 만들지 못했어요. 다른 사진으로 다시 시도해 주세요.`,
       { cause: error },
     );
   } finally {
@@ -370,7 +372,7 @@ export async function compressProductImageForUpload(file: File): Promise<File> {
   } catch (error) {
     if (error instanceof ProductImageCompressionError) throw error;
     throw new ProductImageCompressionError(
-      `\"${file.name}\" 사진을 720p로 압축하지 못했어요. 다른 사진으로 다시 시도해 주세요.`,
+      `\"${file.name}\" 사진의 2560px 검수본을 만들지 못했어요. 다른 사진으로 다시 시도해 주세요.`,
       { cause: error },
     );
   } finally {

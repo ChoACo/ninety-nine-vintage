@@ -36,6 +36,7 @@ test("product, login, and bid navigation support intercepted modals and direct f
     stickyBidPanel,
     feedCard,
     auctionCard,
+    detailView,
   ] = await Promise.all([
     source("src/app/(shop)/layout.tsx"),
     source("src/app/(shop)/@modal/default.tsx"),
@@ -49,6 +50,7 @@ test("product, login, and bid navigation support intercepted modals and direct f
     source("src/components/features/auction/detail/StickyBidPanel.tsx"),
     source("src/components/features/auction/AuctionFeedCard.tsx"),
     source("src/components/features/auction/AuctionCard.tsx"),
+    source("src/components/features/auction/detail/AuctionDetailView.tsx"),
   ]);
 
   assert.match(shopLayout, /children: React\.ReactNode; modal: React\.ReactNode/);
@@ -56,19 +58,26 @@ test("product, login, and bid navigation support intercepted modals and direct f
   assert.match(defaultModal, /return null/);
   assert.match(modalShell, /backdrop-blur-md/);
   assert.match(modalShell, /aria-modal="true"/);
-  assert.match(modalShell, /event\.key === "Escape"\) router\.back\(\)/);
-  assert.match(modalShell, /document\.body\.style\.overflow = "hidden"/);
-  assert.match(modalShell, /document\.body\.style\.overflow = previousOverflow/);
+  assert.match(modalShell, /event\.key === "Escape"/);
+  assert.match(modalShell, /data-premium-modal-layer="nested"/);
+  assert.match(modalShell, /ROUTE_MODAL_EXIT_MS/);
+  assert.match(modalShell, /\(\) => router\.back\(\)/);
+  assert.match(modalShell, /const releaseBodyScroll = lockBodyScroll\(\)/);
+  assert.match(modalShell, /releaseBodyScroll\(\)/);
   assert.match(
     modalShell,
-    /className="flex min-h-full[^\"]*" onMouseDown=\{\(event\) => event\.target === event\.currentTarget && router\.back\(\)\}/,
+    /className="flex min-h-full[^\"]*" onMouseDown=\{\(event\) => event\.target === event\.currentTarget && close\(\)\}/,
   );
   assert.doesNotMatch(
     modalShell,
     /className="fixed inset-0[^\"]*" onMouseDown=/,
   );
 
-  assert.match(interceptedProduct, /<ModalShell label="상품 상세"><AuctionDetailView compact id=\{id\} \/><\/ModalShell>/);
+  assert.match(interceptedProduct, /<ModalShell label="상품 상세" size="wide"><AuctionDetailView compact id=\{id\} \/><\/ModalShell>/);
+  assert.match(detailView, /grid grid-cols-1 gap-8 md:grid-cols-12/);
+  assert.match(detailView, /md:col-span-7/);
+  assert.match(stickyBidPanel, /md:sticky md:col-span-5/);
+  assert.match(stickyBidPanel, /compact \? "md:top-6" : "md:top-\[100px\]"/);
   assert.match(directProduct, /<AuctionDetailView id=\{id\} \/>/);
   assert.match(interceptedLogin, /<ModalShell label="로그인"><LoginPrompt returnTo=\{safeReturnTo\(query\.next\)\} \/><\/ModalShell>/);
   assert.match(directLogin, /<LoginPrompt returnTo=\{safeReturnTo\(query\.next\)\} \/>/);

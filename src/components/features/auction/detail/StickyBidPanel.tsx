@@ -17,6 +17,7 @@ import { useBidStore } from "@/store/useBidStore";
 import type { BidHistoryEntry, ItemDetail } from "@/types/detail";
 import { ProductInquiryModal } from "@/components/features/auction/detail/ProductInquiryModal";
 import { SizeComparisonScanner } from "@/components/features/auction/detail/SizeComparisonScanner";
+import { QuickCartModal } from "@/components/features/auction/detail/QuickCartModal";
 import { AuctionBidHistoryModal } from "@/components/features/auction/AuctionBidHistoryModal";
 import { useAccountAuctionBids } from "@/components/features/auction/AuctionBidSummary";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
@@ -109,6 +110,8 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [buying, setBuying] = useState(false);
   const [buyNotice, setBuyNotice] = useState("");
+  const [cartReserved, setCartReserved] = useState(false);
+  const [quickCartOpen, setQuickCartOpen] = useState(false);
   const [auctionSnapshot, setAuctionSnapshot] = useState(() => ({
     bidLockedAt: item.bidLockedAt ?? null,
     closesAt: item.closesAt ?? "",
@@ -341,11 +344,13 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
   const addFixedToCart = async () => {
     if (buying) return;
     setBuying(true);
+    setCartReserved(false);
     setBuyNotice("");
     try {
       const { data } = await getSupabaseBrowserClient().auth.getSession();
       const session = data.session;
       if (!session?.access_token) {
+        setQuickCartOpen(false);
         rememberFixedPurchaseIntent(item.id, "cart");
         router.push(
           `/account/login?next=${encodeURIComponent(`/auction/${item.id}?purchaseIntent=cart`)}`,
@@ -354,10 +359,12 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
       }
       const reservation = await reserveCartProduct(item.id, session.user.id);
       addToCart(item.id);
+      setCartReserved(true);
       setBuyNotice(
         `장바구니에 담았습니다. ${new Date(reservation.reservedUntil).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}까지 15분간 재고가 점유됩니다.`,
       );
     } catch (error) {
+      setCartReserved(false);
       setBuyNotice(
         error instanceof Error ? error.message : "장바구니에 담지 못했습니다.",
       );
@@ -509,37 +516,38 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
 
   return (
     <aside
-      className={`${compact ? "" : "lg:sticky lg:top-[100px] lg:col-span-5"} z-30 self-start border-t-2 border-zinc-950 bg-white pb-24 md:pb-0`}
+      className={`${compact ? "md:top-6" : "md:top-[100px]"} z-10 self-start rounded-3xl border border-white/10 bg-white p-5 pb-32 shadow-xl shadow-black/5 md:sticky md:col-span-5 md:p-6 md:pb-6`}
+      data-bid-panel="sticky"
     >
       <div className="border-b border-zinc-200 py-6">
         <p className="mb-3 text-xs font-medium tracking-[0.1em] text-zinc-500">
           {item.brand}
         </p>
-        <h1 className="text-3xl font-black leading-tight tracking-[-0.05em] text-zinc-950">
+        <h1 className="text-3xl font-black leading-snug tracking-tight text-zinc-950 [text-wrap:balance]">
           {item.name}
         </h1>
-        <dl className="mt-5 grid grid-cols-3 border-y border-zinc-200 text-[11px]">
-          <div className="border-r border-zinc-200 py-3 pr-3">
+        <dl className="mt-5 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 text-[11px] xl:grid-cols-3">
+          <div className="bg-white px-3 py-3">
             <dt className="text-zinc-500">카테고리</dt>
             <dd className="mt-1 truncate font-bold">
               {item.category || "미분류"}
             </dd>
           </div>
-          <div className="border-r border-zinc-200 px-3 py-3">
+          <div className="bg-white px-3 py-3">
             <dt className="text-zinc-500">사이즈</dt>
             <dd className="mt-1 truncate font-bold">
               {item.size || "표기 없음"}
             </dd>
           </div>
-          <div className="py-3 pl-3">
+          <div className="bg-white px-3 py-3">
             <dt className="text-zinc-500">상태</dt>
             <dd className="mt-1 truncate font-bold">{item.conditionGrade}</dd>
           </div>
         </dl>
-        <p className="mt-5 whitespace-pre-line text-xs leading-6 text-zinc-600">
+        <p className="mt-5 whitespace-pre-line text-xs leading-relaxed text-zinc-600">
           {item.description || "상세 사진과 컨디션 리포트를 확인해 주세요."}
         </p>
-        <div className="mt-8 flex items-end justify-between">
+        <div className="mt-8 flex flex-col items-start gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="mb-2 text-xs text-zinc-500">
               {item.saleType === "fixed" ? "판매 정가" : "현재 최고 입찰가"}
@@ -558,14 +566,14 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
         {measurementChips.length > 0 && (
           <div className="mt-5 flex flex-wrap gap-2 text-[11px] text-zinc-600">
             {measurementChips.map(([label, value]) => (
-              <span className="border border-zinc-200 px-3 py-2" key={label}>
+              <span className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 shadow-sm" key={label}>
                 {label} {value}cm
               </span>
             ))}
           </div>
         )}
         <button
-          className="mt-4 flex h-11 w-full items-center justify-between border border-zinc-200 px-4 text-xs font-bold hover:border-zinc-950"
+          className="mt-4 flex h-11 w-full items-center justify-between rounded-2xl border border-zinc-200 px-4 text-xs font-bold shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95"
           onClick={() => setScannerOpen(true)}
           type="button"
         >
@@ -577,7 +585,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
       </div>
 
       {LIVE_AUCTION_ENABLED && item.saleType === "auction" && (
-        <div className="my-6 border border-zinc-950 bg-zinc-950 px-5 py-5 text-white">
+        <div className="my-6 rounded-2xl border border-white/10 bg-zinc-950 px-5 py-5 text-white shadow-xl shadow-black/15">
           <div className="flex items-center justify-between">
             <span className="text-xs text-zinc-400">실시간 경매 남은 시간</span>
             <span
@@ -634,7 +642,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
             {canStartBid ? (
               <Link
                 aria-describedby="auction-settlement-summary"
-                className="mobile-detail-cta mt-6 flex h-14 w-full items-center justify-center gap-2 bg-zinc-950 text-sm font-bold text-white transition-colors hover:bg-zinc-800"
+                className="mobile-detail-cta mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-950 text-sm font-bold text-white shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:bg-zinc-800 hover:shadow-xl active:scale-95"
                 href={`/auction/${item.id}/bid`}
               >
                 <LockKeyhole size={15} /> {bidButtonLabel}
@@ -642,7 +650,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
             ) : (
               <button
                 aria-describedby="auction-settlement-summary"
-                className="mobile-detail-cta mt-6 flex h-14 w-full items-center justify-center gap-2 bg-zinc-300 text-sm font-bold text-white"
+                className="mobile-detail-cta mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-300 text-sm font-bold text-white"
                 disabled
                 type="button"
               >
@@ -672,7 +680,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
             )}
           </>
         ) : (
-          <div className="mt-6 border border-zinc-200 bg-zinc-50 p-4 text-xs leading-5 text-zinc-600">
+          <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-xs leading-5 text-zinc-600 shadow-sm">
             실시간 경매는 현재 점검 중입니다. 즉시 구매 상품은 정상적으로 이용할
             수 있습니다.
           </div>
@@ -680,15 +688,15 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
       ) : (
         <div className="mobile-detail-cta mt-6 grid grid-cols-2 gap-2">
           <button
-            className="flex h-14 items-center justify-center gap-2 border border-zinc-950 text-sm font-bold text-zinc-950 disabled:opacity-50"
+            className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-zinc-950 text-sm font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 disabled:opacity-50"
             disabled={buying}
-            onClick={() => void addFixedToCart()}
+            onClick={() => { setBuyNotice(""); setCartReserved(false); setQuickCartOpen(true); }}
             type="button"
           >
             <ShoppingBag size={15} /> 장바구니
           </button>
           <button
-            className="flex h-14 items-center justify-center bg-zinc-950 text-sm font-bold text-white disabled:opacity-50"
+            className="flex h-14 items-center justify-center rounded-2xl bg-zinc-950 text-sm font-bold text-white shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-95 disabled:opacity-50"
             disabled={buying}
             onClick={() => void buyNow()}
             type="button"
@@ -697,7 +705,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
           </button>
         </div>
       )}
-      {buyNotice && (
+      {buyNotice && !quickCartOpen && (
         <p
           aria-live="polite"
           className="mt-3 text-xs font-bold text-emerald-700"
@@ -706,7 +714,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
         </p>
       )}
       <button
-        className="mt-2 flex h-12 w-full items-center justify-center gap-2 border border-zinc-200 text-xs font-bold text-zinc-950 transition-colors hover:border-zinc-950 disabled:opacity-50"
+        className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 text-xs font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95 disabled:opacity-50"
         onClick={() => void updateWishlist()}
         type="button"
       >
@@ -714,7 +722,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
         {liked ? "찜 해제" : "관심 상품 담기"}
       </button>
       <button
-        className="mt-2 flex h-12 w-full items-center justify-center gap-2 border border-zinc-200 text-xs font-bold text-zinc-950 transition-colors hover:border-zinc-950 disabled:opacity-50"
+        className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 text-xs font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95 disabled:opacity-50"
         onClick={() => setInquiryOpen(true)}
         type="button"
       >
@@ -739,6 +747,19 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
         productId={item.id}
         productTitle={item.name}
       />
+      {item.saleType === "fixed" && (
+        <QuickCartModal
+          busy={buying}
+          completed={cartReserved}
+          notice={buyNotice}
+          onClose={() => !buying && setQuickCartOpen(false)}
+          onConfirm={() => void addFixedToCart()}
+          onViewCart={() => router.push("/cart")}
+          open={quickCartOpen}
+          price={displayPrice}
+          productTitle={item.name}
+        />
+      )}
       <SizeComparisonScanner
         itemMeasurements={item.measurements}
         onClose={() => setScannerOpen(false)}

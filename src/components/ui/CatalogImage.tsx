@@ -76,7 +76,7 @@ function getNativeImageSrcSet(
   }
 }
 
-/** Restore the uploaded 720p asset for the zoom gallery instead of chaining
+/** Restore the uploaded inspection master for the zoom gallery instead of chaining
  * a previously generated 800px Supabase render through Next Image. */
 function getRequestedImageSource(source: string, maxDimension: number): string {
   if (maxDimension <= CATALOG_TRANSFORM_MAX_DIMENSION) {
@@ -158,11 +158,9 @@ export function CatalogImage({
     // equivalent to the trusted next/image path.
     const nativeLoaded = loadedNativeSource === requestedSource;
     const useBlur = placeholder === "blur" && Boolean(blurDataURL);
-    const nativeSrcSet = getNativeImageSrcSet(
-      source,
-      maxDimension,
-      srcSet,
-    );
+    const nativeSrcSet = props.unoptimized
+      ? undefined
+      : getNativeImageSrcSet(source, maxDimension, srcSet);
     const transition = [
       props.style?.transition,
       "filter 240ms ease, opacity 240ms ease, transform 240ms ease",

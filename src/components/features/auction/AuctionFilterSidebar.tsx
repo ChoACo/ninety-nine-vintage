@@ -1,7 +1,8 @@
 "use client";
 
 import { RotateCcw, SlidersHorizontal, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { PremiumDialog } from "@/components/ui/PremiumDialog";
 
 const sizes = ["S", "M", "L", "XL", "FREE"];
 const categories = ["구제 의류"];
@@ -15,6 +16,16 @@ export function AuctionFilterSidebar({ saleType = "auction" }: { saleType?: "auc
   const [closingOnly, setClosingOnly] = useState(false);
   const [selectedSort, setSelectedSort] = useState<Sort>(saleType === "fixed" ? "latest" : "ending");
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 768px)");
+    const closeAtDesktop = () => {
+      if (desktop.matches) setMobileOpen(false);
+    };
+    closeAtDesktop();
+    desktop.addEventListener("change", closeAtDesktop);
+    return () => desktop.removeEventListener("change", closeAtDesktop);
+  }, []);
   const notify = (next: CatalogFilters) => window.dispatchEvent(new CustomEvent<CatalogFilters>("catalog-filters", { detail: next }));
 
   const resetFilters = () => {
@@ -78,9 +89,19 @@ export function AuctionFilterSidebar({ saleType = "auction" }: { saleType?: "auc
 
   return (
     <>
-      <button aria-expanded={mobileOpen} className="mb-4 flex h-12 w-full items-center justify-between border-y border-zinc-950 px-1 text-xs font-bold md:hidden" onClick={() => setMobileOpen(true)} type="button"><span className="flex items-center gap-2"><SlidersHorizontal size={15} /> 필터·정렬</span><span className="text-[10px] text-muted">{selectedSizes.length + selectedCategories.length}개 선택</span></button>
+      <button aria-expanded={mobileOpen} aria-haspopup="dialog" className="mb-4 flex h-12 w-full items-center justify-between rounded-2xl border border-zinc-950 px-4 text-xs font-bold shadow-sm transition-all duration-300 active:scale-95 md:hidden" onClick={() => setMobileOpen(true)} type="button"><span className="flex items-center gap-2"><SlidersHorizontal size={15} /> 필터·정렬</span><span className="text-[10px] text-muted">{selectedSizes.length + selectedCategories.length}개 선택</span></button>
       <aside className="sticky top-[100px] hidden w-[240px] flex-shrink-0 self-start border-t border-zinc-950 md:block">{filterContent}</aside>
-      {mobileOpen && <div aria-label="모바일 필터 바텀시트" aria-modal="true" className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-md md:hidden" role="dialog" onClick={() => setMobileOpen(false)}><aside className="absolute inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto rounded-t-2xl bg-paper px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-ink shadow-2xl" onClick={(event) => event.stopPropagation()}>{filterContent}</aside></div>}
+      <PremiumDialog
+        ariaLabel="모바일 필터 바텀시트"
+        onClose={() => setMobileOpen(false)}
+        open={mobileOpen}
+        overlayClassName="md:hidden"
+        panelClassName="px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+        placement="sheet-bottom"
+        zIndexClassName="z-[80]"
+      >
+        {filterContent}
+      </PremiumDialog>
     </>
   );
 }

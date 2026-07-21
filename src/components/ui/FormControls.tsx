@@ -5,7 +5,7 @@ import type {
   TextareaHTMLAttributes,
 } from "react";
 
-const inputClassName = "border border-line bg-paper px-3 py-3 text-xs";
+const inputClassName = "rounded-xl border border-line bg-paper px-3 py-3 text-xs shadow-sm subpixel-antialiased outline-none transition-all duration-300 placeholder:text-zinc-400 hover:border-zinc-400 focus:border-ink focus:ring-4 focus:ring-black/5";
 
 export const TextInput = forwardRef<
   HTMLInputElement,

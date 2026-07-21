@@ -4,14 +4,17 @@ export const PRODUCT_IMAGE_MIME_TYPES = Object.freeze([
   "image/webp",
   "image/gif",
   "image/avif",
-  "image/heic",
-  "image/heif",
 ]);
 
 const PRODUCT_IMAGE_MIME_TYPE_SET = new Set(PRODUCT_IMAGE_MIME_TYPES);
 
 export const PRODUCT_IMAGE_FORMAT_LABEL =
-  "JPG, PNG, WebP, GIF, AVIF, HEIC 또는 HEIF";
+  "JPG, PNG, WebP, GIF 또는 AVIF";
+
+export const PRODUCT_IMAGE_INPUT_ACCEPT = PRODUCT_IMAGE_MIME_TYPES.join(",");
+
+export const PRODUCT_IMAGE_HEIC_CONVERSION_NOTE =
+  "HEIC/HEIF 사진은 브라우저마다 디코딩 지원이 달라 JPG로 변환한 뒤 선택해 주세요.";
 
 export function isSupportedProductImageMimeType(mimeType: string): boolean {
   return PRODUCT_IMAGE_MIME_TYPE_SET.has(mimeType.trim().toLowerCase());
@@ -55,8 +58,6 @@ export async function hasSupportedProductImageSignature(
   }
   const expectedBrands: Record<string, readonly string[]> = {
     "image/avif": ["avif", "avis"],
-    "image/heic": ["heic", "heix", "hevc", "hevx", "heis", "hevm", "mif1", "msf1"],
-    "image/heif": ["heic", "heix", "hevc", "hevx", "heis", "hevm", "mif1", "msf1"],
   };
   return (expectedBrands[mimeType] ?? []).some((brand) => brands.has(brand));
 }

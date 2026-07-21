@@ -7,14 +7,20 @@ import {
   getProductThumbnailDimensions,
   PRODUCT_IMAGE_COMPRESSION_TARGET_MS,
 } from "../../src/lib/images/productImageCompression.ts";
+import {
+  isSupportedProductImageMimeType,
+  PRODUCT_IMAGE_FORMAT_LABEL,
+  PRODUCT_IMAGE_HEIC_CONVERSION_NOTE,
+  PRODUCT_IMAGE_INPUT_ACCEPT,
+} from "../../src/lib/supabase/productImagePolicy.ts";
 
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("product uploads produce bounded 720p and 360p variants", () => {
+test("product uploads preserve a 2560px inspection master and a 360p thumbnail", () => {
   assert.deepEqual(getCompressedProductImageDimensions(4_000, 3_000), {
-    width: 960,
-    height: 720,
+    width: 2560,
+    height: 1920,
   });
   assert.deepEqual(getProductThumbnailDimensions(4_000, 3_000), {
     width: 480,
@@ -24,6 +30,18 @@ test("product uploads produce bounded 720p and 360p variants", () => {
     width: 600,
     height: 400,
   });
+  assert.deepEqual(getCompressedProductImageDimensions(3_000, 4_000), {
+    width: 1920,
+    height: 2560,
+  });
+});
+
+test("browser upload copy does not promise HEIC decoding without a bundled decoder", () => {
+  assert.equal(isSupportedProductImageMimeType("image/heic"), false);
+  assert.equal(isSupportedProductImageMimeType("image/heif"), false);
+  assert.equal(PRODUCT_IMAGE_INPUT_ACCEPT.includes("image/heic"), false);
+  assert.doesNotMatch(PRODUCT_IMAGE_FORMAT_LABEL, /HEIC|HEIF/);
+  assert.match(PRODUCT_IMAGE_HEIC_CONVERSION_NOTE, /JPG로 변환/);
 });
 
 test("variant encoding runs concurrently and records the 100 ms budget without assuming it passes", async () => {
@@ -85,7 +103,7 @@ test("variant encoding runs concurrently and records the 100 ms budget without a
     assert.deepEqual(
       canvases.map(({ width, height }) => ({ width, height })),
       [
-        { width: 960, height: 720 },
+        { width: 2560, height: 1920 },
         { width: 480, height: 360 },
       ],
     );
@@ -123,10 +141,12 @@ test("variant encoding runs concurrently and records the 100 ms budget without a
 });
 
 test("uploads overlap both variants and report honest device timings to the operator", async () => {
-  const [products, operatorConsole, uploadModal] = await Promise.all([
+  const [products, operatorConsole, uploadModal, singleRoute, bulkRoute] = await Promise.all([
     source("src/lib/supabase/products.ts"),
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
     source("src/components/admin/operator/OperatorXlsxImportModal.tsx"),
+    source("src/app/api/admin/operator/products/route.ts"),
+    source("src/app/api/admin/operator/products/bulk/route.ts"),
   ]);
 
   assert.match(
@@ -145,6 +165,15 @@ test("uploads overlap both variants and report honest device timings to the oper
   assert.match(uploadModal, /100ms 목표 초과/);
   assert.match(uploadModal, /느린 기기에서 초과해도 업로드는 계속됩니다/);
   assert.doesNotMatch(uploadModal, /disabled=\{[^}]*targetMet/);
+  assert.equal((uploadModal.match(/accept=\{PRODUCT_IMAGE_INPUT_ACCEPT\}/g) ?? []).length, 2);
+  assert.match(uploadModal, /PRODUCT_IMAGE_HEIC_CONVERSION_NOTE/);
+  assert.match(operatorConsole, /URL 등록은 원격 파일을 그대로 연결/);
+  assert.match(operatorConsole, /레거시 CSV의 원격 URL은 재인코딩하지 않으며/);
+  for (const route of [singleRoute, bulkRoute]) {
+    assert.match(route, /body\??\.thumbnailUrls === undefined\s*\? imageUrls\s*:\s*images\(body\.?thumbnailUrls\)/);
+    assert.match(route, /thumbnailUrls\.length !== imageUrls\.length/);
+    assert.match(route, /thumbnail_urls: thumbnailUrls/);
+  }
 });
 
 test("zoom and fallback images keep responsive sizing, blur, and the proxy boundary", async () => {
@@ -175,7 +204,7 @@ test("zoom and fallback images keep responsive sizing, blur, and the proxy bound
   assert.match(itemGallery, /const COMPACT_IMAGE_SIZES/);
   assert.match(itemGallery, /\(max-width: 767px\) calc\(100vw - 2rem\)/);
   assert.match(itemGallery, /56\.5rem/);
-  assert.match(itemGallery, /45rem/);
+  assert.match(itemGallery, /44rem/);
   assert.match(itemGallery, /maxDimension=\{1280\} sizes=\{imageSizes\}/);
   assert.match(itemGallery, /maxDimension=\{480\} sizes=\{thumbnailSizes\}/);
   assert.doesNotMatch(itemGallery, /sizes="58vw"/);

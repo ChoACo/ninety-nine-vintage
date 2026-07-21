@@ -72,8 +72,12 @@ test("auction detail restores inquiry, route-based bidding, full ledger, specifi
   assert.match(scanner, /compareGarmentMeasurements/);
   assert.match(profile, /window\.localStorage/);
   assert.match(profile, /window\.sessionStorage/);
-  assert.match(modalShell, /event\.key === "Escape"\) router\.back\(\)/);
-  assert.match(modalShell, /document\.body\.style\.overflow = "hidden"/);
+  assert.match(modalShell, /event\.key === "Escape"/);
+  assert.match(modalShell, /data-premium-modal-layer="nested"/);
+  assert.match(modalShell, /ROUTE_MODAL_EXIT_MS/);
+  assert.match(modalShell, /\(\) => router\.back\(\)/);
+  assert.match(modalShell, /const releaseBodyScroll = lockBodyScroll\(\)/);
+  assert.match(modalShell, /releaseBodyScroll\(\)/);
   assert.match(modalShell, /returnFocusRef\.current\?\.focus\(\)/);
   assert.match(modalShell, /aria-modal="true"/);
   assert.match(interceptedBid, /<ModalShell label="실시간 경매 입찰">/);

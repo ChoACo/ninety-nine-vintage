@@ -58,11 +58,14 @@ export async function POST(request: Request) {
   const storeId = text(body?.storeId);
   const saleType = body?.saleType === "fixed" ? "fixed" : "auction";
   const imageUrls = images(body?.imageUrls);
+  const thumbnailUrls = body?.thumbnailUrls === undefined
+    ? imageUrls
+    : images(body.thumbnailUrls);
   const startingPrice = Number(body?.startingPrice);
   const fixedPrice = saleType === "fixed" ? Number(body?.fixedPrice ?? body?.startingPrice) : null;
   const publishAt = text(body?.publishAt, new Date().toISOString());
   const closesAt = text(body?.closesAt, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
-  if (!title || !description || !normalizedBrand || !storeId || imageUrls.length === 0 || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
+  if (!title || !description || !normalizedBrand || !storeId || imageUrls.length === 0 || thumbnailUrls.length !== imageUrls.length || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
     return commerceJson({ error: "상품 입력값을 확인해 주세요." }, 400);
   }
   const storeQuery = auth.user.from("stores").select("id, operator_id").eq("id", storeId);
@@ -84,7 +87,7 @@ export async function POST(request: Request) {
     current_price: price,
     bid_increment: Number(body?.bidIncrement) > 0 ? Number(body?.bidIncrement) : 1000,
     image_urls: imageUrls,
-    thumbnail_urls: imageUrls,
+    thumbnail_urls: thumbnailUrls,
     publish_at: publishAt,
     closes_at: closesAt,
     status: "pending",

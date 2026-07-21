@@ -4,11 +4,11 @@ type ButtonVariant = "primary" | "secondary" | "outline" | "danger" | "ghost";
 type ButtonSize = "compact" | "regular";
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: "bg-ink text-paper",
-  secondary: "border border-line",
-  outline: "border border-ink",
-  danger: "border border-red-300 text-red-700",
-  ghost: "underline",
+  primary: "bg-ink text-paper shadow-lg shadow-black/10 hover:bg-zinc-800",
+  secondary: "border border-line bg-paper hover:border-zinc-400",
+  outline: "border border-ink bg-paper",
+  danger: "border border-red-300 bg-paper text-red-700 hover:bg-red-50",
+  ghost: "underline underline-offset-4 hover:bg-surface",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -29,7 +29,7 @@ export function Button({
 >) {
   return (
     <button
-      className={`${variantClasses[variant]} ${sizeClasses[size]} font-bold disabled:opacity-40 ${className}`.trim()}
+      className={`${variantClasses[variant]} ${sizeClasses[size]} rounded-xl font-bold transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:pointer-events-none disabled:opacity-40 ${className}`.trim()}
       {...props}
     />
   );

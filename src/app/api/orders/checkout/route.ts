@@ -10,7 +10,7 @@ import {
   readCommercePaymentMode,
   type CommercePaymentMode,
 } from "@/lib/commerce/paymentMode";
-import { syncManualTransferSettings } from "@/lib/manualTransferConfig";
+import { getManualTransferAccount } from "@/lib/manualTransferConfig";
 import {
   createCommercePortOnePaymentId,
   getPortOneChannelMode,
@@ -156,7 +156,7 @@ async function checkoutWithManualTransfer(
   idempotencyKey: string,
 ) {
   try {
-    await syncManualTransferSettings(auth.admin);
+    await getManualTransferAccount(auth.admin);
   } catch {
     return commerceJson(
       { error: "manual_transfer_configuration_missing" },

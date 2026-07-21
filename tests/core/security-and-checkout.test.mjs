@@ -678,7 +678,7 @@ test("manual transfer is the only live checkout mode while PortOne stays archive
       ),
     ]);
 
-  assert.match(ownerRoute, /getManualTransferAccount\(\)/);
+  assert.match(ownerRoute, /getManualTransferAccount\(admin\)/);
   assert.match(ownerRoute, /mode\s*===\s*"portone"[\s\S]*?"portone_archived"/);
   assert.doesNotMatch(ownerRoute, /set_payment_runtime_mode/);
   assert.match(ownerConsole, /useSupabaseSession\(\)/);
@@ -688,7 +688,7 @@ test("manual transfer is the only live checkout mode while PortOne stays archive
   assert.match(ownerConsole, /PortOne 코드는 향후 재도입을 위해 보관 중/);
   assert.doesNotMatch(ownerConsole, /changePaymentMode/);
   assert.doesNotMatch(ownerConsole, /window\.confirm\(/);
-  assert.match(cartRoute, /getManualTransferAccount\(\)/);
+  assert.match(cartRoute, /getManualTransferAccount\(createSupabaseServerClients\(\)\.admin\)/);
   assert.match(cartRoute, /ACTIVE_COMMERCE_PAYMENT_MODE/);
   assert.doesNotMatch(cartRoute, /get_commerce_payment_status/);
   assert.match(cartView, /주문하고 입금계좌 확인/);

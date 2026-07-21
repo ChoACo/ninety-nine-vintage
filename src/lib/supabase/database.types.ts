@@ -2816,6 +2816,14 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_manual_transfer_account_for_service: {
+        Args: never
+        Returns: {
+          account_number: string | null
+          bank_name: string | null
+          updated_at: string | null
+        }[]
+      }
       get_manual_transfer_settings: {
         Args: never
         Returns: {

@@ -2,6 +2,7 @@ import { authenticateMemberRlsRequest, commerceJson } from "@/lib/commerce/serve
 import { ACTIVE_COMMERCE_PAYMENT_MODE } from "@/lib/commerce/paymentMode";
 import { getCatalogImageUrl } from "@/lib/images";
 import { getManualTransferAccount } from "@/lib/manualTransferConfig";
+import { createSupabaseServerClients } from "@/lib/supabase/server";
 import { mapPublishedProduct } from "@/services/products";
 
 export async function GET(request: Request) {
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
   const { data, error } = await auth.user.rpc("get_my_cart_reservations");
   if (error) return commerceJson({ error: "cart_unavailable" }, 503);
   try {
-    getManualTransferAccount();
+    await getManualTransferAccount(createSupabaseServerClients().admin);
   } catch {
     return commerceJson({ error: "payment_status_unavailable" }, 503);
   }

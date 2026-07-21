@@ -1,5 +1,5 @@
 import { authenticateMemberCommerceRequest, commerceJson, normalizeIds } from "@/lib/commerce/server";
-import { syncManualTransferSettings } from "@/lib/manualTransferConfig";
+import { getManualTransferAccount } from "@/lib/manualTransferConfig";
 
 export async function POST(request: Request) {
   const auth = await authenticateMemberCommerceRequest(request, true);
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const amount = Number(process.env.SHIPPING_FEE_AMOUNT ?? "3500");
     if (!Number.isSafeInteger(amount) || amount <= 0) return commerceJson({ error: "배송비 설정이 없습니다." }, 503);
     let account;
-    try { account = await syncManualTransferSettings(auth.admin); } catch { return commerceJson({ error: "manual_transfer_unavailable" }, 503); }
+    try { account = await getManualTransferAccount(auth.admin); } catch { return commerceJson({ error: "manual_transfer_unavailable" }, 503); }
     const { data: existingPayment } = await auth.admin
       .from("shipping_fee_payments")
       .select("id")

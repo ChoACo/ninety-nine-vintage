@@ -7,37 +7,53 @@ import type { Database } from "@/lib/supabase/database.types";
 export interface ManualTransferAccount {
   bankName: string;
   accountNumber: string;
-  accountHolder: string;
+  updatedAt: string | null;
 }
 
-function readRequired(name: "MANUAL_TRANSFER_BANK_NAME" | "MANUAL_TRANSFER_ACCOUNT_NUMBER" | "MANUAL_TRANSFER_ACCOUNT_HOLDER") {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error("manual_transfer_not_configured");
-  return value;
+interface ManualTransferAccountRow {
+  bank_name?: unknown;
+  account_number?: unknown;
+  updated_at?: unknown;
 }
 
-export function getManualTransferAccount(): ManualTransferAccount {
-  return {
-    bankName: readRequired("MANUAL_TRANSFER_BANK_NAME"),
-    accountNumber: readRequired("MANUAL_TRANSFER_ACCOUNT_NUMBER"),
-    accountHolder: readRequired("MANUAL_TRANSFER_ACCOUNT_HOLDER"),
-  };
+function firstRow(value: unknown): ManualTransferAccountRow | null {
+  if (Array.isArray(value)) {
+    return (value[0] as ManualTransferAccountRow | undefined) ?? null;
+  }
+  return value && typeof value === "object"
+    ? (value as ManualTransferAccountRow)
+    : null;
 }
 
 /**
- * The deployment environment is the source of truth. The database copy exists
- * only because legacy settlement RPCs snapshot the account inside their DB
- * transaction; browser code never receives the settings table directly.
+ * The owner-managed database setting is the source of truth. Direct table
+ * access remains revoked; the server can only read through a narrow RPC.
  */
-export async function syncManualTransferSettings(
+export async function getManualTransferAccount(
   admin: SupabaseClient<Database>,
 ): Promise<ManualTransferAccount> {
-  const account = getManualTransferAccount();
-  const { error } = await admin.rpc("sync_manual_transfer_runtime_settings", {
-    p_bank_name: account.bankName,
-    p_account_number: account.accountNumber,
-  });
-  if (error) throw new Error("manual_transfer_settings_unavailable");
+  const { data, error } = await admin.rpc(
+    "get_manual_transfer_account_for_service",
+  );
+  const row = firstRow(data);
+  const bankName = typeof row?.bank_name === "string"
+    ? row.bank_name.trim()
+    : "";
+  const accountNumber = typeof row?.account_number === "string"
+    ? row.account_number.trim()
+    : "";
+  if (
+    error ||
+    bankName.length < 2 ||
+    accountNumber.length < 5 ||
+    !/^[0-9 -]+$/.test(accountNumber)
+  ) {
+    throw new Error("manual_transfer_not_configured");
+  }
 
-  return account;
+  return {
+    bankName,
+    accountNumber,
+    updatedAt: typeof row?.updated_at === "string" ? row.updated_at : null,
+  };
 }

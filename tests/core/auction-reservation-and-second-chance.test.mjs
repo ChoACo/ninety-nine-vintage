@@ -13,6 +13,28 @@ function extractPlaceBidDefinition(migration) {
   return definition.replaceAll("\r\n", "\n");
 }
 
+function extractSqlFunctionDefinition(migration, qualifiedName) {
+  const escapedName = qualifiedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const definition = migration.match(
+    new RegExp(
+      `create or replace function ${escapedName}\\([\\s\\S]*?\\n\\$\\$;`,
+      "i",
+    ),
+  )?.[0];
+  assert.ok(definition, `${qualifiedName} definition must exist`);
+  return definition.replaceAll("\r\n", "\n");
+}
+
+function replaceSqlFragmentExactlyOnce(source, before, after, label) {
+  const pieces = source.split(before);
+  assert.equal(
+    pieces.length,
+    2,
+    `${label} must match exactly once in the canonical processor`,
+  );
+  return `${pieces[0]}${after}${pieces[1]}`;
+}
+
 test("auction countdown and soft close remain anchored to the database clock", async () => {
   const [migration, boundaryMigration, clockHook] = await Promise.all([
     source(
@@ -168,11 +190,120 @@ test("the storefront surfaces the server-based 15-minute hold and blocks expired
   );
 });
 
+test("operator retry is an exact product-scoped mirror of the scheduled offer processor", async () => {
+  const [canonicalMigration, scopedMigration] = await Promise.all([
+    source(
+      "supabase/migrations/20260718102000_live_auction_revenue_defense.sql",
+    ),
+    source(
+      "supabase/migrations/20260721080000_scope_operator_second_chance_processing.sql",
+    ),
+  ]);
+
+  const canonical = extractSqlFunctionDefinition(
+    canonicalMigration,
+    "public.process_auction_purchase_offers",
+  );
+  let expected = replaceSqlFragmentExactlyOnce(
+    canonical,
+    `create or replace function public.process_auction_purchase_offers(
+  p_at timestamptz default clock_timestamp()
+)`,
+    `create or replace function app_private.process_auction_purchase_offer_for_product(
+  p_product_id uuid,
+  p_at timestamptz
+)`,
+    "scoped processor signature",
+  );
+  expected = replaceSqlFragmentExactlyOnce(
+    expected,
+    `begin
+  if p_at is null then`,
+    `begin
+  if p_product_id is null then
+    raise exception using
+      errcode = '22023',
+      message = '세컨드 찬스를 처리할 경매를 선택해 주세요.';
+  end if;
+  if p_at is null then`,
+    "scoped processor argument guard",
+  );
+  expected = replaceSqlFragmentExactlyOnce(
+    expected,
+    `  where products.status = 'closed'`,
+    `  where products.id = p_product_id
+    and products.status = 'closed'`,
+    "offer seeding scope",
+  );
+  expected = replaceSqlFragmentExactlyOnce(
+    expected,
+    `  where offers.status in ('payment_due', 'accepted')
+    and exists (`,
+    `  where offers.product_id = p_product_id
+    and offers.status in ('payment_due', 'accepted')
+    and exists (`,
+    "settlement reconciliation scope",
+  );
+  expected = replaceSqlFragmentExactlyOnce(
+    expected,
+    `    from public.auction_purchase_offers as offers
+    where offers.status = 'offered'`,
+    `    from public.auction_purchase_offers as offers
+    where offers.product_id = p_product_id
+      and offers.status = 'offered'`,
+    "unaccepted offer expiry scope",
+  );
+  expected = replaceSqlFragmentExactlyOnce(
+    expected,
+    `    from public.auction_purchase_offers as offers
+    where offers.status in ('payment_due', 'accepted')`,
+    `    from public.auction_purchase_offers as offers
+    where offers.product_id = p_product_id
+      and offers.status in ('payment_due', 'accepted')`,
+    "payment deadline scope",
+  );
+
+  const scoped = extractSqlFunctionDefinition(
+    scopedMigration,
+    "app_private.process_auction_purchase_offer_for_product",
+  );
+  assert.equal(
+    scoped,
+    expected,
+    "the operator processor may differ from the scheduled processor only by its target argument and four product filters",
+  );
+
+  const operatorWrapper = extractSqlFunctionDefinition(
+    scopedMigration,
+    "public.operator_process_second_chance",
+  );
+  assert.match(
+    operatorWrapper,
+    /app_private\.process_auction_purchase_offer_for_product\(\s*p_product_id,\s*v_now\s*\)/i,
+  );
+  assert.doesNotMatch(
+    operatorWrapper,
+    /public\.process_auction_purchase_offers\(/i,
+  );
+  assert.match(
+    scopedMigration,
+    /revoke all on function\s+app_private\.process_auction_purchase_offer_for_product\(uuid, timestamptz\)\s+from public, anon, authenticated, service_role/i,
+  );
+  assert.doesNotMatch(
+    scopedMigration,
+    /grant execute on function\s+app_private\.process_auction_purchase_offer_for_product/i,
+  );
+  assert.match(
+    scopedMigration,
+    /comment on function public\.operator_process_second_chance\(uuid\) is\s+'Owner\/operator assigned-store, product-scoped retry/i,
+  );
+});
+
 test("operator second chance is role, store, deadline, audit, and payment-mode constrained", async () => {
   const [migration, route, consoleSource, pastConsole, pastRoute, button] =
     await Promise.all([
       source(
-        "supabase/migrations/20260721060000_auction_second_chance_and_cart_reservations.sql",
+        "supabase/migrations/20260721080000_scope_operator_second_chance_processing.sql",
       ),
       source("src/app/api/admin/operator/auctions/[id]/second-chance/route.ts"),
       source("src/components/admin/operator/OperatorConsole.tsx"),
@@ -196,7 +327,7 @@ test("operator second chance is role, store, deadline, audit, and payment-mode c
   );
   assert.match(
     migration,
-    /v_processed := public\.process_auction_purchase_offers\(v_now\)/i,
+    /v_processed := app_private\.process_auction_purchase_offer_for_product\(\s*p_product_id,\s*v_now\s*\)/i,
   );
   assert.match(migration, /auction\.second_chance\.processed/i);
   assert.match(
@@ -225,8 +356,10 @@ test("operator second chance is role, store, deadline, audit, and payment-mode c
   assert.match(route, /second_chance_manual_transfer_only/);
   assert.match(
     consoleSource,
-    /canMutate &&\s*product\.sale_type === "auction" &&\s*product\.status === "closed"/,
+    /canMutate &&\s*paymentMode === "manual_transfer" &&\s*product\.sale_type === "auction" &&\s*product\.status === "closed"/,
   );
+  assert.match(consoleSource, /\/api\/admin\/operator\/products\/past/);
+  assert.match(consoleSource, /paymentMode === "portone"/);
   assert.match(consoleSource, /<OperatorSecondChanceButton/);
   assert.match(
     pastRoute,

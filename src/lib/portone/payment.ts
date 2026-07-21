@@ -68,27 +68,7 @@ export class ProductPaymentError extends Error {
   }
 }
 
-const configuredStoreId = process.env.VITE_PORTONE_STORE_ID?.trim();
-const fallbackChannelKey = process.env.VITE_PORTONE_CHANNEL_KEY?.trim();
 const configuredWebhookUrl = process.env.VITE_PORTONE_WEBHOOK_URL?.trim();
-
-function configuredChannelKey(payMethod: ProductPaymentMethod): string | undefined {
-  const cardChannelKey =
-    process.env.VITE_PORTONE_CARD_CHANNEL_KEY?.trim() || fallbackChannelKey;
-  if (payMethod === "EASY_PAY") {
-    return (
-      process.env.VITE_PORTONE_KAKAOPAY_CHANNEL_KEY?.trim() ||
-      fallbackChannelKey
-    );
-  }
-  if (payMethod === "VIRTUAL_ACCOUNT") {
-    return (
-      process.env.VITE_PORTONE_VIRTUAL_ACCOUNT_CHANNEL_KEY?.trim() ||
-      cardChannelKey
-    );
-  }
-  return cardChannelKey;
-}
 
 const publicApiErrorMessages: Record<string, string> = {
   forbidden: "안전한 결제 요청을 확인하지 못했습니다. 페이지를 새로고침해 주세요.",
@@ -288,10 +268,7 @@ async function postAuthenticated<T>(
 function validatePreparedPayment(
   value: unknown,
   payMethod: ProductPaymentMethod,
-  options: {
-    expectedPaymentId?: string;
-    requireConfiguredIds?: boolean;
-  } = {},
+  options: { expectedPaymentId?: string } = {},
 ): PreparedProductPayment {
   if (!isProductPaymentMethod(payMethod)) {
     throw new ProductPaymentError("지원하지 않는 결제 방법입니다.");
@@ -305,9 +282,6 @@ function validatePreparedPayment(
   const responsePaymentStatus = payment.paymentStatus;
   const responsePortOneStatus = payment.portoneStatus;
   const responseCanRetryPayment = payment.canRetryPayment;
-  const expectedChannelKey = options.requireConfiguredIds
-    ? configuredChannelKey(payMethod)
-    : undefined;
   if (
     typeof payment.storeId !== "string" ||
     !/^store-[A-Za-z0-9_-]+$/.test(payment.storeId) ||
@@ -339,12 +313,7 @@ function validatePreparedPayment(
       responsePortOneStatus,
       responseCanRetryPayment,
     ) ||
-    normalizedCustomer === null ||
-    (options.requireConfiguredIds &&
-      (!configuredStoreId ||
-        !expectedChannelKey ||
-        payment.storeId !== configuredStoreId ||
-        payment.channelKey !== expectedChannelKey))
+    normalizedCustomer === null
   ) {
     throw new ProductPaymentError("서버의 결제 준비 정보를 확인하지 못했습니다.");
   }
@@ -521,6 +490,8 @@ export async function requestProductPayment(input: {
   if (!isValidPaymentId(paymentId)) {
     throw new ProductPaymentError("결제 고유 번호가 올바르지 않습니다.");
   }
+  // The authenticated server response is the source of truth for public
+  // PortOne identifiers; Cloudflare runtime values are not baked into clients.
   const prepared = validatePreparedPayment(
     await postAuthenticated<unknown>(
       "/api/payments/prepare",
@@ -534,7 +505,7 @@ export async function requestProductPayment(input: {
       "결제를 준비하지 못했습니다.",
     ),
     input.payMethod,
-    { expectedPaymentId: paymentId, requireConfiguredIds: true },
+    { expectedPaymentId: paymentId },
   );
   return openPreparedProductPayment(prepared, input.payMethod);
 }

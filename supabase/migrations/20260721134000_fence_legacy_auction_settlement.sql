@@ -1,3 +1,5 @@
+begin;
+
 -- Phase 0 of the manual-transfer hardening rollout. Every application writer
 -- must already be stopped before this migration. The postgres-owned auction
 -- scheduler cannot be drained by revoking API EXECUTE privileges, so install
@@ -225,3 +227,5 @@ begin
   end if;
 end;
 $$;
+
+commit;

@@ -1,3 +1,5 @@
+begin;
+
 -- Fixed-price checkout closes inventory through the authenticated member RPC.
 -- The auction blackout guard predates sale_type and otherwise treats that
 -- exact inventory transition as an auction mutation between 21:00 and 22:00.
@@ -70,3 +72,5 @@ $$;
 
 revoke all on function public.guard_product_auction_blackout()
 from public, anon, authenticated, service_role;
+
+commit;

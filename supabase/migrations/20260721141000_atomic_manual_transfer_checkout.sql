@@ -1,3 +1,5 @@
+begin;
+
 -- Create the commerce order and its manual-transfer request in one database
 -- transaction. Move the existing, already-hardened order implementation behind
 -- a private schema and keep a public compatibility wrapper that is atomic too.
@@ -134,3 +136,5 @@ comment on function public.create_commerce_manual_transfer_checkout(uuid[], text
 
 comment on function public.create_commerce_order(uuid[], text, boolean) is
   'Rolling-compatible atomic manual-transfer checkout entrypoint; returns the legacy order-only JSON contract.';
+
+commit;

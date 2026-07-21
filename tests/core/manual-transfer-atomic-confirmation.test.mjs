@@ -33,6 +33,33 @@ function section(value, startToken, endToken, label) {
   return value.slice(start, end);
 }
 
+test("manual-transfer rollout migrations commit atomically per file", async () => {
+  const paths = [
+    fenceMigrationPath,
+    revokeMigrationPath,
+    migrationPath,
+    "supabase/migrations/20260721141000_atomic_manual_transfer_checkout.sql",
+    "supabase/migrations/20260721142000_allow_fixed_checkout_during_auction_blackout.sql",
+    "supabase/migrations/20260721143000_grant_service_role_server_table_access.sql",
+  ];
+
+  for (const path of paths) {
+    const sql = (await source(path)).trim();
+    assert.match(sql, /^begin;/i, `${path}: migration must begin an explicit transaction`);
+    assert.match(sql, /commit;$/i, `${path}: migration must commit its explicit transaction`);
+    assert.equal(
+      sql.match(/^begin;$/gim)?.length,
+      1,
+      `${path}: migration must have exactly one top-level begin`,
+    );
+    assert.equal(
+      sql.match(/^commit;$/gim)?.length,
+      1,
+      `${path}: migration must have exactly one top-level commit`,
+    );
+  }
+});
+
 function sqlFunction(value, functionName) {
   const header = new RegExp(
     `create\\s+or\\s+replace\\s+function\\s+public\\.${functionName}\\s*\\(`,

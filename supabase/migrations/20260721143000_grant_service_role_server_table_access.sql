@@ -1,3 +1,5 @@
+begin;
+
 -- New Supabase projects no longer auto-expose newly created public tables to
 -- Data API roles. Pin the direct-table contract used by the repository's
 -- service-key server client so clean and legacy projects behave the same.
@@ -61,3 +63,5 @@ grant insert on table public.shipping_fee_payments to service_role;
 grant update on table public.shipping_requests to service_role;
 grant insert, update on table public.site_status to service_role;
 grant insert on table public.support_messages to service_role;
+
+commit;

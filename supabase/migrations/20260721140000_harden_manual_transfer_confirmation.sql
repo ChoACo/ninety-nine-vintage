@@ -1,3 +1,5 @@
+begin;
+
 -- Manual-transfer receipts are authoritative for every settlement transition.
 -- Browser retries are deduplicated by an operator-scoped UUID v4 key, while
 -- all parent/ledger mutations use one canonical lock order per payment kind.
@@ -2036,3 +2038,5 @@ begin
   end if;
 end;
 $$;
+
+commit;

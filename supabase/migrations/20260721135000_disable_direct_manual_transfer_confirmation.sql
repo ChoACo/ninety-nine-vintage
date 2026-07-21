@@ -1,3 +1,5 @@
+begin;
+
 -- Phase 1 of the manual-transfer hardening rollout. Commit the external
 -- confirmation revocation before changing the receipt contract so no new
 -- authenticated client can bypass the ledger during the maintenance window.
@@ -225,3 +227,5 @@ from public, anon, authenticated, service_role;
 
 revoke all on function public.reverse_shipping_fee_payment(uuid, text)
 from public, anon, authenticated, service_role;
+
+commit;

@@ -9,6 +9,8 @@ const revokeMigrationPath =
   "supabase/migrations/20260721135000_disable_direct_manual_transfer_confirmation.sql";
 const fenceMigrationPath =
   "supabase/migrations/20260721134000_fence_legacy_auction_settlement.sql";
+const queueSnapshotMigrationPath =
+  "supabase/migrations/20260722010000_shared_commerce_payment_queue_snapshot.sql";
 
 async function source(path) {
   try {
@@ -41,6 +43,7 @@ test("manual-transfer rollout migrations commit atomically per file", async () =
     "supabase/migrations/20260721141000_atomic_manual_transfer_checkout.sql",
     "supabase/migrations/20260721142000_allow_fixed_checkout_during_auction_blackout.sql",
     "supabase/migrations/20260721143000_grant_service_role_server_table_access.sql",
+    queueSnapshotMigrationPath,
   ];
 
   for (const path of paths) {
@@ -498,8 +501,9 @@ test("partial auction receipts suspend automatic expiry before cron is restored"
 });
 
 test("operator balances are full-ledger aggregates and the commerce queue is shared", async () => {
-  const [migration, operatorRoute, ownerRoute] = await Promise.all([
+  const [migration, queueMigration, operatorRoute, ownerRoute] = await Promise.all([
     source(migrationPath),
+    source(queueSnapshotMigrationPath),
     source("src/app/api/admin/operator/orders/route.ts"),
     source("src/app/api/admin/owner/operations/route.ts"),
   ]);
@@ -518,9 +522,21 @@ test("operator balances are full-ledger aggregates and the commerce queue is sha
     /when\s+ledger\.entry_type\s*=\s*'receipt'\s+then\s+ledger\.amount[\s\S]{0,140}when\s+ledger\.entry_type\s*=\s*'reversal'\s+then\s+-ledger\.amount/i,
     "the aggregate must use the signed ledger total",
   );
-  assert.ok(
-    (operatorRoute.match(/get_manual_transfer_ledger_balances/g) ?? []).length >= 1,
+  const queueSnapshot = sqlFunction(
+    queueMigration,
+    "get_shared_commerce_payment_queue_page",
   );
+  expectMatch(
+    queueSnapshot,
+    /count\s*\(\s*ledger\.id\s*\)::bigint/i,
+    "the shared queue CAS version must be aggregated in its statement snapshot",
+  );
+  expectMatch(
+    queueSnapshot,
+    /when\s+ledger\.entry_type\s*=\s*'receipt'\s+then\s+ledger\.amount[\s\S]{0,140}when\s+ledger\.entry_type\s*=\s*'reversal'\s+then\s+-ledger\.amount/i,
+    "the shared queue must use the signed full-ledger total",
+  );
+  assert.doesNotMatch(operatorRoute, /get_manual_transfer_ledger_balances/);
   assert.ok(
     (ownerRoute.match(/get_manual_transfer_ledger_balances/g) ?? []).length >= 3,
   );
@@ -531,9 +547,10 @@ test("operator balances are full-ledger aggregates and the commerce queue is sha
   );
   expectMatch(
     operatorRoute,
-    /receivedAmount:\s*balance\.received_amount[\s\S]{0,100}ledgerEntryCount:\s*balance\.ledger_entry_count/,
-    "raw history rows must not drive the receipt CAS",
+    /const\s+receivedAmount\s*=\s*value\.received_amount[\s\S]{0,100}const\s+ledgerEntryCount\s*=\s*value\.ledger_entry_count/,
+    "the validated queue snapshot must drive the receipt CAS",
   );
+  expectMatch(operatorRoute, /\breceivedAmount,[\s\S]{0,80}\bledgerEntryCount,/);
   assert.doesNotMatch(
     ownerRoute,
     /from\(\s*"manual_transfer_payment_ledger"\s*\)/,
@@ -541,14 +558,20 @@ test("operator balances are full-ledger aggregates and the commerce queue is sha
   );
   expectMatch(
     operatorRoute,
-    /activeTransferResult[\s\S]{0,500}recentTransferResult/,
-    "outstanding transfers must be queried separately from recent history",
+    /auth\.user\.rpc\([\s\S]{0,100}"get_shared_commerce_payment_queue_page"/,
+    "the API must use the authenticated shared snapshot RPC",
+  );
+  assert.doesNotMatch(
+    operatorRoute,
+    /\.from\(\s*"commerce_order_transfers"\s*\)/,
+    "the API must not race separate active and completed table reads",
   );
 });
 
 test("shared payment evidence is a bounded projection and direct staff rows stay closed", async () => {
-  const [migration, operatorRoute, ledgerRoute, operatorConsole] = await Promise.all([
+  const [migration, queueMigration, operatorRoute, ledgerRoute, operatorConsole] = await Promise.all([
     source(migrationPath),
+    source(queueSnapshotMigrationPath),
     source("src/app/api/admin/operator/orders/route.ts"),
     source("src/app/api/admin/operator/transfers/[id]/ledger/route.ts"),
     source("src/components/admin/operator/OperatorOrdersConsole.tsx"),
@@ -591,28 +614,17 @@ test("shared payment evidence is a bounded projection and direct staff rows stay
   );
   expectMatch(
     operatorRoute,
-    /get_shared_commerce_payment_order_summaries[\s\S]{0,1800}summary\.items\.length\s*!==\s*summary\.item_count/,
+    /summary\.items\.length\s*!==\s*summary\.item_count/,
     "the API must fail closed when a projected order summary is incomplete",
   );
   expectMatch(
-    operatorRoute,
-    /\.limit\(401\)[\s\S]{0,900}length\s*>\s*400[\s\S]{0,200}operator_orders_queue_limit_exceeded/,
+    queueMigration,
+    /limit\s+401[\s\S]{0,1800}count\(\*\)\s*>\s*400\s+as\s+active_overflow/i,
     "an oversized active queue must fail closed instead of hiding payable transfers",
   );
-  const ledgerProjection = section(
-    operatorRoute,
-    "const { data: ledger",
-    "const balances =",
-    "operator ledger projection",
-  );
-  assert.doesNotMatch(
-    ledgerProjection,
-    /\.select\(\s*"\*"\s*\)/,
-    "internal ledger keys must not be returned to the browser",
-  );
   expectMatch(
-    ledgerProjection,
-    /\.select\([^\n]*recorded_by[^\n]*created_at/,
+    queueMigration,
+    /jsonb_build_object\([\s\S]{0,700}'recorded_by',[\s\S]{0,120}'created_at'/i,
     "the audit projection must include its actor and timestamp",
   );
   assert.doesNotMatch(
@@ -621,14 +633,14 @@ test("shared payment evidence is a bounded projection and direct staff rows stay
     "future transfer columns must not be exposed implicitly to every operator",
   );
   expectMatch(
-    operatorRoute,
-    /const\s+transferById\s*=\s*new\s+Map[\s\S]{0,420}transferById\.set\(transfer\.id,\s*transfer\)/,
-    "a status transition crossing the active and recent reads must not duplicate one transfer",
+    queueMigration,
+    /selected_transfers\s+as\s+materialized[\s\S]{0,700}union\s+all[\s\S]{0,240}history_page/i,
+    "active and completed lanes must be selected inside one statement snapshot",
   );
   expectMatch(
     operatorConsole,
-    /recentHistoryTruncated[\s\S]{0,800}최근 100건만 표시/,
-    "the console must disclose when completed history is intentionally bounded",
+    /historyHasMore[\s\S]*appendHistory[\s\S]*이전 완료·취소 이력 더 보기/,
+    "the console must page older completed history instead of silently truncating it",
   );
   expectMatch(
     operatorConsole,
@@ -1205,7 +1217,7 @@ test("all three receipt UIs persist one canonical key until a successful respons
 
   expectMatch(
     operatorConsole,
-    /useSupabaseSession\s*\(\)[\s\S]*loadedSessionRevision\s*===\s*sessionRevision[\s\S]*const\s+visibleTransfers\s*=\s*useMemo\s*\([\s\S]{0,180}snapshotIsCurrent\s*\?\s*transfers\s*:\s*\[\]/,
+    /useSupabaseSession\s*\(\)[\s\S]*loadedSessionRevision\s*===\s*sessionRevision[\s\S]*const\s+visibleActiveTransfers\s*=\s*useMemo\s*\([\s\S]{0,180}snapshotIsCurrent\s*\?\s*activeTransfers\s*:\s*\[\][\s\S]{0,300}snapshotIsCurrent\s*\?\s*historyTransfers\s*:\s*\[\]/,
     "the shared operator queue must hide the previous identity's rows during a session transition",
   );
   expectMatch(

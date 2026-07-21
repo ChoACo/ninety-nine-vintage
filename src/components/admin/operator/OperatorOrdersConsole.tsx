@@ -41,6 +41,7 @@ interface LedgerEntry {
 interface Transfer {
   id: string;
   order_id: string;
+  member_id: string;
   status: string;
   expected_amount: number;
   receivedAmount: number;
@@ -49,7 +50,14 @@ interface Transfer {
   remainingAmount: number;
   bank_name_snapshot: string;
   requested_at: string;
+  activityAt: string;
   ledger: LedgerEntry[];
+  items: Item[];
+}
+
+interface HistoryCursor {
+  activityAt: string;
+  transferId: string;
 }
 
 interface ReceiptForm {
@@ -93,9 +101,12 @@ export function OperatorOrdersConsole() {
     useSupabaseSession();
   const token = session?.access_token ?? null;
   const actorId = session?.user.id ?? null;
-  const [items, setItems] = useState<Item[]>([]);
-  const [transfers, setTransfers] = useState<Transfer[]>([]);
-  const [recentHistoryTruncated, setRecentHistoryTruncated] = useState(false);
+  const [activeTransfers, setActiveTransfers] = useState<Transfer[]>([]);
+  const [historyTransfers, setHistoryTransfers] = useState<Transfer[]>([]);
+  const [activeCount, setActiveCount] = useState(0);
+  const [historyCursor, setHistoryCursor] = useState<HistoryCursor | null>(null);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [forms, setForms] = useState<Record<string, ReceiptForm>>({});
   const [filter, setFilter] = useState({ search: "", status: "all" });
   const [notice, setNotice] = useState("");
@@ -125,25 +136,92 @@ export function OperatorOrdersConsole() {
   const load = useCallback(async (
     accessToken: string | null,
     expectedSessionRevision: number,
+    options?: { appendHistory?: boolean; cursor?: HistoryCursor | null },
   ) => {
     const generation = ++loadGeneration.current;
     if (!accessToken) {
-      setItems([]);
-      setTransfers([]);
-      setRecentHistoryTruncated(false);
+      setActiveTransfers([]);
+      setHistoryTransfers([]);
+      setActiveCount(0);
+      setHistoryCursor(null);
+      setHistoryHasMore(false);
+      setHistoryLoading(false);
       setForms({});
       setLoadedSessionRevision(null);
       setNotice("");
       return;
     }
-    const response = await fetch("/api/admin/operator/orders", { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store" });
-    const payload = await response.json() as { items?: Item[]; transfers?: Transfer[]; recentHistoryTruncated?: boolean; error?: string };
-    if (generation !== loadGeneration.current) return;
-    if (!response.ok) throw new Error(payload.error ?? "주문을 불러오지 못했습니다.");
-    setItems(payload.items ?? []);
-    setTransfers(payload.transfers ?? []);
-    setRecentHistoryTruncated(payload.recentHistoryTruncated === true);
-    setLoadedSessionRevision(expectedSessionRevision);
+    const appendHistory = options?.appendHistory === true;
+    const cursor = options?.cursor ?? null;
+    if (appendHistory && !cursor) return;
+    if (appendHistory) {
+      setHistoryLoading(true);
+    } else {
+      setLoadedSessionRevision(null);
+      setHistoryCursor(null);
+      setHistoryHasMore(false);
+    }
+    try {
+      const query = cursor
+        ? `?before=${encodeURIComponent(cursor.activityAt)}&beforeId=${encodeURIComponent(cursor.transferId)}`
+        : "";
+      const response = await fetch(`/api/admin/operator/orders${query}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: "no-store",
+      });
+      const payload = await response.json() as {
+        activeCount?: number;
+        activeTransfers?: Transfer[];
+        historyTransfers?: Transfer[];
+        historyHasMore?: boolean;
+        nextHistoryCursor?: HistoryCursor | null;
+        error?: string;
+      };
+      if (generation !== loadGeneration.current) return;
+      const currentSnapshot = sessionSnapshot.current;
+      if (
+        currentSnapshot.loading ||
+        currentSnapshot.token !== accessToken ||
+        currentSnapshot.revision !== expectedSessionRevision
+      ) {
+        return;
+      }
+      if (!response.ok) throw new Error(payload.error ?? "주문을 불러오지 못했습니다.");
+      const nextActive = payload.activeTransfers ?? [];
+      const historyPage = payload.historyTransfers ?? [];
+      const activeIds = new Set(nextActive.map((transfer) => transfer.id));
+      setActiveTransfers(nextActive);
+      setForms((current) => Object.fromEntries(
+        nextActive
+          .filter((transfer) => current[transfer.id])
+          .map((transfer) => [transfer.id, current[transfer.id]]),
+      ));
+      setHistoryTransfers((current) => {
+        const historyById = new Map(
+          (appendHistory ? current : []).map((transfer) => [transfer.id, transfer]),
+        );
+        for (const transfer of historyPage) historyById.set(transfer.id, transfer);
+        for (const activeId of activeIds) historyById.delete(activeId);
+        return [...historyById.values()];
+      });
+      setActiveCount(payload.activeCount ?? nextActive.length);
+      setHistoryHasMore(payload.historyHasMore === true);
+      setHistoryCursor(payload.nextHistoryCursor ?? null);
+      setLoadedSessionRevision(expectedSessionRevision);
+    } catch (error) {
+      if (generation === loadGeneration.current) {
+        setActiveTransfers([]);
+        setHistoryTransfers([]);
+        setActiveCount(0);
+        setHistoryCursor(null);
+        setHistoryHasMore(false);
+        setForms({});
+        setLoadedSessionRevision(null);
+      }
+      throw error;
+    } finally {
+      if (generation === loadGeneration.current) setHistoryLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -168,23 +246,27 @@ export function OperatorOrdersConsole() {
     Boolean(token) &&
     Boolean(actorId) &&
     loadedSessionRevision === sessionRevision;
-  const visibleItems = useMemo(
-    () => snapshotIsCurrent ? items : [],
-    [items, snapshotIsCurrent],
+  const visibleActiveTransfers = useMemo(
+    () => snapshotIsCurrent ? activeTransfers : [],
+    [activeTransfers, snapshotIsCurrent],
+  );
+  const visibleHistoryTransfers = useMemo(
+    () => snapshotIsCurrent ? historyTransfers : [],
+    [historyTransfers, snapshotIsCurrent],
   );
   const visibleTransfers = useMemo(
-    () => snapshotIsCurrent ? transfers : [],
-    [snapshotIsCurrent, transfers],
+    () => [...visibleActiveTransfers, ...visibleHistoryTransfers],
+    [visibleActiveTransfers, visibleHistoryTransfers],
   );
 
   const orders = useMemo(() => visibleTransfers.map((transfer) => ({
     transfer,
-    lines: visibleItems.filter((item) => item.order_id === transfer.order_id),
+    lines: transfer.items,
   })).filter(({ transfer, lines }) => {
     const query = filter.search.trim().toLowerCase();
     const text = [transfer.order_id, lines[0]?.commerce_orders?.member_id ?? "", ...lines.map((line) => line.products?.title ?? "")].join(" ").toLowerCase();
     return (!query || text.includes(query)) && (filter.status === "all" || transfer.status === filter.status);
-  }), [filter, visibleItems, visibleTransfers]);
+  }), [filter, visibleTransfers]);
 
   const updateForm = (id: string, patch: Partial<ReceiptForm>) => {
     setForms((current) => ({ ...current, [id]: { ...(current[id] ?? emptyForm), ...patch } }));
@@ -321,19 +403,24 @@ export function OperatorOrdersConsole() {
     }
   };
 
-  const waiting = visibleTransfers.filter(isActionableTransfer).length;
-  const settled = visibleTransfers.filter((transfer) => transfer.status === "confirmed").length;
+  const waiting = snapshotIsCurrent ? activeCount : 0;
+  const settled = visibleHistoryTransfers.filter(
+    (transfer) => transfer.status === "confirmed",
+  ).length;
+  const visibleItemCount = visibleTransfers.reduce(
+    (count, transfer) => count + transfer.items.length,
+    0,
+  );
 
   return <div className="space-y-8">
     <SectionHeading action={<Button className="flex items-center gap-2" disabled={!token} onClick={() => void load(token, sessionRevision).catch((error) => setNotice(error instanceof Error ? error.message : "새로고침에 실패했습니다."))} type="button"><RefreshCw size={13} /> 새로고침</Button>} description="입금액을 부분 기록하고 잔액이 0원일 때만 주문을 결제 완료로 전환합니다." eyebrow="운영자 / 주문 관리" title="입금·주문 처리" variant="page" />
     {notice && <StatusNotice>{notice}</StatusNotice>}
-    {snapshotIsCurrent && recentHistoryTruncated && <StatusNotice>완료·취소 이력은 최근 100건만 표시합니다. 더 오래된 감사 이력은 후속 cursor 조회 화면에서 확인해야 합니다.</StatusNotice>}
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <div className="border border-line p-5"><Clock3 size={17} /><p className="mt-7 text-xs text-muted">잔액 입금 대기</p><p className="mt-2 font-mono text-3xl font-bold">{waiting}</p></div>
-      <div className="border border-line p-5"><CircleCheck size={17} /><p className="mt-7 text-xs text-muted">입금 확인 완료</p><p className="mt-2 font-mono text-3xl font-bold">{settled}</p></div>
-      <div className="border border-line bg-ink p-5 text-paper"><p className="eyebrow text-zinc-400">주문 상품</p><p className="mt-7 font-mono text-3xl font-bold">{visibleItems.length}</p><p className="mt-2 text-xs text-zinc-400">공동 입금 큐의 통합 주문 상품 수</p></div>
+      <div className="border border-line p-5"><CircleCheck size={17} /><p className="mt-7 text-xs text-muted">불러온 입금 완료</p><p className="mt-2 font-mono text-3xl font-bold">{settled}</p></div>
+      <div className="border border-line bg-ink p-5 text-paper"><p className="eyebrow text-zinc-400">주문 상품</p><p className="mt-7 font-mono text-3xl font-bold">{visibleItemCount}</p><p className="mt-2 text-xs text-zinc-400">현재 불러온 통합 주문 상품 수</p></div>
     </div>
-    <div className="flex flex-col gap-3 sm:flex-row"><div className="flex flex-1 items-center gap-2 border border-line bg-paper px-3"><Search size={14} className="text-muted" /><input aria-label="주문 검색" className="h-11 w-full bg-transparent text-xs outline-none" onChange={(event) => setFilter({ ...filter, search: event.target.value })} placeholder="주문번호·회원 식별자·상품명 검색" value={filter.search} /></div><select aria-label="주문 상태 필터" className="h-11 w-full border border-line bg-paper px-3 text-xs sm:w-48" onChange={(event) => setFilter({ ...filter, status: event.target.value })} value={filter.status}><option value="all">전체 상태</option><option value="awaiting_transfer">입금 대기</option><option value="partially_paid">부분 입금</option><option value="confirmed">입금 확인</option></select></div>
+    <div className="flex flex-col gap-3 sm:flex-row"><div className="flex flex-1 items-center gap-2 border border-line bg-paper px-3"><Search size={14} className="text-muted" /><input aria-label="주문 검색" className="h-11 w-full bg-transparent text-xs outline-none" onChange={(event) => setFilter({ ...filter, search: event.target.value })} placeholder="주문번호·회원 식별자·상품명 검색" value={filter.search} /></div><select aria-label="주문 상태 필터" className="h-11 w-full border border-line bg-paper px-3 text-xs sm:w-48" onChange={(event) => setFilter({ ...filter, status: event.target.value })} value={filter.status}><option value="all">전체 상태</option><option value="awaiting_transfer">입금 대기</option><option value="partially_paid">부분 입금</option><option value="confirmed">입금 확인</option><option value="cancelled">취소</option></select></div>
     <div className="divide-y divide-line border-y border-line">{orders.map(({ transfer, lines }) => {
       const form = forms[transfer.id] ?? emptyForm;
       return <article className="py-6" key={transfer.id}>
@@ -344,5 +431,11 @@ export function OperatorOrdersConsole() {
         {!transfer.ledgerHistoryComplete && <p className="mt-3 text-[10px] text-muted">전체 원장 {transfer.ledgerEntryCount.toLocaleString("ko-KR")}건 중 최근 기록만 표시합니다. 누적액과 원장 버전은 전체 원장 기준입니다.</p>}
       </article>;
     })}{orders.length === 0 && <p className="py-16 text-center text-sm text-muted">조건에 맞는 주문이 없습니다.</p>}</div>
+    {snapshotIsCurrent && historyHasMore && historyCursor && <div className="flex justify-center"><Button disabled={historyLoading || Boolean(busy)} onClick={() => {
+      setNotice("");
+      void load(token, sessionRevision, { appendHistory: true, cursor: historyCursor }).catch((error) => {
+        setNotice(error instanceof Error ? error.message : "이전 입금 이력을 불러오지 못했습니다.");
+      });
+    }} type="button" variant="outline">{historyLoading ? "불러오는 중" : "이전 완료·취소 이력 더 보기"}</Button></div>}
   </div>;
 }

@@ -2852,6 +2852,15 @@ export type Database = {
           transfer_id: string
         }[]
       }
+      get_shared_commerce_payment_queue_page: {
+        Args: {
+          p_history_before_activity_at?: string | null
+          p_history_before_transfer_id?: string | null
+          p_history_limit?: number
+          p_summary_only?: boolean
+        }
+        Returns: Json
+      }
       get_shared_commerce_payment_order_summaries: {
         Args: { p_order_ids: string[] }
         Returns: {

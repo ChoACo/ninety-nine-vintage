@@ -18,6 +18,7 @@ const eslintConfig = defineConfig([
     ".open-next/**",
     ".wrangler/**",
     "dist/**",
+    "work/**",
   ]),
 ]);
 

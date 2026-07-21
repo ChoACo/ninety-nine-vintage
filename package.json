@@ -16,6 +16,7 @@
     "verify:integrations": "node scripts/verify-integrations.mjs",
     "verify:local": "node scripts/verify-local-happy-path.mjs",
     "verify:migrations": "node scripts/verify-migration-parity.mjs",
+    "verify:queue-snapshot-db": "node scripts/verify-local-queue-snapshot-postgres.mjs",
     "lint": "eslint .",
     "db:generate": "drizzle-kit generate",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",

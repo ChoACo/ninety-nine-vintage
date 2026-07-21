@@ -72,7 +72,10 @@ export function OperatorConsole() {
             headers,
             cache: "no-store",
           }),
-          fetch("/api/admin/operator/orders", { headers, cache: "no-store" }),
+          fetch("/api/admin/operator/orders?summary=1", {
+            headers,
+            cache: "no-store",
+          }),
           fetch("/api/admin/operator/shipping", { headers, cache: "no-store" }),
           fetch("/api/admin/operator/members?limit=500", {
             headers,
@@ -84,7 +87,7 @@ export function OperatorConsole() {
           await pastProductResponse.json() as PastProductResponse;
         const orderData = await orderResponse.json() as {
           error?: string;
-          transfers?: { status: string }[];
+          activeCount?: number;
         };
         const shippingData = await shippingResponse.json() as {
           requests?: unknown[];
@@ -105,13 +108,7 @@ export function OperatorConsole() {
         setPaymentMode(
           pastProductResponse.ok ? (pastProductData.paymentMode ?? null) : null,
         );
-        setOrders(
-          orderData.transfers?.filter(
-            (transfer) =>
-              transfer.status === "awaiting_transfer" ||
-              transfer.status === "partially_paid",
-          ).length ?? 0,
-        );
+        setOrders(orderData.activeCount ?? 0);
         setShipping(shippingData.requests?.length ?? 0);
         setMembers(memberData.members?.length ?? 0);
       } catch (error) {

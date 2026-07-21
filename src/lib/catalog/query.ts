@@ -1,5 +1,6 @@
 const DEFAULT_PRODUCT_LIMIT = 24;
 const MAX_PRODUCT_LIMIT = 100;
+const MAX_PRODUCT_OFFSET = 1_000_000;
 const MAX_SEARCH_LENGTH = 80;
 
 export function normalizeProductLimit(
@@ -12,6 +13,15 @@ export function normalizeProductLimit(
     : DEFAULT_PRODUCT_LIMIT;
   if (!Number.isFinite(numeric)) return safeFallback;
   return Math.min(Math.max(Math.floor(numeric), 1), MAX_PRODUCT_LIMIT);
+}
+
+export function normalizeProductOffset(value: unknown, fallback = 0): number {
+  const numeric = typeof value === "number" ? value : Number(value);
+  const safeFallback = Number.isFinite(fallback)
+    ? Math.min(Math.max(Math.floor(fallback), 0), MAX_PRODUCT_OFFSET)
+    : 0;
+  if (!Number.isFinite(numeric)) return safeFallback;
+  return Math.min(Math.max(Math.floor(numeric), 0), MAX_PRODUCT_OFFSET);
 }
 
 export function normalizeCatalogSearch(value: unknown): string {

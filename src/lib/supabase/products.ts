@@ -15,7 +15,11 @@ import {
   isSupportedProductImageMimeType,
   PRODUCT_IMAGE_FORMAT_LABEL,
 } from "./productImagePolicy";
-import { compressProductImageVariantsForUpload } from "../images/productImageCompression";
+import {
+  compressProductImageVariantsForUpload,
+  type ProductImageCompressionMeasurement,
+  type ProductImageCompressionReporter,
+} from "../images/productImageCompression";
 
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -191,7 +195,19 @@ async function removeUploadedImages(paths: readonly string[]) {
   }
 }
 
+/**
+ * Remove a browser-uploaded batch when the guarded product API rejects the
+ * database write. Storage RLS only allows this while no product row owns the
+ * generated UUID path, so a successful save cannot be erased from the client.
+ */
+export async function discardUnpersistedProductImages(
+  paths: readonly string[],
+) {
+  await removeUploadedImages(paths);
+}
+
 export interface UploadedProductImages {
+  compressionMeasurements: ProductImageCompressionMeasurement[];
   imageUrls: string[];
   thumbnailUrls: string[];
   paths: string[];
@@ -201,6 +217,7 @@ export async function uploadProductImages(
   files: readonly File[],
   productId: string,
   onUploaded?: (completed: number, total: number) => void,
+  onCompressionMeasured?: ProductImageCompressionReporter,
 ): Promise<UploadedProductImages> {
   if (files.length === 0) {
     throw new ProductRepositoryError("상품 사진을 하나 이상 선택해 주세요.");
@@ -210,6 +227,7 @@ export async function uploadProductImages(
   const imageUrls: string[] = [];
   const thumbnailUrls: string[] = [];
   const paths: string[] = [];
+  const compressionMeasurements: ProductImageCompressionMeasurement[] = [];
 
   try {
     for (const file of files) {
@@ -219,43 +237,56 @@ export async function uploadProductImages(
           "사진 파일의 실제 형식과 확장자 또는 MIME 정보가 일치하지 않아요.",
         );
       }
-      const { imageFile, thumbnailFile } =
+      const { imageFile, measurement, thumbnailFile } =
         await compressProductImageVariantsForUpload(file);
+      compressionMeasurements.push(measurement);
+      onCompressionMeasured?.(
+        measurement,
+        compressionMeasurements.length,
+        files.length,
+      );
       const uniqueName = `${Date.now()}-${crypto.randomUUID()}`;
       const imagePath = `products/${productId}/images/${uniqueName}.${getImageExtension(imageFile)}`;
       const thumbnailPath = `products/${productId}/thumbnails/${uniqueName}.${getImageExtension(thumbnailFile)}`;
-      const { data: imageData, error: imageError } = await client.storage
-        .from(PRODUCT_IMAGES_BUCKET)
-        .upload(imagePath, imageFile, {
-          cacheControl: "31536000",
-          contentType: imageFile.type,
-          upsert: false,
-        });
 
-      if (imageError) {
+      // Track both deterministic targets before starting the requests. If one
+      // upload succeeds while its sibling rejects, cleanup can still remove the
+      // successful orphan. Per-file concurrency bounds browser memory while
+      // eliminating the avoidable main-then-thumbnail network waterfall.
+      paths.push(imagePath, thumbnailPath);
+      const [imageUpload, thumbnailUpload] = await Promise.all([
+        client.storage
+          .from(PRODUCT_IMAGES_BUCKET)
+          .upload(imagePath, imageFile, {
+            cacheControl: "31536000",
+            contentType: imageFile.type,
+            upsert: false,
+          }),
+        client.storage
+          .from(PRODUCT_IMAGES_BUCKET)
+          .upload(thumbnailPath, thumbnailFile, {
+            cacheControl: "31536000",
+            contentType: thumbnailFile.type,
+            upsert: false,
+          }),
+      ]);
+      const { data: imageData, error: imageError } = imageUpload;
+
+      if (imageError || !imageData) {
         throw new ProductRepositoryError(
           "사진 업로드에 실패했어요. Storage 버킷과 운영자 권한을 확인해 주세요.",
           { cause: imageError },
         );
       }
 
-      paths.push(imageData.path);
-      const { data: thumbnailData, error: thumbnailError } =
-        await client.storage
-          .from(PRODUCT_IMAGES_BUCKET)
-          .upload(thumbnailPath, thumbnailFile, {
-            cacheControl: "31536000",
-            contentType: thumbnailFile.type,
-            upsert: false,
-          });
-      if (thumbnailError) {
+      const { data: thumbnailData, error: thumbnailError } = thumbnailUpload;
+      if (thumbnailError || !thumbnailData) {
         throw new ProductRepositoryError(
           "미리보기 사진 업로드에 실패했어요. Storage 버킷과 운영자 권한을 확인해 주세요.",
           { cause: thumbnailError },
         );
       }
 
-      paths.push(thumbnailData.path);
       const { data: imagePublicUrlData } = client.storage
         .from(PRODUCT_IMAGES_BUCKET)
         .getPublicUrl(imageData.path);
@@ -267,7 +298,12 @@ export async function uploadProductImages(
       onUploaded?.(imageUrls.length, files.length);
     }
 
-    return { imageUrls, thumbnailUrls, paths };
+    return {
+      compressionMeasurements,
+      imageUrls,
+      thumbnailUrls,
+      paths,
+    };
   } catch (error) {
     await removeUploadedImages(paths);
     throw error;
@@ -365,7 +401,9 @@ function prepareProductDraft(draft: NewAuctionDraft): PreparedProductDraft {
     draft.fixedPrice !== null &&
     draft.fixedPrice !== undefined
   ) {
-    throw new ProductRepositoryError("경매 상품에는 정가를 함께 저장할 수 없습니다.");
+    throw new ProductRepositoryError(
+      "경매 상품에는 정가를 함께 저장할 수 없습니다.",
+    );
   }
   if (
     !Number.isSafeInteger(draft.bidIncrement) ||
@@ -813,45 +851,6 @@ export async function fetchPublishedFixedProductsPage({
       typeof count === "number"
         ? rangeStart + (data?.length ?? 0) < count
         : (data?.length ?? 0) === PUBLISHED_PRODUCTS_PAGE_SIZE,
-  };
-}
-
-export interface FixedPriceClaimResult {
-  productId: string;
-  bidId: string;
-  buyerId: string;
-  buyerDisplayName: string;
-  amount: number;
-  claimedAt: string;
-}
-
-/** 서버 행 잠금으로 정가 상품을 한 번만 구매 확정합니다. */
-export async function claimFixedPriceProduct(
-  productId: string,
-): Promise<FixedPriceClaimResult> {
-  if (!productId.trim()) {
-    throw new ProductRepositoryError("구매할 상품을 선택해 주세요.");
-  }
-
-  const client = getSupabaseBrowserClient();
-  const { data, error } = await client
-    .rpc("claim_fixed_price_product", { p_product_id: productId })
-    .single();
-
-  if (error || !data) {
-    throw new ProductRepositoryError(
-      error?.message ?? "정가 상품 구매를 확정하지 못했어요.",
-      error ? { cause: error } : undefined,
-    );
-  }
-
-  return {
-    productId: data.product_id,
-    bidId: data.bid_id,
-    buyerId: data.buyer_id,
-    buyerDisplayName: data.buyer_display_name,
-    amount: data.amount,
-    claimedAt: data.claimed_at,
   };
 }
 

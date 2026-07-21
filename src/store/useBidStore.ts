@@ -2,7 +2,6 @@
 
 import { create } from "zustand";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { isEntryReadOnly } from "@/lib/entryMode";
 import type { BidHistoryEntry } from "@/types/detail";
 
 interface BidStore {
@@ -10,8 +9,17 @@ interface BidStore {
   bids: BidHistoryEntry[];
   currentPrice: number;
   hydrate: (itemId: string, bids: BidHistoryEntry[], currentPrice: number) => void;
-  addBid: (amount: number) => Promise<BidHistoryEntry>;
+  replaceAuthoritative: (itemId: string, bids: BidHistoryEntry[], currentPrice: number) => void;
+  addBid: (amount: number) => Promise<PlacedBidEntry>;
   receiveBid: (bid: BidHistoryEntry) => void;
+}
+
+export interface PlacedBidEntry extends BidHistoryEntry {
+  bidLockedAt: string | null;
+  currentPrice: number;
+  finalBidId: string | null;
+  isFinal: boolean;
+  participantCount: number;
 }
 
 export const useBidStore = create<BidStore>((set, get) => ({
@@ -22,8 +30,10 @@ export const useBidStore = create<BidStore>((set, get) => ({
     if (get().itemId === itemId && get().bids.length > 0) return;
     set({ itemId, bids, currentPrice });
   },
+  replaceAuthoritative: (itemId, bids, currentPrice) => {
+    set({ itemId, bids, currentPrice });
+  },
   addBid: async (amount) => {
-    if (isEntryReadOnly()) throw new Error("현재 사이트 연결이 불안정해 읽기 전용 모드입니다.");
     const state = get();
     if (!state.itemId) throw new Error("입찰 상품을 확인하지 못했습니다.");
 
@@ -47,6 +57,11 @@ export const useBidStore = create<BidStore>((set, get) => ({
         bidderDisplayName: string;
         amount: number;
         createdAt: string;
+        bidLockedAt: string | null;
+        currentPrice: number;
+        finalBidId: string | null;
+        isFinal: boolean;
+        participantCount: number;
       };
       error?: string;
     } | null;
@@ -58,7 +73,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
       throw new Error(message);
     }
 
-    const newBid: BidHistoryEntry = {
+    const newBid: PlacedBidEntry = {
       id: payload.bid.bidId,
       itemId: payload.bid.productId,
       bidderId: payload.bid.bidderId,
@@ -66,9 +81,15 @@ export const useBidStore = create<BidStore>((set, get) => ({
       bidderMaskedId: payload.bid.bidderDisplayName,
       amount: payload.bid.amount,
       createdAt: payload.bid.createdAt,
+      outcome: "active",
       timeLabel: "방금 전",
+      bidLockedAt: payload.bid.bidLockedAt,
+      currentPrice: payload.bid.currentPrice,
+      finalBidId: payload.bid.finalBidId,
+      isFinal: payload.bid.isFinal,
+      participantCount: payload.bid.participantCount,
     };
-    set({ bids: [newBid, ...state.bids], currentPrice: payload.bid.amount });
+    set({ bids: [newBid, ...state.bids], currentPrice: payload.bid.currentPrice });
     return newBid;
   },
   receiveBid: (bid) => {

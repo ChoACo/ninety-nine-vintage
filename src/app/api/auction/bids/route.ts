@@ -1,21 +1,11 @@
 import { hasTrustedRequestOrigin } from "@/lib/kakao/oidc";
-import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 import { placeBid, AuctionServiceError } from "@/services/auction";
 
 function response(body: Record<string, unknown>, status = 200) {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
 }
 
-function maskBidder(value: string): string {
-  const normalized = value.trim();
-  if (!normalized) return "member****";
-  return `${normalized.slice(0, Math.min(3, normalized.length))}****`;
-}
-
 export async function POST(request: Request) {
-  if (!LIVE_AUCTION_ENABLED) {
-    return response({ error: "auction_disabled" }, 503);
-  }
   if (!hasTrustedRequestOrigin(request)) return response({ error: "forbidden" }, 403);
   const authorization = request.headers.get("authorization")?.trim();
   const token = authorization?.startsWith("Bearer ") ? authorization.slice(7).trim() : null;
@@ -26,7 +16,7 @@ export async function POST(request: Request) {
   if (typeof productId !== "string" || typeof amount !== "number") return response({ error: "invalid_request" }, 400);
   try {
     const bid = await placeBid(token, productId, amount);
-    return response({ bid: { ...bid, bidderDisplayName: maskBidder(bid.bidderDisplayName) } }, 200);
+    return response({ bid }, 200);
   } catch (error) {
     if (error instanceof AuctionServiceError) {
       const errorMessage = error.message.includes("카카오 회원 로그인")

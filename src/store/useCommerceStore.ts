@@ -2,7 +2,6 @@
 
 import { create } from "zustand";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { isEntryReadOnly } from "@/lib/entryMode";
 import {
   canCommitCommerceSnapshot,
   shouldPersistCommerceLocally,
@@ -182,19 +181,16 @@ export const useCommerceStore = create<CommerceState>((set, get) => ({
     }
   },
   toggleLike: (id) => {
-    if (isEntryReadOnly()) return;
     const likedIds = get().likedIds.includes(id) ? get().likedIds.filter((value) => value !== id) : [...get().likedIds, id];
     const persistLocally = shouldPersistCommerceLocally(get().ownerMode);
     set({ likedIds }); if (persistLocally) save(likedIds, get().cartIds);
   },
   addToCart: (id) => {
-    if (isEntryReadOnly()) return;
     const cartIds = get().cartIds.includes(id) ? get().cartIds : [...get().cartIds, id];
     const persistLocally = shouldPersistCommerceLocally(get().ownerMode);
     set({ cartIds }); if (persistLocally) save(get().likedIds, cartIds);
   },
   removeFromCart: (id) => {
-    if (isEntryReadOnly()) return;
     const cartIds = get().cartIds.filter((value) => value !== id);
     const persistLocally = shouldPersistCommerceLocally(get().ownerMode);
     set({ cartIds }); if (persistLocally) save(get().likedIds, cartIds);
@@ -217,6 +213,6 @@ export const useCommerceStore = create<CommerceState>((set, get) => ({
       hydrated: true,
     });
   },
-  clearCart: () => { if (isEntryReadOnly()) return; const persistLocally = shouldPersistCommerceLocally(get().ownerMode); set({ cartIds: [] }); if (persistLocally) save(get().likedIds, []); },
+  clearCart: () => { const persistLocally = shouldPersistCommerceLocally(get().ownerMode); set({ cartIds: [] }); if (persistLocally) save(get().likedIds, []); },
   replaceCart: (ids) => { const cartIds = [...new Set(ids)]; set({ cartIds, serverInitialized: true, ownerMode: get().ownerMode === "guest" ? "guest" : "member-ready" }); },
 }));

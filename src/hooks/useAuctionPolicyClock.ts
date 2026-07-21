@@ -190,10 +190,11 @@ function getMinuteSnapshot() {
  * 모든 피드 카드와 사이드바가 하나의 1초 타이머를 공유합니다.
  * 카드 수가 늘어도 상품마다 별도 setInterval을 만들지 않습니다.
  */
-export function useAuctionPolicyClock(): Date {
+export function useAuctionPolicyClock(enabled = true): Date {
+  const active = LIVE_AUCTION_ENABLED && enabled;
   return useSyncExternalStore(
-    LIVE_AUCTION_ENABLED ? subscribe : subscribeToDisabledClock,
-    LIVE_AUCTION_ENABLED ? getSnapshot : getServerSnapshot,
+    active ? subscribe : subscribeToDisabledClock,
+    active ? getSnapshot : getServerSnapshot,
     getServerSnapshot,
   );
 }

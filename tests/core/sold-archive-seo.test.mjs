@@ -23,21 +23,22 @@ test("single and bulk product writes require and explicitly persist brand", asyn
   const routes = await Promise.all([
     source("src/app/api/admin/operator/products/route.ts"),
     source("src/app/api/admin/operator/products/bulk/route.ts"),
-    source("src/app/api/admin/owner/products/route.ts"),
-    source("src/app/api/admin/owner/products/bulk/route.ts"),
   ]);
   for (const route of routes) {
     assert.match(route, /normalizeProductBrand\(body\??\.brand\)/);
     assert.match(route, /brand_source:\s*"explicit"/);
   }
-  const updates = await Promise.all([
+  const [operatorUpdate, ownerUpdate, operatorMutation] = await Promise.all([
     source("src/app/api/admin/operator/products/[id]/route.ts"),
     source("src/app/api/admin/owner/products/[id]/route.ts"),
+    source("supabase/migrations/20260721030000_harden_operator_product_mutations.sql"),
   ]);
-  for (const route of updates) {
-    assert.match(route, /brand_slug\s*=/);
-    assert.match(route, /brand_source\s*=\s*"explicit"/);
-  }
+  assert.match(operatorUpdate, /normalizeProductBrand\(body\.brand\)/);
+  assert.match(operatorUpdate, /\.rpc\("update_operator_product"/);
+  assert.match(operatorMutation, /brand_slug\s*=\s*v_brand_slug/);
+  assert.match(operatorMutation, /brand_source\s*=\s*'explicit'/);
+  assert.match(ownerUpdate, /PATCH as updateManagedProduct/);
+  assert.doesNotMatch(ownerUpdate, /auth\.admin\.from\("products"\)/);
 });
 
 test("sold RPCs expose only archive-safe fields with cursor and brand filtering", async () => {
@@ -73,14 +74,23 @@ test("sold routes own their canonical, structured data and safe 404 boundary", a
 });
 
 test("auction settlement copy and optional measurement rendering match policy", async () => {
-  const [panel, modal, report] = await Promise.all([
+  const [panel, bidRoutePanel, report] = await Promise.all([
     source("src/components/features/auction/detail/StickyBidPanel.tsx"),
-    source("src/components/features/auction/detail/BidModal.tsx"),
+    source("src/components/features/auction/detail/AuctionBidRoutePanel.tsx"),
     source("src/components/features/auction/detail/ConditionReport.tsx"),
   ]);
+  await assert.rejects(
+    source("src/components/features/auction/detail/BidModal.tsx"),
+  );
   assert.match(panel, /aria-describedby="auction-settlement-summary"/);
-  assert.match(panel, /낙찰 후 다음 날 11:59까지 결제 · 미결제 시 낙찰 취소·경고 및 차순위 전환/);
-  assert.match(modal, /미결제 경고가 누적되면 입찰이 제한될 수 있습니다/);
+  assert.match(
+    panel,
+    /낙찰 후 다음 날 11:59까지 결제 · 미결제 시 낙찰 취소·경고 및\s*차순위 전환/,
+  );
+  assert.match(
+    bidRoutePanel,
+    /미결제 경고가 누적되면 입찰이 제한될 수 있습니다/,
+  );
   assert.doesNotMatch(panel, /미등록/);
   assert.doesNotMatch(report, /미등록/);
   assert.match(report, /rows\.length > 0/);

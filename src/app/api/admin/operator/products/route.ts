@@ -1,25 +1,50 @@
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
 import type { Json } from "@/lib/supabase/database.types";
-import { getCatalogImageUrl } from "@/lib/images";
 import { normalizeProductBrand } from "@/lib/catalog/brand";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
 }
 
+function images(value: unknown) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 12) return [];
+  const normalized = value.flatMap((candidate) => {
+    if (typeof candidate !== "string") return [];
+    const image = candidate.trim();
+    try {
+      const url = new URL(image);
+      return (url.protocol === "http:" || url.protocol === "https:")
+        && !url.pathname.includes("/storage/v1/render/image/public/")
+        ? [image]
+        : [];
+    } catch {
+      return [];
+    }
+  });
+  return normalized.length === value.length ? normalized : [];
+}
+
 export async function GET(request: Request) {
   const auth = await authenticateStaffRequest(request);
   if (!auth.ok) return auth.response;
-  let storeQuery = auth.admin.from("stores").select("id, name, slug, operator_id, is_active").eq("is_active", true);
-  if (auth.roleCode !== "owner") storeQuery = storeQuery.eq("operator_id", auth.userId);
+  if (auth.roleCode !== "owner" && !auth.effectiveOperatorId) {
+    return commerceJson({ error: "operator_assignment_required" }, 403);
+  }
+  let storeQuery = auth.user.from("stores").select("id, name, slug, operator_id, is_active").eq("is_active", true);
+  if (auth.roleCode !== "owner") storeQuery = storeQuery.eq("operator_id", auth.effectiveOperatorId as string);
   const { data: stores, error: storeError } = await storeQuery.order("name");
   if (storeError) return commerceJson({ error: "operator_products_unavailable" }, 503);
   const storeIds = (stores ?? []).map((store) => store.id);
   const { data: products, error: productError } = storeIds.length === 0
     ? { data: [], error: null }
-    : await auth.admin.from("products").select("*, stores(id, name, slug)").in("store_id", storeIds).order("created_at", { ascending: false });
+    : await auth.user.from("products").select("*, stores(id, name, slug)").in("store_id", storeIds).order("created_at", { ascending: false });
   if (productError) return commerceJson({ error: "operator_products_unavailable" }, 503);
-  return commerceJson({ stores: stores ?? [], products: (products ?? []).map((product) => ({ ...product, image_urls: product.image_urls.map((image) => getCatalogImageUrl(image, 320)), thumbnail_urls: product.thumbnail_urls.map((image) => getCatalogImageUrl(image, 320)) })) });
+  const canMutate = auth.roleCode === "owner" || auth.roleCode === "operator";
+  return commerceJson({
+    stores: stores ?? [],
+    products: products ?? [],
+    permissions: { canCreate: true, canMutate, canPublish: canMutate },
+  });
 }
 
 export async function POST(request: Request) {
@@ -32,7 +57,7 @@ export async function POST(request: Request) {
   const normalizedBrand = normalizeProductBrand(body?.brand);
   const storeId = text(body?.storeId);
   const saleType = body?.saleType === "fixed" ? "fixed" : "auction";
-  const imageUrls = Array.isArray(body?.imageUrls) ? body?.imageUrls.filter((value): value is string => typeof value === "string" && value.startsWith("http")) : [];
+  const imageUrls = images(body?.imageUrls);
   const startingPrice = Number(body?.startingPrice);
   const fixedPrice = saleType === "fixed" ? Number(body?.fixedPrice ?? body?.startingPrice) : null;
   const publishAt = text(body?.publishAt, new Date().toISOString());
@@ -40,12 +65,12 @@ export async function POST(request: Request) {
   if (!title || !description || !normalizedBrand || !storeId || imageUrls.length === 0 || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
     return commerceJson({ error: "상품 입력값을 확인해 주세요." }, 400);
   }
-  const storeQuery = auth.admin.from("stores").select("id, operator_id").eq("id", storeId);
+  const storeQuery = auth.user.from("stores").select("id, operator_id").eq("id", storeId);
   const { data: store, error: storeError } = await storeQuery.maybeSingle();
   if (storeError) return commerceJson({ error: "store_unavailable" }, 503);
-  if (!store || (auth.roleCode !== "owner" && store.operator_id !== auth.userId)) return commerceJson({ error: "forbidden" }, 403);
+  if (!store || (auth.roleCode !== "owner" && store.operator_id !== auth.effectiveOperatorId)) return commerceJson({ error: "forbidden" }, 403);
   const price = saleType === "fixed" ? fixedPrice as number : startingPrice;
-  const { data: product, error } = await auth.admin.from("products").insert({
+  const { data: product, error } = await auth.user.from("products").insert({
     title,
     description,
     category,

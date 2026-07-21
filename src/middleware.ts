@@ -2,11 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Keep this entrypoint on the Edge middleware convention: the current
 // OpenNext Cloudflare adapter rejects Next.js's Node.js-only proxy runtime.
-import {
-  getEntryGateCookieName,
-  verifyEntryPass,
-} from "@/lib/entryGateCookie";
-import { ENTRY_GATE_ENABLED } from "@/lib/featureFlags";
 
 const SKIPPED_PATHS = [
   "/api/security/session",
@@ -98,20 +93,7 @@ export async function middleware(request: NextRequest) {
     return blockedResponse(request);
   }
 
-  if (!ENTRY_GATE_ENABLED) return NextResponse.next();
-
-  const { pathname, search } = request.nextUrl;
-  if (pathname === "/" || pathname.startsWith("/auth/callback")) {
-    return NextResponse.next();
-  }
-  const pass = request.cookies.get(getEntryGateCookieName())?.value;
-  if (await verifyEntryPass(pass)) return NextResponse.next();
-
-  const redirectUrl = request.nextUrl.clone();
-  redirectUrl.pathname = "/";
-  redirectUrl.search = "";
-  redirectUrl.searchParams.set("next", `${pathname}${search}`);
-  return NextResponse.redirect(redirectUrl);
+  return NextResponse.next();
 }
 
 export const config = {

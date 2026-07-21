@@ -172,7 +172,7 @@ function PaymentCompletion() {
   return (
     <main className="mx-auto grid min-h-[60vh] max-w-xl place-items-center px-6 py-20 text-center">
       <div>
-        <p className="eyebrow text-muted">PAYMENT / COMPLETE</p>
+        <p className="eyebrow text-muted">결제 · 결과 확인</p>
         <h1 className="mt-4 text-3xl font-black tracking-[-.08em]">
           {message}
         </h1>

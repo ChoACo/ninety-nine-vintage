@@ -40,7 +40,10 @@ export interface AuctionBidDecision {
 
 export interface AuctionPolicyPost {
   status: "pending" | "active" | "closed";
-  bidHistory: readonly { bidderName: string }[];
+  bidHistory: readonly {
+    bidderName: string;
+    outcome?: "active" | "cancelled" | "unpaid_cancelled";
+  }[];
   bidLockedAt?: string | null;
   closesAt: string;
   antiSnipingBaseClosesAt?: string | null;
@@ -160,10 +163,13 @@ export function getAuctionBidDecision({
     ? "existing-participants-only"
     : getDailyAuctionPhase(now);
   const normalizedUserName = normalizeIdentity(currentUserName);
-  const hasAnyBidHistory = post.bidHistory.length > 0;
+  const activeBidHistory = post.bidHistory.filter(
+    (bid) => bid.outcome === undefined || bid.outcome === "active",
+  );
+  const hasAnyBidHistory = activeBidHistory.length > 0;
   const userHasBidHistory =
     normalizedUserName.length > 0 &&
-    post.bidHistory.some(
+    activeBidHistory.some(
       (bid) => normalizeIdentity(bid.bidderName) === normalizedUserName,
     );
 

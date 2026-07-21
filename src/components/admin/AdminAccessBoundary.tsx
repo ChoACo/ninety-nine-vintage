@@ -173,7 +173,7 @@ export function AdminAccessBoundary({
           }
           href="/admin/operator"
         >
-          OPERATOR
+          운영자
         </Link>
         {access.canAccessOwner && (
           <Link
@@ -184,7 +184,7 @@ export function AdminAccessBoundary({
             }
             href="/admin/owner"
           >
-            OWNER
+            소유자
           </Link>
         )}
       </nav>
@@ -208,7 +208,7 @@ function AccessMessage({
       role="status"
     >
       <div className="max-w-lg">
-        <p className="eyebrow text-muted">ADMIN / ACCESS CONTROL</p>
+        <p className="eyebrow text-muted">관리자 · 접근 권한</p>
         <h1 className="mt-4 text-3xl font-black tracking-[-0.06em]">{title}</h1>
         <p className="mt-4 text-sm leading-6 text-muted">{description}</p>
         {action && <div className="mt-7">{action}</div>}

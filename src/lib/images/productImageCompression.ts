@@ -7,6 +7,13 @@ const PRODUCT_IMAGE_JPEG_QUALITY = 0.86;
 const PRODUCT_THUMBNAIL_WEBP_QUALITY = 0.76;
 const PRODUCT_THUMBNAIL_JPEG_QUALITY = 0.8;
 
+/**
+ * Product-image compression is an aspirational 100 ms client-side budget, not
+ * a guaranteed wall-clock SLA. The measurement returned with every result lets
+ * the operator/browser verifier report the actual device-specific duration.
+ */
+export const PRODUCT_IMAGE_COMPRESSION_TARGET_MS = 100;
+
 export interface ProductImageDimensions {
   width: number;
   height: number;
@@ -267,7 +274,36 @@ const PRODUCT_THUMBNAIL_VARIANT_OPTIONS: ProductImageVariantOptions = {
 
 export interface CompressedProductImageVariants {
   imageFile: File;
+  measurement: ProductImageCompressionMeasurement;
   thumbnailFile: File;
+}
+
+export interface ProductImageCompressionMeasurement {
+  decodeMs: number;
+  encodeMs: number;
+  imageBytes: number;
+  inputBytes: number;
+  targetMet: boolean;
+  targetMs: number;
+  thumbnailBytes: number;
+  totalMs: number;
+}
+
+export type ProductImageCompressionReporter = (
+  measurement: ProductImageCompressionMeasurement,
+  completed: number,
+  total: number,
+) => void;
+
+function getMonotonicTime(): number {
+  return typeof performance !== "undefined" &&
+    typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
+}
+
+function elapsedMilliseconds(startedAt: number, finishedAt: number): number {
+  return Math.max(0, Number((finishedAt - startedAt).toFixed(2)));
 }
 
 /**
@@ -278,7 +314,9 @@ export interface CompressedProductImageVariants {
 export async function compressProductImageVariantsForUpload(
   file: File,
 ): Promise<CompressedProductImageVariants> {
+  const startedAt = getMonotonicTime();
   const decoded = await decodeProductImage(file);
+  const decodedAt = getMonotonicTime();
 
   try {
     const [imageFile, thumbnailFile] = await Promise.all([
@@ -289,7 +327,22 @@ export async function compressProductImageVariantsForUpload(
         PRODUCT_THUMBNAIL_VARIANT_OPTIONS,
       ),
     ]);
-    return { imageFile, thumbnailFile };
+    const finishedAt = getMonotonicTime();
+    const totalMs = elapsedMilliseconds(startedAt, finishedAt);
+    return {
+      imageFile,
+      measurement: {
+        decodeMs: elapsedMilliseconds(startedAt, decodedAt),
+        encodeMs: elapsedMilliseconds(decodedAt, finishedAt),
+        imageBytes: imageFile.size,
+        inputBytes: file.size,
+        targetMet: totalMs <= PRODUCT_IMAGE_COMPRESSION_TARGET_MS,
+        targetMs: PRODUCT_IMAGE_COMPRESSION_TARGET_MS,
+        thumbnailBytes: thumbnailFile.size,
+        totalMs,
+      },
+      thumbnailFile,
+    };
   } catch (error) {
     if (error instanceof ProductImageCompressionError) throw error;
     throw new ProductImageCompressionError(

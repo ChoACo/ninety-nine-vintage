@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 import { parseSupabaseMigrationList } from "../../scripts/migration-list-parser.mjs";
 
@@ -68,23 +68,32 @@ test("migration parity accepts current Supabase CLI table output", () => {
   );
 });
 
-test("temporary entry and live-auction features fail closed across reusable surfaces", async () => {
+test("the former entry gate is absent while live auctions keep their authoritative security boundary", async () => {
   const [
     flags,
-    entryRoute,
-    entryGate,
+    entryPage,
+    shopLayout,
+    middleware,
     storePage,
     storeService,
     auctionGrid,
+    auctionRoute,
+    auctionService,
     bidRepository,
     pauseMigration,
+    resumeMigration,
+    header,
+    mobileNavigation,
   ] = await Promise.all([
     readFile(new URL("src/lib/featureFlags.ts", rootUrl), "utf8"),
-    readFile(new URL("src/app/api/entry/complete/route.ts", rootUrl), "utf8"),
-    readFile(new URL("src/components/layout/EntryGate.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/app/(shop)/page.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/app/(shop)/layout.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/middleware.ts", rootUrl), "utf8"),
     readFile(new URL("src/app/(shop)/stores/[slug]/page.tsx", rootUrl), "utf8"),
     readFile(new URL("src/services/stores.ts", rootUrl), "utf8"),
     readFile(new URL("src/components/features/auction/AuctionFeedGrid.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/app/api/auction/bids/route.ts", rootUrl), "utf8"),
+    readFile(new URL("src/services/auction.ts", rootUrl), "utf8"),
     readFile(new URL("src/lib/supabase/bids.ts", rootUrl), "utf8"),
     readFile(
       new URL(
@@ -93,22 +102,54 @@ test("temporary entry and live-auction features fail closed across reusable surf
       ),
       "utf8",
     ),
+    readFile(
+      new URL(
+        "supabase/migrations/20260721010000_resume_live_auction_bidding.sql",
+        rootUrl,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("src/components/layout/PcHeader.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/components/layout/MobileBottomNav.tsx", rootUrl), "utf8"),
   ]);
 
-  assert.match(flags, /ENTRY_GATE_ENABLED\s*=\s*false/);
-  assert.match(flags, /LIVE_AUCTION_ENABLED\s*=\s*false/);
-  assert.match(entryRoute, /if\s*\(!ENTRY_GATE_ENABLED\)/);
-  assert.match(entryRoute, /disabled:\s*true/);
-  assert.match(entryGate, /if\s*\(!ENTRY_GATE_ENABLED\)\s*return null/);
+  await Promise.all([
+    assert.rejects(access(new URL("src/app/api/entry/complete/route.ts", rootUrl))),
+    assert.rejects(access(new URL("src/components/layout/EntryGate.tsx", rootUrl))),
+    assert.rejects(access(new URL("src/lib/entryGateCookie.ts", rootUrl))),
+  ]);
+  assert.doesNotMatch(flags, /ENTRY_GATE_ENABLED/);
+  assert.match(flags, /LIVE_AUCTION_ENABLED\s*=\s*true/);
+  assert.match(entryPage, /redirect\("\/home"\)/);
+  assert.doesNotMatch(shopLayout, /EntryGate|entry\/complete/);
+  assert.doesNotMatch(middleware, /ENTRY_GATE_ENABLED|EntryGate|entry\/complete/);
   assert.match(storePage, /fetchStoreProducts\(store\.id,\s*"fixed"\)/);
   assert.match(storeService, /query\s*=\s*query\.eq\("sale_type",\s*saleType\)/);
   assert.match(auctionGrid, /props\.saleType\s*===\s*"auction"\s*&&\s*!LIVE_AUCTION_ENABLED/);
-  assert.match(bidRepository, /if\s*\(!LIVE_AUCTION_ENABLED\)/);
-  assert.match(bidRepository, /"auction_disabled"/);
+  for (const source of [auctionRoute, auctionService, bidRepository]) {
+    assert.doesNotMatch(source, /auction_disabled/);
+    assert.doesNotMatch(source, /if\s*\(!LIVE_AUCTION_ENABLED\)/);
+  }
+  assert.match(auctionRoute, /hasTrustedRequestOrigin\(request\)/);
+  assert.match(auctionRoute, /startsWith\("Bearer "\)/);
+  assert.match(auctionService, /\.rpc\("place_bid"/);
+  assert.match(bidRepository, /\.rpc\("place_bid"/);
   assert.match(
     pauseMigration,
     /revoke all on function public\.place_bid\(uuid, bigint\)[\s\S]*authenticated/i,
   );
+  assert.match(
+    resumeMigration,
+    /revoke all on function public\.place_bid\(uuid, bigint\)[\s\S]*from public, anon/i,
+  );
+  assert.match(
+    resumeMigration,
+    /grant execute on function public\.place_bid\(uuid, bigint\)[\s\S]*to authenticated/i,
+  );
+  for (const source of [header, mobileNavigation]) {
+    assert.match(source, /"\/feed"/);
+    assert.match(source, /"\/admin\/operator"/);
+  }
 });
 
 test("Kakao returnTo accepts only same-origin application paths", () => {
@@ -217,20 +258,27 @@ test("Kakao callback hides identity and commerce surfaces until profile validati
   );
 });
 
-test("public shop surfaces expose shopper session controls without admin discovery", async () => {
+test("public shop surfaces expose shopper controls while admin links remain session-role gated", async () => {
   const [
     authStatus,
     header,
-    entryGate,
+    mobileHeader,
+    mobileNavigation,
+    accessHook,
+    adminSession,
     accountPage,
     policyPage,
     homePage,
     storePage,
     storeService,
+    adminLayout,
   ] = await Promise.all([
     readFile(new URL("src/components/layout/AuthStatus.tsx", rootUrl), "utf8"),
     readFile(new URL("src/components/layout/PcHeader.tsx", rootUrl), "utf8"),
-    readFile(new URL("src/components/layout/EntryGate.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/components/layout/MobileHeader.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/components/layout/MobileBottomNav.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/hooks/useAdminNavigationAccess.ts", rootUrl), "utf8"),
+    readFile(new URL("src/app/api/admin/session/route.ts", rootUrl), "utf8"),
     readFile(new URL("src/app/(shop)/account/page.tsx", rootUrl), "utf8"),
     readFile(new URL("src/components/layout/PolicyPage.tsx", rootUrl), "utf8"),
     readFile(new URL("src/app/(shop)/home/page.tsx", rootUrl), "utf8"),
@@ -239,24 +287,35 @@ test("public shop surfaces expose shopper session controls without admin discove
       "utf8",
     ),
     readFile(new URL("src/services/stores.ts", rootUrl), "utf8"),
+    readFile(new URL("src/app/(admin)/admin/layout.tsx", rootUrl), "utf8"),
   ]);
 
   assert.match(authStatus, /useSupabaseSession\(\)/);
   assert.match(authStatus, /aria-label="내 정보"/);
   assert.match(authStatus, /aria-label="로그아웃"/);
-  for (const source of [authStatus, entryGate, accountPage]) {
+  for (const source of [authStatus, accountPage]) {
     assert.doesNotMatch(source, /\/api\/account\/session/);
   }
   for (const source of [authStatus, header, accountPage]) {
     assert.doesNotMatch(source, /href="\/(?:owner|operator)"/);
     assert.doesNotMatch(source, /AccountSessionPanel/);
   }
+  assert.match(header, /access\.canAccessOperator && <Link[\s\S]*?href="\/admin\/operator"/);
+  assert.match(header, /access\.canAccessOwner && <Link[\s\S]*?href="\/admin\/owner"/);
+  assert.match(mobileHeader, /access\.canAccessOperator && <Link[\s\S]*?href="\/admin\/operator"/);
+  assert.match(mobileNavigation, /access\.canAccessOperator \? \[\["운영자", "\/admin\/operator"/);
+  assert.match(accessHook, /useSupabaseSession\(\)/);
+  assert.match(accessHook, /fetch\("\/api\/admin\/session"/);
+  assert.match(accessHook, /snapshot\.userId === userId[\s\S]*snapshot\.revision === revision/);
+  assert.match(adminSession, /const canAccessOperator = isOwner \|\| roleCode === "operator" \|\| roleCode === "employee"/);
+  assert.match(adminSession, /canAccessOwner: isOwner/);
+  assert.match(adminLayout, /<AdminAccessBoundary>\{children\}<\/AdminAccessBoundary>/);
   assert.doesNotMatch(policyPage, /PcLayout/);
   for (const source of [homePage, storePage, storeService]) {
     assert.doesNotMatch(source, /operatorId|operator_id/);
   }
   assert.match(homePage, /String\(index \+ 1\)\.padStart\(2, "0"\)/);
-  assert.match(storePage, /CURATED STORE \/ SHOP PROFILE/);
+  assert.match(storePage, /엄선된 숍 · 숍 소개/);
 });
 
 test("PortOne payment IDs are deterministic, provider-safe, and bounded", () => {

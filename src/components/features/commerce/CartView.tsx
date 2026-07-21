@@ -12,7 +12,6 @@ import {
 } from "@/lib/commerce/paymentMode";
 import { useCommerceStore } from "@/store/useCommerceStore";
 import { CatalogImage } from "@/components/ui/CatalogImage";
-import { isEntryReadOnly, useEntryReadOnly } from "@/lib/entryMode";
 import {
   COMMERCE_CHECKOUT_STORAGE_KEY,
   isConfirmedProductPayment,
@@ -35,6 +34,7 @@ interface PublishedFixedProduct {
   storageClass?: "small" | "large";
   sizeLabel?: string;
   conditionGrade?: "S" | "A+" | "A" | "B";
+  reservationExpiresAt?: string | null;
 }
 
 interface CartProduct {
@@ -48,13 +48,11 @@ interface CartProduct {
   closesAt: string;
   store: { name: string };
   imageUrls: string[];
+  reservationExpiresAt?: string | null;
 }
 
 type CartAccess = "loading" | "member" | "guest";
-type CartPaymentMode =
-  | "loading"
-  | CommercePaymentMode
-  | "unavailable";
+type CartPaymentMode = "loading" | CommercePaymentMode | "unavailable";
 
 class CheckoutSessionChangedError extends Error {
   constructor() {
@@ -107,24 +105,30 @@ const DEFINITELY_PRE_LEDGER_ERRORS = new Set([
   "payment_mode_changed",
   "checkout_request_releasable",
 ]);
+const conditionLabels: Record<CartProduct["condition"], string> = {
+  NEW: "새 상품 수준",
+  EXCELLENT: "매우 좋음",
+  GOOD: "좋음",
+  FAIR: "사용감 있음",
+};
 
 function createProductSignature(productIds: readonly string[]): string {
   return [...productIds].sort().join(",");
 }
 
-function isProductPaymentMethod(
-  value: unknown,
-): value is ProductPaymentMethod {
+function isProductPaymentMethod(value: unknown): value is ProductPaymentMethod {
   return (
-    value === "CARD" ||
-    value === "EASY_PAY" ||
-    value === "VIRTUAL_ACCOUNT"
+    value === "CARD" || value === "EASY_PAY" || value === "VIRTUAL_ACCOUNT"
   );
 }
 
 function isSafeImageUrl(value: unknown): value is string {
   if (typeof value !== "string" || !value || value.length > 2048) return false;
-  if (value.startsWith("/") && !value.startsWith("//") && !value.includes("\\")) {
+  if (
+    value.startsWith("/") &&
+    !value.startsWith("//") &&
+    !value.includes("\\")
+  ) {
     return true;
   }
   try {
@@ -195,7 +199,8 @@ function createProductSnapshot(product: CartProduct): CartProduct {
 
 const checkoutErrorMessages: Record<string, string> = {
   unauthorized: "로그인이 만료되었습니다. 카카오로 다시 로그인해 주세요.",
-  forbidden: "안전한 주문 요청을 확인하지 못했습니다. 페이지를 새로고침해 주세요.",
+  forbidden:
+    "안전한 주문 요청을 확인하지 못했습니다. 페이지를 새로고침해 주세요.",
   member_required: "카카오 회원 계정으로 로그인한 뒤 다시 시도해 주세요.",
   member_unavailable:
     "회원 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -309,7 +314,9 @@ function readStoredCheckoutRequest(options?: {
       ) &&
       new Set(productIds).size === productIds.length &&
       snapshots.length === productIds.length &&
-      snapshots.every((snapshot): snapshot is CartProduct => snapshot !== null) &&
+      snapshots.every(
+        (snapshot): snapshot is CartProduct => snapshot !== null,
+      ) &&
       typeof parsed.productSignature === "string" &&
       createProductSignature(productIds) === parsed.productSignature &&
       (!options?.productSignature ||
@@ -423,13 +430,33 @@ function toCartProduct(product: PublishedFixedProduct): CartProduct {
     title: product.title,
     category: product.category,
     size: product.sizeLabel || "사이즈 미등록",
-    condition: grade === "S" ? "NEW" : grade === "A+" ? "EXCELLENT" : grade === "B" ? "FAIR" : "GOOD",
+    condition:
+      grade === "S"
+        ? "NEW"
+        : grade === "A+"
+          ? "EXCELLENT"
+          : grade === "B"
+            ? "FAIR"
+            : "GOOD",
     saleType: "fixed",
     price: product.fixedPrice ?? product.currentPrice,
     closesAt: product.closesAt,
     store: { name: "NINETY-NINE VINTAGE" },
     imageUrls: product.imageUrls,
+    reservationExpiresAt: product.reservationExpiresAt ?? null,
   };
+}
+
+function reservationRemainingLabel(
+  expiresAt: string | null | undefined,
+  now: number,
+) {
+  const remaining = expiresAt ? Date.parse(expiresAt) - now : 0;
+  if (!Number.isFinite(remaining) || remaining <= 0) return "재고 점유 만료";
+  const totalSeconds = Math.ceil(remaining / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `재고 점유 ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")} 남음`;
 }
 
 export function CartView() {
@@ -447,8 +474,12 @@ export function CartView() {
   const [access, setAccess] = useState<CartAccess>("loading");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [messageKind, setMessageKind] = useState<"success" | "error">("success");
+  const [messageKind, setMessageKind] = useState<"success" | "error">(
+    "success",
+  );
   const [staleCount, setStaleCount] = useState(0);
+  const [serverClockOffset, setServerClockOffset] = useState(0);
+  const [reservationClock, setReservationClock] = useState(() => Date.now());
   const [payMethod, setPayMethod] = useState<ProductPaymentMethod>("CARD");
   const [paymentMode, setPaymentMode] = useState<CartPaymentMode>("loading");
   const [heldCheckoutIds, setHeldCheckoutIds] = useState<string[]>([]);
@@ -462,8 +493,6 @@ export function CartView() {
   const cartOwnerId = useRef<string | null>(null);
   const checkoutOperationSequence = useRef(0);
   const activeCheckoutOperation = useRef<number | null>(null);
-  const readOnly = useEntryReadOnly();
-
   const invalidateCheckoutRequest = () => {
     checkoutRequest.current = null;
     setHeldCheckoutIds([]);
@@ -472,7 +501,18 @@ export function CartView() {
     clearStoredCheckoutRequest();
   };
 
-  useEffect(() => { hydrate(); }, [hydrate]);
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
+  useEffect(() => {
+    if (liveProducts.length === 0) return;
+    const timer = window.setInterval(
+      () => setReservationClock(Date.now()),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [liveProducts.length]);
 
   useEffect(() => {
     let disposed = false;
@@ -492,6 +532,7 @@ export function CartView() {
       setLiveProducts([]);
       replaceCart([]);
       setStaleCount(0);
+      setServerClockOffset(0);
       setPayMethod("CARD");
       setPaymentMode("loading");
       setMessage("");
@@ -575,7 +616,9 @@ export function CartView() {
               },
             );
             if (!isCurrent()) return;
-            const recoveryPayload = await recoveryResponse.json().catch(() => null);
+            const recoveryPayload = await recoveryResponse
+              .json()
+              .catch(() => null);
             if (!isCurrent()) return;
             const recovered = recoveryResponse.ok
               ? normalizeRecoveredCheckoutRequest(
@@ -614,7 +657,10 @@ export function CartView() {
         }
         if (!isCurrent()) return;
         setAccess("member");
-        const response = await fetch("/api/cart", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+        const response = await fetch("/api/cart", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
         if (!isCurrent()) return;
         if (!response.ok) {
           if (response.status === 401 || response.status === 403) {
@@ -633,9 +679,10 @@ export function CartView() {
           }
           return;
         }
-        const payload = await response.json() as {
+        const payload = (await response.json()) as {
           paymentMode?: unknown;
           productIds?: string[];
+          serverTime?: string | null;
           staleProductIds?: string[];
           items?: PublishedFixedProduct[];
         };
@@ -646,12 +693,23 @@ export function CartView() {
         ) {
           setPaymentMode("unavailable");
           setMessageKind("error");
-          setMessage("결제 운영 모드를 확인하지 못했습니다. 잠시 후 새로고침해 주세요.");
+          setMessage(
+            "결제 운영 모드를 확인하지 못했습니다. 잠시 후 새로고침해 주세요.",
+          );
         } else {
           setPaymentMode(payload.paymentMode);
         }
         const cartProducts = (payload.items ?? []).map(toCartProduct);
-        const ids = payload.productIds ?? cartProducts.map((product) => product.id);
+        const serverTime =
+          typeof payload.serverTime === "string"
+            ? Date.parse(payload.serverTime)
+            : Number.NaN;
+        setServerClockOffset(
+          Number.isFinite(serverTime) ? serverTime - Date.now() : 0,
+        );
+        setReservationClock(Date.now());
+        const ids =
+          payload.productIds ?? cartProducts.map((product) => product.id);
         setLiveProducts(cartProducts);
         replaceCart(ids);
         setStaleCount(payload.staleProductIds?.length ?? 0);
@@ -670,7 +728,6 @@ export function CartView() {
         setProductsLoading(false);
         setCartLoading(false);
       }
-
     };
 
     const scheduleSession = (session: Session | null) => {
@@ -695,7 +752,8 @@ export function CartView() {
     try {
       const client = getSupabaseBrowserClient();
       const eventSequenceAtRead = authEventSequence;
-      void client.auth.getSession()
+      void client.auth
+        .getSession()
         .then(({ data }) => {
           if (!disposed && authEventSequence === eventSequenceAtRead) {
             scheduleSession(data.session);
@@ -706,10 +764,12 @@ export function CartView() {
             handleUnconfirmedSessionReadFailure();
           }
         });
-      const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
-        authEventSequence += 1;
-        scheduleSession(session);
-      });
+      const { data: listener } = client.auth.onAuthStateChange(
+        (_event, session) => {
+          authEventSequence += 1;
+          scheduleSession(session);
+        },
+      );
       return () => {
         disposed = true;
         loadSequence += 1;
@@ -742,13 +802,28 @@ export function CartView() {
   }, [cartIds, heldCheckoutIds, liveProducts, restoredCheckoutProducts]);
   const total = products.reduce((sum, product) => sum + product.price, 0);
   const hasPendingCheckout = heldCheckoutIds.length > 0;
+  const reservationNow = reservationClock + serverClockOffset;
+  const reservationExpired =
+    !hasPendingCheckout &&
+    products.some((product) => {
+      const expiresAt = product.reservationExpiresAt
+        ? Date.parse(product.reservationExpiresAt)
+        : Number.NaN;
+      return Number.isFinite(expiresAt) && expiresAt <= reservationNow;
+    });
 
   const checkout = async () => {
-    if (busy || activeCheckoutOperation.current !== null || products.length === 0) return;
-    if (isEntryReadOnly()) { setMessageKind("error"); setMessage("사이트 연결이 복구될 때까지 읽기 전용입니다."); return; }
+    if (
+      busy ||
+      activeCheckoutOperation.current !== null ||
+      products.length === 0
+    )
+      return;
     if (paymentMode !== "manual_transfer" && paymentMode !== "portone") {
       setMessageKind("error");
-      setMessage("결제 운영 모드를 확인하지 못했습니다. 잠시 후 새로고침해 주세요.");
+      setMessage(
+        "결제 운영 모드를 확인하지 못했습니다. 잠시 후 새로고침해 주세요.",
+      );
       return;
     }
     const expectedPaymentMode = paymentMode;
@@ -805,7 +880,10 @@ export function CartView() {
       setReleaseCheckoutAllowed(false);
       const response = await fetch("/api/orders/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           productIds,
           idempotencyKey: currentRequest.idempotencyKey,
@@ -813,7 +891,7 @@ export function CartView() {
           expectedPaymentMode,
         }),
       });
-      const payload = await response.json().catch(() => null) as unknown;
+      const payload = (await response.json().catch(() => null)) as unknown;
       if (
         authGeneration.current !== checkoutGeneration ||
         authUserId.current !== buyerId
@@ -898,9 +976,7 @@ export function CartView() {
           checkoutRequest.current = preparedRequest;
           storeCheckoutRequest(preparedRequest);
         }
-        let result: Awaited<
-          ReturnType<typeof requestPreparedProductPayment>
-        >;
+        let result: Awaited<ReturnType<typeof requestPreparedProductPayment>>;
         try {
           result = await requestPreparedProductPayment({
             payment: checkout.payment,
@@ -944,8 +1020,8 @@ export function CartView() {
         }
 
         removePurchasedFromCart(productIds);
-        productIds.forEach((productId) =>
-          void persistCart(productId, false, buyerId),
+        productIds.forEach(
+          (productId) => void persistCart(productId, false, buyerId),
         );
         setHeldCheckoutIds([]);
         setRestoredCheckoutProducts([]);
@@ -968,8 +1044,8 @@ export function CartView() {
           ? (checkout.transfer as Partial<CheckoutTransfer>)
           : null;
       removePurchasedFromCart(productIds);
-      productIds.forEach((productId) =>
-        void persistCart(productId, false, buyerId),
+      productIds.forEach(
+        (productId) => void persistCart(productId, false, buyerId),
       );
       setHeldCheckoutIds([]);
       setRestoredCheckoutProducts([]);
@@ -991,7 +1067,9 @@ export function CartView() {
         return;
       }
       setMessageKind("error");
-      setMessage(error instanceof Error ? error.message : "주문을 만들지 못했습니다.");
+      setMessage(
+        error instanceof Error ? error.message : "주문을 만들지 못했습니다.",
+      );
     } finally {
       if (activeCheckoutOperation.current === checkoutOperation) {
         activeCheckoutOperation.current = null;
@@ -1002,12 +1080,11 @@ export function CartView() {
 
   const clear = () => {
     if (busy || hasPendingCheckout) return;
-    if (isEntryReadOnly()) { setMessageKind("error"); setMessage("사이트 연결이 복구될 때까지 읽기 전용입니다."); return; }
     invalidateCheckoutRequest();
     const buyerId = cartOwnerId.current;
     if (buyerId) {
-      products.forEach((product) =>
-        void persistCart(product.id, false, buyerId),
+      products.forEach(
+        (product) => void persistCart(product.id, false, buyerId),
       );
     }
     clearCart();
@@ -1023,23 +1100,266 @@ export function CartView() {
 
   const checkoutDisabled =
     busy ||
-    readOnly ||
+    reservationExpired ||
     (paymentMode !== "manual_transfer" && paymentMode !== "portone");
   const checkoutButtonLabel = busy
     ? "결제 준비 중..."
-    : readOnly
-      ? "읽기 전용"
+    : reservationExpired
+      ? "재고 점유 만료"
       : paymentMode === "manual_transfer"
         ? "주문하고 입금계좌 확인"
         : paymentMode === "portone"
           ? "결제하기"
           : "결제 설정 확인 중";
 
-  return <div className="space-y-10">
-    <div className="flex items-end justify-between border-b border-ink pb-6"><div><p className="eyebrow text-muted">BAG / BUY NOW</p><h1 className="mt-3 text-4xl font-black tracking-[-0.08em]">장바구니</h1></div><span className="font-mono text-xs text-muted">{productsLoading || cartLoading ? "—" : `${products.length} ITEMS`}</span></div>
-    {staleCount > 0 && <div aria-live="polite" className="border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">판매가 완료되었거나 공개가 종료된 상품 {staleCount}개를 장바구니에서 제외했습니다.</div>}
-    {hasPendingCheckout && !busy && <div aria-live="polite" className="border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900"><p>진행 중인 주문 요청이 있습니다. 결제 재개는 저장된 동일 주문 키와 결제 번호만 사용합니다. 결제가 확인될 때까지 해당 상품 삭제, 장바구니 비우기, 결제 방법 변경은 잠깁니다.</p><div className="mt-3 flex items-center gap-4"><button className="font-bold underline" onClick={() => void checkout()} type="button">결제 재개</button>{releaseCheckoutAllowed && <button className="font-bold underline" onClick={releaseCheckout} type="button">결제 요청 해제</button>}<Link className="font-bold underline" href="/account#orders">주문 상태 확인</Link></div></div>}
-    {message && <div aria-live="polite" className={messageKind === "error" ? "border border-red-200 bg-red-50 px-4 py-3 text-xs leading-5 text-red-900" : "border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900"}>{message} {messageKind === "success" && <Link className="ml-2 font-bold underline" href="/account#orders">내 주문 확인</Link>}</div>}
-    {access === "loading" || productsLoading || cartLoading ? <div className="border border-dashed border-line py-24 text-center"><p className="text-sm font-bold">장바구니를 불러오는 중입니다.</p><p className="mt-2 text-[11px] text-muted">잠시만 기다려 주세요.</p></div> : access !== "member" ? <div className="border border-dashed border-line bg-surface py-24 text-center"><p className="text-sm font-bold">카카오 로그인 후 장바구니를 이용할 수 있습니다.</p><a className="mt-5 inline-flex border border-ink px-5 py-3 text-xs font-bold" href="/api/auth/kakao/start?returnTo=%2Fcart">카카오 로그인</a></div> : products.length === 0 ? <div className="border border-dashed border-line py-24 text-center"><p className="text-sm font-bold">장바구니가 비어 있습니다.</p><Link className="mt-5 inline-flex items-center gap-2 text-xs font-bold underline" href="/shop">SHOP 둘러보기 <ArrowRight size={14} /></Link></div> : <div className="grid gap-10 grid-cols-[1fr_360px]"><div className="divide-y divide-line border-y border-line">{products.map((product) => <div className="flex gap-5 py-5" key={product.id}><CatalogImage alt={product.title} className="size-28 object-cover" loading="lazy" src={product.imageUrls[0]} /><div className="min-w-0 flex-1"><div className="flex justify-between gap-4"><div><p className="text-xs font-bold text-muted">{product.store.name}</p><h2 className="mt-2 truncate text-base font-bold">{product.title}</h2><p className="mt-2 text-xs text-muted">{product.size} · {product.condition}</p></div><button aria-label="장바구니에서 삭제" className="text-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || readOnly || hasPendingCheckout} onClick={() => { if (busy || hasPendingCheckout) return; const buyerId = cartOwnerId.current; invalidateCheckoutRequest(); removeFromCart(product.id); if (buyerId) void persistCart(product.id, false, buyerId); }} type="button"><Trash2 size={16} /></button></div><div className="mt-6 flex items-center justify-between"><div className="border border-line px-3 py-2 text-xs text-muted"><span aria-label="수량">단일 상품 · 1점</span></div><span className="font-mono text-sm font-bold">{product.price.toLocaleString("ko-KR")}원</span></div></div></div>)}</div><aside className="h-fit border-t-2 border-ink bg-surface p-6"><div className="flex justify-between text-xs"><span>상품 금액</span><strong className="font-mono">{total.toLocaleString("ko-KR")}원</strong></div><div className="mt-4 flex justify-between text-xs"><span>배송비</span><span className="text-muted">배송 요청 시 계산</span></div><div className="mt-6 flex justify-between border-t border-line pt-5"><span className="text-sm font-bold">예상 결제 금액</span><strong className="font-mono text-xl">{total.toLocaleString("ko-KR")}원</strong></div>{paymentMode === "portone" ? <><label className="mt-6 block text-[11px] font-bold" htmlFor="cart-pay-method">결제 방법</label><select className="mt-2 h-11 w-full border border-line bg-paper px-3 text-xs" disabled={busy || readOnly || hasPendingCheckout} id="cart-pay-method" onChange={(event) => setPayMethod(event.target.value as ProductPaymentMethod)} value={payMethod}><option value="CARD">신용·체크카드</option><option value="EASY_PAY">카카오페이</option><option value="VIRTUAL_ACCOUNT">가상계좌</option></select></> : paymentMode === "manual_transfer" ? <div className="mt-6 border border-line bg-paper px-3 py-3 text-xs"><p className="font-bold">수동 계좌이체</p><p className="mt-1 text-[11px] text-muted">주문 생성 후 서버가 입금계좌를 안내합니다.</p></div> : <div className="mt-6 border border-amber-200 bg-amber-50 px-3 py-3 text-[11px] text-amber-900">결제 운영 모드를 확인하고 있습니다.</div>}<button className="mt-4 h-13 w-full bg-ink text-xs font-bold text-paper disabled:opacity-50" disabled={checkoutDisabled} onClick={() => void checkout()} type="button">{checkoutButtonLabel}</button><button className="mt-3 w-full text-[11px] text-muted underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || readOnly || hasPendingCheckout} onClick={clear} type="button">장바구니 비우기</button></aside></div>}
-  </div>;
+  return (
+    <div className="space-y-10">
+      <div className="flex flex-col items-start gap-3 border-b border-ink pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="eyebrow text-muted">장바구니 / 즉시구매</p>
+          <h1 className="mt-3 text-3xl font-black tracking-[-0.08em] md:text-4xl">
+            장바구니
+          </h1>
+        </div>
+        <span className="font-mono text-xs text-muted">
+          {productsLoading || cartLoading ? "—" : `${products.length}개`}
+        </span>
+      </div>
+      {staleCount > 0 && (
+        <div
+          aria-live="polite"
+          className="border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900"
+        >
+          판매가 완료되었거나 공개가 종료된 상품 {staleCount}개를 장바구니에서
+          제외했습니다.
+        </div>
+      )}
+      {products.length > 0 && !hasPendingCheckout && (
+        <div className="border border-sky-200 bg-sky-50 px-4 py-3 text-xs leading-5 text-sky-900">
+          장바구니에 담은 한 점 상품은 서버 시간을 기준으로 15분 동안 내
+          계정에만 임시 점유됩니다. 시간이 끝나기 전에 결제를 시작해 주세요.
+        </div>
+      )}
+      {reservationExpired && (
+        <div
+          aria-live="assertive"
+          className="border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-800"
+        >
+          재고 점유 시간이 만료되었습니다. 새로고침 후 아직 구매 가능한 상품을
+          다시 담아 주세요.
+        </div>
+      )}
+      {hasPendingCheckout && !busy && (
+        <div
+          aria-live="polite"
+          className="border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900"
+        >
+          <p>
+            진행 중인 주문 요청이 있습니다. 결제 재개는 저장된 동일 주문 키와
+            결제 번호만 사용합니다. 결제가 확인될 때까지 해당 상품 삭제,
+            장바구니 비우기, 결제 방법 변경은 잠깁니다.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <button
+              className="font-bold underline"
+              onClick={() => void checkout()}
+              type="button"
+            >
+              결제 재개
+            </button>
+            {releaseCheckoutAllowed && (
+              <button
+                className="font-bold underline"
+                onClick={releaseCheckout}
+                type="button"
+              >
+                결제 요청 해제
+              </button>
+            )}
+            <Link className="font-bold underline" href="/account#orders">
+              주문 상태 확인
+            </Link>
+          </div>
+        </div>
+      )}
+      {message && (
+        <div
+          aria-live="polite"
+          className={
+            messageKind === "error"
+              ? "border border-red-200 bg-red-50 px-4 py-3 text-xs leading-5 text-red-900"
+              : "border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900"
+          }
+        >
+          {message}{" "}
+          {messageKind === "success" && (
+            <Link className="ml-2 font-bold underline" href="/account#orders">
+              내 주문 확인
+            </Link>
+          )}
+        </div>
+      )}
+      {access === "loading" || productsLoading || cartLoading ? (
+        <div className="border border-dashed border-line py-24 text-center">
+          <p className="text-sm font-bold">장바구니를 불러오는 중입니다.</p>
+          <p className="mt-2 text-[11px] text-muted">잠시만 기다려 주세요.</p>
+        </div>
+      ) : access !== "member" ? (
+        <div className="border border-dashed border-line bg-surface py-24 text-center">
+          <p className="text-sm font-bold">
+            카카오 로그인 후 장바구니를 이용할 수 있습니다.
+          </p>
+          <Link
+            className="mt-5 inline-flex border border-ink px-5 py-3 text-xs font-bold"
+            href="/account/login?next=%2Fcart"
+          >
+            카카오 로그인
+          </Link>
+        </div>
+      ) : products.length === 0 ? (
+        <div className="border border-dashed border-line py-24 text-center">
+          <p className="text-sm font-bold">장바구니가 비어 있습니다.</p>
+          <Link
+            className="mt-5 inline-flex items-center gap-2 text-xs font-bold underline"
+            href="/shop"
+          >
+            상품 둘러보기 <ArrowRight size={14} />
+          </Link>
+        </div>
+      ) : (
+        <div className="grid gap-10 lg:grid-cols-[1fr_360px]">
+          <div className="divide-y divide-line border-y border-line">
+            {products.map((product) => (
+              <div className="flex gap-4 py-5 md:gap-5" key={product.id}>
+                <CatalogImage
+                  alt={product.title}
+                  className="size-24 shrink-0 object-cover md:size-28"
+                  loading="lazy"
+                  sizes="112px"
+                  src={product.imageUrls[0]}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-muted">
+                        {product.store.name}
+                      </p>
+                      <h2 className="mt-2 truncate text-base font-bold">
+                        {product.title}
+                      </h2>
+                      <p className="mt-2 text-xs text-muted">
+                        {product.size} · {conditionLabels[product.condition]}
+                      </p>
+                      {!hasPendingCheckout && (
+                        <p
+                          className={`mt-2 font-mono text-[10px] font-bold ${product.reservationExpiresAt && Date.parse(product.reservationExpiresAt) <= reservationNow ? "text-red-700" : "text-sky-700"}`}
+                        >
+                          {reservationRemainingLabel(
+                            product.reservationExpiresAt,
+                            reservationNow,
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      aria-label="장바구니에서 삭제"
+                      className="text-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={busy || hasPendingCheckout}
+                      onClick={() => {
+                        if (busy || hasPendingCheckout) return;
+                        const buyerId = cartOwnerId.current;
+                        invalidateCheckoutRequest();
+                        removeFromCart(product.id);
+                        if (buyerId)
+                          void persistCart(product.id, false, buyerId);
+                      }}
+                      type="button"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <div className="mt-6 flex items-center justify-between">
+                    <div className="border border-line px-3 py-2 text-xs text-muted">
+                      <span aria-label="수량">단일 상품 · 1점</span>
+                    </div>
+                    <span className="font-mono text-sm font-bold">
+                      {product.price.toLocaleString("ko-KR")}원
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <aside className="h-fit border-t-2 border-ink bg-surface p-5 sm:p-6 lg:sticky lg:top-28">
+            <div className="flex justify-between text-xs">
+              <span>상품 금액</span>
+              <strong className="font-mono">
+                {total.toLocaleString("ko-KR")}원
+              </strong>
+            </div>
+            <div className="mt-4 flex justify-between text-xs">
+              <span>배송비</span>
+              <span className="text-muted">배송 요청 시 계산</span>
+            </div>
+            <div className="mt-6 flex justify-between border-t border-line pt-5">
+              <span className="text-sm font-bold">예상 결제 금액</span>
+              <strong className="font-mono text-xl">
+                {total.toLocaleString("ko-KR")}원
+              </strong>
+            </div>
+            {paymentMode === "portone" ? (
+              <>
+                <label
+                  className="mt-6 block text-[11px] font-bold"
+                  htmlFor="cart-pay-method"
+                >
+                  결제 방법
+                </label>
+                <select
+                  className="mt-2 h-11 w-full border border-line bg-paper px-3 text-xs"
+                  disabled={busy || hasPendingCheckout}
+                  id="cart-pay-method"
+                  onChange={(event) =>
+                    setPayMethod(event.target.value as ProductPaymentMethod)
+                  }
+                  value={payMethod}
+                >
+                  <option value="CARD">신용·체크카드</option>
+                  <option value="EASY_PAY">카카오페이</option>
+                  <option value="VIRTUAL_ACCOUNT">가상계좌</option>
+                </select>
+              </>
+            ) : paymentMode === "manual_transfer" ? (
+              <div className="mt-6 border border-line bg-paper px-3 py-3 text-xs">
+                <p className="font-bold">수동 계좌이체</p>
+                <p className="mt-1 text-[11px] text-muted">
+                  주문 생성 후 서버가 입금계좌를 안내합니다.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-6 border border-amber-200 bg-amber-50 px-3 py-3 text-[11px] text-amber-900">
+                결제 운영 모드를 확인하고 있습니다.
+              </div>
+            )}
+            <button
+              className="mt-4 h-13 w-full bg-ink text-xs font-bold text-paper disabled:opacity-50"
+              disabled={checkoutDisabled}
+              onClick={() => void checkout()}
+              type="button"
+            >
+              {checkoutButtonLabel}
+            </button>
+            <button
+              className="mt-3 w-full text-[11px] text-muted underline disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={busy || hasPendingCheckout}
+              onClick={clear}
+              type="button"
+            >
+              장바구니 비우기
+            </button>
+          </aside>
+        </div>
+      )}
+    </div>
+  );
 }

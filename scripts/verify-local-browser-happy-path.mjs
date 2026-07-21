@@ -231,18 +231,17 @@ try {
   await navigate(client, `${baseUrl}/`);
   await waitForExpression(
     client,
-    `location.pathname === "/home" && document.body?.innerText.includes("BUY NOW")`,
-    "Root did not immediately render the BUY NOW home page",
+    `location.pathname === "/home" && document.body?.innerText.includes("즉시 구매")`,
+    "Root did not immediately render the localized home page",
   );
   const homeText = await evaluate(client, "document.body.innerText");
   assert.doesNotMatch(homeText, /DEVICE CHECKING|SESSION WAITING/);
-  assert.doesNotMatch(homeText, /LIVE DROP COUNTDOWN|\b\d{2}:\d{2}:\d{2}\b/);
 
   const fixedHref = await evaluate(
     client,
     `(() => {
       const link = [...document.querySelectorAll('a[href^="/auction/"]')]
-        .find((element) => element.innerText.includes("BUY NOW"));
+        .find((element) => element.innerText.includes("즉시 구매"));
       return link?.getAttribute("href") ?? null;
     })()`,
   );
@@ -261,8 +260,8 @@ try {
   assert.equal(clickedProduct, true, "Could not click a fixed-price product");
   await waitForExpression(
     client,
-    `location.pathname === ${JSON.stringify(fixedHref)} && document.body?.innerText.includes("바로 구매")`,
-    "Fixed-price detail did not render after the product click",
+    `location.pathname === ${JSON.stringify(fixedHref)} && document.body?.innerText.includes("즉시 구매") && Boolean(document.querySelector('[role="dialog"]'))`,
+    "Fixed-price intercepted modal did not render after the product click",
   );
 
   const detailState = await evaluate(
@@ -274,13 +273,12 @@ try {
         cartEnabled: [...(panel?.querySelectorAll("button") ?? [])]
           .some((button) => button.innerText.trim() === "장바구니" && !button.disabled),
         buyEnabled: [...(panel?.querySelectorAll("button") ?? [])]
-          .some((button) => button.innerText.trim() === "바로 구매" && !button.disabled),
+          .some((button) => button.innerText.trim() === "즉시 구매" && !button.disabled),
       };
     })()`,
   );
   assert.equal(detailState.cartEnabled, true);
   assert.equal(detailState.buyEnabled, true);
-  assert.doesNotMatch(detailState.text, /LIVE DROP COUNTDOWN|\b\d{2}:\d{2}:\d{2}\b/);
 
   const clickedCart = await evaluate(
     client,
@@ -294,8 +292,8 @@ try {
   assert.equal(clickedCart, true, "Could not click the detail cart action");
   await waitForExpression(
     client,
-    `location.pathname === "/api/auth/kakao/start"`,
-    "Anonymous cart action did not enter the Kakao login route",
+    `location.pathname === "/account/login" && document.body?.innerText.includes("카카오로 계속하기")`,
+    "Anonymous cart action did not open the intercepted login route",
   );
 
   const storedIntent = await evaluate(
@@ -306,6 +304,32 @@ try {
   assert.equal(parsedIntent.productId, fixedHref.split("/").at(-1));
   assert.equal(parsedIntent.intent, "cart");
   assert.equal(Number.isFinite(parsedIntent.createdAt), true);
+
+  await client.send("Emulation.setDeviceMetricsOverride", {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 1,
+    mobile: true,
+  });
+  await navigate(client, `${baseUrl}/home`);
+  const mobileLayout = await evaluate(
+    client,
+    `(() => {
+      const mobileHome = document.querySelector('[data-home-presentation="mobile"]');
+      const desktopHome = document.querySelector('[data-home-presentation="desktop"]');
+      const visible = (element) => element && getComputedStyle(element).display !== "none";
+      return {
+        mobileVisible: visible(mobileHome),
+        desktopVisible: visible(desktopHome),
+        bottomNavVisible: visible(document.querySelector('nav[aria-label="모바일 하단 메뉴"]')),
+        overflow: document.documentElement.scrollWidth - window.innerWidth,
+      };
+    })()`,
+  );
+  assert.equal(mobileLayout.mobileVisible, true);
+  assert.equal(mobileLayout.desktopVisible, false);
+  assert.equal(mobileLayout.bottomNavVisible, true);
+  assert.ok(mobileLayout.overflow <= 1, `Mobile layout overflows by ${mobileLayout.overflow}px`);
 
   await navigate(client, `${baseUrl}/cart`);
   await waitForExpression(

@@ -150,5 +150,5 @@ export default function AuthCallbackPage() {
     };
   }, []);
 
-  return <main className="mx-auto grid min-h-[60vh] max-w-xl place-items-center px-6 py-20 text-center"><div><p className="eyebrow text-muted">KAKAO / AUTHENTICATION</p><h1 className="mt-4 text-3xl font-black tracking-[-.08em]">{error ? "로그인을 완료하지 못했습니다." : message}</h1>{error && <><p className="mt-4 text-sm text-red-700">{error}</p><Link className="mt-8 inline-flex border border-ink px-5 py-3 text-xs font-bold" href="/account">내 정보로 돌아가기</Link></>}</div></main>;
+  return <main className="mx-auto grid min-h-[60vh] max-w-xl place-items-center px-6 py-20 text-center"><div><p className="eyebrow text-muted">카카오 · 로그인 확인</p><h1 className="mt-4 text-3xl font-black tracking-[-.08em]">{error ? "로그인을 완료하지 못했습니다." : message}</h1>{error && <><p className="mt-4 text-sm text-red-700">{error}</p><Link className="mt-8 inline-flex border border-ink px-5 py-3 text-xs font-bold" href="/account">내 정보로 돌아가기</Link></>}</div></main>;
 }

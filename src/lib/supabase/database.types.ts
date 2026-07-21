@@ -385,16 +385,19 @@ export type Database = {
           created_at: string
           member_id: string
           product_id: string
+          reserved_until: string
         }
         Insert: {
           created_at?: string
           member_id: string
           product_id: string
+          reserved_until?: string
         }
         Update: {
           created_at?: string
           member_id?: string
           product_id?: string
+          reserved_until?: string
         }
         Relationships: [
           {
@@ -2670,6 +2673,10 @@ export type Database = {
       }
       can_manage_members: { Args: never; Returns: boolean }
       can_manage_products: { Args: never; Returns: boolean }
+      can_manage_product_store: {
+        Args: { p_store_id: string }
+        Returns: boolean
+      }
       can_manage_support_conversation: {
         Args: { p_conversation_id: string }
         Returns: boolean
@@ -2839,6 +2846,15 @@ export type Database = {
           payment_deadline_exempt: boolean
           sanction_count: number
           warning_count: number
+        }[]
+      }
+      get_my_cart_reservations: {
+        Args: never
+        Returns: {
+          created_at: string
+          product_id: string
+          reserved_until: string
+          server_time: string
         }[]
       }
       get_my_nickname_state: {
@@ -3279,6 +3295,27 @@ export type Database = {
       is_security_ip_blocked: { Args: { p_ip: string }; Returns: boolean }
       is_staff: { Args: never; Returns: boolean }
       is_support_operator: { Args: { p_user_id: string }; Returns: boolean }
+      list_account_auction_bid_states: {
+        Args: never
+        Returns: {
+          amount: number
+          bid_created_at: string
+          bid_id: string
+          bid_increment: number
+          closes_at: string
+          current_price: number
+          final_bid_amount: number | null
+          final_bid_id: string | null
+          image_urls: string[]
+          is_final: boolean
+          product_id: string
+          product_status: string
+          sale_type: string
+          starting_price: number
+          thumbnail_urls: string[]
+          title: string
+        }[]
+      }
       list_my_security_log_access_requests: {
         Args: never
         Returns: {
@@ -3347,6 +3384,19 @@ export type Database = {
       normalize_member_nickname: {
         Args: { p_nickname: string }
         Returns: string
+      }
+      operator_process_second_chance: {
+        Args: { p_product_id: string }
+        Returns: {
+          bidder_display_name: string | null
+          offer_id: string | null
+          offer_status: string
+          offered_amount: number | null
+          processed_count: number
+          product_id: string
+          response_due_at: string | null
+          server_time: string
+        }[]
       }
       owner_begin_hidden_test_manual_transfer: {
         Args: { p_product_id: string }
@@ -3769,6 +3819,18 @@ export type Database = {
           session_record_id: string
         }[]
       }
+      release_my_cart_reservation: {
+        Args: { p_product_id: string }
+        Returns: boolean
+      }
+      reserve_fixed_product_for_cart: {
+        Args: { p_product_id: string }
+        Returns: {
+          product_id: string
+          reserved_until: string
+          server_time: string
+        }[]
+      }
       record_shipping_fee_payment: {
         Args: {
           p_amount: number
@@ -3972,6 +4034,76 @@ export type Database = {
           p_publish_at: string
           p_starting_price: number
           p_status: string
+          p_title: string
+        }
+        Returns: {
+          anti_sniping_base_closes_at: string | null
+          anti_sniping_extended_at: string | null
+          anti_sniping_extension_count: number
+          auction_feed_expires_at: string | null
+          bid_history: Json
+          bid_increment: number
+          bid_locked_at: string | null
+          brand: string
+          brand_slug: string
+          brand_source: string
+          category: string
+          closes_at: string
+          condition_grade: string
+          created_at: string
+          created_by: string | null
+          current_price: number
+          description: string
+          final_bid_amount: number | null
+          final_bid_id: string | null
+          fixed_price: number | null
+          id: string
+          image_urls: string[]
+          inquiry_operator_id: string | null
+          inspection_notes: string[]
+          measurements: Json
+          participant_count: number
+          past_action: string | null
+          past_at: string | null
+          past_expires_at: string | null
+          publish_at: string
+          sale_type: string
+          size_label: string
+          starting_price: number
+          status: string
+          storage_class: string
+          store_id: string | null
+          thumbnail_urls: string[]
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "products"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      update_operator_product: {
+        Args: {
+          p_bid_increment: number
+          p_brand: string
+          p_category: string
+          p_condition_grade: string
+          p_description: string
+          p_expected_updated_at: string
+          p_image_urls: string[]
+          p_inspection_notes: string[]
+          p_measurements: Json
+          p_product_id: string
+          p_publish_at: string
+          p_sale_type: string
+          p_size_label: string
+          p_starting_price: number
+          p_storage_class: string
+          p_store_id: string
+          p_thumbnail_urls: string[]
           p_title: string
         }
         Returns: {

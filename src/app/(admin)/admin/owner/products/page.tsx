@@ -1,3 +1,3 @@
-import { OwnerProductsConsole } from "@/components/admin/owner/OwnerProductsConsole";
+import { OperatorProductsConsole } from "@/components/admin/operator/OperatorProductsConsole";
 export const dynamic = "force-dynamic";
-export default function OwnerProductsPage() { return <OwnerProductsConsole />; }
+export default function OwnerProductsPage() { return <OperatorProductsConsole />; }

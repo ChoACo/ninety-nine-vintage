@@ -104,6 +104,7 @@ const MAX_IMPORT_ROWS = 200;
 const MAX_RAW_WORKSHEET_ROWS = 1_000;
 const MAX_WORKSHEET_COLUMNS = 256;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_PRODUCT_IMAGES = 12;
 const HEADER_SCAN_LIMIT = 30;
 export const FIRST_PRODUCT_ROW = 6;
 const FIXED_TEMPLATE_COLUMNS = {
@@ -289,6 +290,9 @@ function detectFixedTemplateForSheet(
       parseBatchAuctionConditionScore(
         row.cells[FIXED_TEMPLATE_COLUMNS.conditionScore - 1],
       ) !== null;
+    const hasConditionValue = Boolean(
+      cellAsText(row.cells[FIXED_TEMPLATE_COLUMNS.conditionScore - 1]),
+    );
     const hasDescription = Boolean(
       cellAsText(row.cells[FIXED_TEMPLATE_COLUMNS.description - 1]),
     );
@@ -296,12 +300,24 @@ function detectFixedTemplateForSheet(
       parseStartingPrice(
         row.cells[FIXED_TEMPLATE_COLUMNS.startingPrice - 1],
       ) !== null;
+    const hasStartingPriceValue = Boolean(
+      cellAsText(row.cells[FIXED_TEMPLATE_COLUMNS.startingPrice - 1]),
+    );
     const hasImageName = Boolean(
       cellAsText(row.cells[FIXED_TEMPLATE_COLUMNS.imageNames - 1]),
     );
+    const populatedFixedColumns = [
+      hasTitle,
+      hasSize,
+      hasConditionValue,
+      hasDescription,
+      hasStartingPriceValue,
+      hasImageName,
+    ].filter(Boolean).length;
     const hasFixedTemplateEvidence =
       (hasStartingPrice && (hasTitle || hasDescription || hasImageName)) ||
-      (hasDescription && hasImageName);
+      (hasDescription && hasImageName) ||
+      ((hasTitle || hasDescription) && populatedFixedColumns >= 3);
 
     if (!hasFixedTemplateEvidence) return;
 
@@ -1114,6 +1130,12 @@ export function buildBatchAuctionPreview(
       issues.push({
         code: "missing_image_name",
         message: "이미지명이 비어 있습니다.",
+        severity: "error",
+      });
+    } else if (imageNames.length > MAX_PRODUCT_IMAGES) {
+      issues.push({
+        code: "too_many_product_images",
+        message: `상품 한 개에는 사진을 최대 ${MAX_PRODUCT_IMAGES}장까지 등록할 수 있습니다.`,
         severity: "error",
       });
     }

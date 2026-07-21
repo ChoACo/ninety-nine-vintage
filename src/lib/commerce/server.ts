@@ -102,7 +102,7 @@ export async function authenticateStaffRequest(request: Request, mutation = fals
   if (!auth.ok) return auth;
   const { data: role, error } = await auth.admin
     .from("account_access_roles")
-    .select("role_code, grade_level")
+    .select("role_code, grade_level, reports_to_operator_id")
     .eq("user_id", auth.userId)
     .maybeSingle();
   if (error) return { ok: false as const, response: commerceJson({ error: "role_unavailable" }, 503) };
@@ -110,5 +110,12 @@ export async function authenticateStaffRequest(request: Request, mutation = fals
   if (roleCode !== "owner" && roleCode !== "operator" && roleCode !== "employee") {
     return { ok: false as const, response: commerceJson({ error: "forbidden" }, 403) };
   }
-  return { ...auth, roleCode, gradeLevel: Number(role?.grade_level ?? 99) };
+  return {
+    ...auth,
+    roleCode,
+    gradeLevel: Number(role?.grade_level ?? 99),
+    effectiveOperatorId: roleCode === "employee"
+      ? role?.reports_to_operator_id ?? null
+      : auth.userId,
+  };
 }

@@ -30,10 +30,10 @@ export function AuctionFilterSidebar({ saleType = "auction" }: { saleType?: "auc
   const filterContent = (
     <>
       <div className="flex items-center justify-between border-b border-zinc-200 py-4">
-        <h2 className="text-xs font-bold tracking-[0.12em]">FILTER &amp; SORT <span className="font-normal text-muted hidden">· 모바일 필터</span></h2>
+        <h2 className="text-xs font-bold tracking-[0.12em]">필터·정렬 <span className="font-normal text-muted md:hidden">· 모바일</span></h2>
         <div className="flex items-center gap-3">
           <button className="flex items-center gap-1 text-[11px] text-zinc-500 transition-colors hover:text-zinc-950" onClick={resetFilters} type="button"><RotateCcw size={12} /> 초기화</button>
-          <button aria-label="모바일 필터 닫기" className="hidden" onClick={() => setMobileOpen(false)} type="button"><X size={18} /></button>
+          <button aria-label="모바일 필터 닫기" className="md:hidden" onClick={() => setMobileOpen(false)} type="button"><X size={18} /></button>
         </div>
       </div>
 
@@ -69,8 +69,8 @@ export function AuctionFilterSidebar({ saleType = "auction" }: { saleType?: "auc
       {saleType === "auction" && <section className="py-5">
         <h3 className="mb-4 text-xs font-bold">경매 상태</h3>
         <div className="space-y-3 text-xs text-zinc-600">
-          <label className="flex cursor-pointer items-center gap-2 hover:text-zinc-950"><input checked={liveOnly} className="accent-zinc-950" onChange={(event) => { setLiveOnly(event.target.checked); notify({ sizes: selectedSizes, categories: selectedCategories, liveOnly: event.target.checked, closingOnly, sort: selectedSort }); }} type="checkbox" /><span className="text-emerald-500">●</span> LIVE DROP (진행중)</label>
-          <label className="flex cursor-pointer items-center gap-2 hover:text-zinc-950"><input checked={closingOnly} className="accent-zinc-950" onChange={(event) => { setClosingOnly(event.target.checked); notify({ sizes: selectedSizes, categories: selectedCategories, liveOnly, closingOnly: event.target.checked, sort: selectedSort }); }} type="checkbox" /><span className="text-amber-500">●</span> CLOSING SOON (마감 임박)</label>
+          <label className="flex cursor-pointer items-center gap-2 hover:text-zinc-950"><input checked={liveOnly} className="accent-zinc-950" onChange={(event) => { setLiveOnly(event.target.checked); notify({ sizes: selectedSizes, categories: selectedCategories, liveOnly: event.target.checked, closingOnly, sort: selectedSort }); }} type="checkbox" /><span className="text-emerald-500">●</span> 진행 중</label>
+          <label className="flex cursor-pointer items-center gap-2 hover:text-zinc-950"><input checked={closingOnly} className="accent-zinc-950" onChange={(event) => { setClosingOnly(event.target.checked); notify({ sizes: selectedSizes, categories: selectedCategories, liveOnly, closingOnly: event.target.checked, sort: selectedSort }); }} type="checkbox" /><span className="text-amber-500">●</span> 마감 임박</label>
         </div>
       </section>}
     </>
@@ -78,9 +78,9 @@ export function AuctionFilterSidebar({ saleType = "auction" }: { saleType?: "auc
 
   return (
     <>
-      <button aria-expanded={mobileOpen} className="mb-4 flex h-12 w-full items-center justify-between border-y border-zinc-950 px-1 text-xs font-bold hidden" onClick={() => setMobileOpen(true)} type="button"><span className="flex items-center gap-2"><SlidersHorizontal size={15} /> FILTER &amp; SORT</span><span className="text-[10px] text-muted">{selectedSizes.length + selectedCategories.length}개 선택</span></button>
-      <aside className="w-[240px] flex-shrink-0 self-start border-t border-zinc-950 sticky top-[100px]">{filterContent}</aside>
-      {mobileOpen && <div aria-label="모바일 필터 바텀시트" aria-modal="true" className="fixed inset-0 z-[70] bg-ink/40 hidden" role="dialog" onClick={() => setMobileOpen(false)}><aside className="absolute inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto rounded-t-2xl bg-paper px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-ink shadow-2xl" onClick={(event) => event.stopPropagation()}>{filterContent}</aside></div>}
+      <button aria-expanded={mobileOpen} className="mb-4 flex h-12 w-full items-center justify-between border-y border-zinc-950 px-1 text-xs font-bold md:hidden" onClick={() => setMobileOpen(true)} type="button"><span className="flex items-center gap-2"><SlidersHorizontal size={15} /> 필터·정렬</span><span className="text-[10px] text-muted">{selectedSizes.length + selectedCategories.length}개 선택</span></button>
+      <aside className="sticky top-[100px] hidden w-[240px] flex-shrink-0 self-start border-t border-zinc-950 md:block">{filterContent}</aside>
+      {mobileOpen && <div aria-label="모바일 필터 바텀시트" aria-modal="true" className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-md md:hidden" role="dialog" onClick={() => setMobileOpen(false)}><aside className="absolute inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto rounded-t-2xl bg-paper px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-ink shadow-2xl" onClick={(event) => event.stopPropagation()}>{filterContent}</aside></div>}
     </>
   );
 }

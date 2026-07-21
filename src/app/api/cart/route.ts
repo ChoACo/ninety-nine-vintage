@@ -5,10 +5,7 @@ import { mapPublishedProduct } from "@/services/products";
 export async function GET(request: Request) {
   const auth = await authenticateMemberRlsRequest(request);
   if (!auth.ok) return auth.response;
-  const { data, error } = await auth.user
-    .from("cart_items")
-    .select("product_id, created_at")
-    .order("created_at", { ascending: false });
+  const { data, error } = await auth.user.rpc("get_my_cart_reservations");
   if (error) return commerceJson({ error: "cart_unavailable" }, 503);
   const { data: paymentRows, error: paymentStatusError } = await auth.user.rpc(
     "get_commerce_payment_status",
@@ -25,12 +22,15 @@ export async function GET(request: Request) {
     return commerceJson({ error: "payment_status_unavailable" }, 503);
   }
   const paymentMode = paymentStatus.active_mode;
-  const ids = (data ?? []).map((item) => item.product_id);
+  const reservations = data ?? [];
+  const ids = reservations.map((item) => item.product_id);
   if (ids.length === 0) {
     return commerceJson({
       items: [],
       paymentMode,
       productIds: [],
+      reservations: [],
+      serverTime: null,
     });
   }
   const { data: products, error: productError } = await auth.user
@@ -42,17 +42,31 @@ export async function GET(request: Request) {
     .lte("publish_at", new Date().toISOString());
   if (productError) return commerceJson({ error: "cart_unavailable" }, 503);
   const liveIds = (products ?? []).map((product) => product.id);
-  const items = (products ?? []).map(mapPublishedProduct).map((product) => ({
-    ...product,
-    imageUrls: product.imageUrls.map((image) => getCatalogImageUrl(image)),
-    thumbnailUrls: product.thumbnailUrls.map((image) =>
-      getCatalogImageUrl(image, 320),
-    ),
-  }));
+  const reservationByProduct = new Map(
+    reservations.map((reservation) => [
+      reservation.product_id,
+      reservation.reserved_until,
+    ]),
+  );
+  const items = (products ?? [])
+    .map(mapPublishedProduct)
+    .map((product) => ({
+      ...product,
+      imageUrls: product.imageUrls.map((image) => getCatalogImageUrl(image)),
+      thumbnailUrls: product.thumbnailUrls.map((image) =>
+        getCatalogImageUrl(image, 320),
+      ),
+      reservationExpiresAt: reservationByProduct.get(product.id) ?? null,
+    }));
   return commerceJson({
     items,
     paymentMode,
     productIds: liveIds,
+    reservations: reservations.map((reservation) => ({
+      productId: reservation.product_id,
+      reservedUntil: reservation.reserved_until,
+    })),
+    serverTime: reservations[0]?.server_time ?? null,
     staleProductIds: ids.filter((id) => !liveIds.includes(id)),
   });
 }
@@ -63,23 +77,32 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null) as { productId?: string } | null;
   if (!body?.productId) return commerceJson({ error: "상품을 선택해 주세요." }, 400);
 
-  const { data: product, error: productError } = await auth.user
-    .from("products")
-    .select("id")
-    .eq("id", body.productId)
-    .eq("sale_type", "fixed")
-    .eq("status", "active")
-    .lte("publish_at", new Date().toISOString())
-    .maybeSingle();
-  if (productError) return commerceJson({ error: "cart_unavailable" }, 503);
-  if (!product) return commerceJson({ error: "현재 구매할 수 없는 상품입니다." }, 409);
-
-  const { error } = await auth.user.from("cart_items").upsert(
-    { member_id: auth.userId, product_id: body.productId },
-    { onConflict: "member_id,product_id" },
-  );
-  if (error) return commerceJson({ error: "cart_update_failed" }, 503);
-  return commerceJson({ productId: body.productId }, 201);
+  const { data, error } = await auth.user
+    .rpc("reserve_fixed_product_for_cart", {
+      p_product_id: body.productId,
+    })
+    .single();
+  if (error) {
+    const status = error.code === "22023"
+      ? 400
+      : error.code === "42501"
+        ? 403
+        : error.code === "P0002"
+          ? 404
+          : ["23505", "P0001"].includes(error.code ?? "")
+            ? 409
+            : 503;
+    return commerceJson(
+      { error: error.message || "cart_update_failed" },
+      status,
+    );
+  }
+  if (!data) return commerceJson({ error: "cart_update_failed" }, 503);
+  return commerceJson({
+    productId: data.product_id,
+    reservedUntil: data.reserved_until,
+    serverTime: data.server_time,
+  }, 201);
 }
 
 export async function DELETE(request: Request) {
@@ -87,11 +110,13 @@ export async function DELETE(request: Request) {
   if (!auth.ok) return auth.response;
   const body = await request.json().catch(() => null) as { productId?: string } | null;
   if (!body?.productId) return commerceJson({ error: "상품을 선택해 주세요." }, 400);
-  const { error } = await auth.user
-    .from("cart_items")
-    .delete()
-    .eq("member_id", auth.userId)
-    .eq("product_id", body.productId);
+  const { data, error } = await auth.user.rpc(
+    "release_my_cart_reservation",
+    { p_product_id: body.productId },
+  );
   if (error) return commerceJson({ error: "cart_update_failed" }, 503);
-  return commerceJson({ removedProductId: body.productId });
+  return commerceJson({
+    removed: data,
+    removedProductId: body.productId,
+  });
 }

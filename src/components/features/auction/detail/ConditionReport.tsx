@@ -17,8 +17,8 @@ export function ConditionReport({ item }: ConditionReportProps) {
     <section className="mt-10 border-t border-zinc-950 pt-6 ">
       <div className="flex flex-col items-start justify-between gap-4 ">
         <div>
-          <p className="mb-2 text-[11px] font-bold tracking-[0.15em] text-zinc-500">AUTHENTICITY / CONDITION</p>
-          <h2 className="text-lg font-black tracking-[-0.04em]">VINTAGE INSPECTION REPORT</h2>
+          <p className="mb-2 text-[11px] font-bold tracking-[0.15em] text-zinc-500">정품·상태 확인</p>
+          <h2 className="text-lg font-black tracking-[-0.04em]">빈티지 상품 검수 보고서</h2>
         </div>
         <span className="flex items-center gap-1.5 border border-zinc-200 px-3 py-2 text-[11px] font-bold text-zinc-700">
           <BadgeCheck size={14} /> 전문가 검수 완료
@@ -31,7 +31,7 @@ export function ConditionReport({ item }: ConditionReportProps) {
           {rows.map(([label, value]) => (
             <div className="flex justify-between border-b border-zinc-100 py-3 text-xs last:border-b-0" key={label}>
               <span className="text-zinc-500">{label}</span>
-              <span className="font-mono font-medium text-zinc-950">{value} cm</span>
+              <span className="font-mono font-medium text-zinc-950">{value}cm</span>
             </div>
           ))}
         </div>}

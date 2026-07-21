@@ -2,28 +2,31 @@ import "server-only";
 
 import { createSupabasePublicClient, createSupabaseUserClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/database.types";
-import { normalizeCatalogSearch, normalizeProductLimit } from "@/lib/catalog/query";
+import {
+  normalizeCatalogSearch,
+  normalizeProductLimit,
+  normalizeProductOffset,
+} from "@/lib/catalog/query";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 
-function maskBidderName(value: unknown): string {
-  if (typeof value !== "string" || !value.trim()) return "member****";
-  const normalized = value.trim();
-  return `${normalized.slice(0, Math.min(3, normalized.length))}****`;
-}
-
-function maskPublicBidHistory(value: Json): Json {
+function sanitizePublicBidHistory(value: Json): Json {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
     const record = entry as Record<string, unknown>;
     const amount = Number(record.amount);
     if (typeof record.id !== "string" || !Number.isSafeInteger(amount)) return [];
+    const bidderName = typeof record.bidderName === "string" ? record.bidderName.trim() : "";
+    if (!bidderName) return [];
+    const outcome = record.outcome ?? "active";
+    if (outcome !== "active" && outcome !== "cancelled" && outcome !== "unpaid_cancelled") return [];
     return [{
       id: record.id,
       bidAt: typeof record.bidAt === "string" ? record.bidAt : null,
-      bidderName: maskBidderName(record.bidderName),
+      bidderName,
       amount,
+      outcome: outcome,
     }];
   });
 }
@@ -56,6 +59,9 @@ export interface PublishedProduct {
   bidHistory: Json;
   bidLockedAt: string | null;
   finalBidAmount: number | null;
+  antiSnipingBaseClosesAt: string | null;
+  antiSnipingExtendedAt: string | null;
+  antiSnipingExtensionCount: number;
   updatedAt: string;
   storeId: string | null;
   storageClass: "small" | "large";
@@ -84,9 +90,12 @@ export function mapPublishedProduct(row: ProductRow): PublishedProduct {
     participantCount: row.participant_count,
     imageUrls: row.image_urls,
     thumbnailUrls: row.thumbnail_urls,
-    bidHistory: maskPublicBidHistory(row.bid_history),
+    bidHistory: sanitizePublicBidHistory(row.bid_history),
     bidLockedAt: row.bid_locked_at,
     finalBidAmount: row.final_bid_amount,
+    antiSnipingBaseClosesAt: row.anti_sniping_base_closes_at,
+    antiSnipingExtendedAt: row.anti_sniping_extended_at,
+    antiSnipingExtensionCount: row.anti_sniping_extension_count,
     updatedAt: row.updated_at,
     storeId: row.store_id,
     storageClass: row.storage_class === "large" ? "large" : "small",
@@ -99,12 +108,20 @@ export function mapPublishedProduct(row: ProductRow): PublishedProduct {
 
 export async function fetchPublishedProducts(input: {
   limit?: number;
+  offset?: number;
   saleType?: ProductRow["sale_type"];
   search?: string;
   sort?: "latest" | "ending" | "price_asc" | "price_desc";
 } = {}): Promise<PublishedProduct[]> {
-  const { limit = 24, saleType = "auction", search = "", sort = "latest" } = input;
+  const {
+    limit = 24,
+    offset = 0,
+    saleType = "auction",
+    search = "",
+    sort = "latest",
+  } = input;
   const safeLimit = normalizeProductLimit(limit);
+  const safeOffset = normalizeProductOffset(offset);
   const safeSearch = normalizeCatalogSearch(search);
   const verifier = createSupabasePublicClient();
   const now = new Date().toISOString();
@@ -124,7 +141,8 @@ export async function fetchPublishedProducts(input: {
   else if (sort === "price_asc") query = query.order(saleType === "fixed" ? "fixed_price" : "current_price", { ascending: true, nullsFirst: false });
   else if (sort === "price_desc") query = query.order(saleType === "fixed" ? "fixed_price" : "current_price", { ascending: false, nullsFirst: false });
   else query = query.order("publish_at", { ascending: false });
-  const { data, error } = await query.limit(safeLimit);
+  query = query.order("id", { ascending: true });
+  const { data, error } = await query.range(safeOffset, safeOffset + safeLimit - 1);
   if (error) throw new Error("상품 목록을 불러오지 못했습니다.");
   return (data ?? []).map(mapPublishedProduct);
 }
@@ -140,7 +158,7 @@ export async function fetchPublishedProduct(productId: string): Promise<Publishe
     .lte("publish_at", now)
     .maybeSingle();
   if (error) throw new Error("상품을 불러오지 못했습니다.");
-  if (data?.sale_type === "auction" && (data.final_bid_id !== null || data.auction_feed_expires_at === null || data.auction_feed_expires_at <= now)) return null;
+  if (data?.sale_type === "auction" && (data.auction_feed_expires_at === null || data.auction_feed_expires_at <= now)) return null;
   return data ? mapPublishedProduct(data) : null;
 }
 

@@ -114,12 +114,12 @@
   [class~="grid-cols-3"]:not(.md\:grid-cols-3) { grid-template-columns: minmax(0, 1fr) !important; }
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 767px) {
   .mobile-detail-cta {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: calc(4rem + env(safe-area-inset-bottom));
+    bottom: calc(4rem + 1px + env(safe-area-inset-bottom));
     z-index: 20;
     margin-inline: 0;
     padding: 0.5rem max(0.5rem, env(safe-area-inset-right)) 0.5rem max(0.5rem, env(safe-area-inset-left));

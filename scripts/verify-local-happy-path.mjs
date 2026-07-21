@@ -18,19 +18,15 @@ assert(entry.response.headers.get("location") === "/home", "root must redirect t
 
 const home = await read("/home");
 assert(home.response.ok, "/home must render");
-assert(home.text.includes("BUY NOW"), "/home must expose BUY NOW");
+assert(home.text.includes("즉시 구매"), "/home must expose the localized fixed-price entry");
 assert(!/DEVICE CHECKING|SESSION WAITING/.test(home.text), "entry gate must stay bypassed");
-assert(!/LIVE DROP COUNTDOWN|20:56|남음/.test(home.text), "live countdown must stay disabled");
 
-const disabledEntryCompletion = await read("/api/entry/complete", {
+const removedEntryCompletion = await read("/api/entry/complete", {
   method: "POST",
   headers: { "Content-Type": "application/json", Origin: baseUrl },
   body: JSON.stringify({ nextPath: "/shop?from=entry", deviceType: "desktop" }),
 });
-assert(disabledEntryCompletion.response.ok, "disabled entry completion must bypass its DB and cookie checks");
-const disabledEntryPayload = JSON.parse(disabledEntryCompletion.text);
-assert(disabledEntryPayload.disabled === true, "entry completion must report the disabled state");
-assert(disabledEntryPayload.target === "/shop?from=entry", "entry completion must preserve a safe local target");
+assert(removedEntryCompletion.response.status === 404, "removed entry completion route must stay absent");
 
 const catalog = await read("/api/products?saleType=fixed&limit=1");
 assert(catalog.response.ok, "fixed-product API must be available");
@@ -42,19 +38,18 @@ assert(typeof product.id === "string" && product.id, "fixed product must have an
 const shop = await read("/shop");
 assert(shop.response.ok, "/shop must render");
 assert(shop.text.includes(product.title), "/shop must server-render the initial catalog");
-assert(!/LIVE DROP COUNTDOWN|20:56|남음/.test(shop.text), "/shop must not render a live countdown");
+assert(!/DEVICE CHECKING|SESSION WAITING/.test(shop.text), "/shop must never restore the entry gate");
 
 const storeHref = home.text.match(/href="(\/stores\/[^"?#]+)"/)?.[1];
 if (storeHref) {
   const store = await read(storeHref);
   assert(store.response.ok, "home store links must render");
-  assert(!/LIVE BID|간편 입찰|STORE \/ LIVE DATABASE/.test(store.text), "store pages must not expose live-auction controls while auctions are paused");
+  assert(!/CURATED STORE|ALL SHOP|STORE \/ BUY NOW/.test(store.text), "store pages must stay localized");
 }
 
 const detail = await read(`/auction/${encodeURIComponent(product.id)}`);
 assert(detail.response.ok, "fixed-product detail must render");
-assert(detail.text.includes("장바구니") && detail.text.includes("바로 구매"), "detail must expose cart and buy-now actions");
-assert(!/LIVE DROP COUNTDOWN|20:56|남음/.test(detail.text), "detail must not render a live countdown");
+assert(detail.text.includes("장바구니") && detail.text.includes("즉시 구매"), "detail must expose cart and buy-now actions");
 
 const cart = await read("/cart");
 assert(cart.response.ok && cart.text.includes("장바구니"), "cart entry must render");
@@ -76,15 +71,14 @@ const anonymousPaymentSync = await read("/api/payments/sync", {
 });
 assert(anonymousPaymentSync.response.status === 401, "payment sync must reject an anonymous request");
 
-const disabledAuctionBid = await read("/api/auction/bids", {
+const anonymousAuctionBid = await read("/api/auction/bids", {
   method: "POST",
   headers: { "Content-Type": "application/json", Origin: baseUrl },
   body: JSON.stringify({ productId: product.id, amount: 1 }),
 });
-assert(disabledAuctionBid.response.status === 503, "disabled auction bids must fail closed");
-assert(JSON.parse(disabledAuctionBid.text).error === "auction_disabled", "disabled auction bids must return a stable error code");
+assert(anonymousAuctionBid.response.status === 401, "live auction bids must reject anonymous requests");
 
 const feed = await read("/feed");
-assert(feed.response.ok && feed.text.includes("점검 중"), "live feed must render its maintenance state");
+assert(feed.response.ok && feed.text.includes("실시간 경매"), "live feed must render its localized auction entry");
 
 console.log(`PASS local happy path (${product.id})`);

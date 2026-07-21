@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { LiveTickerBar } from "@/components/layout/LiveTickerBar";
 import { PcFooter } from "@/components/layout/PcFooter";
 import { PcHeader } from "@/components/layout/PcHeader";
+import { MobileHeader } from "@/components/layout/MobileHeader";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { CacheConsentBanner } from "@/components/layout/CacheConsentBanner";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
@@ -15,8 +16,9 @@ export function PcLayout({ children }: PcLayoutProps) {
     <div className="min-h-screen bg-paper text-ink">
       {LIVE_AUCTION_ENABLED && <LiveTickerBar />}
       <PcHeader hasLiveTicker={LIVE_AUCTION_ENABLED} />
-      <main className="mx-auto min-h-[calc(100vh-7rem)] max-w-[1680px] px-4 py-7 pb-28   px-10 pb-7 xl:px-12">{children}</main>
-      <PcFooter />
+      <MobileHeader hasLiveTicker={LIVE_AUCTION_ENABLED} />
+      <main className="mx-auto min-h-[calc(100vh-7rem)] max-w-[1680px] px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-10 md:py-8 md:pb-8 xl:px-12">{children}</main>
+      <div className="hidden md:block"><PcFooter /></div>
       <MobileBottomNav />
       <CacheConsentBanner />
     </div>

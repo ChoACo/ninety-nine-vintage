@@ -5,7 +5,7 @@ import { AuctionFilterSidebar } from "@/components/features/auction/AuctionFilte
 import { fetchPublishedProducts } from "@/services/products";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "BUY NOW | NINETY-NINE VINTAGE", alternates: { canonical: "/shop" } };
+export const metadata: Metadata = { title: "즉시 구매 | NINETY-NINE VINTAGE", alternates: { canonical: "/shop" } };
 
 function toPayload(products: Awaited<ReturnType<typeof fetchPublishedProducts>>): ProductPayload[] {
   return products.map((product) => ({
@@ -39,5 +39,5 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
     sort: "latest",
     search: typeof query === "string" ? query : "",
   }));
-  return <div className="flex flex-col items-stretch gap-8 flex-row items-start gap-10"><AuctionFilterSidebar saleType="fixed" /><Suspense fallback={<div className="min-w-0 flex-1" />}><AuctionFeedGrid className="min-w-0 flex-1" initialProducts={initialProducts} saleType="fixed" title="상시 바로구매" /></Suspense></div>;
+  return <div className="md:flex md:items-start md:gap-10"><AuctionFilterSidebar saleType="fixed" /><Suspense fallback={<div className="min-w-0 flex-1" />}><AuctionFeedGrid className="min-w-0 flex-1" initialProducts={initialProducts} saleType="fixed" title="상시 즉시 구매" /></Suspense></div>;
 }

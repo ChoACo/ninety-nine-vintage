@@ -42,6 +42,11 @@ $env:NINETY_NINE_DOCKER_EXE = 'C:\Program Files\Docker\Docker\resources\bin\dock
 npm run verify:reversal-target-db:docker
 ```
 
+Verified on 2026-07-22 after enabling WSL 2 and restarting Windows: Docker
+Desktop 4.83.0 with Engine 29.6.2 ran the full suite against
+`postgres:17-alpine` (PostgreSQL 17.10). The runner removed its Compose
+project, container, network, and volumes after the successful run.
+
 The concurrency phase proves three boundaries with separate database sessions:
 
 - one actor/key produces one append plus one replay with the same reversal ID;

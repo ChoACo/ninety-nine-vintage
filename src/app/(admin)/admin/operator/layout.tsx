@@ -9,6 +9,7 @@ const links = [
   { exact: false, href: "/admin/operator/products/past", label: "지난 상품" },
   { exact: false, href: "/admin/operator/members", label: "회원" },
   { exact: false, href: "/admin/operator/orders", label: "주문" },
+  { exact: false, href: "/admin/operator/fulfillment", label: "중앙 출고" },
   { exact: false, href: "/admin/operator/revenue", label: "매출" },
   { exact: false, href: "/admin/operator/shipping", label: "배송" },
   { exact: false, href: "/admin/operator/chat", label: "상담" },

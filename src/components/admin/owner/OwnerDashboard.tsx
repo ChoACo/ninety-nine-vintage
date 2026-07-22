@@ -1,6 +1,6 @@
 "use client";
 
-import { Database, PackagePlus, ShieldCheck, Store, Truck } from "lucide-react";
+import { Database, PackagePlus, ShieldCheck, Store, Truck, Warehouse } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -80,8 +80,9 @@ export function OwnerDashboard() {
       </div>
       <OwnerManualTransferAccountPanel />
       <OwnerSiteStatusPanel />
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/owner/products"><PackagePlus size={18} /> 상품 등록·수정·일괄등록</Link>
+        <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/owner/fulfillment"><Warehouse size={18} /> 중앙 입고·보관 관리</Link>
         <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/owner/operations"><Truck size={18} /> 배송 대기·결제 현황</Link>
       </div>
       <section>

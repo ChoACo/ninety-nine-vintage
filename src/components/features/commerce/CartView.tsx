@@ -818,7 +818,7 @@ export function CartView() {
           ? `주문 ${checkout.order.id}의 입금 확인이 완료되었습니다.`
           : transfer.status === "partially_paid"
             ? `주문 ${checkout.order.id}의 일부 입금이 확인되었습니다. 내 정보에서 남은 금액을 확인해 주세요.`
-            : `주문 ${checkout.order.id} 생성 완료 · ${transfer.expected_amount.toLocaleString("ko-KR")}원 · ${transfer.bank_name_snapshot} ${transfer.account_number_snapshot}로 입금해 주세요.`,
+            : `입금 대기 중 · 주문 ${checkout.order.id} · ${transfer.expected_amount.toLocaleString("ko-KR")}원 · ${transfer.bank_name_snapshot} ${transfer.account_number_snapshot}로 입금해 주세요.`,
       );
     } catch (error) {
       if (

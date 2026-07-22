@@ -76,7 +76,7 @@ function getNativeImageSrcSet(
   }
 }
 
-/** Restore the uploaded inspection master for the zoom gallery instead of chaining
+/** Restore the uploaded high-resolution source for the zoom gallery instead of chaining
  * a previously generated 800px Supabase render through Next Image. */
 function getRequestedImageSource(source: string, maxDimension: number): string {
   if (maxDimension <= CATALOG_TRANSFORM_MAX_DIMENSION) {

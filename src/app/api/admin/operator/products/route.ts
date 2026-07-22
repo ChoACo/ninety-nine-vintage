@@ -1,5 +1,4 @@
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
-import type { Json } from "@/lib/supabase/database.types";
 import { normalizeProductBrand } from "@/lib/catalog/brand";
 
 function text(value: unknown, fallback = "") {
@@ -27,23 +26,55 @@ function images(value: unknown) {
 export async function GET(request: Request) {
   const auth = await authenticateStaffRequest(request);
   if (!auth.ok) return auth.response;
-  if (auth.roleCode !== "owner" && !auth.effectiveOperatorId) {
-    return commerceJson({ error: "operator_assignment_required" }, 403);
+  const membershipPermissions = new Map<string, { canManage: boolean; canPublish: boolean }>();
+  if (auth.roleCode !== "owner") {
+    const { data: memberships, error: membershipError } = await auth.user
+      .from("store_memberships")
+      .select("store_id, manage_products, publish_products")
+      .eq("user_id", auth.userId)
+      .eq("status", "active");
+    if (membershipError) return commerceJson({ error: "operator_products_unavailable" }, 503);
+    for (const membership of memberships ?? []) {
+      membershipPermissions.set(membership.store_id, {
+        canManage: membership.manage_products,
+        canPublish: membership.publish_products,
+      });
+    }
   }
-  let storeQuery = auth.user.from("stores").select("id, name, slug, operator_id, is_active").eq("is_active", true);
-  if (auth.roleCode !== "owner") storeQuery = storeQuery.eq("operator_id", auth.effectiveOperatorId as string);
-  const { data: stores, error: storeError } = await storeQuery.order("name");
+
+  const manageableStoreIds = [...membershipPermissions]
+    .filter(([, permission]) => permission.canManage)
+    .map(([storeId]) => storeId);
+  let storeQuery = auth.user
+    .from("stores")
+    .select("id, name, slug, operator_id, is_active")
+    .eq("is_active", true);
+  if (auth.roleCode !== "owner") {
+    if (manageableStoreIds.length === 0) {
+      return commerceJson({ stores: [], products: [], permissions: { canCreate: false, canMutate: false, canPublish: false } });
+    }
+    storeQuery = storeQuery.in("id", manageableStoreIds);
+  }
+  const { data: storeRows, error: storeError } = await storeQuery.order("name");
   if (storeError) return commerceJson({ error: "operator_products_unavailable" }, 503);
+  const stores = (storeRows ?? []).map((store) => ({
+    ...store,
+    canPublish: auth.roleCode === "owner" || membershipPermissions.get(store.id)?.canPublish === true,
+  }));
   const storeIds = (stores ?? []).map((store) => store.id);
   const { data: products, error: productError } = storeIds.length === 0
     ? { data: [], error: null }
     : await auth.user.from("products").select("*, stores(id, name, slug)").in("store_id", storeIds).order("created_at", { ascending: false });
   if (productError) return commerceJson({ error: "operator_products_unavailable" }, 503);
-  const canMutate = auth.roleCode === "owner" || auth.roleCode === "operator";
+  const canMutate = stores.length > 0;
   return commerceJson({
     stores: stores ?? [],
     products: products ?? [],
-    permissions: { canCreate: true, canMutate, canPublish: canMutate },
+    permissions: {
+      canCreate: stores.length > 0,
+      canMutate,
+      canPublish: stores.some((store) => store.canPublish),
+    },
   });
 }
 
@@ -68,10 +99,12 @@ export async function POST(request: Request) {
   if (!title || !description || !normalizedBrand || !storeId || imageUrls.length === 0 || thumbnailUrls.length !== imageUrls.length || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
     return commerceJson({ error: "상품 입력값을 확인해 주세요." }, 400);
   }
-  const storeQuery = auth.user.from("stores").select("id, operator_id").eq("id", storeId);
-  const { data: store, error: storeError } = await storeQuery.maybeSingle();
-  if (storeError) return commerceJson({ error: "store_unavailable" }, 503);
-  if (!store || (auth.roleCode !== "owner" && store.operator_id !== auth.effectiveOperatorId)) return commerceJson({ error: "forbidden" }, 403);
+  const { data: canManageStore, error: permissionError } = await auth.user.rpc(
+    "has_store_permission",
+    { p_store_id: storeId, p_permission: "manage_products" },
+  );
+  if (permissionError) return commerceJson({ error: "store_unavailable" }, 503);
+  if (canManageStore !== true) return commerceJson({ error: "forbidden" }, 403);
   const price = saleType === "fixed" ? fixedPrice as number : startingPrice;
   const { data: product, error } = await auth.user.from("products").insert({
     title,
@@ -96,7 +129,6 @@ export async function POST(request: Request) {
     size_label: text(body?.sizeLabel),
     condition_grade: ["S", "A+", "A", "B"].includes(text(body?.conditionGrade)) ? text(body?.conditionGrade) : "A",
     storage_class: text(body?.storageClass) === "large" ? "large" : "small",
-    measurements: body?.measurements && typeof body.measurements === "object" ? body.measurements as Json : {},
     inspection_notes: Array.isArray(body?.inspectionNotes) ? body.inspectionNotes.filter((value): value is string => typeof value === "string") : [],
   }).select("*").single();
   if (error) return commerceJson({ error: error.message || "상품을 등록하지 못했습니다." }, 409);

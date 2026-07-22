@@ -58,4 +58,4 @@
 
 ## 현재 모델과의 대응
 
-현재 코드는 기존 `account_access_roles`의 `owner`, `operator`, `employee`, `band_member`, `member`와 직원의 `reports_to_operator_id`, 매장의 단일 `operator_id`를 신원·보고 관계로 유지하면서 `store_memberships`를 매장 범위와 세부 권한의 운영 기준으로 함께 사용한다. `has_store_permission`과 `has_business_permission`은 활성 사업체·매장·소속·권한을 검사하고 Owner에게만 암시적 전역 권한을 준다. 상품 관리의 DB 경계도 기존 운영자 추론 대신 이 helper로 연결됐지만, 일부 기존 API의 역할 기반 사전 검사는 아직 남아 있다. 근거와 차이는 [현행 감사](./current-state-audit.md)에 기록한다.
+현재 코드는 기존 `account_access_roles`의 `owner`, `operator`, `employee`, `band_member`, `member`와 직원의 `reports_to_operator_id`, 매장의 단일 `operator_id`를 신원·보고 관계로 유지하면서 `store_memberships`를 매장 범위와 세부 권한의 운영 기준으로 함께 사용한다. `has_store_permission`과 `has_business_permission`은 활성 사업체·매장·소속·권한을 검사하고 Owner에게만 암시적 전역 권한을 준다. 상품 등록·초안 수정·삭제·공개의 DB 경계는 기존 운영자 역할 추론 대신 각각 `manage_products`와 `publish_products`를 기준으로 사용한다. 근거와 차이는 [현행 감사](./current-state-audit.md)에 기록한다.

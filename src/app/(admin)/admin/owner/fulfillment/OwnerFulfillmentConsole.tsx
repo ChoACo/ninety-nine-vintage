@@ -1,9 +1,20 @@
 "use client";
 
-import { AlertTriangle, Archive, PackageCheck, RefreshCw, Save } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, CheckCircle2, MapPinned, RefreshCw, Route, Save } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+
+interface Store {
+  id: string;
+  business_id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  is_active: boolean;
+  updated_at: string;
+}
 
 interface FulfillmentCenter {
   id: string;
@@ -12,136 +23,200 @@ interface FulfillmentCenter {
   name: string;
   status: string;
   is_default: boolean;
-  postal_code: string | null;
-  address_line1: string | null;
-  address_line2: string | null;
-  contact_name: string | null;
-  contact_phone: string | null;
   version: number;
   updated_at: string;
 }
 
-interface FulfillmentItem {
-  orderItemId: string;
+interface StoreRoute {
+  id: string;
+  business_id: string;
+  store_id: string;
+  fulfillment_center_id: string;
+  route_mode: "transfer" | "co_located";
+  status: string;
+  version: number;
+  updated_at: string;
+}
+
+interface StaffAccount {
+  id: string;
+  display_name: string;
+  email: string | null;
+  role_code: "operator" | "employee";
+  last_seen_at: string | null;
+}
+
+interface CenterAssignment {
+  id: string;
+  business_id: string;
+  fulfillment_center_id: string;
+  user_id: string;
+  status: "active" | "inactive";
+  receive_at_center: boolean;
+  create_shipments: boolean;
+  version: number;
+  updated_at: string;
+}
+
+interface RolloutSetting {
+  business_id: string;
+  entitlement_projection_enabled: boolean;
+  unified_inventory_reads_enabled: boolean;
+  item_selected_shipments_enabled: boolean;
+  shipping_fee_amount: number;
+  version: number;
+  updated_at: string;
+}
+
+interface OperationalHealthBusiness {
+  businessId: string;
+  businessName: string;
+  reconciliationRequired: number;
+  blockedItems: number;
+  overdueItems: number;
+  openExceptions: number;
+  pendingRefunds: number;
+  pendingShippingFees: number;
+  rollout: { projection: boolean; reads: boolean; shipments: boolean };
+}
+
+interface ReconciliationItem {
+  inventoryItemId: string;
   productId: string;
   title: string;
-  imageUrl: string | null;
-  paymentStatus: string;
-  stage: string;
-  locationKind: string;
-  storageLocationCode: string | null;
-  isBlocked: boolean;
-  blockReason: string | null;
-  version: number;
-  updatedAt: string;
+  imageUrl: string;
+  businessId: string;
+  originStoreId: string;
+  originStoreName: string;
+  paidAt: string;
+  paidAmount: number;
+  fulfillmentVersion: number;
+  targetCenterId: string | null;
+  targetCenterName: string | null;
+  targetRouteMode: "transfer" | "co_located" | null;
+  targetRouteVersion: number | null;
 }
 
-interface CenterWork {
-  work_id: string;
-  order_id: string;
-  store_id: string;
-  store_name: string;
-  business_id: string;
-  work_status: string;
-  work_version: number;
-  order_status: string;
-  order_created_at: string;
-  center_id: string;
-  center_name: string;
-  center_status: string;
-  active_item_count: number;
-  received_item_count: number;
-  stored_item_count: number;
-  blocked_item_count: number;
-  items: FulfillmentItem[];
+interface RolloutDraft {
+  projection: boolean;
+  reads: boolean;
+  shipments: boolean;
+  shippingFeeAmount: string;
 }
 
-interface QueuePayload {
+interface SetupPayload {
+  stores?: Store[];
   centers?: FulfillmentCenter[];
-  works?: CenterWork[];
+  routes?: StoreRoute[];
+  staff?: StaffAccount[];
+  assignments?: CenterAssignment[];
+  rollouts?: RolloutSetting[];
+  health?: { businesses: OperationalHealthBusiness[]; serverTime: string };
+  reconciliationItems?: ReconciliationItem[];
   error?: string;
   message?: string;
 }
 
-interface CenterForm {
-  postalCode: string;
-  addressLine1: string;
-  addressLine2: string;
-  contactName: string;
-  contactPhone: string;
+interface RouteDraft {
+  centerId: string;
+  routeMode: "transfer" | "co_located";
+  reason: string;
 }
 
-interface ItemDraft {
-  storageLocationCode: string;
-  reasonCode: string;
-  note: string;
-}
-
-type CenterAction = "receive" | "store" | "report_issue" | "resolve_issue";
-
-const emptyCenterForm: CenterForm = {
-  postalCode: "",
-  addressLine1: "",
-  addressLine2: "",
-  contactName: "",
-  contactPhone: "",
-};
-
-const emptyItemDraft: ItemDraft = {
-  storageLocationCode: "",
-  reasonCode: "",
-  note: "",
-};
-
-const stageLabels: Record<string, string> = {
-  in_transit_to_center: "중앙으로 이동 중",
-  center_received: "입고 확인",
-  center_stored: "보관 위치 배정",
-};
-
-function centerForm(center: FulfillmentCenter): CenterForm {
+function routeDraft(route: StoreRoute | undefined): RouteDraft {
   return {
-    postalCode: center.postal_code ?? "",
-    addressLine1: center.address_line1 ?? "",
-    addressLine2: center.address_line2 ?? "",
-    contactName: center.contact_name ?? "",
-    contactPhone: center.contact_phone ?? "",
+    centerId: route?.fulfillment_center_id ?? "",
+    routeMode: route?.route_mode ?? "transfer",
+    reason: "",
   };
 }
 
-function dateLabel(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "주문 시각 미확인" : date.toLocaleString("ko-KR");
+function requestKey(actorId: string, scope: string) {
+  const key = `owner-fulfillment:${actorId}:${scope}`;
+  const existing = window.sessionStorage.getItem(key);
+  if (existing) return { key, value: existing };
+  const value = crypto.randomUUID();
+  window.sessionStorage.setItem(key, value);
+  return { key, value };
 }
 
 export function OwnerFulfillmentConsole() {
   const [token, setToken] = useState<string | null>(null);
+  const [actorId, setActorId] = useState<string | null>(null);
+  const [stores, setStores] = useState<Store[]>([]);
   const [centers, setCenters] = useState<FulfillmentCenter[]>([]);
-  const [works, setWorks] = useState<CenterWork[]>([]);
-  const [selectedCenterId, setSelectedCenterId] = useState("");
-  const [form, setForm] = useState<CenterForm>(emptyCenterForm);
-  const [drafts, setDrafts] = useState<Record<string, ItemDraft>>({});
+  const [routes, setRoutes] = useState<StoreRoute[]>([]);
+  const [staff, setStaff] = useState<StaffAccount[]>([]);
+  const [assignments, setAssignments] = useState<CenterAssignment[]>([]);
+  const [rollouts, setRollouts] = useState<RolloutSetting[]>([]);
+  const [health, setHealth] = useState<OperationalHealthBusiness[]>([]);
+  const [reconciliationItems, setReconciliationItems] = useState<ReconciliationItem[]>([]);
+  const [reconciliationReasons, setReconciliationReasons] = useState<Record<string, string>>({});
+  const [routeDrafts, setRouteDrafts] = useState<Record<string, RouteDraft>>({});
+  const [rolloutDrafts, setRolloutDrafts] = useState<Record<string, RolloutDraft>>({});
+  const [assignmentCenterId, setAssignmentCenterId] = useState("");
+  const [assignmentUserId, setAssignmentUserId] = useState("");
+  const [assignmentReceive, setAssignmentReceive] = useState(false);
+  const [assignmentShip, setAssignmentShip] = useState(false);
+  const [assignmentStatus, setAssignmentStatus] = useState<"active" | "inactive">("active");
   const [busyTarget, setBusyTarget] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
 
-  const load = useCallback(async (accessToken: string, preferredCenterId?: string) => {
+  const load = useCallback(async (
+    accessToken: string,
+    preferredAssignmentCenterId?: string,
+    preferredAssignmentUserId?: string,
+  ) => {
     const response = await fetch("/api/admin/owner/fulfillment", {
       headers: { Authorization: `Bearer ${accessToken}` },
       cache: "no-store",
     });
-    const payload = await response.json() as QueuePayload;
+    const payload = await response.json() as SetupPayload;
     if (!response.ok) {
-      throw new Error(payload.message ?? "중앙 물류 목록을 불러오지 못했습니다.");
+      throw new Error(payload.message ?? "물류 설정을 불러오지 못했습니다.");
     }
+    const nextStores = Array.isArray(payload.stores) ? payload.stores : [];
     const nextCenters = Array.isArray(payload.centers) ? payload.centers : [];
-    const nextWorks = Array.isArray(payload.works) ? payload.works : [];
-    const selected = nextCenters.find((center) => center.id === preferredCenterId) ??
-      nextCenters.find((center) => center.is_default) ?? nextCenters[0];
+    const nextRoutes = Array.isArray(payload.routes) ? payload.routes : [];
+    const nextStaff = Array.isArray(payload.staff) ? payload.staff : [];
+    const nextAssignments = Array.isArray(payload.assignments) ? payload.assignments : [];
+    const nextRollouts = Array.isArray(payload.rollouts) ? payload.rollouts : [];
+    const nextHealth = Array.isArray(payload.health?.businesses) ? payload.health.businesses : [];
+    const nextReconciliationItems = Array.isArray(payload.reconciliationItems) ? payload.reconciliationItems : [];
+    const selected = nextCenters.find((center) => center.is_default) ?? nextCenters[0];
+
+    setStores(nextStores);
     setCenters(nextCenters);
-    setWorks(nextWorks);
-    setSelectedCenterId(selected?.id ?? "");
-    setForm(selected ? centerForm(selected) : emptyCenterForm);
+    setRoutes(nextRoutes);
+    setStaff(nextStaff);
+    setAssignments(nextAssignments);
+    setRollouts(nextRollouts);
+    setHealth(nextHealth);
+    setReconciliationItems(nextReconciliationItems);
+    setRouteDrafts(Object.fromEntries(nextStores.map((store) => [
+      store.id,
+      routeDraft(nextRoutes.find((route) => route.store_id === store.id)),
+    ])));
+    setRolloutDrafts(Object.fromEntries(nextRollouts.map((rollout) => [
+      rollout.business_id,
+      {
+        projection: rollout.entitlement_projection_enabled,
+        reads: rollout.unified_inventory_reads_enabled,
+        shipments: rollout.item_selected_shipments_enabled,
+        shippingFeeAmount: String(rollout.shipping_fee_amount),
+      },
+    ])));
+    const assignmentCenter = nextCenters.find((center) => center.id === preferredAssignmentCenterId) ?? selected;
+    const assignmentStaff = nextStaff.find((candidate) => candidate.id === preferredAssignmentUserId) ?? nextStaff[0];
+    const assignment = nextAssignments.find((candidate) =>
+      candidate.fulfillment_center_id === assignmentCenter?.id && candidate.user_id === assignmentStaff?.id
+    );
+    setAssignmentCenterId(assignmentCenter?.id ?? "");
+    setAssignmentUserId(assignmentStaff?.id ?? "");
+    setAssignmentReceive(assignment?.receive_at_center ?? false);
+    setAssignmentShip(assignment?.create_shipments ?? false);
+    setAssignmentStatus(assignment?.status ?? "active");
   }, []);
 
   useEffect(() => {
@@ -153,23 +228,26 @@ export function OwnerFulfillmentConsole() {
           return;
         }
         setToken(session.access_token);
+        setActorId(session.user.id);
         await load(session.access_token);
       } catch (error) {
-        setNotice(error instanceof Error ? error.message : "중앙 물류 목록을 불러오지 못했습니다.");
+        setNotice(error instanceof Error ? error.message : "물류 설정을 불러오지 못했습니다.");
       } finally {
         setLoading(false);
       }
     })();
   }, [load]);
 
-  const selectedCenter = centers.find((center) => center.id === selectedCenterId) ?? null;
+  const selectedAssignment = assignments.find((assignment) =>
+    assignment.fulfillment_center_id === assignmentCenterId && assignment.user_id === assignmentUserId
+  );
 
   const refresh = async () => {
     if (!token) return;
     setLoading(true);
     setNotice("");
     try {
-      await load(token, selectedCenterId);
+      await load(token, assignmentCenterId, assignmentUserId);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "새로고침하지 못했습니다.");
     } finally {
@@ -177,62 +255,49 @@ export function OwnerFulfillmentConsole() {
     }
   };
 
-  const chooseCenter = (centerId: string) => {
-    const center = centers.find((candidate) => candidate.id === centerId);
-    setSelectedCenterId(centerId);
-    setForm(center ? centerForm(center) : emptyCenterForm);
-  };
-
-  const updateCenterField = (field: keyof CenterForm, value: string) => {
-    setForm((current) => ({ ...current, [field]: value }));
-  };
-
-  const saveCenter = async () => {
-    if (!token || !selectedCenter || busyTarget) return;
-    setBusyTarget(selectedCenter.id);
-    setNotice("");
-    try {
-      const response = await fetch("/api/admin/owner/fulfillment", {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          centerId: selectedCenter.id,
-          expectedVersion: selectedCenter.version,
-          ...form,
-          idempotencyKey: crypto.randomUUID(),
-        }),
-      });
-      const payload = await response.json() as QueuePayload;
-      if (!response.ok) {
-        if (response.status === 409) {
-          await load(token, selectedCenter.id);
-          throw new Error("다른 담당자가 먼저 변경했습니다. 최신 센터 정보로 새로고침했습니다.");
-        }
-        throw new Error(payload.message ?? "중앙 출고지 설정을 저장하지 못했습니다.");
-      }
-      setNotice("중앙 출고지의 실제 주소와 연락처를 저장했습니다.");
-      await load(token, selectedCenter.id);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "중앙 출고지 설정을 저장하지 못했습니다.");
-    } finally {
-      setBusyTarget(null);
-    }
-  };
-
-  const updateDraft = (itemId: string, field: keyof ItemDraft, value: string) => {
-    setDrafts((current) => ({
+  const updateRouteDraft = (storeId: string, field: keyof RouteDraft, value: string) => {
+    setRouteDrafts((current) => ({
       ...current,
-      [itemId]: { ...(current[itemId] ?? emptyItemDraft), [field]: value },
+      [storeId]: { ...(current[storeId] ?? routeDraft(undefined)), [field]: value },
     }));
   };
 
-  const actOnItem = async (item: FulfillmentItem, action: CenterAction) => {
-    if (!token || busyTarget) return;
-    const draft = drafts[item.orderItemId] ?? emptyItemDraft;
-    setBusyTarget(item.orderItemId);
+  const updateRolloutDraft = (businessId: string, patch: Partial<RolloutDraft>) => {
+    setRolloutDrafts((current) => ({
+      ...current,
+      [businessId]: {
+        ...(current[businessId] ?? { projection: false, reads: false, shipments: false, shippingFeeAmount: "" }),
+        ...patch,
+      },
+    }));
+  };
+
+  const chooseAssignment = (centerId: string, userId: string) => {
+    const existing = assignments.find((assignment) =>
+      assignment.fulfillment_center_id === centerId && assignment.user_id === userId
+    );
+    setAssignmentCenterId(centerId);
+    setAssignmentUserId(userId);
+    setAssignmentReceive(existing?.receive_at_center ?? false);
+    setAssignmentShip(existing?.create_shipments ?? false);
+    setAssignmentStatus(existing?.status ?? "active");
+  };
+
+  const saveRoute = async (store: Store) => {
+    if (!token || !actorId || busyTarget) return;
+    const existing = routes.find((route) => route.store_id === store.id);
+    const draft = routeDrafts[store.id] ?? routeDraft(existing);
+    const center = centers.find((candidate) => candidate.id === draft.centerId);
+    if (!center || center.status !== "active" || center.business_id !== store.business_id) {
+      setNotice("같은 사업자의 사용 중인 센터를 선택해 주세요.");
+      return;
+    }
+    const expectedVersion = existing?.version ?? 0;
+    const idempotency = requestKey(
+      actorId,
+      `route:${store.id}:${expectedVersion}:${draft.centerId}:${draft.routeMode}:${draft.reason.trim()}`,
+    );
+    setBusyTarget(`route:${store.id}`);
     setNotice("");
     try {
       const response = await fetch("/api/admin/owner/fulfillment", {
@@ -242,161 +307,312 @@ export function OwnerFulfillmentConsole() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          orderItemId: item.orderItemId,
-          expectedVersion: item.version,
-          action,
-          idempotencyKey: crypto.randomUUID(),
-          storageLocationCode: action === "store" ? draft.storageLocationCode : null,
-          reasonCode: action === "report_issue" || action === "resolve_issue" ? draft.reasonCode : null,
-          note: action === "report_issue" || action === "resolve_issue" ? draft.note : null,
+          storeId: store.id,
+          centerId: draft.centerId,
+          routeMode: draft.routeMode,
+          expectedVersion,
+          idempotencyKey: idempotency.value,
+          reason: draft.reason.trim() || null,
         }),
       });
-      const payload = await response.json() as QueuePayload;
+      const payload = await response.json() as SetupPayload;
       if (!response.ok) {
         if (response.status === 409) {
-          await load(token, selectedCenterId);
-          throw new Error("다른 담당자가 먼저 변경했습니다. 최신 목록으로 새로고침했습니다.");
+          await load(token, assignmentCenterId, assignmentUserId);
+          throw new Error("다른 담당자가 먼저 변경했습니다. 최신 경로로 새로고침했습니다.");
         }
-        throw new Error(payload.message ?? "중앙 물류 작업을 저장하지 못했습니다.");
+        throw new Error(payload.message ?? "매장 경로를 저장하지 못했습니다.");
       }
-      const successMessage: Record<CenterAction, string> = {
-        receive: "중앙 입고를 확인했습니다.",
-        store: "보관 위치를 저장했습니다.",
-        report_issue: "상품 확인 요청을 등록했습니다.",
-        resolve_issue: "상품 확인을 마치고 작업 차단을 해제했습니다.",
-      };
-      setNotice(successMessage[action]);
-      setDrafts((current) => ({ ...current, [item.orderItemId]: emptyItemDraft }));
-      await load(token, selectedCenterId);
+      window.sessionStorage.removeItem(idempotency.key);
+      setNotice(`${store.name}의 센터 경로를 저장했습니다.`);
+      await load(token, assignmentCenterId, assignmentUserId);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "중앙 물류 작업을 저장하지 못했습니다.");
+      setNotice(error instanceof Error ? error.message : "매장 경로를 저장하지 못했습니다.");
     } finally {
       setBusyTarget(null);
     }
   };
 
-  const inTransitCount = works.reduce(
-    (sum, work) => sum + work.items.filter((item) => item.stage === "in_transit_to_center").length,
-    0,
-  );
-  const receivedCount = works.reduce((sum, work) => sum + Number(work.received_item_count), 0);
-  const blockedCount = works.reduce((sum, work) => sum + Number(work.blocked_item_count), 0);
+  const reconcileItem = async (item: ReconciliationItem) => {
+    if (!token || !actorId || busyTarget) return;
+    const reason = (reconciliationReasons[item.inventoryItemId] ?? "").trim();
+    if (!item.targetCenterId || !item.targetRouteMode || item.targetRouteVersion === null) {
+      setNotice(`${item.originStoreName}의 활성 센터 경로를 먼저 설정해 주세요.`);
+      return;
+    }
+    if (reason.length < 3 || reason.length > 500) {
+      setNotice("기존 상품의 실제 위치를 확인한 사유를 3자 이상 500자 이하로 입력해 주세요.");
+      return;
+    }
+    const idempotency = requestKey(
+      actorId,
+      `reconcile:${item.inventoryItemId}:${item.fulfillmentVersion}:${item.targetCenterId}:${item.targetRouteVersion}:${reason}`,
+    );
+    setBusyTarget(`reconcile:${item.inventoryItemId}`);
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/owner/fulfillment", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reconcile_item",
+          inventoryItemId: item.inventoryItemId,
+          expectedVersion: item.fulfillmentVersion,
+          reason,
+          idempotencyKey: idempotency.value,
+        }),
+      });
+      const payload = await response.json() as SetupPayload;
+      if (!response.ok) {
+        if (response.status === 409) {
+          await load(token, assignmentCenterId, assignmentUserId);
+          throw new Error("상품 경로 상태가 변경되었습니다. 최신 목록으로 새로고침했습니다.");
+        }
+        throw new Error(payload.message ?? "기존 상품의 센터 경로를 적용하지 못했습니다.");
+      }
+      window.sessionStorage.removeItem(idempotency.key);
+      setReconciliationReasons((current) => ({ ...current, [item.inventoryItemId]: "" }));
+      setNotice(`${item.title} 상품의 실제 경로 확인을 완료했습니다.`);
+      await load(token, assignmentCenterId, assignmentUserId);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "기존 상품의 센터 경로를 적용하지 못했습니다.");
+    } finally {
+      setBusyTarget(null);
+    }
+  };
+
+  const saveAssignment = async () => {
+    if (!token || !actorId || busyTarget) return;
+    const center = centers.find((candidate) => candidate.id === assignmentCenterId);
+    const member = staff.find((candidate) => candidate.id === assignmentUserId);
+    if (!center || center.status !== "active" || !member) {
+      setNotice("사용 중인 센터와 담당 운영자 또는 직원 계정을 선택해 주세요.");
+      return;
+    }
+    if (assignmentStatus === "active" && !assignmentReceive && !assignmentShip) {
+      setNotice("활성 담당자에게 입고·보관 또는 포장·송장 권한을 하나 이상 부여해 주세요.");
+      return;
+    }
+    const existing = assignments.find((assignment) =>
+      assignment.fulfillment_center_id === center.id && assignment.user_id === member.id
+    );
+    const expectedVersion = existing?.version ?? 0;
+    const idempotency = requestKey(
+      actorId,
+      `assignment:${center.id}:${member.id}:${expectedVersion}:${assignmentReceive}:${assignmentShip}:${assignmentStatus}`,
+    );
+    setBusyTarget(`assignment:${center.id}:${member.id}`);
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/owner/fulfillment", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "configure_assignment",
+          centerId: center.id,
+          userId: member.id,
+          receiveAtCenter: assignmentReceive,
+          createShipments: assignmentShip,
+          status: assignmentStatus,
+          expectedVersion,
+          idempotencyKey: idempotency.value,
+        }),
+      });
+      const payload = await response.json() as SetupPayload;
+      if (!response.ok) {
+        if (response.status === 409) {
+          await load(token, center.id, member.id);
+          throw new Error("센터 담당자 권한이 변경되었습니다. 최신 설정으로 새로고침했습니다.");
+        }
+        throw new Error(payload.message ?? "센터 담당자 권한을 저장하지 못했습니다.");
+      }
+      window.sessionStorage.removeItem(idempotency.key);
+      setNotice(`${member.display_name} 담당자의 ${center.name} 권한을 저장했습니다.`);
+      await load(token, center.id, member.id);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "센터 담당자 권한을 저장하지 못했습니다.");
+    } finally {
+      setBusyTarget(null);
+    }
+  };
+
+  const saveRollout = async (rollout: RolloutSetting) => {
+    if (!token || !actorId || busyTarget) return;
+    const draft = rolloutDrafts[rollout.business_id];
+    const shippingFeeAmount = Number(draft?.shippingFeeAmount);
+    if (!draft || !Number.isSafeInteger(shippingFeeAmount) || shippingFeeAmount < 1 || shippingFeeAmount > 1_000_000) {
+      setNotice("배송비는 1원 이상 1,000,000원 이하 정수로 입력해 주세요.");
+      return;
+    }
+    if ((draft.reads && !draft.projection) || (draft.shipments && (!draft.projection || !draft.reads))) {
+      setNotice("권리는 ‘결제 권리 생성 → 통합 보관함 읽기 → 선택 배송’ 순서로 활성화하고, 비활성화는 반대 순서로 진행해 주세요.");
+      return;
+    }
+    const idempotency = requestKey(actorId, `rollout:${rollout.business_id}:${rollout.version}:${draft.projection}:${draft.reads}:${draft.shipments}:${shippingFeeAmount}`);
+    setBusyTarget(`rollout:${rollout.business_id}`);
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/owner/fulfillment", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "configure_rollout",
+          businessId: rollout.business_id,
+          entitlementProjectionEnabled: draft.projection,
+          unifiedInventoryReadsEnabled: draft.reads,
+          itemSelectedShipmentsEnabled: draft.shipments,
+          shippingFeeAmount,
+          expectedVersion: rollout.version,
+          idempotencyKey: idempotency.value,
+        }),
+      });
+      const payload = await response.json() as SetupPayload;
+      if (!response.ok) {
+        if (response.status === 409) {
+          await load(token, assignmentCenterId, assignmentUserId);
+          throw new Error("전환 설정이 변경되었습니다. 최신 상태로 새로고침했습니다.");
+        }
+        throw new Error(payload.message ?? "단계별 전환 설정을 저장하지 못했습니다.");
+      }
+      window.sessionStorage.removeItem(idempotency.key);
+      setNotice("단계별 전환 설정과 중앙 배송비를 저장했습니다.");
+      await load(token, assignmentCenterId, assignmentUserId);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "단계별 전환 설정을 저장하지 못했습니다.");
+    } finally {
+      setBusyTarget(null);
+    }
+  };
 
   return (
     <div className="space-y-9">
       <header className="flex flex-col items-stretch justify-between gap-5 border-b border-ink pb-6 sm:flex-row sm:items-end">
         <div>
-          <p className="eyebrow text-muted">소유자 / 중앙 물류</p>
-          <h1 className="mt-3 text-3xl font-black tracking-[-.06em] sm:text-4xl sm:tracking-[-.08em]">중앙 입고 센터</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">매장에서 넘어온 상품의 실제 입고, 보관 위치, 확인이 필요한 문제를 순서대로 기록합니다.</p>
+          <p className="eyebrow text-muted">소유자 / 물류 설정</p>
+          <h1 className="mt-3 text-3xl font-black tracking-[-.06em] sm:text-4xl sm:tracking-[-.08em]">매장 → 센터 경로·권한</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">각 실제 매장이 결제 완료 상품을 어느 실제 센터로 보내는지 설정합니다. 매장 이름이나 식별자를 자동으로 추론하지 않습니다.</p>
         </div>
         <button className="flex items-center justify-center gap-2 border border-line px-4 py-3 text-xs font-bold disabled:opacity-40" disabled={!token || loading} onClick={() => void refresh()} type="button"><RefreshCw size={14} /> 새로고침</button>
       </header>
 
       {notice && <div aria-live="polite" className="border border-line bg-surface px-4 py-3 text-sm">{notice}</div>}
 
-      <section className="border border-line p-5 sm:p-6">
-        <div className="flex flex-col justify-between gap-3 border-b border-line pb-5 sm:flex-row sm:items-end">
-          <div><p className="eyebrow text-muted">필수 설정</p><h2 className="mt-2 text-xl font-black">중앙 출고지 실제 정보</h2><p className="mt-2 text-xs leading-5 text-muted">가상의 주소는 사용하지 않습니다. 실제 상품을 받을 장소와 연락처를 입력해 주세요.</p></div>
-          {selectedCenter && <span className={`w-fit border px-3 py-1 text-[10px] font-bold ${selectedCenter.status === "active" ? "border-emerald-300 text-emerald-700" : "border-amber-300 text-amber-700"}`}>{selectedCenter.status === "active" ? "사용 중" : "설정 필요"}</span>}
-        </div>
-
-        {centers.length > 0 ? (
-          <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            <label className="text-xs font-bold lg:col-span-2">출고지
-              <select className="mt-2 h-11 w-full border border-line bg-paper px-3 text-sm font-normal" onChange={(event) => chooseCenter(event.target.value)} value={selectedCenterId}>
-                {centers.map((center) => <option key={center.id} value={center.id}>{center.name}{center.is_default ? " · 기본" : ""}</option>)}
-              </select>
-            </label>
-            <label className="text-xs font-bold">우편번호
-              <input className="mt-2 h-11 w-full border border-line px-3 text-sm font-normal" inputMode="numeric" maxLength={5} onChange={(event) => updateCenterField("postalCode", event.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="5자리" value={form.postalCode} />
-            </label>
-            <label className="text-xs font-bold">담당자 이름
-              <input className="mt-2 h-11 w-full border border-line px-3 text-sm font-normal" maxLength={80} onChange={(event) => updateCenterField("contactName", event.target.value)} value={form.contactName} />
-            </label>
-            <label className="text-xs font-bold lg:col-span-2">기본 주소
-              <input className="mt-2 h-11 w-full border border-line px-3 text-sm font-normal" maxLength={500} onChange={(event) => updateCenterField("addressLine1", event.target.value)} placeholder="도로명 주소" value={form.addressLine1} />
-            </label>
-            <label className="text-xs font-bold">상세 주소
-              <input className="mt-2 h-11 w-full border border-line px-3 text-sm font-normal" maxLength={500} onChange={(event) => updateCenterField("addressLine2", event.target.value)} placeholder="층, 호수 등 (선택)" value={form.addressLine2} />
-            </label>
-            <label className="text-xs font-bold">담당자 연락처
-              <input className="mt-2 h-11 w-full border border-line px-3 text-sm font-normal" maxLength={30} onChange={(event) => updateCenterField("contactPhone", event.target.value)} placeholder="실제 연락 가능한 번호" value={form.contactPhone} />
-            </label>
-            <div className="lg:col-span-2">
-              <button className="flex w-full items-center justify-center gap-2 bg-ink px-4 py-3 text-xs font-bold text-paper disabled:opacity-40 sm:w-auto" disabled={Boolean(busyTarget)} onClick={() => void saveCenter()} type="button"><Save size={14} /> {busyTarget === selectedCenterId ? "저장 중" : "실제 출고지 정보 저장"}</button>
-            </div>
-          </div>
-        ) : (
-          <p className="mt-5 border border-dashed border-line p-5 text-sm text-muted">등록된 중앙 출고지가 없습니다.</p>
-        )}
+      <section className="border border-line p-5 sm:p-6" aria-busy={loading}>
+        <div className="border-b border-line pb-5"><p className="eyebrow text-muted">안전한 단계별 전환</p><h2 className="mt-2 text-xl font-black">통합 물류 운영 상태</h2><p className="mt-2 max-w-2xl text-xs leading-5 text-muted">결제 권리 생성, 통합 보관함 읽기, 선택 배송을 순서대로 켭니다. 미조정 상품과 활성 매장 경로가 남아 있으면 서버가 선택 배송 활성화를 거부합니다.</p></div>
+        <div className="mt-5 space-y-4">{rollouts.map((rollout) => {
+          const draft = rolloutDrafts[rollout.business_id] ?? { projection: false, reads: false, shipments: false, shippingFeeAmount: String(rollout.shipping_fee_amount) };
+          const operational = health.find((business) => business.businessId === rollout.business_id);
+          return <article className="border border-line p-5" key={rollout.business_id}>
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><p className="text-sm font-black">{operational?.businessName ?? rollout.business_id}</p><p className="mt-1 font-mono text-[10px] text-muted">설정 v{rollout.version} · {new Date(rollout.updated_at).toLocaleString("ko-KR")}</p></div><div className="flex flex-wrap gap-2 text-[10px] font-bold"><span className="border border-line px-2 py-1">미조정 {operational?.reconciliationRequired ?? 0}</span><span className="border border-line px-2 py-1">보류 {operational?.blockedItems ?? 0}</span><span className="border border-line px-2 py-1">기한 초과 {operational?.overdueItems ?? 0}</span><span className="border border-line px-2 py-1">예외 {operational?.openExceptions ?? 0}</span><span className="border border-line px-2 py-1">환불 {operational?.pendingRefunds ?? 0}</span><span className="border border-line px-2 py-1">배송비 입금 {operational?.pendingShippingFees ?? 0}</span></div></div>
+            <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_auto] lg:items-end"><fieldset><legend className="text-xs font-bold">전환 단계</legend><div className="mt-2 flex min-h-11 flex-col gap-3 border border-line p-3 text-xs sm:flex-row sm:items-center sm:gap-6"><label className="flex items-center gap-2"><input checked={draft.projection} onChange={(event) => updateRolloutDraft(rollout.business_id, { projection: event.target.checked })} type="checkbox" /> 1. 결제 권리 생성</label><label className="flex items-center gap-2"><input checked={draft.reads} onChange={(event) => updateRolloutDraft(rollout.business_id, { reads: event.target.checked })} type="checkbox" /> 2. 통합 보관함</label><label className="flex items-center gap-2"><input checked={draft.shipments} onChange={(event) => updateRolloutDraft(rollout.business_id, { shipments: event.target.checked })} type="checkbox" /> 3. 선택 배송</label></div></fieldset><label className="text-xs font-bold">중앙 배송비<input className="mt-2 h-11 w-full border border-line px-3 font-mono font-normal" inputMode="numeric" maxLength={7} onChange={(event) => updateRolloutDraft(rollout.business_id, { shippingFeeAmount: event.target.value.replace(/\D/g, "") })} value={draft.shippingFeeAmount} /></label><button className="flex h-11 items-center justify-center gap-2 bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40" disabled={Boolean(busyTarget)} onClick={() => void saveRollout(rollout)} type="button"><Save size={14} /> {busyTarget === `rollout:${rollout.business_id}` ? "저장 중" : "전환 설정 저장"}</button></div>
+          </article>;
+        })}{!loading && rollouts.length === 0 && <p className="border border-dashed border-line p-5 text-sm text-muted">단계별 전환 설정이 없습니다. 마이그레이션 적용 상태를 확인해 주세요.</p>}</div>
       </section>
 
-      <div className="grid grid-cols-1 gap-px border border-line bg-line sm:grid-cols-3">
-        <div className="bg-paper p-5"><p className="text-xs text-muted">입고 확인 대기</p><p className="mt-3 font-mono text-3xl font-bold">{inTransitCount}</p></div>
-        <div className="bg-paper p-5"><p className="text-xs text-muted">보관 위치 배정 대기</p><p className="mt-3 font-mono text-3xl font-bold">{receivedCount}</p></div>
-        <div className={blockedCount > 0 ? "bg-rose-950 p-5 text-white" : "bg-ink p-5 text-paper"}><p className="text-xs text-zinc-400">확인 필요한 상품</p><p className="mt-3 font-mono text-3xl font-bold">{blockedCount}</p></div>
-      </div>
-
-      <section className="space-y-5" aria-busy={loading}>
-        {works.map((work) => (
-          <article className="border border-line" key={work.work_id}>
-            <div className="flex flex-col justify-between gap-3 border-b border-line bg-surface p-5 sm:flex-row sm:items-start">
-              <div><p className="text-sm font-black">{work.store_name} → {work.center_name}</p><p className="mt-2 break-all text-[11px] text-muted">주문 {work.order_id} · {dateLabel(work.order_created_at)}</p></div>
-              <div className="flex flex-wrap gap-2 text-[10px] font-bold"><span className="border border-line bg-paper px-2 py-1">상품 {work.active_item_count}</span>{work.blocked_item_count > 0 && <span className="border border-rose-300 bg-paper px-2 py-1 text-rose-700">확인 필요 {work.blocked_item_count}</span>}</div>
-            </div>
-            <div className="divide-y divide-line">
-              {work.items.map((item) => {
-                const draft = drafts[item.orderItemId] ?? emptyItemDraft;
-                const isBusy = busyTarget === item.orderItemId;
-                const isAtCenter = item.stage === "center_received" || item.stage === "center_stored";
-                return (
-                  <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)]" key={item.orderItemId}>
-                    <div className="min-w-0">
-                      <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold">{item.title}</p><p className="mt-2 text-xs text-muted">{stageLabels[item.stage] ?? item.stage}{item.storageLocationCode ? ` · ${item.storageLocationCode}` : ""}</p></div>{item.isBlocked && <AlertTriangle className="shrink-0 text-rose-700" size={18} />}</div>
-                      <p className="mt-4 break-all font-mono text-[10px] text-muted">상품 기록 {item.orderItemId}</p>
-                      {item.isBlocked && <p className="mt-3 border border-rose-200 bg-rose-50 p-3 text-xs leading-5 text-rose-900">확인 내용: {item.blockReason}</p>}
-                    </div>
-
-                    <div className="border border-line p-4">
-                      {item.stage === "in_transit_to_center" && !item.isBlocked && (
-                        <button className="flex w-full items-center justify-center gap-2 bg-ink px-4 py-3 text-xs font-bold text-paper disabled:opacity-40" disabled={Boolean(busyTarget)} onClick={() => void actOnItem(item, "receive")} type="button"><PackageCheck size={14} /> {isBusy ? "저장 중" : "실물 입고 확인"}</button>
-                      )}
-
-                      {item.stage === "center_received" && !item.isBlocked && (
-                        <div>
-                          <label className="text-xs font-bold">보관 위치
-                            <input className="mt-2 h-10 w-full border border-line px-3 text-xs font-normal" maxLength={120} onChange={(event) => updateDraft(item.orderItemId, "storageLocationCode", event.target.value)} placeholder="예: A-03-02" value={draft.storageLocationCode} />
-                          </label>
-                          <button className="mt-3 flex w-full items-center justify-center gap-2 bg-ink px-4 py-3 text-xs font-bold text-paper disabled:opacity-40" disabled={Boolean(busyTarget) || !draft.storageLocationCode.trim()} onClick={() => void actOnItem(item, "store")} type="button"><Archive size={14} /> {isBusy ? "저장 중" : "보관 위치 저장"}</button>
-                        </div>
-                      )}
-
-                      {isAtCenter && (
-                        <div className={item.stage === "center_received" && !item.isBlocked ? "mt-5 border-t border-line pt-5" : ""}>
-                          <p className="text-xs font-bold">{item.isBlocked ? "확인 완료 처리" : "상품 문제 등록"}</p>
-                          <select aria-label={`${item.title} 사유 분류`} className="mt-3 h-10 w-full border border-line bg-paper px-3 text-xs" onChange={(event) => updateDraft(item.orderItemId, "reasonCode", event.target.value)} value={draft.reasonCode}>
-                            <option value="">사유를 선택해 주세요</option>
-                            {item.isBlocked ? (
-                              <><option value="checked_ok">검수 후 정상 확인</option><option value="corrected">문제 조치 완료</option><option value="other">기타</option></>
-                            ) : (
-                              <><option value="damaged">상품 손상</option><option value="wrong_item">상품 불일치</option><option value="missing_information">정보 확인 필요</option><option value="other">기타</option></>
-                            )}
-                          </select>
-                          <textarea aria-label={`${item.title} 처리 내용`} className="mt-2 min-h-20 w-full resize-y border border-line p-3 text-xs" maxLength={1_000} onChange={(event) => updateDraft(item.orderItemId, "note", event.target.value)} placeholder={item.isBlocked ? "확인 결과와 조치 내용을 적어 주세요." : "발견한 문제를 구체적으로 적어 주세요."} value={draft.note} />
-                          <button className={`mt-3 flex w-full items-center justify-center gap-2 px-4 py-3 text-xs font-bold disabled:opacity-40 ${item.isBlocked ? "bg-ink text-paper" : "border border-rose-700 text-rose-800"}`} disabled={Boolean(busyTarget) || !draft.reasonCode || !draft.note.trim()} onClick={() => void actOnItem(item, item.isBlocked ? "resolve_issue" : "report_issue")} type="button">{item.isBlocked ? "확인 완료 · 작업 재개" : "문제 등록 · 작업 멈춤"}</button>
-                        </div>
-                      )}
-                    </div>
+      <section className="border border-line p-5 sm:p-6" aria-busy={loading}>
+        <div className="flex flex-col justify-between gap-3 border-b border-line pb-5 sm:flex-row sm:items-end">
+          <div>
+            <p className="eyebrow text-muted">전환 전 상품 확인</p>
+            <h2 className="mt-2 text-xl font-black">미조정 보관 상품 경로 적용</h2>
+            <p className="mt-2 max-w-2xl text-xs leading-5 text-muted">기존 결제 상품의 실제 위치를 확인한 뒤, 원산지 매장에 설정된 현재 센터 경로를 한 건씩 적용합니다. 확인되지 않은 상품은 선택 배송 활성화를 계속 차단합니다.</p>
+          </div>
+          <span className="w-fit border border-line px-3 py-1 text-[10px] font-bold">미조정 {reconciliationItems.length}건</span>
+        </div>
+        <div className="mt-5 space-y-4">
+          {reconciliationItems.map((item) => {
+            const reason = reconciliationReasons[item.inventoryItemId] ?? "";
+            const routeReady = Boolean(item.targetCenterId && item.targetCenterName && item.targetRouteMode && item.targetRouteVersion !== null);
+            return (
+              <article className="grid gap-4 border border-line p-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,380px)]" key={item.inventoryItemId}>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0"><p className="truncate text-sm font-black">{item.title}</p><p className="mt-1 text-[11px] text-muted">{item.originStoreName} · 결제 {new Date(item.paidAt).toLocaleString("ko-KR")} · {item.paidAmount.toLocaleString("ko-KR")}원</p></div>
+                    <span className={`border px-2 py-1 text-[10px] font-bold ${routeReady ? "border-emerald-300 text-emerald-700" : "border-rose-300 text-rose-700"}`}>{routeReady ? `${item.targetCenterName} 경로 준비` : "매장 경로 필요"}</span>
                   </div>
-                );
-              })}
-            </div>
-          </article>
-        ))}
+                  <p className="mt-3 text-xs leading-5 text-muted">현재 물류 버전 v{item.fulfillmentVersion}{item.targetRouteMode ? ` · ${item.targetRouteMode === "transfer" ? "센터 이동" : "같은 장소 입고"}` : ""}</p>
+                </div>
+                <div>
+                  <input aria-label={`${item.title} 실제 위치 확인 사유`} className="h-11 w-full border border-line px-3 text-xs" maxLength={500} onChange={(event) => setReconciliationReasons((current) => ({ ...current, [item.inventoryItemId]: event.target.value }))} placeholder="예: B센터 실물 보관 위치 확인 완료" value={reason} />
+                  <button className="mt-3 flex w-full items-center justify-center gap-2 bg-ink px-4 py-3 text-xs font-bold text-paper disabled:opacity-40" disabled={!routeReady || reason.trim().length < 3 || Boolean(busyTarget)} onClick={() => void reconcileItem(item)} type="button"><CheckCircle2 size={14} /> {busyTarget === `reconcile:${item.inventoryItemId}` ? "경로 적용 중" : "실제 경로 확인 완료"}</button>
+                </div>
+              </article>
+            );
+          })}
+          {!loading && reconciliationItems.length === 0 && <p className="border border-dashed border-line p-5 text-sm text-muted">미조정 보관 상품이 없습니다.</p>}
+        </div>
+      </section>
 
-        {!loading && works.length === 0 && <div className="border border-dashed border-line py-16 text-center text-sm text-muted">현재 중앙에서 처리할 상품이 없습니다.</div>}
-        {loading && works.length === 0 && <div className="py-16 text-center text-sm text-muted">중앙 물류 목록을 불러오는 중입니다.</div>}
+      <section className="border border-line p-5 sm:p-6" aria-busy={loading}>
+        <div className="flex flex-col justify-between gap-3 border-b border-line pb-5 sm:flex-row sm:items-end">
+          <div><p className="eyebrow text-muted">명시적 경로 설정</p><h2 className="mt-2 text-xl font-black">각 매장별 센터 연결</h2><p className="mt-2 max-w-2xl text-xs leading-5 text-muted">센터로 이동은 매장 상품을 센터로 이관한 뒤 입고 처리합니다. 같은 장소 즉시 센터 입고는 동일 물리 장소에서 센터 입고를 시작합니다.</p></div>
+          <MapPinned className="text-muted" size={22} />
+        </div>
+
+        <div className="mt-5 space-y-4">
+          {stores.map((store) => {
+            const existing = routes.find((route) => route.store_id === store.id);
+            const draft = routeDrafts[store.id] ?? routeDraft(existing);
+            const compatibleCenters = centers.filter((center) => center.business_id === store.business_id && center.status === "active");
+            const selectedRouteCenter = centers.find((center) => center.id === existing?.fulfillment_center_id);
+            return (
+              <article className="border border-line p-5" key={store.id}>
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                  <div><p className="text-base font-black">{store.name}</p><p className="mt-1 font-mono text-[10px] text-muted">매장 ID {store.id}</p></div>
+                  {!store.is_active ? <span className="border border-amber-300 px-2 py-1 text-[10px] font-bold text-amber-700">비활성 매장</span> : existing?.status === "active" ? <span className="border border-emerald-300 px-2 py-1 text-[10px] font-bold text-emerald-700">경로 설정됨 · v{existing.version}</span> : <span className="border border-rose-300 px-2 py-1 text-[10px] font-bold text-rose-700">경로 미설정</span>}
+                </div>
+                {existing?.status === "active" ? <p className="mt-3 text-xs text-muted">현재: {selectedRouteCenter?.name ?? "센터 정보 없음"} · {existing.route_mode === "transfer" ? "센터로 이동" : "같은 장소 즉시 센터 입고"}</p> : <p className="mt-3 flex gap-2 border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950"><AlertTriangle className="shrink-0" size={15} />경로가 설정되지 않은 매장의 결제 완료 상품은 <strong>reconciliation_required</strong>로 분류됩니다.</p>}
+                <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="text-xs font-bold">연결할 활성 센터
+                      <select className="mt-2 h-11 w-full border border-line bg-paper px-3 text-sm font-normal" onChange={(event) => updateRouteDraft(store.id, "centerId", event.target.value)} value={draft.centerId}>
+                        <option value="">센터를 명시적으로 선택해 주세요</option>
+                        {compatibleCenters.map((center) => <option key={center.id} value={center.id}>{center.name} · {center.code}</option>)}
+                      </select>
+                    </label>
+                    <fieldset><legend className="text-xs font-bold">입고 방식</legend><div className="mt-2 flex min-h-11 gap-4 border border-line px-3 text-xs"><label className="flex items-center gap-2"><input checked={draft.routeMode === "transfer"} name={`route-mode-${store.id}`} onChange={() => updateRouteDraft(store.id, "routeMode", "transfer")} type="radio" />센터로 이동</label><label className="flex items-center gap-2"><input checked={draft.routeMode === "co_located"} name={`route-mode-${store.id}`} onChange={() => updateRouteDraft(store.id, "routeMode", "co_located")} type="radio" />같은 장소 즉시 센터 입고</label></div></fieldset>
+                    <label className="text-xs font-bold sm:col-span-2">변경 사유 <span className="font-normal text-muted">(선택)</span>
+                      <input className="mt-2 h-11 w-full border border-line px-3 text-sm font-normal" maxLength={1_000} onChange={(event) => updateRouteDraft(store.id, "reason", event.target.value)} placeholder="예: 매장 물리 위치와 센터 입고 절차 변경" value={draft.reason} />
+                    </label>
+                  </div>
+                  <button className="flex h-11 items-center justify-center gap-2 self-end bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40" disabled={Boolean(busyTarget) || !store.is_active || !draft.centerId} onClick={() => void saveRoute(store)} type="button"><Route size={14} /> {busyTarget === `route:${store.id}` ? "저장 중" : "경로 저장"}</button>
+                </div>
+              </article>
+            );
+          })}
+          {!loading && stores.length === 0 && <p className="border border-dashed border-line p-5 text-sm text-muted">등록된 실제 매장이 없습니다.</p>}
+          {loading && stores.length === 0 && <p className="py-12 text-center text-sm text-muted">매장과 센터 설정을 불러오는 중입니다.</p>}
+        </div>
+      </section>
+
+      <section className="border border-line p-5 sm:p-6" aria-busy={loading}>
+        <div className="flex flex-col justify-between gap-3 border-b border-line pb-5 sm:flex-row sm:items-end">
+          <div><p className="eyebrow text-muted">센터별 최소 권한</p><h2 className="mt-2 text-xl font-black">운영자·직원 센터 배정</h2><p className="mt-2 max-w-2xl text-xs leading-5 text-muted">관리자는 운영자와 직원을 각 센터에 직접 배정하고 가능한 작업을 지정합니다. 입고·보관 권한과 B센터 포장·송장 권한은 서로 독립적입니다.</p></div>
+          <MapPinned className="text-muted" size={22} />
+        </div>
+        {centers.length > 0 && staff.length > 0 ? <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <label className="text-xs font-bold">담당 센터
+            <select className="mt-2 h-11 w-full border border-line bg-paper px-3 text-sm font-normal" onChange={(event) => chooseAssignment(event.target.value, assignmentUserId)} value={assignmentCenterId}>
+              {centers.filter((center) => center.status === "active").map((center) => <option key={center.id} value={center.id}>{center.name} · {center.code}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-bold">담당 운영자 또는 직원
+            <select className="mt-2 h-11 w-full border border-line bg-paper px-3 text-sm font-normal" onChange={(event) => chooseAssignment(assignmentCenterId, event.target.value)} value={assignmentUserId}>
+              {staff.map((member) => <option key={member.id} value={member.id}>{member.display_name} · {member.role_code === "operator" ? "운영자" : "직원"}{member.email ? ` · ${member.email}` : ""}</option>)}
+            </select>
+          </label>
+          <fieldset className="border border-line p-4 lg:col-span-2"><legend className="px-2 text-xs font-bold">허용 작업</legend><div className="flex flex-col gap-3 text-xs sm:flex-row sm:gap-8"><label className="flex items-center gap-2"><input checked={assignmentReceive} onChange={(event) => setAssignmentReceive(event.target.checked)} type="checkbox" /> 센터 입고·보관</label><label className="flex items-center gap-2"><input checked={assignmentShip} onChange={(event) => setAssignmentShip(event.target.checked)} type="checkbox" /> 포장·송장 등록</label><label className="flex items-center gap-2"><input checked={assignmentStatus === "active"} onChange={(event) => setAssignmentStatus(event.target.checked ? "active" : "inactive")} type="checkbox" /> 배정 활성</label></div></fieldset>
+          <div className="flex flex-col justify-between gap-3 border border-line bg-surface p-4 text-xs sm:flex-row sm:items-center lg:col-span-2"><p>{selectedAssignment ? `현재 배정 버전 v${selectedAssignment.version}` : "새 센터 배정"} · 포장·송장은 선택한 센터의 담당자만 수행할 수 있습니다.</p><button className="flex shrink-0 items-center justify-center gap-2 bg-ink px-4 py-3 font-bold text-paper disabled:opacity-40" disabled={Boolean(busyTarget) || !assignmentCenterId || !assignmentUserId} onClick={() => void saveAssignment()} type="button"><Save size={14} /> {busyTarget === `assignment:${assignmentCenterId}:${assignmentUserId}` ? "저장 중" : "센터 권한 저장"}</button></div>
+          {assignments.length > 0 && <div className="divide-y divide-line border-y border-line lg:col-span-2">{assignments.map((assignment) => { const center = centers.find((candidate) => candidate.id === assignment.fulfillment_center_id); const member = staff.find((candidate) => candidate.id === assignment.user_id); return <div className="flex flex-col justify-between gap-2 py-3 text-xs sm:flex-row sm:items-center" key={assignment.id}><p><strong>{member?.display_name ?? assignment.user_id}</strong>{member ? ` · ${member.role_code === "operator" ? "운영자" : "직원"}` : ""} · {center?.name ?? assignment.fulfillment_center_id}</p><p className="text-muted">{assignment.status === "active" ? "활성" : "비활성"} · {assignment.receive_at_center ? "입고·보관" : "입고 없음"} · {assignment.create_shipments ? "포장·송장" : "배송 없음"} · v{assignment.version}</p></div>; })}</div>}
+        </div> : <p className="mt-5 border border-dashed border-line p-5 text-sm text-muted">활성 센터와 운영자 또는 직원 계정이 모두 있어야 센터 권한을 배정할 수 있습니다.</p>}
+      </section>
+
+      <section className="border border-line bg-surface p-5 text-sm leading-6">
+        <p className="font-bold">상품 입고·보관·출고 처리는 권한이 배정된 운영자·직원 통합 물류에서 진행합니다.</p>
+        <p className="mt-1 text-muted">발송인 센터 주소는 수집하지 않습니다. 이 화면에서 매장별 경로와 센터 담당 권한을 관리합니다.</p>
+        <Link className="mt-4 inline-flex items-center gap-2 border border-line bg-paper px-4 py-2 text-xs font-bold" href="/admin/operator/fulfillment"><Route size={14} /> 운영자 통합 물류 열기</Link>
       </section>
     </div>
   );

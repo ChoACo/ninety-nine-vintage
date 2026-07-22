@@ -125,7 +125,10 @@ export function ownerAccessJsonResponse(
   body: Record<string, unknown>,
   status = 200,
 ): Response {
-  return Response.json(body, {
+  const normalizedBody = typeof body.error === "string" && typeof body.code !== "string"
+    ? { ...body, code: body.error }
+    : body;
+  return Response.json(normalizedBody, {
     status,
     headers: {
       "Cache-Control": "no-store, max-age=0",
@@ -138,9 +141,16 @@ export function ownerAccessJsonResponse(
 
 export function ownerAccessErrorResponse(error: unknown): Response {
   if (error instanceof OwnerAccessRequestError) {
-    return ownerAccessJsonResponse({ error: error.code }, error.status);
+    const message = error.status === 401
+      ? "로그인이 필요합니다."
+      : error.status === 403
+        ? "요청 권한이 없습니다."
+        : error.status === 413
+          ? "요청 크기가 너무 큽니다."
+          : "요청을 처리하지 못했습니다.";
+    return ownerAccessJsonResponse({ error: error.code, message }, error.status);
   }
-  return ownerAccessJsonResponse({ error: "owner_access_failed" }, 500);
+  return ownerAccessJsonResponse({ error: "owner_access_failed", message: "Owner 권한을 확인하지 못했습니다." }, 500);
 }
 
 export async function readSmallJsonBody(

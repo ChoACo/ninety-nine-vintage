@@ -38,10 +38,10 @@
 
 ### 상품
 
-- 상품은 `store_id`, 보관 분류, 치수, 상태 등급, 검수 메모를 가진다. 근거: `supabase/migrations/20260719130000_multistore_commerce_storage.sql`.
+- 상품은 `store_id`, 보관 분류, 치수, 상태 등급, 상태·하자 메모를 가진다. 근거: `supabase/migrations/20260719130000_multistore_commerce_storage.sql`.
 - 운영자/직원 인증을 통과한 사용자는 자기 유효 운영자에 연결된 매장 범위에서 상품을 생성할 수 있다. 근거: `src/app/api/admin/operator/products/route.ts`, `supabase/migrations/20260721030000_harden_operator_product_mutations.sql`.
-- 생성 상품은 즉시 `active`가 아니라 `pending`으로 저장된다. 공개는 별도 API/RPC를 호출하며 현재 API는 `owner` 또는 `operator`만 허용한다. 따라서 “권한 있는 직원의 즉시 등록·공개” 목표와 충돌한다. 근거: `src/app/api/admin/operator/products/route.ts`, `src/app/api/admin/operator/products/[id]/publish/route.ts`, `supabase/migrations/20260721020000_harden_operator_product_publishing.sql`.
-- `inspection_notes`는 존재하지만 이것이 승인 워크플로인지 단순 상품 정보인지 UI 의미를 추가 확인해야 한다.
+- 기존 구현은 생성 상품을 `pending`으로 저장한 뒤 운영자 전용 공개 RPC를 다시 호출해 “권한 있는 직원의 즉시 등록·공개” 목표와 충돌했다. 후속 `20260722130000_activate_direct_product_publishing.sql`과 상품 관리 API/UI는 `pending`을 초안으로만 표현하고 `publish_products` 권한이 있는 운영자·직원이 저장 직후 동일한 공개 RPC를 호출하도록 재구현했다. 이 순방향 마이그레이션은 아직 운영 DB에 적용하지 않았다.
+- `inspection_notes` 필드명은 호환성을 위해 유지하지만 UI에서는 상태 등급·오염·수선·사용감 등 객관적인 `상태·하자 메모`로만 표현하며 승인·전문가 검수·품질 보증 의미를 제거했다.
 
 ### 장바구니와 통합 주문
 
@@ -98,7 +98,7 @@
 3. [2026-07-22 결정] 중앙 출고 담당자용 새 역할을 만들지 않고 기존 사용자에게 세부 권한을 부여한다. 현재 중앙 입고 화면은 Owner만 사용한다.
 4. 주문 즉시 배송과 보관 후 배송의 배송비 부과 시점 및 중복 방지 규칙.
 5. 일부 상품 문제·취소 시 고객과 합의가 지연될 때 나머지 상품의 최대 대기 정책.
-6. `inspection_notes`와 condition grade를 유지하되 승인 절차로 오해되지 않게 할 UI 용어.
+6. `inspection_notes`와 condition grade를 유지하되 승인 절차로 오해되지 않게 하는 `상태·하자` UI 용어.
 7. 기존 `pending` 상품 상태를 `draft`로 의미 변경할지, 즉시 공개 생성과 별도 임시 저장을 추가할지.
 
 추측으로 채우지 않고 각 항목이 결정된 뒤 마이그레이션과 API 계약을 작성한다.

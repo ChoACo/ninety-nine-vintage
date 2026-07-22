@@ -63,8 +63,8 @@ export function SettlementActions({ productId }: SettlementActionsProps) {
         낙찰 결제
       </p>
       <p className="mb-3 text-[11px] leading-5 text-zinc-500">
-        현재 결제 방식은 수동 계좌이체입니다. PG 카드 결제는 운영자가 활성화한
-        이후 제공됩니다.
+        현재 신규 결제는 수동 계좌이체로만 진행됩니다. 계좌를 확인해 입금한 뒤
+        운영자의 입금 확인을 기다려 주세요.
       </p>
       <button
         className="h-10 w-full border border-zinc-950 text-xs font-bold transition-colors hover:bg-zinc-950 hover:text-white disabled:opacity-50"
@@ -82,7 +82,7 @@ export function SettlementActions({ productId }: SettlementActionsProps) {
           </p>
           <p>
             {transfer.expectedAmount.toLocaleString("ko-KR")}원 ·{" "}
-            {transfer.status}
+            {transfer.status === "confirmed" ? "입금 확인 완료" : "입금 대기 중"}
           </p>
         </div>
       )}

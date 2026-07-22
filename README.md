@@ -23,11 +23,12 @@ npm run verify:integrations -- --public-only
 ## 운영 구성
 
 - Production: `https://www.ninety-nine-vintage.store`
-- Runtime: Next.js App Router on Vercel
+- Canonical domain: `www.ninety-nine-vintage.store`; the apex domain routes to the same Sites project
+- Runtime: Next.js App Router on OpenAI Sites, with authoritative DNS on Cloudflare
 - Database/Auth/Realtime: Supabase
 - Payments: PortOne V2 및 수동 계좌이체
 - Social login: Kakao OIDC → Supabase session
 
-필수 환경변수 이름은 `.env.example`에만 관리합니다. 실제 비밀값은 Vercel encrypted environment 또는 로컬 `.env.local`에 두고 커밋하지 않습니다.
+필수 환경변수 이름은 `.env.example`에만 관리합니다. 실제 비밀값은 Sites runtime environment 또는 로컬 `.env.local`에 두고 커밋하지 않습니다.
 
 통합 및 실환경 검증 기록은 `docs/consolidation-verification.md`를 참고하세요.

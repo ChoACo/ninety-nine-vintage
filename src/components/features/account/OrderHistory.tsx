@@ -50,7 +50,7 @@ interface Order {
 }
 
 const statusLabels: Record<string, string> = {
-  awaiting_payment: "입금 대기",
+  awaiting_payment: "입금 대기 중",
   paid: "결제 완료·보관 중",
   partially_paid: "부분 취소·환불 조정 중",
   shipped: "배송 완료",
@@ -282,7 +282,7 @@ export function OrderHistory() {
                   {order.transfer.expected_amount.toLocaleString("ko-KR")}원 ·{" "}
                   {order.transfer.bank_name_snapshot}{" "}
                   {order.transfer.account_number_snapshot}로 입금해 주세요. 입금
-                  확인 후 보관 기간이 시작됩니다.
+                  확인 후 상품이 보관함으로 이동하며, 보관 기간은 중앙센터의 실물 보관 완료 시 시작됩니다.
                 </p>
               )}
               {order.status === "awaiting_payment" && virtualAccount && (
@@ -290,7 +290,7 @@ export function OrderHistory() {
                   가상계좌 · {virtualAccount.bank ? `${virtualAccount.bank} ` : ""}
                   {virtualAccount.accountNumber}로 입금해 주세요.
                   {dueAt ? ` 입금 기한은 ${dueAt}입니다.` : ""} 입금 확인 후
-                  보관 기간이 시작됩니다.
+                  상품이 보관함으로 이동하며, 보관 기간은 중앙센터의 실물 보관 완료 시 시작됩니다.
                 </p>
               )}
               {order.portonePayment?.canResume && (

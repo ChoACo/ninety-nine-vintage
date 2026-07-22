@@ -1,20 +1,46 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { RefreshCw, Save } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Button } from "@/components/ui/Button";
-import { TextInput } from "@/components/ui/FormControls";
-import { SectionHeading } from "@/components/ui/SectionHeading";
-import { StatusNotice } from "@/components/ui/StatusNotice";
-import {
-  getDailyRevenue,
-  upsertDailyRevenue,
-  type DailyRevenueEntry,
-} from "@/lib/supabase/operations";
+import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { formatKRW } from "@/utils/formatters";
 
-function kstDateKey(date = new Date()): string {
+interface FinancialEntry {
+  id: string;
+  entryKind: "item_payment" | "item_refund" | "payment_reversal";
+  amount: number;
+  occurredAt: string;
+  inventoryItemId: string | null;
+  manualRefundId: string | null;
+}
+
+function entryKindLabel(entryKind: FinancialEntry["entryKind"]) {
+  if (entryKind === "item_payment") return "상품 결제";
+  if (entryKind === "payment_reversal") return "결제 취소";
+  return "상품 환불";
+}
+
+interface StoreReport {
+  storeId: string;
+  storeName: string;
+  grossSales: number;
+  refunds: number;
+  netSales: number;
+  paidItemCount: number;
+  refundedItemCount: number;
+  entries: FinancialEntry[];
+}
+
+interface ReportPayload {
+  stores?: StoreReport[];
+  centralShippingFees?: number;
+  serverTime?: string;
+  error?: string;
+  message?: string;
+}
+
+function kstDateKey(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
     day: "2-digit",
     month: "2-digit",
@@ -23,252 +49,99 @@ function kstDateKey(date = new Date()): string {
   }).format(date);
 }
 
-function shiftDateKey(dateKey: string, days: number): string {
-  const date = new Date(`${dateKey}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function startOfWeek(dateKey: string): string {
-  const day = new Date(`${dateKey}T00:00:00Z`).getUTCDay();
-  return shiftDateKey(dateKey, -(day === 0 ? 6 : day - 1));
-}
-
-function sumAmount(
-  rows: DailyRevenueEntry[],
-  predicate: (row: DailyRevenueEntry) => boolean,
-): number {
-  return rows.filter(predicate).reduce((sum, row) => sum + row.grossAmount, 0);
-}
-
 export function OperatorRevenueConsole() {
+  const { session } = useSupabaseSession();
+  const token = session?.access_token ?? null;
   const today = kstDateKey();
-  const [rows, setRows] = useState<DailyRevenueEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [from, setFrom] = useState(`${today.slice(0, 7)}-01`);
+  const [to, setTo] = useState(today);
+  const [stores, setStores] = useState<StoreReport[]>([]);
+  const [centralShippingFees, setCentralShippingFees] = useState(0);
+  const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
-  const [noticeTone, setNoticeTone] = useState<"error" | "success">("success");
-  const [revenueDate, setRevenueDate] = useState(today);
-  const [grossAmount, setGrossAmount] = useState("");
-  const [paidOrderCount, setPaidOrderCount] = useState("");
 
   const load = useCallback(async () => {
-    setIsLoading(true);
+    if (!token) return;
+    setLoading(true);
     setNotice("");
     try {
-      setRows(await getDailyRevenue("2000-01-01", today));
+      const query = new URLSearchParams({ from, to });
+      const response = await fetch(`/api/admin/operator/revenue?${query}`, {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const payload = await response.json() as ReportPayload;
+      if (!response.ok || !Array.isArray(payload.stores)) {
+        throw new Error(payload.message ?? "매장별 매출을 불러오지 못했습니다.");
+      }
+      setStores(payload.stores);
+      setCentralShippingFees(payload.centralShippingFees ?? 0);
     } catch (error) {
-      setNoticeTone("error");
-      setNotice(error instanceof Error ? error.message : "매출 정보를 불러오지 못했습니다.");
+      setNotice(error instanceof Error ? error.message : "매장별 매출을 불러오지 못했습니다.");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }, [today]);
+  }, [from, to, token]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  const summary = useMemo(() => {
-    const weekStart = startOfWeek(today);
-    const monthPrefix = today.slice(0, 7);
-    const yearPrefix = today.slice(0, 4);
-    return {
-      day: sumAmount(rows, (row) => row.revenueDate === today),
-      week: sumAmount(rows, (row) => row.revenueDate >= weekStart && row.revenueDate <= today),
-      month: sumAmount(rows, (row) => row.revenueDate.startsWith(monthPrefix)),
-      year: sumAmount(rows, (row) => row.revenueDate.startsWith(yearPrefix)),
-    };
-  }, [rows, today]);
-
-  const yearly = useMemo(() => {
-    const totals = new Map<string, number>();
-    for (const row of rows) {
-      const year = row.revenueDate.slice(0, 4);
-      totals.set(year, (totals.get(year) ?? 0) + row.grossAmount);
-    }
-    return [...totals.entries()].sort(([left], [right]) => right.localeCompare(left));
-  }, [rows]);
-
-  const save = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (isSaving) return;
-
-    const parsedAmount = Number(grossAmount);
-    const parsedCount = Number(paidOrderCount);
-    if (
-      !Number.isSafeInteger(parsedAmount)
-      || parsedAmount < 0
-      || !Number.isSafeInteger(parsedCount)
-      || parsedCount < 0
-    ) {
-      setNoticeTone("error");
-      setNotice("확정 매출액과 결제 건수를 0 이상의 정수로 입력해 주세요.");
-      return;
-    }
-
-    setIsSaving(true);
-    setNotice("");
-    try {
-      const saved = await upsertDailyRevenue({
-        grossAmount: parsedAmount,
-        paidOrderCount: parsedCount,
-        revenueDate,
-      });
-      setRows((current) => [
-        ...current.filter((row) => row.revenueDate !== saved.revenueDate),
-        saved,
-      ].sort((left, right) => left.revenueDate.localeCompare(right.revenueDate)));
-      setGrossAmount("");
-      setPaidOrderCount("");
-      setNoticeTone("success");
-      setNotice(`${saved.revenueDate} 확정 매출을 저장했습니다.`);
-    } catch (error) {
-      setNoticeTone("error");
-      setNotice(error instanceof Error ? error.message : "일 매출을 저장하지 못했습니다.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const summaryCards = [
-    ["오늘", summary.day],
-    ["이번 주", summary.week],
-    ["이번 달", summary.month],
-    ["올해", summary.year],
-  ] as const;
+  const totals = useMemo(() => stores.reduce((result, store) => ({
+    gross: result.gross + store.grossSales,
+    refunds: result.refunds + store.refunds,
+    net: result.net + store.netSales,
+  }), { gross: 0, refunds: 0, net: 0 }), [stores]);
 
   return (
     <div className="space-y-8">
-      <SectionHeading
-        action={(
-          <Button
-            className="flex items-center gap-2"
-            disabled={isLoading}
-            onClick={() => void load()}
-            type="button"
-          >
-            <RefreshCw size={13} /> 새로고침
-          </Button>
-        )}
-        description="실제 입금이 확인된 하루 매출만 저장하고 기간별로 합산합니다. 낙찰가는 자동 매출로 계산하지 않습니다."
-        eyebrow="운영자 / 매출 원장"
-        title="매출 현황"
-        variant="page"
-      />
+      <header className="flex flex-col justify-between gap-5 border-b border-ink pb-6 sm:flex-row sm:items-end">
+        <div>
+          <p className="eyebrow text-muted">운영자 / 매장별 재무 원장</p>
+          <h1 className="mt-3 text-3xl font-black tracking-[-.06em] sm:text-4xl sm:tracking-[-.08em]">매출 현황</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">결제 확정 상품은 원등록 매장 매출로, 결제 취소와 환불은 같은 매장의 음수 원장으로 기록합니다. 배송비는 중앙 수익으로 분리합니다.</p>
+        </div>
+        <button className="flex items-center justify-center gap-2 border border-line px-4 py-3 text-xs font-bold disabled:opacity-40" disabled={!token || loading} onClick={() => void load()} type="button"><RefreshCw size={14} /> 새로고침</button>
+      </header>
 
-      {notice && <StatusNotice variant={noticeTone}>{notice}</StatusNotice>}
+      <div className="grid gap-3 border border-line bg-surface p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+        <label className="text-xs font-bold">시작일<input className="mt-2 h-10 w-full border border-line bg-paper px-3 font-normal" max={to} onChange={(event) => setFrom(event.target.value)} type="date" value={from} /></label>
+        <label className="text-xs font-bold">종료일<input className="mt-2 h-10 w-full border border-line bg-paper px-3 font-normal" max={today} min={from} onChange={(event) => setTo(event.target.value)} type="date" value={to} /></label>
+        <button className="h-10 bg-ink px-5 text-xs font-bold text-paper disabled:opacity-40" disabled={!token || loading || !from || !to} onClick={() => void load()} type="button">기간 조회</button>
+      </div>
 
-      <div aria-label="매출 요약" className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-4">
-        {summaryCards.map(([label, amount]) => (
-          <article className="bg-paper p-5" key={label}>
-            <p className="text-xs text-muted">{label}</p>
-            <p className="mt-4 font-mono text-2xl font-bold">
-              {isLoading ? "—" : formatKRW(amount)}
-            </p>
+      {notice && <p aria-live="polite" className="border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">{notice}</p>}
+
+      <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-4">
+        <article className="bg-paper p-5"><p className="text-xs text-muted">상품 결제</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(totals.gross)}</p></article>
+        <article className="bg-paper p-5"><p className="text-xs text-muted">결제 취소·상품 환불</p><p className="mt-3 font-mono text-2xl font-bold">-{formatKRW(totals.refunds)}</p></article>
+        <article className="bg-ink p-5 text-paper"><p className="text-xs text-zinc-400">매장 순매출</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(totals.net)}</p></article>
+        <article className="bg-paper p-5"><p className="text-xs text-muted">중앙 배송비 수익</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(centralShippingFees)}</p></article>
+      </div>
+
+      <section className="space-y-5" aria-busy={loading}>
+        {stores.map((store) => (
+          <article className="border border-line" key={store.storeId}>
+            <div className="grid gap-px border-b border-line bg-line sm:grid-cols-4">
+              <div className="bg-surface p-4"><p className="text-sm font-black">{store.storeName}</p><p className="mt-2 text-[10px] text-muted">결제 상품 {store.paidItemCount} · 환불 상품 {store.refundedItemCount}</p></div>
+              <div className="bg-paper p-4"><p className="text-[10px] text-muted">결제</p><p className="mt-2 font-mono font-bold">{formatKRW(store.grossSales)}</p></div>
+              <div className="bg-paper p-4"><p className="text-[10px] text-muted">취소·환불</p><p className="mt-2 font-mono font-bold">-{formatKRW(store.refunds)}</p></div>
+              <div className="bg-paper p-4"><p className="text-[10px] text-muted">순매출</p><p className="mt-2 font-mono font-bold">{formatKRW(store.netSales)}</p></div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-xs">
+                <thead className="border-b border-line text-[10px] text-muted"><tr><th className="px-4 py-3">시각</th><th className="px-4 py-3">구분</th><th className="px-4 py-3">금액</th><th className="px-4 py-3">재고 상품</th><th className="px-4 py-3">환불</th></tr></thead>
+                <tbody className="divide-y divide-line">
+                  {store.entries.map((entry) => <tr key={entry.id}><td className="px-4 py-3">{new Date(entry.occurredAt).toLocaleString("ko-KR")}</td><td className="px-4 py-3">{entryKindLabel(entry.entryKind)}</td><td className={`px-4 py-3 font-mono font-bold ${entry.amount < 0 ? "text-rose-700" : ""}`}>{formatKRW(entry.amount)}</td><td className="px-4 py-3 font-mono text-[10px] text-muted">{entry.inventoryItemId ?? "-"}</td><td className="px-4 py-3 font-mono text-[10px] text-muted">{entry.manualRefundId ?? "-"}</td></tr>)}
+                  {store.entries.length === 0 && <tr><td className="px-4 py-10 text-center text-muted" colSpan={5}>선택 기간의 원장 항목이 없습니다.</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </article>
         ))}
-      </div>
-
-      <form className="grid grid-cols-1 items-end gap-3 border border-ink bg-surface p-4 sm:grid-cols-2 sm:p-6 xl:grid-cols-[180px_1fr_180px_auto]" onSubmit={save}>
-        <label className="text-xs font-bold">
-          <span className="mb-2 block text-[10px] text-muted">매출 날짜</span>
-          <TextInput
-            className="w-full"
-            max={today}
-            onChange={(event) => setRevenueDate(event.target.value)}
-            required
-            type="date"
-            value={revenueDate}
-          />
-        </label>
-        <label className="text-xs font-bold">
-          <span className="mb-2 block text-[10px] text-muted">확정 하루 매출</span>
-          <TextInput
-            className="w-full font-mono"
-            min="0"
-            onChange={(event) => setGrossAmount(event.target.value)}
-            placeholder="실제 입금 확인 금액"
-            required
-            step="1"
-            type="number"
-            value={grossAmount}
-          />
-        </label>
-        <label className="text-xs font-bold">
-          <span className="mb-2 block text-[10px] text-muted">결제 건수</span>
-          <TextInput
-            className="w-full font-mono"
-            min="0"
-            onChange={(event) => setPaidOrderCount(event.target.value)}
-            placeholder="0"
-            required
-            step="1"
-            type="number"
-            value={paidOrderCount}
-          />
-        </label>
-        <Button className="flex items-center justify-center gap-2 sm:col-span-2 xl:col-span-1" disabled={isSaving} type="submit" variant="primary">
-          <Save size={13} /> {isSaving ? "저장 중…" : "일 매출 저장"}
-        </Button>
-      </form>
-
-      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1fr_280px]">
-        <div className="overflow-x-auto border-y border-line">
-          <table className="w-full min-w-[680px] text-left text-xs">
-            <thead className="border-b border-line bg-surface text-[10px] uppercase tracking-[.12em] text-muted">
-              <tr>
-                <th className="px-4 py-4">날짜</th>
-                <th className="px-4 py-4">하루 매출</th>
-                <th className="px-4 py-4">결제 건수</th>
-                <th className="px-4 py-4">수정 시각</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {[...rows]
-                .sort((left, right) => right.revenueDate.localeCompare(left.revenueDate))
-                .slice(0, 31)
-                .map((row) => (
-                  <tr key={row.revenueDate}>
-                    <td className="px-4 py-4 font-mono font-bold">{row.revenueDate}</td>
-                    <td className="px-4 py-4 font-mono font-bold">{formatKRW(row.grossAmount)}</td>
-                    <td className="px-4 py-4 font-mono">{row.paidOrderCount}건</td>
-                    <td className="px-4 py-4 text-[10px] text-muted">
-                      {new Date(row.updatedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}
-                    </td>
-                  </tr>
-                ))}
-              {isLoading && (
-                <tr>
-                  <td className="px-4 py-12 text-center text-muted" colSpan={4}>매출 내역을 불러오는 중…</td>
-                </tr>
-              )}
-              {!isLoading && rows.length === 0 && (
-                <tr>
-                  <td className="px-4 py-12 text-center text-muted" colSpan={4}>저장된 매출이 없습니다.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <aside className="border border-line bg-surface p-5">
-          <p className="eyebrow text-muted">연도별 / 누적 매출</p>
-          <h2 className="mt-3 text-lg font-black">연도별 누적</h2>
-          <ul className="mt-5 divide-y divide-line border-y border-line">
-            {yearly.map(([year, amount]) => (
-              <li className="flex justify-between gap-3 py-3 text-xs" key={year}>
-                <span className="font-mono font-bold">{year}년</span>
-                <span className="font-mono">{formatKRW(amount)}</span>
-              </li>
-            ))}
-            {!isLoading && yearly.length === 0 && (
-              <li className="py-8 text-center text-xs text-muted">누적 데이터가 없습니다.</li>
-            )}
-          </ul>
-        </aside>
-      </div>
+        {!loading && stores.length === 0 && <p className="border border-dashed border-line py-14 text-center text-sm text-muted">조회 권한이 있는 매장 또는 원장이 없습니다.</p>}
+      </section>
     </div>
   );
 }

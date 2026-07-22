@@ -21,6 +21,7 @@
     "verify:integrations": "node scripts/verify-integrations.mjs",
     "verify:local": "node scripts/verify-local-happy-path.mjs",
     "verify:migrations": "node scripts/verify-migration-parity.mjs",
+    "verify:published-products-db": "node scripts/verify-local-published-product-management-postgres.mjs",
     "verify:queue-snapshot-db": "node scripts/verify-local-queue-snapshot-postgres.mjs",
     "verify:reversal-target-db": "node scripts/verify-local-reversal-target-postgres.mjs",
     "verify:reversal-target-db:docker": "node scripts/verify-docker-reversal-target-postgres.mjs",

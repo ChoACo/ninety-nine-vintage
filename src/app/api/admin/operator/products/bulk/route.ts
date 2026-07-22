@@ -1,5 +1,5 @@
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
-import type { Database, Json } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/supabase/database.types";
 import { normalizeProductBrand } from "@/lib/catalog/brand";
 
 type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
@@ -82,7 +82,6 @@ function normalizeProduct(body: Record<string, unknown>, userId: string): Produc
     size_label: text(body.sizeLabel),
     condition_grade: ["S", "A+", "A", "B"].includes(text(body.conditionGrade)) ? text(body.conditionGrade) : "A",
     storage_class: text(body.storageClass) === "large" ? "large" : "small",
-    measurements: body.measurements && typeof body.measurements === "object" ? body.measurements as Json : {},
     inspection_notes: Array.isArray(body.inspectionNotes)
       ? body.inspectionNotes.filter((item): item is string => typeof item === "string").slice(0, 30)
       : [],
@@ -103,13 +102,16 @@ export async function POST(request: Request) {
   if (rows.some((row) => !row)) return commerceJson({ error: "일괄등록 상품 입력값을 확인해 주세요." }, 400);
 
   const storeIds = [...new Set(rows.map((row) => (row as ProductInsert).store_id).filter((id): id is string => typeof id === "string"))];
-  if (auth.roleCode !== "owner" && !auth.effectiveOperatorId) {
-    return commerceJson({ error: "operator_assignment_required" }, 403);
+  const permissionResults = await Promise.all(storeIds.map((storeId) => auth.user.rpc(
+    "has_store_permission",
+    { p_store_id: storeId, p_permission: "manage_products" },
+  )));
+  if (permissionResults.some((result) => result.error)) {
+    return commerceJson({ error: "상품의 숍 권한을 확인하지 못했습니다." }, 503);
   }
-  let storeQuery = auth.user.from("stores").select("id, operator_id").in("id", storeIds);
-  if (auth.roleCode !== "owner") storeQuery = storeQuery.eq("operator_id", auth.effectiveOperatorId as string);
-  const { data: stores, error: storeError } = await storeQuery;
-  if (storeError || (stores ?? []).length !== storeIds.length) return commerceJson({ error: "상품의 숍 권한을 확인해 주세요." }, 403);
+  if (permissionResults.some((result) => result.data !== true)) {
+    return commerceJson({ error: "상품의 숍 권한을 확인해 주세요." }, 403);
+  }
 
   const { data, error } = await auth.user
     .from("products")

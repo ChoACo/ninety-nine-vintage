@@ -5,7 +5,7 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("canonical shipment schema binds one immutable manifest to exact settlement evidence", async () => {
+test("historical v1 canonical shipment schema remains immutable compatibility history", async () => {
   const migration = await source(
     "supabase/migrations/20260722060000_add_canonical_commerce_shipments.sql",
   );
@@ -43,7 +43,7 @@ test("canonical shipment schema binds one immutable manifest to exact settlement
   );
 });
 
-test("canonical shipment commands enforce complete-order CAS packing and one tracking dispatch", async () => {
+test("historical v1 canonical commands retain their complete-order safety contract", async () => {
   const migration = await source(
     "supabase/migrations/20260722070000_activate_canonical_commerce_shipments.sql",
   );
@@ -76,54 +76,117 @@ test("canonical shipment commands enforce complete-order CAS packing and one tra
   }
 });
 
-test("shipping API exposes only canonical shipment RPC write paths", async () => {
-  const [memberRoute, operatorRoute, ownerRoute, hiddenTestRoute] =
+test("buyer shipping API keeps exact legacy and v2 paths during staged rollout", async () => {
+  const [memberRoute, storageRoute, shipmentHistoryRoute, hiddenTestRoute] =
     await Promise.all([
       source("src/app/api/shipping/requests/route.ts"),
-      source("src/app/api/admin/operator/shipping/route.ts"),
-      source("src/app/api/admin/owner/shipping/[id]/route.ts"),
+      source("src/app/api/account/storage/route.ts"),
+      source("src/app/api/account/shipments/route.ts"),
       source("src/app/api/admin/owner/test-member/shipping/route.ts"),
     ]);
 
+  assert.match(memberRoute, /authenticateMemberCommerceRequest\(request,\s*true\)/);
+  assert.match(memberRoute, /auth\.user as unknown as RpcClient/);
+  assert.match(memberRoute, /"request_inventory_shipment"/);
+  assert.match(memberRoute, /"get_legacy_commerce_shipment_quote"/);
   assert.match(memberRoute, /"request_commerce_order_shipment"/);
-  assert.match(memberRoute, /p_order_id:\s*body\.orderId/);
   assert.match(memberRoute, /p_member_id:\s*auth\.userId/);
-  assert.doesNotMatch(memberRoute, /productIds|request_product_shipping/);
+  assert.match(memberRoute, /p_order_id:\s*body\.orderId/);
+  assert.match(memberRoute, /p_inventory_item_ids:\s*\[\.\.\.inventoryItemIds\]\.sort\(\)/);
+  assert.match(memberRoute, /inventoryItemIds\.length\s*>\s*100/);
+  assert.match(memberRoute, /new Set\(inventoryItemIds\)\.size\s*!==\s*inventoryItemIds\.length/);
+  assert.match(memberRoute, /p_address_id:\s*body\.addressId/);
+  assert.match(memberRoute, /p_settlement_method:\s*settlement/);
+  assert.match(memberRoute, /p_idempotency_key:\s*body\.idempotencyKey/);
+  assert.match(memberRoute, /LEGACY_BODY_KEYS/);
+  assert.match(memberRoute, /V2_BODY_KEYS/);
+  assert.match(memberRoute, /hasExactKeys\(body,\s*LEGACY_BODY_KEYS\)/);
+  assert.match(memberRoute, /hasExactKeys\(body,\s*V2_BODY_KEYS\)/);
+  assert.doesNotMatch(memberRoute, /request_product_shipping/);
   assert.doesNotMatch(memberRoute, /\.from\("shipping_fee_payments"\)/);
 
-  assert.match(operatorRoute, /"get_commerce_shipment_queue"/);
-  assert.match(operatorRoute, /"pack_commerce_shipment"/);
-  assert.match(operatorRoute, /"ship_commerce_shipment"/);
-  assert.match(operatorRoute, /p_expected_version:\s*body\.expectedVersion/);
-  assert.match(operatorRoute, /p_idempotency_key:\s*body\.idempotencyKey/);
-  assert.doesNotMatch(operatorRoute, /mark_shipping_request_shipped|get_shipping_work/);
+  assert.match(storageRoute, /auth\.user as unknown as RpcClient/);
+  assert.match(storageRoute, /"get_my_inventory_overview"/);
+  assert.match(storageRoute, /hasExactKeys\(value,\s*\["rolloutEnabled",\s*"items",\s*"serverTime"\]\)/);
+  assert.match(storageRoute, /"get_my_won_products"/);
+  assert.match(storageRoute, /legacyAuctionWins/);
+  assert.match(storageRoute, /itemSelectedShipmentsEnabled/);
+  assert.match(storageRoute, /itemSelectedProductIds/);
+  assert.match(storageRoute, /\.filter\(\(win\)\s*=>\s*!itemSelectedProductIds\.has\(win\.product_id\)\)/);
+  assert.match(shipmentHistoryRoute, /auth\.user as unknown as RpcClient/);
+  assert.match(shipmentHistoryRoute, /"get_my_inventory_shipments"/);
+  assert.match(shipmentHistoryRoute, /hasExactKeys\(value,\s*\["shipments"\]\)/);
 
-  assert.match(ownerRoute, /"correct_commerce_shipment_tracking"/);
-  assert.doesNotMatch(ownerRoute, /auth\.admin[\s\S]*\.from\("shipping_requests"\)/);
   assert.match(hiddenTestRoute, /test_member_shipping_retired/);
   assert.match(hiddenTestRoute, /410/);
 });
 
-test("customer and operator UIs use complete-order and versioned shipment commands", async () => {
-  const [account, operator] = await Promise.all([
-    source("src/components/features/account/AccountDashboard.tsx"),
+test("current operator shipping uses v2 CAS packing and exact unfulfilled-item gate", async () => {
+  const [operatorRoute, operator] = await Promise.all([
+    source("src/app/api/admin/operator/shipping/route.ts"),
     source("src/components/admin/operator/OperatorShippingConsole.tsx"),
   ]);
 
-  assert.match(account, /orderId:\s*selectedOrderId/);
-  assert.match(account, /order\.status !== "paid"/);
-  assert.match(account, /items\.every\(\(item\) => item\.payment_status === "paid"\)/);
-  assert.match(account, /shipment\.payment/);
-  assert.doesNotMatch(account, /productIds:\s*selectedIds|prepareShippingFee/);
+  assert.match(operatorRoute, /authenticateStaffRequest\(request,\s*true\)/);
+  assert.match(operatorRoute, /auth\.user as unknown as RpcClient/);
+  assert.match(operatorRoute, /"get_inventory_shipment_queue"/);
+  assert.match(operatorRoute, /"pack_inventory_shipment"/);
+  assert.match(operatorRoute, /"ship_inventory_shipment"/);
+  assert.match(operatorRoute, /p_expected_version:\s*body\.expectedVersion/);
+  assert.match(operatorRoute, /p_idempotency_key:\s*body\.idempotencyKey/);
+  assert.match(
+    operatorRoute,
+    /error\.code\s*===\s*"55000"\s*&&\s*error\.message\s*===\s*"미 출고된 상품이 존재합니다"/,
+  );
+  assert.match(operatorRoute, /code:\s*"UNRELEASED_ITEMS"/);
+  assert.match(operatorRoute, /blockedItemIds/);
+  assert.match(operatorRoute, /"addressSnapshot"/);
+  assert.match(operatorRoute, /},\s*422\)/);
+  assert.doesNotMatch(
+    operatorRoute,
+    /get_commerce_shipment_queue|pack_commerce_shipment|ship_commerce_shipment|mark_shipping_request_shipped|get_shipping_work/,
+  );
 
-  assert.match(operator, /shipmentId:\s*shipment\.shipment_id/);
+  assert.match(operator, /shipmentId:\s*shipment\.id/);
   assert.match(operator, /expectedVersion:\s*shipment\.version/);
   assert.match(operator, /idempotencyKey/);
-  assert.match(operator, /action === "pack"/);
-  assert.match(operator, /action === "ship"/);
-  assert.match(operator, /readiness_status === "ready_to_pack"/);
-  assert.match(operator, /readiness_status === "ready_to_ship"/);
-  assert.doesNotMatch(operator, /requestId, courier|product_ids/);
+  assert.match(operator, /item\.lineStatus\s*===\s*"ready"/);
+  assert.match(operator, /item\.physicalStatus\s*===\s*"center_stored"/);
+  assert.match(operator, /work\.status\s*===\s*"outbound_complete"/);
+  assert.match(operator, /"미 출고된 상품이 존재합니다"/);
+  assert.match(operator, /shipment\.addressSnapshot\.recipientName/);
+  assert.match(operator, /shipment\.addressSnapshot\.postalCode/);
+  assert.match(operator, /action\s*===\s*"pack"/);
+  assert.match(operator, /action\s*===\s*"ship"/);
+});
+
+test("customer UI supports mixed per-business rollout while keeping each request single-mode", async () => {
+  const account = await source("src/components/features/account/AccountDashboard.tsx");
+
+  assert.match(account, /selectedInventoryItemIds/);
+  assert.match(account, /selectedOrderId/);
+  assert.match(account, /fetch\("\/api\/orders"/);
+  assert.match(account, /legacyAuctionWins/);
+  assert.match(account, /itemSelectedCommerceOrderItemIds/);
+  assert.match(account, /items\.some\(\(item\)\s*=>\s*itemSelectedCommerceOrderItemIds\.has\(item\.id\)\)/);
+  assert.match(account, /storage\.filter\(\(item\)\s*=>\s*item\.rolloutEnabled\)/);
+  assert.match(account, /item\.itemSelectedShipmentsEnabled/);
+  assert.match(account, /selectedShippingMode/);
+  assert.match(account, /const selectedIds\s*=\s*\[\.\.\.selectedInventoryItemIds\]\.sort\(\)/);
+  assert.match(account, /inventoryItemIds:\s*selectedIds/);
+  assert.match(account, /orderId:\s*selectedLegacyOrder\?\.id/);
+  assert.match(account, /body:\s*JSON\.stringify\(useV2/);
+  assert.match(account, /requestEligibleItems\.map\(\(item\)\s*=>\s*item\.id\)/);
+  assert.match(account, /disabled=\{disabled\}/);
+  assert.match(account, /전환이 완료된 매장의 상품은 필요한 상품만 골라 함께 신청할 수 있습니다/);
+  assert.match(account, /전환 전 매장의 결제 완료 상품은 주문 한 건 전체를 선택합니다/);
+  assert.match(account, /setSelectedOrderId\(""\)/);
+  assert.match(account, /setSelectedInventoryItemIds\(\[\]\)/);
+  assert.match(account, /선택 상품 배송 신청/);
+  assert.match(account, /shipment\.trackingNumber\s*&&\s*shipment\.courier/);
+  assert.match(account, /배송조회/);
+  assert.match(account, /기존 주문 전체 배송 신청/);
+  assert.match(account, /선택 주문 전체 배송 신청/);
 });
 
 test("retired browser repositories no longer expose legacy shipping mutations", async () => {
@@ -144,7 +207,7 @@ test("retired browser repositories no longer expose legacy shipping mutations", 
   }
 });
 
-test("generated database types expose canonical shipment tables and commands", async () => {
+test("generated database types retain historical canonical shipment compatibility", async () => {
   const types = await source("src/lib/supabase/database.types.ts");
   for (const contract of [
     "commerce_shipments:",

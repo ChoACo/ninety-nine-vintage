@@ -17,7 +17,7 @@ import {
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("product uploads preserve a 2560px inspection master and a 360p thumbnail", () => {
+test("product uploads preserve a 2560px high-resolution source and a 360p thumbnail", () => {
   assert.deepEqual(getCompressedProductImageDimensions(4_000, 3_000), {
     width: 2560,
     height: 1920,
@@ -140,7 +140,7 @@ test("variant encoding runs concurrently and records the 100 ms budget without a
   }
 });
 
-test("uploads overlap both variants and report honest device timings to the operator", async () => {
+test("uploads overlap both variants without adding device measurements to product registration", async () => {
   const [products, operatorConsole, uploadModal, singleRoute, bulkRoute] = await Promise.all([
     source("src/lib/supabase/products.ts"),
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
@@ -157,18 +157,13 @@ test("uploads overlap both variants and report honest device timings to the oper
   assert.match(products, /\.upload\(thumbnailPath, thumbnailFile,/);
   assert.match(products, /compressionMeasurements/);
   assert.match(products, /onCompressionMeasured\?\.\(/);
-  assert.match(operatorConsole, /onCompressionMeasured\(/);
-  assert.match(operatorConsole, /completedImages \+ compressedForProduct/);
-  assert.match(uploadModal, /measurement\.targetMet/);
-  assert.match(uploadModal, /measurement\.totalMs/);
-  assert.match(uploadModal, /100ms 목표 달성/);
-  assert.match(uploadModal, /100ms 목표 초과/);
-  assert.match(uploadModal, /느린 기기에서 초과해도 업로드는 계속됩니다/);
-  assert.doesNotMatch(uploadModal, /disabled=\{[^}]*targetMet/);
+  assert.doesNotMatch(operatorConsole, /onCompressionMeasured|compressedForProduct|기기 실측/);
+  assert.doesNotMatch(uploadModal, /measurement\.targetMet|measurement\.totalMs|100ms 목표|기기 실측/);
   assert.equal((uploadModal.match(/accept=\{PRODUCT_IMAGE_INPUT_ACCEPT\}/g) ?? []).length, 2);
   assert.match(uploadModal, /PRODUCT_IMAGE_HEIC_CONVERSION_NOTE/);
   assert.match(operatorConsole, /URL 등록은 원격 파일을 그대로 연결/);
-  assert.match(operatorConsole, /레거시 CSV의 원격 URL은 재인코딩하지 않으며/);
+  assert.match(operatorConsole, /2560px 고해상도 원본과 360p 미리보기/);
+  assert.doesNotMatch(operatorConsole, /일괄 등록 CSV|CSV 일괄 등록 실행/);
   for (const route of [singleRoute, bulkRoute]) {
     assert.match(route, /body\??\.thumbnailUrls === undefined\s*\? imageUrls\s*:\s*images\(body\.?thumbnailUrls\)/);
     assert.match(route, /thumbnailUrls\.length !== imageUrls\.length/);

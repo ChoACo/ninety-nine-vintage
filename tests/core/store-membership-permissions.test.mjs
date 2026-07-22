@@ -58,18 +58,18 @@ test("legacy projection fails closed and preserves scoped product management", a
 
   expectMatch(
     migration,
-    /where\s+public\.access_role_for_user\(stores\.operator_id\)\s+is\s+distinct\s+from\s+'operator'[\s\S]{0,180}raise\s+exception/i,
-    "invalid legacy store operators must abort the migration",
+    /where\s+public\.access_role_for_user\(stores\.operator_id\)\s+is\s+distinct\s+from\s+'operator'[\s\S]{0,120}access_role_for_user\(stores\.operator_id\)\s+is\s+distinct\s+from\s+'owner'[\s\S]{0,180}raise\s+exception/i,
+    "invalid legacy store assignees must abort while Owner remains an explicit exception",
   );
   expectMatch(
     migration,
-    /select[\s\S]{0,500}stores\.operator_id[\s\S]{0,180}'operator'[\s\S]{0,220}true\s*,\s*true\s*,\s*true\s*,\s*true\s*,\s*false\s*,\s*false\s*,\s*true\s*,\s*true[\s\S]{0,180}from\s+public\.stores/i,
-    "operators must retain product and store-operation permissions without central rights",
+    /select[\s\S]{0,500}stores\.operator_id[\s\S]{0,180}'operator'[\s\S]{0,220}true\s*,\s*true\s*,\s*true\s*,\s*true\s*,\s*false\s*,\s*false\s*,\s*true\s*,\s*true[\s\S]{0,180}from\s+public\.stores[\s\S]{0,120}access_role_for_user\(stores\.operator_id\)\s*=\s*'operator'/i,
+    "only actual operators retain product and store-operation permissions without central rights",
   );
   expectMatch(
     migration,
-    /from\s+public\.account_access_roles\s+as\s+roles[\s\S]{0,180}join\s+public\.stores[\s\S]{0,160}stores\.operator_id\s*=\s*roles\.reports_to_operator_id[\s\S]{0,140}roles\.role_code\s*=\s*'employee'/i,
-    "employees must be projected to the current stores of their reporting operator",
+    /from\s+public\.account_access_roles\s+as\s+roles[\s\S]{0,180}join\s+public\.stores[\s\S]{0,160}stores\.operator_id\s*=\s*roles\.reports_to_operator_id[\s\S]{0,180}roles\.role_code\s*=\s*'employee'[\s\S]{0,180}access_role_for_user\(stores\.operator_id\)\s*=\s*'operator'/i,
+    "employees must be projected only to stores assigned to an actual operator",
   );
   expectMatch(
     migration,
@@ -124,8 +124,18 @@ test("relationship triggers prevent store and account-role drift", async () => {
   );
   expectMatch(
     migration,
+    /function\s+public\.sync_store_operator_memberships[\s\S]{0,2200}v_assignee_role\s*=\s*'owner'[\s\S]{0,1400}if\s+v_assignee_role\s*=\s*'owner'\s+then\s+return\s+new[\s\S]{0,360}sync_store_membership_relationship\([\s\S]{0,220}'operator'/i,
+    "Owner assignment must clear stale explicit memberships and return before operator provisioning",
+  );
+  expectMatch(
+    migration,
     /create\s+trigger\s+account_access_roles_sync_employee_memberships[\s\S]{0,180}after\s+insert\s+or\s+update\s+of\s+role_code\s*,\s*reports_to_operator_id\s+or\s+delete/i,
     "employee role changes must synchronize memberships",
+  );
+  expectMatch(
+    migration,
+    /function\s+public\.sync_employee_store_memberships[\s\S]{0,1800}where\s+stores\.operator_id\s*=\s*new\.reports_to_operator_id[\s\S]{0,180}access_role_for_user\(stores\.operator_id\)\s*=\s*'operator'/i,
+    "employee synchronization must never create explicit membership for an Owner-assigned store",
   );
   expectMatch(
     migration,

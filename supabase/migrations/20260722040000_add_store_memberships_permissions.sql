@@ -16,10 +16,11 @@ begin
     select 1
     from public.stores as stores
     where public.access_role_for_user(stores.operator_id) is distinct from 'operator'
+      and public.access_role_for_user(stores.operator_id) is distinct from 'owner'
   ) then
     raise exception using
       errcode = '23514',
-      message = '유효한 운영자가 아닌 stores.operator_id가 있어 매장 소속을 안전하게 생성할 수 없습니다.';
+      message = '유효한 운영자가 아닌 stores.operator_id가 있어 매장 소속을 안전하게 생성할 수 없습니다. 단, 시스템 관리자는 명시적 예외로 허용됩니다.';
   end if;
 end;
 $$;
@@ -264,7 +265,8 @@ execute function public.validate_store_membership();
 
 -- The backfill preserves the existing product-management contract. Operators
 -- retain their own active stores and employees retain every current store of
--- their reporting operator. Central rights are deliberately never inferred.
+-- their reporting operator. Owner-assigned stores intentionally receive no
+-- explicit operator or employee membership; central rights are never inferred.
 insert into public.store_memberships (
   business_id,
   store_id,
@@ -294,7 +296,8 @@ select
   false,
   true,
   true
-from public.stores as stores;
+from public.stores as stores
+where public.access_role_for_user(stores.operator_id) = 'operator';
 
 insert into public.store_memberships (
   business_id,
@@ -329,7 +332,8 @@ from public.account_access_roles as roles
 join public.stores as stores
   on stores.operator_id = roles.reports_to_operator_id
 where roles.role_code = 'employee'
-  and public.access_role_for_user(roles.user_id) = 'employee';
+  and public.access_role_for_user(roles.user_id) = 'employee'
+  and public.access_role_for_user(stores.operator_id) = 'operator';
 
 insert into public.store_membership_permission_audits (
   membership_id,
@@ -553,10 +557,12 @@ begin
       message = '기존 매장의 사업체 경계는 변경할 수 없습니다.';
   end if;
 
-  if public.access_role_for_user(new.operator_id) is distinct from 'operator' then
+  if public.access_role_for_user(new.operator_id) is distinct from 'operator'
+    and public.access_role_for_user(new.operator_id) is distinct from 'owner'
+  then
     raise exception using
       errcode = '23514',
-      message = '매장 담당자는 현재 유효한 운영자여야 합니다.';
+      message = '매장 담당자는 현재 유효한 운영자 또는 시스템 관리자여야 합니다.';
   end if;
   return new;
 end;
@@ -580,10 +586,13 @@ as $$
 declare
   v_membership record;
   v_employee record;
+  v_assignee_role text;
 begin
   if tg_op = 'UPDATE' and new.operator_id = old.operator_id then
     return new;
   end if;
+
+  v_assignee_role := public.access_role_for_user(new.operator_id);
 
   for v_membership in
     select memberships.*
@@ -591,6 +600,8 @@ begin
     where memberships.store_id = new.id
       and memberships.status = 'active'
       and (
+        v_assignee_role = 'owner'
+        or
         (
           memberships.membership_role = 'operator'
           and memberships.user_id <> new.operator_id
@@ -617,6 +628,13 @@ begin
       '매장 담당 운영자 변경으로 기존 소속 비활성화'
     );
   end loop;
+
+  -- A legacy/current Owner-assigned store is safe through Owner's implicit
+  -- authority. It must never synthesize an operator membership for the Owner,
+  -- and any stale explicit relationship is removed above.
+  if v_assignee_role = 'owner' then
+    return new;
+  end if;
 
   perform app_private.sync_store_membership_relationship(
     new.business_id,
@@ -733,6 +751,7 @@ begin
       select stores.id, stores.business_id
       from public.stores as stores
       where stores.operator_id = new.reports_to_operator_id
+        and public.access_role_for_user(stores.operator_id) = 'operator'
       order by stores.id
     loop
       perform app_private.sync_store_membership_relationship(

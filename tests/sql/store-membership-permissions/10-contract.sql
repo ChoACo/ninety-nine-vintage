@@ -7,6 +7,15 @@ select test_support.assert_true(
   not exists (
     select 1
     from public.store_memberships as memberships
+    where memberships.store_id = '20000000-0000-4000-8000-000000000003'
+  ),
+  'Owner-assigned store must not synthesize an operator membership'
+);
+
+select test_support.assert_true(
+  not exists (
+    select 1
+    from public.store_memberships as memberships
     where memberships.membership_role in ('operator', 'employee')
       and (
         not memberships.manage_products
@@ -61,6 +70,13 @@ select test_support.assert_true(
   'Owner must have implicit store permission'
 );
 select test_support.assert_true(
+  public.has_store_permission(
+    '20000000-0000-4000-8000-000000000003',
+    'manage_products'
+  ),
+  'Owner must implicitly manage an Owner-assigned store without membership'
+);
+select test_support.assert_true(
   public.has_business_permission(
     '99000000-0000-4000-8000-000000000001',
     'receive_at_center'
@@ -78,7 +94,8 @@ select test_support.assert_true(
 select set_config('app.test_user_id', '10000000-0000-4000-8000-000000000002', false);
 select test_support.assert_true(
   public.can_manage_product_store('20000000-0000-4000-8000-000000000001')
-  and not public.can_manage_product_store('20000000-0000-4000-8000-000000000002'),
+  and not public.can_manage_product_store('20000000-0000-4000-8000-000000000002')
+  and not public.can_manage_product_store('20000000-0000-4000-8000-000000000003'),
   'operator product access must remain scoped to the assigned store'
 );
 select test_support.assert_true(
@@ -92,7 +109,8 @@ select test_support.assert_true(
 select set_config('app.test_user_id', '10000000-0000-4000-8000-000000000004', false);
 select test_support.assert_true(
   public.can_manage_product_store('20000000-0000-4000-8000-000000000001')
-  and not public.can_manage_product_store('20000000-0000-4000-8000-000000000002'),
+  and not public.can_manage_product_store('20000000-0000-4000-8000-000000000002')
+  and not public.can_manage_product_store('20000000-0000-4000-8000-000000000003'),
   'employee product access must follow the explicit backfilled membership'
 );
 select test_support.assert_true(
@@ -291,7 +309,7 @@ reset role;
 select set_config('app.test_user_id', '', false);
 
 insert into public.stores (id, business_id, operator_id, is_active) values (
-  '20000000-0000-4000-8000-000000000003',
+  '20000000-0000-4000-8000-000000000004',
   '99000000-0000-4000-8000-000000000001',
   '10000000-0000-4000-8000-000000000003',
   true
@@ -301,7 +319,7 @@ select test_support.assert_true(
   exists (
     select 1
     from public.store_memberships as memberships
-    where memberships.store_id = '20000000-0000-4000-8000-000000000003'
+    where memberships.store_id = '20000000-0000-4000-8000-000000000004'
       and memberships.user_id = '10000000-0000-4000-8000-000000000003'
       and memberships.membership_role = 'operator'
       and memberships.status = 'active'
@@ -309,13 +327,69 @@ select test_support.assert_true(
   and exists (
     select 1
     from public.store_memberships as memberships
-    where memberships.store_id = '20000000-0000-4000-8000-000000000003'
+    where memberships.store_id = '20000000-0000-4000-8000-000000000004'
       and memberships.user_id = '10000000-0000-4000-8000-000000000004'
       and memberships.membership_role = 'employee'
       and memberships.status = 'active'
   ),
   'new store relationships did not provision operator and employee memberships'
 );
+
+insert into public.stores (id, business_id, operator_id, is_active) values (
+  '20000000-0000-4000-8000-000000000005',
+  '99000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+
+select test_support.assert_true(
+  not exists (
+    select 1
+    from public.store_memberships as memberships
+    where memberships.store_id = '20000000-0000-4000-8000-000000000005'
+  ),
+  'new Owner-assigned store unexpectedly provisioned an explicit membership'
+);
+
+update public.stores
+set operator_id = '10000000-0000-4000-8000-000000000002'
+where id = '20000000-0000-4000-8000-000000000003';
+
+select test_support.assert_true(
+  exists (
+    select 1
+    from public.store_memberships as memberships
+    where memberships.store_id = '20000000-0000-4000-8000-000000000003'
+      and memberships.user_id = '10000000-0000-4000-8000-000000000002'
+      and memberships.membership_role = 'operator'
+      and memberships.status = 'active'
+  ),
+  'Owner-to-operator reassignment did not provision the explicit operator membership'
+);
+
+update public.stores
+set operator_id = '10000000-0000-4000-8000-000000000001'
+where id = '20000000-0000-4000-8000-000000000001';
+
+select test_support.assert_true(
+  not exists (
+    select 1
+    from public.store_memberships as memberships
+    where memberships.store_id = '20000000-0000-4000-8000-000000000001'
+      and memberships.status = 'active'
+  ),
+  'operator-to-Owner reassignment left a stale active membership'
+);
+
+set role authenticated;
+select set_config('app.test_user_id', '10000000-0000-4000-8000-000000000002', false);
+select test_support.assert_true(
+  not public.can_manage_product_store('20000000-0000-4000-8000-000000000001')
+  and public.can_manage_product_store('20000000-0000-4000-8000-000000000003'),
+  'operator scope did not move away from the Owner-assigned store'
+);
+reset role;
+select set_config('app.test_user_id', '', false);
 
 update public.account_access_roles
 set role_code = 'member', reports_to_operator_id = null

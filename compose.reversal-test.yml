@@ -1,0 +1,32 @@
+# Isolated, disposable PostgreSQL for the reversal-target SQL suite. This
+# service deliberately publishes no host port and retains no named volume.
+name: ninety-nine-reversal-target-postgres
+
+services:
+  reversal-target-postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: reversal_target_test
+      POSTGRES_USER: reversal_target_test
+      # Test-only credential. The database is isolated to this Compose project.
+      POSTGRES_PASSWORD: reversal_target_test_only
+    read_only: true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reversal_target_test -d reversal_target_test"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+      start_period: 2s
+    tmpfs:
+      - /var/lib/postgresql/data:rw,nosuid,nodev,noexec,size=256m
+      - /var/run/postgresql:rw,nosuid,nodev,noexec,size=16m
+      - /tmp:rw,nosuid,nodev,noexec,size=64m
+    volumes:
+      - type: bind
+        source: ./tests/sql/reversal-target-binding
+        target: /sql/reversal-target-binding
+        read_only: true
+      - type: bind
+        source: ./supabase/migrations
+        target: /sql/migrations
+        read_only: true

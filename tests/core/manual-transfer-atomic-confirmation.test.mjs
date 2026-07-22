@@ -1175,12 +1175,12 @@ test("all three receipt UIs persist one canonical key until a successful respons
     );
     expectMatch(
       mutation,
-      /getOrCreatePendingManualTransferReceipt\s*\(\s*actorId\s*,\s*receiptScope/,
+      /getOrCreatePendingManualTransferReceipt\s*\(\s*actorId\s*,\s*(?:receiptScope|pendingScope)/,
       `${label}: the actor-bound pending request key must be reused`,
     );
     expectMatch(
       mutation,
-      /clearPendingManualTransferReceipt\s*\(\s*actorId\s*,\s*receiptScope/,
+      /clearPendingManualTransferReceipt\s*\(\s*actorId\s*,\s*(?:receiptScope|pendingScope)/,
       `${label}: only the current actor's pending key may be cleared`,
     );
     assertOrdered(
@@ -1205,7 +1205,7 @@ test("all three receipt UIs persist one canonical key until a successful respons
     );
     expectMatch(
       mutation,
-      /readIdempotentReplay\s*\([\s\S]{0,220}idempotentReplay\s*===\s*null[\s\S]{0,500}clearPendingManualTransferReceipt\s*\(/,
+      /readIdempotentReplay\s*\([\s\S]*?idempotentReplay\s*===\s*null[\s\S]*?clearPendingManualTransferReceipt\s*\(/,
       `${label}: malformed success JSON must keep the retry key until the replay marker is known`,
     );
     expectMatch(

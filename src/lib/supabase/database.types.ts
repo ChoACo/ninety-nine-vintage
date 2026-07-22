@@ -3997,11 +3997,27 @@ export type Database = {
         Returns: boolean
       }
       reverse_manual_transfer_payment: {
-        Args: { p_ledger_id: string; p_reason: string }
+        Args: {
+          p_expected_ledger_entry_count: number
+          p_expected_received_amount: number
+          p_expected_transfer_id: string
+          p_expected_transfer_kind: string
+          p_idempotency_key: string
+          p_ledger_id: string
+          p_reason: string
+        }
         Returns: Json
       }
       reverse_shipping_fee_payment: {
-        Args: { p_ledger_id: string; p_reason: string }
+        Args: {
+          p_expected_ledger_entry_count: number
+          p_expected_received_amount: number
+          p_expected_transfer_id: string
+          p_expected_transfer_kind: string
+          p_idempotency_key: string
+          p_ledger_id: string
+          p_reason: string
+        }
         Returns: Json
       }
       review_nickname_change_request: {

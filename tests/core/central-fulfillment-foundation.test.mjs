@@ -163,7 +163,7 @@ test("foundation is read-only to clients and adds no automatic fulfillment write
   );
 });
 
-test("generated database snapshot includes the foundation without mutation RPCs", async () => {
+test("generated database snapshot includes the activated fulfillment boundary", async () => {
   const types = await databaseTypesSource();
 
   for (const table of [
@@ -189,9 +189,14 @@ test("generated database snapshot includes the foundation without mutation RPCs"
     /stores:\s*\{[\s\S]{0,220}Row:\s*\{[\s\S]{0,100}business_id:\s*string/,
     "stores must expose their business boundary",
   );
-  assert.doesNotMatch(
+  expectMatch(
     types,
-    /record_order_item_fulfillment_action|configure_fulfillment_center/,
-    "the type snapshot must not advertise mutation RPCs that this phase does not install",
+    /^      configure_fulfillment_center: \{$/m,
+    "the current type snapshot must expose the guarded center configuration RPC",
+  );
+  expectMatch(
+    types,
+    /^      record_center_item_action: \{$/m,
+    "the current type snapshot must expose the guarded item action RPC",
   );
 });

@@ -1,9 +1,8 @@
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 
 import { getSupabaseBrowserClient } from "./client";
-import type { MemberAccountStatus as DatabaseMemberAccountStatus } from "./database.types";
 
-export type MemberAccountStatus = DatabaseMemberAccountStatus;
+export type MemberAccountStatus = "active" | "suspended";
 export type ManagedAccessRole =
   | "operator"
   | "employee"

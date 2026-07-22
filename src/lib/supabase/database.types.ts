@@ -6,37 +6,6 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type ProductStatus = "pending" | "active" | "closed"
-export type ProductSaleType = "auction" | "fixed"
-export type SupportConversationStatus = "open" | "closed"
-export type MemberAccountStatus = "active" | "suspended"
-export type ShippingRequestStatus = "requested" | "shipped" | "cancelled"
-export type PortOnePayMethod = "CARD" | "EASY_PAY" | "VIRTUAL_ACCOUNT"
-export type ProductPaymentStatus = "대기중" | "가상계좌발급" | "결제완료"
-export type ActivePaymentMode = "manual_transfer" | "portone"
-export type ManualTransferStatus =
-  | "awaiting_manual_transfer"
-  | "confirmed"
-  | "cancelled_unpaid"
-export type AuctionPurchaseOfferKind = "original" | "second_chance"
-export type AuctionPurchaseOfferStatus =
-  | "payment_due"
-  | "offered"
-  | "accepted"
-  | "settled"
-  | "expired_unpaid"
-  | "declined"
-  | "expired_offer"
-  | "no_successor"
-export type PortOnePaymentStatus =
-  | "READY"
-  | "PAY_PENDING"
-  | "VIRTUAL_ACCOUNT_ISSUED"
-  | "PAID"
-  | "FAILED"
-  | "PARTIAL_CANCELLED"
-  | "CANCELLED"
-
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -641,6 +610,57 @@ export type Database = {
           },
         ]
       }
+      fulfillment_center_events: {
+        Row: {
+          actor_role_snapshot: string
+          actor_user_id: string
+          event_type: string
+          from_snapshot: Json
+          fulfillment_center_id: string
+          id: string
+          idempotency_key: string
+          occurred_at: string
+          to_snapshot: Json
+        }
+        Insert: {
+          actor_role_snapshot: string
+          actor_user_id: string
+          event_type: string
+          from_snapshot: Json
+          fulfillment_center_id: string
+          id?: string
+          idempotency_key: string
+          occurred_at?: string
+          to_snapshot: Json
+        }
+        Update: {
+          actor_role_snapshot?: string
+          actor_user_id?: string
+          event_type?: string
+          from_snapshot?: Json
+          fulfillment_center_id?: string
+          id?: string
+          idempotency_key?: string
+          occurred_at?: string
+          to_snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_center_events_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_center_events_fulfillment_center_id_fkey"
+            columns: ["fulfillment_center_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fulfillment_centers: {
         Row: {
           address_line1: string | null
@@ -658,6 +678,7 @@ export type Database = {
           status: string
           updated_at: string
           updated_by: string | null
+          version: number
         }
         Insert: {
           address_line1?: string | null
@@ -675,6 +696,7 @@ export type Database = {
           status?: string
           updated_at?: string
           updated_by?: string | null
+          version?: number
         }
         Update: {
           address_line1?: string | null
@@ -692,6 +714,7 @@ export type Database = {
           status?: string
           updated_at?: string
           updated_by?: string | null
+          version?: number
         }
         Relationships: [
           {
@@ -711,6 +734,44 @@ export type Database = {
           {
             foreignKeyName: "fulfillment_centers_updated_by_fkey"
             columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fulfillment_command_receipts: {
+        Row: {
+          actor_user_id: string
+          command_name: string
+          created_at: string
+          idempotency_key: string
+          request_fingerprint: string
+          result: Json
+          target_id: string
+        }
+        Insert: {
+          actor_user_id: string
+          command_name: string
+          created_at?: string
+          idempotency_key: string
+          request_fingerprint: string
+          result: Json
+          target_id: string
+        }
+        Update: {
+          actor_user_id?: string
+          command_name?: string
+          created_at?: string
+          idempotency_key?: string
+          request_fingerprint?: string
+          result?: Json
+          target_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_command_receipts_actor_user_id_fkey"
+            columns: ["actor_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1362,7 +1423,7 @@ export type Database = {
           {
             foreignKeyName: "order_item_fulfillments_order_item_identity_fkey"
             columns: ["order_item_id", "order_id", "store_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "commerce_order_items"
             referencedColumns: ["id", "order_id", "store_id"]
           },
@@ -2749,6 +2810,178 @@ export type Database = {
           },
         ]
       }
+      store_membership_permission_audits: {
+        Row: {
+          action: string
+          actor_kind: string
+          actor_role_snapshot: string
+          actor_user_id: string | null
+          after_permissions: Json
+          after_status: string
+          before_permissions: Json | null
+          before_status: string | null
+          business_id: string
+          from_version: number | null
+          id: string
+          idempotency_key: string
+          membership_id: string
+          occurred_at: string
+          reason: string
+          requested_permissions: Json | null
+          requested_status: string | null
+          store_id: string
+          to_version: number
+          user_id: string
+        }
+        Insert: {
+          action: string
+          actor_kind: string
+          actor_role_snapshot: string
+          actor_user_id?: string | null
+          after_permissions: Json
+          after_status: string
+          before_permissions?: Json | null
+          before_status?: string | null
+          business_id: string
+          from_version?: number | null
+          id?: string
+          idempotency_key: string
+          membership_id: string
+          occurred_at?: string
+          reason: string
+          requested_permissions?: Json | null
+          requested_status?: string | null
+          store_id: string
+          to_version: number
+          user_id: string
+        }
+        Update: {
+          action?: string
+          actor_kind?: string
+          actor_role_snapshot?: string
+          actor_user_id?: string | null
+          after_permissions?: Json
+          after_status?: string
+          before_permissions?: Json | null
+          before_status?: string | null
+          business_id?: string
+          from_version?: number | null
+          id?: string
+          idempotency_key?: string
+          membership_id?: string
+          occurred_at?: string
+          reason?: string
+          requested_permissions?: Json | null
+          requested_status?: string | null
+          store_id?: string
+          to_version?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_membership_permission_audits_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "store_memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_membership_permission_audits_membership_identity_fkey"
+            columns: ["membership_id", "business_id", "store_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "store_memberships"
+            referencedColumns: ["id", "business_id", "store_id", "user_id"]
+          },
+        ]
+      }
+      store_memberships: {
+        Row: {
+          business_id: string
+          confirm_payments: boolean
+          create_shipments: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          manage_products: boolean
+          manage_staff: boolean
+          membership_role: string
+          prepare_orders: boolean
+          publish_products: boolean
+          receive_at_center: boolean
+          status: string
+          store_id: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+          version: number
+          view_reports: boolean
+        }
+        Insert: {
+          business_id: string
+          confirm_payments?: boolean
+          create_shipments?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          manage_products?: boolean
+          manage_staff?: boolean
+          membership_role: string
+          prepare_orders?: boolean
+          publish_products?: boolean
+          receive_at_center?: boolean
+          status?: string
+          store_id: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+          version?: number
+          view_reports?: boolean
+        }
+        Update: {
+          business_id?: string
+          confirm_payments?: boolean
+          create_shipments?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          manage_products?: boolean
+          manage_staff?: boolean
+          membership_role?: string
+          prepare_orders?: boolean
+          publish_products?: boolean
+          receive_at_center?: boolean
+          status?: string
+          store_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+          version?: number
+          view_reports?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_memberships_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_memberships_store_business_fkey"
+            columns: ["store_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "store_memberships_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stores: {
         Row: {
           business_id: string
@@ -3007,6 +3240,16 @@ export type Database = {
         Args: { p_delta: number; p_member_id: string }
         Returns: number
       }
+      advance_store_fulfillment_work: {
+        Args: {
+          p_action: string
+          p_expected_version: number
+          p_idempotency_key: string
+          p_note?: string
+          p_work_id: string
+        }
+        Returns: Json
+      }
       assert_valid_member_nickname: {
         Args: { p_nickname: string }
         Returns: string
@@ -3050,11 +3293,11 @@ export type Database = {
         Returns: boolean
       }
       can_manage_members: { Args: never; Returns: boolean }
-      can_manage_products: { Args: never; Returns: boolean }
       can_manage_product_store: {
         Args: { p_store_id: string }
         Returns: boolean
       }
+      can_manage_products: { Args: never; Returns: boolean }
       can_manage_support_conversation: {
         Args: { p_conversation_id: string }
         Returns: boolean
@@ -3092,6 +3335,19 @@ export type Database = {
           product_id: string
           status: string
         }[]
+      }
+      configure_fulfillment_center: {
+        Args: {
+          p_address_line1: string
+          p_address_line2: string
+          p_center_id: string
+          p_contact_name: string
+          p_contact_phone: string
+          p_expected_version: number
+          p_idempotency_key: string
+          p_postal_code: string
+        }
+        Returns: Json
       }
       confirm_commerce_order_transfer: {
         Args: { p_order_id: string }
@@ -3175,6 +3431,28 @@ export type Database = {
         }[]
       }
       get_auction_server_time: { Args: never; Returns: string }
+      get_center_fulfillment_queue: {
+        Args: { p_limit?: number; p_offset?: number }
+        Returns: {
+          active_item_count: number
+          blocked_item_count: number
+          business_id: string
+          center_id: string
+          center_name: string
+          center_status: string
+          items: Json
+          order_created_at: string
+          order_id: string
+          order_status: string
+          received_item_count: number
+          store_id: string
+          store_name: string
+          stored_item_count: number
+          work_id: string
+          work_status: string
+          work_version: number
+        }[]
+      }
       get_commerce_payment_status: {
         Args: never
         Returns: {
@@ -3205,9 +3483,9 @@ export type Database = {
       get_manual_transfer_account_for_service: {
         Args: never
         Returns: {
-          account_number: string | null
-          bank_name: string | null
-          updated_at: string | null
+          account_number: string
+          bank_name: string
+          updated_at: string
         }[]
       }
       get_manual_transfer_ledger_balances: {
@@ -3216,27 +3494,6 @@ export type Database = {
           ledger_entry_count: number
           received_amount: number
           transfer_id: string
-        }[]
-      }
-      get_shared_commerce_payment_queue_page: {
-        Args: {
-          p_history_before_activity_at?: string | null
-          p_history_before_transfer_id?: string | null
-          p_history_limit?: number
-          p_summary_only?: boolean
-        }
-        Returns: Json
-      }
-      get_shared_commerce_payment_order_summaries: {
-        Args: { p_order_ids: string[] }
-        Returns: {
-          created_at: string
-          item_count: number
-          items: Json
-          member_id: string
-          order_id: string
-          order_status: string
-          total: number
         }[]
       }
       get_manual_transfer_settings: {
@@ -3262,15 +3519,6 @@ export type Database = {
           period_start: string
         }[]
       }
-      get_my_enforcement_status: {
-        Args: never
-        Returns: {
-          bid_blocked_until: string
-          payment_deadline_exempt: boolean
-          sanction_count: number
-          warning_count: number
-        }[]
-      }
       get_my_cart_reservations: {
         Args: never
         Returns: {
@@ -3278,6 +3526,15 @@ export type Database = {
           product_id: string
           reserved_until: string
           server_time: string
+        }[]
+      }
+      get_my_enforcement_status: {
+        Args: never
+        Returns: {
+          bid_blocked_until: string
+          payment_deadline_exempt: boolean
+          sanction_count: number
+          warning_count: number
         }[]
       }
       get_my_nickname_state: {
@@ -3611,6 +3868,27 @@ export type Database = {
           winning_amount: number
         }[]
       }
+      get_shared_commerce_payment_order_summaries: {
+        Args: { p_order_ids: string[] }
+        Returns: {
+          created_at: string
+          item_count: number
+          items: Json
+          member_id: string
+          order_id: string
+          order_status: string
+          total: number
+        }[]
+      }
+      get_shared_commerce_payment_queue_page: {
+        Args: {
+          p_history_before_activity_at?: string
+          p_history_before_transfer_id?: string
+          p_history_limit?: number
+          p_summary_only?: boolean
+        }
+        Returns: Json
+      }
       get_shipping_work: {
         Args: {
           p_include_shipped?: boolean
@@ -3658,6 +3936,31 @@ export type Database = {
           warning_count: number
         }[]
       }
+      get_store_fulfillment_queue: {
+        Args: { p_limit?: number; p_offset?: number }
+        Returns: {
+          active_item_count: number
+          blocked_item_count: number
+          business_id: string
+          center_address_line1: string
+          center_address_line2: string
+          center_contact_name: string
+          center_contact_phone: string
+          center_id: string
+          center_name: string
+          center_postal_code: string
+          center_status: string
+          items: Json
+          order_created_at: string
+          order_id: string
+          order_status: string
+          store_id: string
+          store_name: string
+          work_id: string
+          work_status: string
+          work_version: number
+        }[]
+      }
       get_weekly_revenue: {
         Args: { p_from: string; p_to: string }
         Returns: {
@@ -3676,8 +3979,16 @@ export type Database = {
           period_start: string
         }[]
       }
+      has_business_permission: {
+        Args: { p_business_id: string; p_permission: string }
+        Returns: boolean
+      }
       has_kakao_identity: { Args: { p_user_id: string }; Returns: boolean }
       has_required_kakao_profile: { Args: never; Returns: boolean }
+      has_store_permission: {
+        Args: { p_permission: string; p_store_id: string }
+        Returns: boolean
+      }
       insert_owner_hidden_test_member_audit: {
         Args: {
           p_action: string
@@ -3727,8 +4038,8 @@ export type Database = {
           bid_increment: number
           closes_at: string
           current_price: number
-          final_bid_amount: number | null
-          final_bid_id: string | null
+          final_bid_amount: number
+          final_bid_id: string
           image_urls: string[]
           is_final: boolean
           product_id: string
@@ -3811,13 +4122,13 @@ export type Database = {
       operator_process_second_chance: {
         Args: { p_product_id: string }
         Returns: {
-          bidder_display_name: string | null
-          offer_id: string | null
+          bidder_display_name: string
+          offer_id: string
           offer_status: string
-          offered_amount: number | null
+          offered_amount: number
           processed_count: number
           product_id: string
-          response_due_at: string | null
+          response_due_at: string
           server_time: string
         }[]
       }
@@ -4212,12 +4523,24 @@ export type Database = {
           skipped_ids: string[]
         }[]
       }
+      record_center_item_action: {
+        Args: {
+          p_action: string
+          p_expected_version: number
+          p_idempotency_key: string
+          p_note?: string
+          p_order_item_id: string
+          p_reason_code?: string
+          p_storage_location_code?: string
+        }
+        Returns: Json
+      }
       record_manual_transfer_payment: {
         Args: {
           p_amount: number
           p_depositor_name: string
-          p_expected_received_amount: number
           p_expected_ledger_entry_count: number
+          p_expected_received_amount: number
           p_idempotency_key: string
           p_memo?: string
           p_transfer_id: string
@@ -4245,29 +4568,21 @@ export type Database = {
           session_record_id: string
         }[]
       }
-      release_my_cart_reservation: {
-        Args: { p_product_id: string }
-        Returns: boolean
-      }
-      reserve_fixed_product_for_cart: {
-        Args: { p_product_id: string }
-        Returns: {
-          product_id: string
-          reserved_until: string
-          server_time: string
-        }[]
-      }
       record_shipping_fee_payment: {
         Args: {
           p_amount: number
           p_depositor_name: string
-          p_expected_received_amount: number
           p_expected_ledger_entry_count: number
+          p_expected_received_amount: number
           p_idempotency_key: string
           p_memo?: string
           p_payment_id: string
         }
         Returns: Json
+      }
+      release_my_cart_reservation: {
+        Args: { p_product_id: string }
+        Returns: boolean
       }
       reopen_my_support_conversation: {
         Args: never
@@ -4354,6 +4669,14 @@ export type Database = {
         }
         Returns: string
       }
+      reserve_fixed_product_for_cart: {
+        Args: { p_product_id: string }
+        Returns: {
+          product_id: string
+          reserved_until: string
+          server_time: string
+        }[]
+      }
       respond_security_log_subject_consent: {
         Args: { p_approved: boolean; p_note?: string; p_request_id: string }
         Returns: undefined
@@ -4410,6 +4733,21 @@ export type Database = {
       set_payment_runtime_mode: {
         Args: { p_active_mode: string }
         Returns: string
+      }
+      set_store_membership_access: {
+        Args: {
+          p_expected_version: number
+          p_idempotency_key: string
+          p_membership_id: string
+          p_permissions: Json
+          p_reason: string
+          p_status: string
+        }
+        Returns: {
+          membership_id: string
+          membership_version: number
+          replayed: boolean
+        }[]
       }
       start_product_inquiry: {
         Args: { p_body: string; p_client_nonce: string; p_product_id: string }
@@ -4530,6 +4868,16 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      update_manual_transfer_settings: {
+        Args: { p_account_number: string; p_bank_name: string }
+        Returns: {
+          account_number: string
+          active_mode: string
+          bank_name: string
+          configured: boolean
+          updated_at: string
+        }[]
+      }
       update_operator_product: {
         Args: {
           p_bid_increment: number
@@ -4599,16 +4947,6 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
-      }
-      update_manual_transfer_settings: {
-        Args: { p_account_number: string; p_bank_name: string }
-        Returns: {
-          account_number: string
-          active_mode: string
-          bank_name: string
-          configured: boolean
-          updated_at: string
-        }[]
       }
       upsert_daily_revenue: {
         Args: {

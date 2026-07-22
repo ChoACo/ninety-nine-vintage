@@ -629,8 +629,8 @@ export async function GET(request: Request) {
   const { data, error } = await auth.user.rpc(
     "get_shared_commerce_payment_queue_page",
     {
-      p_history_before_activity_at: query.before,
-      p_history_before_transfer_id: query.beforeId,
+      p_history_before_activity_at: query.before ?? undefined,
+      p_history_before_transfer_id: query.beforeId ?? undefined,
       p_history_limit: HISTORY_PAGE_SIZE,
       p_summary_only: query.summaryOnly,
     },

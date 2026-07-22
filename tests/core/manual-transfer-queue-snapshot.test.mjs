@@ -214,7 +214,7 @@ test("operator API validates the snapshot fail-closed and exposes summary mode",
   expectMatch(dashboard, /setOrders\(orderData\.activeCount\s*\?\?\s*0\)/);
   expectMatch(
     databaseTypes,
-    /get_shared_commerce_payment_queue_page:[\s\S]{0,420}p_history_before_activity_at\?:\s*string\s*\|\s*null[\s\S]{0,260}Returns:\s*Json/,
+    /get_shared_commerce_payment_queue_page:[\s\S]{0,420}p_history_before_activity_at\?:\s*string(?:\s*\|\s*null)?[\s\S]{0,260}Returns:\s*Json/,
     "generated database types must include the JSON queue RPC",
   );
 });

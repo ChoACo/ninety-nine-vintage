@@ -326,6 +326,33 @@ export type Database = {
         }
         Relationships: []
       }
+      businesses: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cancelled_auction_bids: {
         Row: {
           amount: number
@@ -425,7 +452,7 @@ export type Database = {
           payment_status: string
           product_id: string
           storage_expires_at: string | null
-          store_id: string | null
+          store_id: string
           unit_price: number
         }
         Insert: {
@@ -436,7 +463,7 @@ export type Database = {
           payment_status?: string
           product_id: string
           storage_expires_at?: string | null
-          store_id?: string | null
+          store_id: string
           unit_price: number
         }
         Update: {
@@ -447,7 +474,7 @@ export type Database = {
           payment_status?: string
           product_id?: string
           storage_expires_at?: string | null
-          store_id?: string | null
+          store_id?: string
           unit_price?: number
         }
         Relationships: [
@@ -611,6 +638,162 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      fulfillment_centers: {
+        Row: {
+          address_line1: string | null
+          address_line2: string | null
+          business_id: string
+          code: string
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_default: boolean
+          name: string
+          postal_code: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          business_id: string
+          code: string
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          postal_code?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          business_id?: string
+          code?: string
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          postal_code?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_centers_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_centers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_centers_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fulfillment_events: {
+        Row: {
+          actor_kind: string
+          actor_role_snapshot: string
+          actor_user_id: string | null
+          event_type: string
+          from_blocked: boolean | null
+          from_location_code: string | null
+          from_location_kind: string | null
+          from_stage: string | null
+          id: string
+          idempotency_key: string
+          metadata: Json
+          note: string | null
+          occurred_at: string
+          order_item_id: string
+          reason_code: string | null
+          recorded_at: string
+          sequence_no: number
+          to_blocked: boolean
+          to_location_code: string | null
+          to_location_kind: string
+          to_stage: string
+        }
+        Insert: {
+          actor_kind: string
+          actor_role_snapshot: string
+          actor_user_id?: string | null
+          event_type: string
+          from_blocked?: boolean | null
+          from_location_code?: string | null
+          from_location_kind?: string | null
+          from_stage?: string | null
+          id?: string
+          idempotency_key: string
+          metadata?: Json
+          note?: string | null
+          occurred_at?: string
+          order_item_id: string
+          reason_code?: string | null
+          recorded_at?: string
+          sequence_no: number
+          to_blocked: boolean
+          to_location_code?: string | null
+          to_location_kind: string
+          to_stage: string
+        }
+        Update: {
+          actor_kind?: string
+          actor_role_snapshot?: string
+          actor_user_id?: string | null
+          event_type?: string
+          from_blocked?: boolean | null
+          from_location_code?: string | null
+          from_location_kind?: string | null
+          from_stage?: string | null
+          id?: string
+          idempotency_key?: string
+          metadata?: Json
+          note?: string | null
+          occurred_at?: string
+          order_item_id?: string
+          reason_code?: string | null
+          recorded_at?: string
+          sequence_no?: number
+          to_blocked?: boolean
+          to_location_code?: string | null
+          to_location_kind?: string
+          to_stage?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_events_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_item_fulfillments"
+            referencedColumns: ["order_item_id"]
           },
         ]
       }
@@ -1113,6 +1296,94 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_item_fulfillments: {
+        Row: {
+          block_reason: string | null
+          business_id: string
+          created_at: string
+          current_stage: string
+          fulfillment_center_id: string
+          is_blocked: boolean
+          last_event_at: string
+          location_kind: string
+          order_id: string
+          order_item_id: string
+          storage_location_code: string | null
+          store_id: string
+          updated_at: string
+          version: number
+          work_id: string
+        }
+        Insert: {
+          block_reason?: string | null
+          business_id: string
+          created_at?: string
+          current_stage: string
+          fulfillment_center_id: string
+          is_blocked?: boolean
+          last_event_at?: string
+          location_kind: string
+          order_id: string
+          order_item_id: string
+          storage_location_code?: string | null
+          store_id: string
+          updated_at?: string
+          version?: number
+          work_id: string
+        }
+        Update: {
+          block_reason?: string | null
+          business_id?: string
+          created_at?: string
+          current_stage?: string
+          fulfillment_center_id?: string
+          is_blocked?: boolean
+          last_event_at?: string
+          location_kind?: string
+          order_id?: string
+          order_item_id?: string
+          storage_location_code?: string | null
+          store_id?: string
+          updated_at?: string
+          version?: number
+          work_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_item_fulfillments_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_fulfillments_order_item_identity_fkey"
+            columns: ["order_item_id", "order_id", "store_id"]
+            isOneToOne: true
+            referencedRelation: "commerce_order_items"
+            referencedColumns: ["id", "order_id", "store_id"]
+          },
+          {
+            foreignKeyName: "order_item_fulfillments_work_identity_fkey"
+            columns: [
+              "work_id",
+              "business_id",
+              "order_id",
+              "store_id",
+              "fulfillment_center_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "store_fulfillment_works"
+            referencedColumns: [
+              "id",
+              "business_id",
+              "order_id",
+              "store_id",
+              "fulfillment_center_id",
+            ]
           },
         ]
       }
@@ -2393,8 +2664,94 @@ export type Database = {
         }
         Relationships: []
       }
+      store_fulfillment_works: {
+        Row: {
+          business_id: string
+          created_at: string
+          created_by: string | null
+          fulfillment_center_id: string
+          id: string
+          order_id: string
+          status: string
+          store_id: string
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          fulfillment_center_id: string
+          id?: string
+          order_id: string
+          status?: string
+          store_id: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          fulfillment_center_id?: string
+          id?: string
+          order_id?: string
+          status?: string
+          store_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_fulfillment_works_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_fulfillment_works_center_business_fkey"
+            columns: ["fulfillment_center_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_centers"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "store_fulfillment_works_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_fulfillment_works_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_fulfillment_works_store_business_fkey"
+            columns: ["store_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "store_fulfillment_works_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stores: {
         Row: {
+          business_id: string
           created_at: string
           description: string
           id: string
@@ -2405,6 +2762,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          business_id?: string
           created_at?: string
           description?: string
           id?: string
@@ -2415,6 +2773,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          business_id?: string
           created_at?: string
           description?: string
           id?: string
@@ -2425,6 +2784,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "stores_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "stores_operator_id_fkey"
             columns: ["operator_id"]

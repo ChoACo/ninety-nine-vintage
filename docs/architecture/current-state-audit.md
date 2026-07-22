@@ -12,9 +12,11 @@
 
 > 2026-07-22 역분개 후속 운영 추적: `20260722020000_harden_manual_transfer_reversal.sql`을 운영 DB에 적용하고 코드 커밋 `fe88ae9`를 최초 Vercel Production 배포 `dpl_8CnZjNxyCLFcW6WxAHf67Cyvp99j`로 공개했다. 현재 공개 도메인 alias는 Ready 재배포 `dpl_3thy1uLNCRe4Bcj1y6NgkYSKEQze`에 연결돼 있다. 역분개 RPC는 URL의 transfer 종류·ID와 원본 ledger를 같은 mutation 안에서 결박하고, 화면이 관찰한 signed 원장 합계·행 수 CAS와 처리자별 멱등 재시도를 강제한다. PostgreSQL 18.4 임시 클러스터와 Docker Desktop 4.83.0·Engine 29.6.2의 PostgreSQL 17.10 격리 Compose 환경에서 계약과 실제 다중 세션 경쟁 검증을 모두 통과했다. Docker runner는 성공 후 프로젝트·컨테이너·네트워크·볼륨을 제거했다. 공개 통합 검사, `site/status` DB 연결, 비인증 mutation 차단과 인증된 운영자 주문·대시보드 읽기 검증도 통과했다. 운영 원장이 비어 있어 실제 역분개 mutation은 실행하지 않았다.
 
+> 2026-07-22 중앙 물류 기반 구현 추적: `20260722030000_add_central_fulfillment_foundation.sql`은 `businesses`, 주소 설정 전 `configuration_required`인 기본 `fulfillment_centers`, 주문·매장별 `store_fulfillment_works`, 주문 상품별 `order_item_fulfillments`, append-only `fulfillment_events`를 순방향으로 추가한다. 결제 상태나 보관 만료를 실물 입고로 추정하지 않고, 명시적 취소·발송 사실 외 기존 상품은 `reconciliation_required/unknown`으로만 분류한다. 새 테이블은 Owner 읽기만 허용하며 신규 주문 초기화 trigger, 물류 전이 RPC, 기존 송장 gate는 실제 센터 주소와 P0-3 세부 권한을 확정한 후 별도 단계에서 활성화한다. 정적 계약, PostgreSQL 18.4 임시 클러스터, Docker PostgreSQL 17.10 격리 suite가 같은 backfill·FK·CHECK·append-only·RLS/ACL 계약을 통과했고 두 runner 모두 임시 자원을 제거했다. 따라서 이 변경은 P1-1 기반이지 중앙 집하 운영 완료나 단일 송장 강제 완료가 아니다.
+
 ## 요약
 
-조사 기준선의 코드는 통합 장바구니, 매장 정보가 포함된 통합 주문, 수동 계좌이체 원장, 직원/운영자 역할, 고객 보관과 배송 요청을 이미 갖고 있다. 그러나 확정 목표에 필요한 중앙 출고지, 매장→중앙 인계 상태, 주문당 단일 송장 제약, 매장 멤버십 기반 세부 권한은 없다. 기준선에서 PortOne은 격리된 미래 코드가 아니라 런타임에서 전환 가능한 완전한 결제 경로였다. 후속 P0-2는 운영 DB와 Production까지 반영해 수동이체만 활성화했고 PortOne 어댑터와 기록은 비활성 상태로 보존한다.
+조사 기준선의 코드는 통합 장바구니, 매장 정보가 포함된 통합 주문, 수동 계좌이체 원장, 직원/운영자 역할, 고객 보관과 배송 요청을 이미 갖고 있다. 그러나 확정 목표에 필요한 중앙 출고지, 매장→중앙 인계 상태, 주문당 단일 송장 제약, 매장 멤버십 기반 세부 권한은 없다. 후속 `20260722030000`은 중앙 출고 기반 스키마와 보수적 이력 projection을 추가하지만 운영 전이와 송장 gate는 아직 열지 않는다. 기준선에서 PortOne은 격리된 미래 코드가 아니라 런타임에서 전환 가능한 완전한 결제 경로였다. 후속 P0-2는 운영 DB와 Production까지 반영해 수동이체만 활성화했고 PortOne 어댑터와 기록은 비활성 상태로 보존한다.
 
 ## 영역별 확인 결과
 
@@ -70,7 +72,7 @@
 
 - 결제된 주문 상품은 `storage_expires_at`을 가지며 소형 14일, 대형 7일이라는 기존 주석 정책이 있다. 근거: `supabase/migrations/20260719130000_multistore_commerce_storage.sql`.
 - 고객 보관 API는 결제된 주문 상품과 경매 낙찰 상품을 함께 반환한다. 근거: `src/app/api/account/storage/route.ts`.
-- 물리적 중앙 출고지, 선반/위치, 중앙 입고자, 입고 시각을 표현하는 엔터티는 확인되지 않았다. 현재 보관 만료는 시간 중심 모델이다.
+- 조사 기준선에는 물리적 중앙 출고지, 선반/위치, 중앙 입고자, 입고 시각을 표현하는 엔터티가 없고 보관 만료만 시간 중심으로 존재한다. 후속 `20260722030000`은 중앙 출고지, 상품별 현재 위치·보관 위치 코드와 이벤트 기반을 추가하지만, 센터 주소 구성과 입고/보관 mutation은 아직 비활성 상태다.
 
 ### 배송
 
@@ -79,6 +81,7 @@
 - 중앙 출고지 테이블, 매장 인계, 중앙 입고, 전 상품 집하 완료 후 송장 생성 제약은 확인되지 않았다.
 - DB에서 주문당 또는 배송 요청당 활성 송장 정확히 1개를 보장하는 별도 `shipments` 엔터티/유니크 제약은 확인되지 않았다. 현재 송장 필드는 `shipping_requests`에 직접 있다.
 - 배송비는 상품 주문 시점과 보관 상품 배송 요청 시점에 서로 다른 흐름이 존재한다. 근거: `commerce_orders.shipping_fee`, `shipping_fee_payments`, `src/app/api/shipping/requests/route.ts`. 통합 정책에서 언제 배송비를 한 번 받는지 명확화가 필요하다.
+- 후속 `20260722030000`은 기존 `shipping_requests`, Owner 직접 UPDATE API, 운영자 송장 RPC를 변경하지 않는다. 중앙 기반 테이블이 생겨도 P1-3 gate 전까지는 기존 송장 경로가 중앙 입고·최종 확인·합포장을 검사하지 않는 위험이 그대로 남는다.
 
 ### 운영자 콘솔
 

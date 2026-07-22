@@ -12,6 +12,8 @@
     "start": "next start",
     "test": "node --test tests/core/*.test.mjs",
     "verify:browser": "node scripts/verify-local-browser-happy-path.mjs",
+    "verify:central-fulfillment-db": "node scripts/verify-local-central-fulfillment-postgres.mjs",
+    "verify:central-fulfillment-db:docker": "node scripts/verify-docker-central-fulfillment-postgres.mjs",
     "verify:checkout-browser": "node scripts/verify-local-checkout-browser.mjs",
     "verify:integrations": "node scripts/verify-integrations.mjs",
     "verify:local": "node scripts/verify-local-happy-path.mjs",

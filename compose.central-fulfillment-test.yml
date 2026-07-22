@@ -1,0 +1,32 @@
+# Isolated, disposable PostgreSQL for the central-fulfillment foundation SQL suite.
+# This service deliberately publishes no host port and retains no named volume.
+name: ninety-nine-central-fulfillment-postgres
+
+services:
+  central-fulfillment-postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: central_fulfillment_test
+      POSTGRES_USER: central_fulfillment_test
+      # Test-only credential. The database is isolated to this Compose project.
+      POSTGRES_PASSWORD: central_fulfillment_test_only
+    read_only: true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U central_fulfillment_test -d central_fulfillment_test"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+      start_period: 2s
+    tmpfs:
+      - /var/lib/postgresql/data:rw,nosuid,nodev,noexec,size=256m
+      - /var/run/postgresql:rw,nosuid,nodev,noexec,size=16m
+      - /tmp:rw,nosuid,nodev,noexec,size=64m
+    volumes:
+      - type: bind
+        source: ./tests/sql/central-fulfillment-foundation
+        target: /sql/central-fulfillment-foundation
+        read_only: true
+      - type: bind
+        source: ./supabase/migrations
+        target: /sql/migrations
+        read_only: true

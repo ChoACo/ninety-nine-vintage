@@ -53,3 +53,51 @@ The concurrency phase proves three boundaries with separate database sessions:
 - different actors racing one receipt produce one winner and one fail-closed result;
 - a ledger append committed while reversal waits on the parent lock produces a
   stale-CAS rejection and no reversal.
+
+## Central-fulfillment foundation
+
+The P1-1 foundation has a separate four-step suite: an operational-shape
+bootstrap, conservative legacy rows, the forward migration, and database
+contracts.
+
+```powershell
+npm run verify:central-fulfillment-db
+npm run verify:central-fulfillment-db:docker
+```
+
+The installed-runtime runner accepts PostgreSQL 17 or newer and uses the same
+random-port temporary-cluster cleanup boundary as the reversal runner. The
+Docker runner uses `postgres:17-alpine` with no published host port, read-only
+SQL mounts, a read-only container filesystem, `tmpfs` database storage, and a
+unique Compose project. It verifies that no project-labelled container,
+network, or volume remains after `down --volumes --remove-orphans`.
+
+Verified on 2026-07-22 against installed PostgreSQL 18.4 and isolated Docker
+PostgreSQL 17.10. Both runs proved:
+
+- payment completion and `storage_expires_at` never become inferred central
+  receipt or storage facts;
+- cancelled and explicit shipped evidence are the only automatic terminal
+  legacy classifications;
+- business, store, order-item, work, and center composite relationships fail
+  closed;
+- the unconfigured default center contains no invented address, while an
+  active center requires a valid five-digit postal code and bounded contact
+  data;
+- fulfillment events reject update, delete, and truncate operations;
+- only an Owner can read the foundation tables, and client/service roles have
+  no direct mutation privileges;
+- the foundation deliberately creates no new-order initialization trigger or
+  fulfillment mutation RPC.
+
+There is no concurrency phase yet because this migration exposes no workflow
+writer. The later transition RPC migration must add version/CAS, idempotency,
+lock-order, and multi-session competition tests before enabling operations.
+
+A complete `supabase start` replay currently stops before this migration at
+`20260718030000_add_role_levels_revenue_enforcement.sql`. That historical
+migration requires the production Kakao Owner identity to exist before normal
+seed files run, so an empty local Auth schema fails closed. This is a pre-existing
+fresh-environment reproducibility gap, not a failure in the fulfillment
+foundation; the isolated PostgreSQL suites remain the executable contract until
+the Owner bootstrap is separated from schema migration replay.

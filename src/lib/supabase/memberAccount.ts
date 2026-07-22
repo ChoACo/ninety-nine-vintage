@@ -432,30 +432,3 @@ export async function deleteMyShippingAddress(addressId: string): Promise<void> 
   );
   throwQueryError(error, "배송지를 삭제하지 못했습니다.");
 }
-
-export async function requestMyProductShipping(
-  productIds: readonly string[],
-  addressId: string,
-): Promise<string> {
-  const uniqueProductIds = [...new Set(productIds.filter(Boolean))];
-  if (uniqueProductIds.length === 0) {
-    throw new MemberAccountError("택배로 받을 상품을 선택해 주세요.");
-  }
-  if (!addressId) {
-    throw new MemberAccountError("택배를 받을 배송지를 선택해 주세요.");
-  }
-
-  const { data, error } = await getMemberAccountClient().rpc(
-    "request_product_shipping",
-    {
-      p_product_ids: uniqueProductIds,
-      p_address_id: addressId,
-    },
-  );
-
-  throwQueryError(error, "택배 접수를 완료하지 못했습니다.");
-  if (typeof data !== "string" || !data) {
-    throw new MemberAccountError("택배 접수 결과를 확인하지 못했습니다.");
-  }
-  return data;
-}

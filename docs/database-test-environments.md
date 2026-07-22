@@ -107,3 +107,39 @@ The linked production rollout on 2026-07-22 had exactly one pending migration,
 passed with 73 linked migrations. A fresh remote schema dump confirmed all five
 tables, forced RLS, the five Owner-only SELECT policies, authenticated SELECT-only
 grants, and no direct `service_role` table grant on the foundation tables.
+
+## Canonical combined shipment
+
+The final combined-pack and single-tracking boundary has a dedicated Docker
+PostgreSQL 17 suite:
+
+```powershell
+npm run verify:canonical-shipment-db:docker
+```
+
+The runner mounts the repository read-only, stores PostgreSQL data in `tmpfs`,
+applies the real fulfillment migrations from `20260722030000` through
+`20260722070000`, and always removes its container, network, and volumes. It
+proves the manual-transfer and shipping-credit paths, exact settlement XOR,
+complete-order manifests, unpaid and stale-CAS failures, idempotent replay and
+payload conflict, forced RLS and RPC ACLs, append-only audit history, immutable
+manifest sources, Owner-only tracking correction, and two real multi-session
+races: one shipment dispatched twice and two shipments claiming one tracking
+number.
+
+Verified repeatedly on 2026-07-22 with Docker Engine 29.6.2 and
+`postgres:17-alpine`; every run completed and cleaned up its isolated Compose
+project.
+
+## Docker GPU opt-in
+
+Docker keeps `runc` as the safe default runtime. GPU workloads opt in per
+container instead of changing database and web containers globally:
+
+```powershell
+docker run --rm --gpus all nvidia/cuda:12.9.1-base-ubuntu24.04 nvidia-smi
+```
+
+After the Windows restart on 2026-07-22, both host `nvidia-smi` and the Docker
+CUDA container detected the NVIDIA GeForce RTX 5060 Ti, driver 591.86, and
+16,311 MiB of GPU memory.

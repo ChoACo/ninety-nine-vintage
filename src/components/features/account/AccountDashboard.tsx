@@ -9,7 +9,7 @@ import {
   Truck,
   UserRound,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
@@ -37,6 +37,33 @@ interface StoragePayload {
     image_urls: string[];
     shipping_status: string;
   }>;
+}
+interface CommerceOrderItem {
+  id: string;
+  product_id: string;
+  payment_status: string;
+}
+interface CommerceOrder {
+  id: string;
+  status: string;
+  commerce_order_items?: CommerceOrderItem[];
+}
+interface ShipmentPayment {
+  expected_amount: number;
+  status: string;
+  bank_name_snapshot: string;
+  account_number_snapshot: string;
+}
+interface ShipmentResponse {
+  shipment_id: string;
+  shipping_request_id: string;
+  order_id: string;
+  status: string;
+  readiness_status: string;
+  block_reason: string | null;
+  settlement_method: "shipping_credit" | "manual_transfer";
+  version: number;
+  payment: ShipmentPayment | null;
 }
 interface Address {
   id: string;
@@ -67,7 +94,8 @@ function AccountDashboardForSession({
   const [now, setNow] = useState(0);
   const [notice, setNotice] = useState("");
   const [addresses, setAddresses] = useState<Address[]>([]);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [orders, setOrders] = useState<CommerceOrder[]>([]);
+  const [selectedOrderId, setSelectedOrderId] = useState("");
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [addressForm, setAddressForm] = useState({
     label: "집",
@@ -98,17 +126,20 @@ function AccountDashboardForSession({
           creditResponse,
           wishlistResponse,
           addressResponse,
+          ordersResponse,
         ] = await Promise.all([
           fetch("/api/account/storage", { headers, cache: "no-store" }),
           fetch("/api/shipping/credits", { headers, cache: "no-store" }),
           fetch("/api/wishlist", { headers, cache: "no-store" }),
           fetch("/api/account/addresses", { headers, cache: "no-store" }),
+          fetch("/api/orders", { headers, cache: "no-store" }),
         ]);
         if (
           !storageResponse.ok ||
           !creditResponse.ok ||
           !wishlistResponse.ok ||
-          !addressResponse.ok
+          !addressResponse.ok ||
+          !ordersResponse.ok
         ) {
           throw new Error("account_data_unavailable");
         }
@@ -121,6 +152,9 @@ function AccountDashboardForSession({
         };
         const addressData = (await addressResponse.json()) as {
           addresses?: Address[];
+        };
+        const ordersData = (await ordersResponse.json()) as {
+          orders?: CommerceOrder[];
         };
         const ids = wishlistData.productIds ?? [];
         const [auctionResponse, fixedResponse] = await Promise.all([
@@ -152,6 +186,7 @@ function AccountDashboardForSession({
           setApplyShippingCredit(Number(creditData.credits ?? 0) > 0);
           setLiked(allProducts.filter((product) => ids.includes(product.id)));
           setAddresses(addressData.addresses ?? []);
+          setOrders(ordersData.orders ?? []);
           setSelectedAddressId(
             addressData.addresses?.find((address) => address.is_default)?.id ??
               addressData.addresses?.[0]?.id ??
@@ -205,6 +240,26 @@ function AccountDashboardForSession({
     ],
   ] as const;
   const eligible = storage.filter((item) => item.shippingEligible);
+  const eligibleOrders = useMemo(() => {
+    const storageByProductId = new Map(
+      storage.map((item) => [item.product_id, item]),
+    );
+    return orders.flatMap((order) => {
+      const items = order.commerce_order_items ?? [];
+      const completeOrderItems = items.map((item) =>
+        storageByProductId.get(item.product_id),
+      );
+      if (
+        order.status !== "paid" ||
+        items.length === 0 ||
+        !items.every((item) => item.payment_status === "paid") ||
+        completeOrderItems.some((item) => !item?.shippingEligible)
+      ) {
+        return [];
+      }
+      return [{ id: order.id, itemCount: items.length }];
+    });
+  }, [orders, storage]);
   const saveAddress = async () => {
     if (!token) return;
     const response = await fetch("/api/account/addresses", {
@@ -237,8 +292,7 @@ function AccountDashboardForSession({
     });
     setShippingMessage("배송지를 저장했습니다.");
   };
-  const shippingRequestKey = useRef<string | null>(null);
-  const shippingFeeKey = useRef<string | null>(null);
+  const shippingRequestKeys = useRef(new Map<string, string>());
   if (loading || (token && dataStatus === "loading")) {
     return (
       <div
@@ -274,13 +328,14 @@ function AccountDashboardForSession({
     );
   }
   const requestShipping = async () => {
-    if (!token || selectedIds.length === 0 || !selectedAddressId) {
-      setShippingMessage("배송 상품과 배송지를 선택해 주세요.");
+    if (!token || !selectedOrderId || !selectedAddressId) {
+      setShippingMessage("배송 신청 주문과 배송지를 선택해 주세요.");
       return;
     }
+    const idempotencyScope = `${selectedOrderId}:${selectedAddressId}:${applyShippingCredit ? "shipping_credit" : "manual_transfer"}`;
     const idempotencyKey =
-      shippingRequestKey.current ??
-      (shippingRequestKey.current = crypto.randomUUID());
+      shippingRequestKeys.current.get(idempotencyScope) ?? crypto.randomUUID();
+    shippingRequestKeys.current.set(idempotencyScope, idempotencyKey);
     const response = await fetch("/api/shipping/requests", {
       method: "POST",
       headers: {
@@ -288,7 +343,7 @@ function AccountDashboardForSession({
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        productIds: selectedIds,
+        orderId: selectedOrderId,
         addressId: selectedAddressId,
         applyShippingCredit,
         idempotencyKey,
@@ -296,50 +351,29 @@ function AccountDashboardForSession({
     });
     const payload = (await response.json()) as {
       error?: string;
-      request?: { id: string };
+      message?: string;
+      shipment?: ShipmentResponse;
     };
-    if (!response.ok) {
-      setShippingMessage(payload.error ?? "배송 요청을 만들지 못했습니다.");
+    if (!response.ok || !payload.shipment) {
+      setShippingMessage(
+        payload.message ?? payload.error ?? "배송 요청을 만들지 못했습니다.",
+      );
       return;
     }
-    shippingRequestKey.current = null;
-    setSelectedIds([]);
+    shippingRequestKeys.current.delete(idempotencyScope);
+    setOrders((current) =>
+      current.filter((order) => order.id !== selectedOrderId),
+    );
+    setSelectedOrderId("");
     setCredits((current) =>
       applyShippingCredit ? Math.max(0, current - 1) : current,
     );
+    if (applyShippingCredit) setApplyShippingCredit(credits > 1);
+    const shipment = payload.shipment;
     setShippingMessage(
-      applyShippingCredit
-        ? `합배송 요청 ${payload.request?.id ?? "완료"}을 접수했습니다. 배송 크레딧 1회를 사용했습니다.`
-        : `합배송 요청 ${payload.request?.id ?? "완료"}을 접수했습니다. 배송비 계좌이체 안내를 준비했습니다.`,
-    );
-  };
-  const prepareShippingFee = async () => {
-    if (!token) return;
-    const idempotencyKey =
-      shippingFeeKey.current ?? (shippingFeeKey.current = crypto.randomUUID());
-    const response = await fetch("/api/shipping/credits", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ idempotencyKey }),
-    });
-    const payload = (await response.json()) as {
-      payment?: {
-        expected_amount: number;
-        bank_name_snapshot: string;
-        account_number_snapshot: string;
-      };
-      error?: string;
-    };
-    if (!response.ok || !payload.payment) {
-      setShippingMessage(payload.error ?? "배송비 안내를 불러오지 못했습니다.");
-      return;
-    }
-    shippingFeeKey.current = null;
-    setShippingMessage(
-      `${payload.payment.expected_amount.toLocaleString("ko-KR")}원 · ${payload.payment.bank_name_snapshot} ${payload.payment.account_number_snapshot}로 입금해 주세요.`,
+      shipment.payment
+        ? `배송 신청 ${shipment.shipping_request_id}을 접수했습니다. ${shipment.payment.expected_amount.toLocaleString("ko-KR")}원 · ${shipment.payment.bank_name_snapshot} ${shipment.payment.account_number_snapshot}로 입금해 주세요.`
+        : `배송 신청 ${shipment.shipping_request_id}을 접수했습니다. 배송 크레딧 1회를 사용했습니다.`,
     );
   };
   return (
@@ -426,23 +460,10 @@ function AccountDashboardForSession({
                 ? new Date(item.storage_expires_at)
                 : null;
               return (
-                <label
-                  className={`flex gap-3 py-4 sm:gap-4 ${item.shippingEligible ? "cursor-pointer" : "opacity-60"}`}
+                <div
+                  className={`flex gap-3 py-4 sm:gap-4 ${item.shippingEligible ? "" : "opacity-60"}`}
                   key={item.id}
                 >
-                  <input
-                    checked={selectedIds.includes(item.product_id)}
-                    className="mt-2 accent-zinc-950"
-                    disabled={!item.shippingEligible}
-                    onChange={(event) =>
-                      setSelectedIds((current) =>
-                        event.target.checked
-                          ? [...current, item.product_id]
-                          : current.filter((id) => id !== item.product_id),
-                      )
-                    }
-                    type="checkbox"
-                  />
                   <CatalogImage
                     alt=""
                     className="size-16 shrink-0 object-cover sm:size-20"
@@ -463,16 +484,39 @@ function AccountDashboardForSession({
                     </div>
                     <p className="mt-2 text-xs text-muted">
                       {item.shippingEligible
-                        ? "합배송 상품으로 선택할 수 있습니다."
+                        ? "배송 신청 주문에 포함될 수 있습니다."
                         : "보관 기간이 만료되어 운영자 문의가 필요합니다."}
                     </p>
                   </div>
-                </label>
+                </div>
               );
             })}
           </div>
           <div className="mt-4 border border-line bg-surface p-4">
-            <p className="text-xs font-bold">배송지 선택</p>
+            <p className="text-xs font-bold">배송 신청 주문</p>
+            <p className="mt-2 text-[11px] leading-5 text-muted">
+              주문의 모든 보관 상품이 배송 가능할 때만 주문 전체를 신청할 수 있습니다.
+            </p>
+            <select
+              aria-label="배송 신청 주문"
+              className="mt-3 h-10 w-full border border-line bg-paper px-3 text-xs"
+              disabled={!token || eligibleOrders.length === 0}
+              onChange={(event) => setSelectedOrderId(event.target.value)}
+              value={selectedOrderId}
+            >
+              <option value="">주문 전체를 선택하세요</option>
+              {eligibleOrders.map((order) => (
+                <option key={order.id} value={order.id}>
+                  주문 {order.id} · {order.itemCount}개 상품 전체
+                </option>
+              ))}
+            </select>
+            {eligible.length > 0 && eligibleOrders.length === 0 && (
+              <p className="mt-2 text-[11px] text-muted">
+                주문 전체의 보관 상품이 준비되면 배송 신청할 수 있습니다.
+              </p>
+            )}
+            <p className="mt-4 text-xs font-bold">배송지 선택</p>
             <select
               aria-label="배송지"
               className="mt-3 h-10 w-full border border-line bg-paper px-3 text-xs"
@@ -544,14 +588,14 @@ function AccountDashboardForSession({
             className="mt-4 h-11 w-full bg-ink text-xs font-bold text-paper disabled:opacity-40"
             disabled={
               !token ||
-              eligible.length === 0 ||
-              selectedIds.length === 0 ||
+              eligibleOrders.length === 0 ||
+              !selectedOrderId ||
               !selectedAddressId
             }
             onClick={() => void requestShipping()}
             type="button"
           >
-            선택 상품 합배송 요청
+            선택 주문 전체 배송 신청
           </button>
           {shippingMessage && (
             <p aria-live="polite" className="mt-3 text-xs text-emerald-700">
@@ -567,16 +611,8 @@ function AccountDashboardForSession({
           <p className="mt-6 font-mono text-5xl font-bold">{credits}</p>
           <h2 className="mt-2 text-lg font-black">배송 요청 가능 횟수</h2>
           <p className="mt-3 text-xs leading-5 text-muted">
-            택배비를 선결제하면 배송 크레딧으로 전환됩니다.
+            배송 크레딧이 없으면 배송 신청 시 해당 주문의 계좌이체 안내가 표시됩니다.
           </p>
-          <button
-            className="mt-6 h-11 w-full border border-ink text-xs font-bold disabled:opacity-40"
-            disabled={!token}
-            onClick={() => void prepareShippingFee()}
-            type="button"
-          >
-            택배비 선결제 안내
-          </button>
         </section>
       </div>
       <section id="likes">

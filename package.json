@@ -15,6 +15,7 @@
     "verify:central-fulfillment-db": "node scripts/verify-local-central-fulfillment-postgres.mjs",
     "verify:central-fulfillment-db:docker": "node scripts/verify-docker-central-fulfillment-postgres.mjs",
     "verify:central-fulfillment-intake-db": "node scripts/verify-local-central-fulfillment-intake-postgres.mjs",
+    "verify:canonical-shipment-db:docker": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-canonical-commerce-shipment.ps1",
     "verify:store-membership-db": "node scripts/verify-local-store-membership-postgres.mjs",
     "verify:checkout-browser": "node scripts/verify-local-checkout-browser.mjs",
     "verify:integrations": "node scripts/verify-integrations.mjs",

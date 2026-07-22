@@ -578,6 +578,379 @@ export type Database = {
           },
         ]
       }
+      commerce_shipment_events: {
+        Row: {
+          actor_kind: string
+          actor_role_snapshot: string
+          actor_user_id: string | null
+          event_type: string
+          from_status: string | null
+          id: string
+          idempotency_key: string
+          metadata: Json
+          occurred_at: string
+          reason: string | null
+          sequence_no: number
+          shipment_id: string
+          to_status: string
+        }
+        Insert: {
+          actor_kind: string
+          actor_role_snapshot: string
+          actor_user_id?: string | null
+          event_type: string
+          from_status?: string | null
+          id?: string
+          idempotency_key: string
+          metadata?: Json
+          occurred_at?: string
+          reason?: string | null
+          sequence_no: number
+          shipment_id: string
+          to_status: string
+        }
+        Update: {
+          actor_kind?: string
+          actor_role_snapshot?: string
+          actor_user_id?: string | null
+          event_type?: string
+          from_status?: string | null
+          id?: string
+          idempotency_key?: string
+          metadata?: Json
+          occurred_at?: string
+          reason?: string | null
+          sequence_no?: number
+          shipment_id?: string
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_shipment_events_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_shipment_items: {
+        Row: {
+          business_id: string
+          created_at: string
+          fulfillment_center_id: string
+          manifest_fulfillment_version: number
+          member_id: string
+          order_id: string
+          order_item_id: string
+          packed_fulfillment_version: number | null
+          product_id: string
+          shipment_id: string
+          shipped_fulfillment_version: number | null
+          store_id: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          fulfillment_center_id: string
+          manifest_fulfillment_version: number
+          member_id: string
+          order_id: string
+          order_item_id: string
+          packed_fulfillment_version?: number | null
+          product_id: string
+          shipment_id: string
+          shipped_fulfillment_version?: number | null
+          store_id: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          fulfillment_center_id?: string
+          manifest_fulfillment_version?: number
+          member_id?: string
+          order_id?: string
+          order_item_id?: string
+          packed_fulfillment_version?: number | null
+          product_id?: string
+          shipment_id?: string
+          shipped_fulfillment_version?: number | null
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_shipment_items_fulfillment_identity_fkey"
+            columns: [
+              "order_item_id",
+              "order_id",
+              "store_id",
+              "business_id",
+              "fulfillment_center_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "order_item_fulfillments"
+            referencedColumns: [
+              "order_item_id",
+              "order_id",
+              "store_id",
+              "business_id",
+              "fulfillment_center_id",
+            ]
+          },
+          {
+            foreignKeyName: "commerce_shipment_items_order_item_identity_fkey"
+            columns: ["order_item_id", "order_id", "product_id", "store_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_order_items"
+            referencedColumns: ["id", "order_id", "product_id", "store_id"]
+          },
+          {
+            foreignKeyName: "commerce_shipment_items_shipment_order_fkey"
+            columns: [
+              "shipment_id",
+              "order_id",
+              "member_id",
+              "business_id",
+              "fulfillment_center_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "commerce_shipment_orders"
+            referencedColumns: [
+              "shipment_id",
+              "order_id",
+              "member_id",
+              "business_id",
+              "fulfillment_center_id",
+            ]
+          },
+        ]
+      }
+      commerce_shipment_orders: {
+        Row: {
+          business_id: string
+          created_at: string
+          fulfillment_center_id: string
+          member_id: string
+          order_id: string
+          shipment_id: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          fulfillment_center_id: string
+          member_id: string
+          order_id: string
+          shipment_id: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          fulfillment_center_id?: string
+          member_id?: string
+          order_id?: string
+          shipment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_shipment_orders_order_member_fkey"
+            columns: ["order_id", "member_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id", "member_id"]
+          },
+          {
+            foreignKeyName: "commerce_shipment_orders_shipment_identity_fkey"
+            columns: [
+              "shipment_id",
+              "member_id",
+              "business_id",
+              "fulfillment_center_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "commerce_shipments"
+            referencedColumns: [
+              "id",
+              "member_id",
+              "business_id",
+              "fulfillment_center_id",
+            ]
+          },
+        ]
+      }
+      commerce_shipment_reconciliation_cases: {
+        Row: {
+          created_at: string
+          details: Json
+          id: string
+          reason_code: string
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          shipping_request_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          id?: string
+          reason_code: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          shipping_request_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          id?: string
+          reason_code?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          shipping_request_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_shipment_reconciliation_cases_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_shipment_reconciliation_cases_shipping_request_id_fkey"
+            columns: ["shipping_request_id"]
+            isOneToOne: true
+            referencedRelation: "shipping_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_shipments: {
+        Row: {
+          address_snapshot: Json
+          business_id: string
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          courier: string | null
+          created_at: string
+          fulfillment_center_id: string
+          id: string
+          member_id: string
+          packed_at: string | null
+          packed_by: string | null
+          settlement_method: string
+          shipped_at: string | null
+          shipped_by: string | null
+          shipping_credit_ledger_id: string | null
+          shipping_fee_payment_id: string | null
+          shipping_request_id: string
+          status: string
+          tracking_number: string | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          address_snapshot: Json
+          business_id: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          courier?: string | null
+          created_at?: string
+          fulfillment_center_id: string
+          id?: string
+          member_id: string
+          packed_at?: string | null
+          packed_by?: string | null
+          settlement_method: string
+          shipped_at?: string | null
+          shipped_by?: string | null
+          shipping_credit_ledger_id?: string | null
+          shipping_fee_payment_id?: string | null
+          shipping_request_id: string
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          address_snapshot?: Json
+          business_id?: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          courier?: string | null
+          created_at?: string
+          fulfillment_center_id?: string
+          id?: string
+          member_id?: string
+          packed_at?: string | null
+          packed_by?: string | null
+          settlement_method?: string
+          shipped_at?: string | null
+          shipped_by?: string | null
+          shipping_credit_ledger_id?: string | null
+          shipping_fee_payment_id?: string | null
+          shipping_request_id?: string
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_shipments_center_business_fkey"
+            columns: ["fulfillment_center_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_centers"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "commerce_shipments_packed_by_fkey"
+            columns: ["packed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_shipments_shipped_by_fkey"
+            columns: ["shipped_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_shipments_shipping_credit_identity_fkey"
+            columns: [
+              "shipping_credit_ledger_id",
+              "member_id",
+              "shipping_request_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "shipping_credit_ledger"
+            referencedColumns: ["id", "member_id", "shipping_request_id"]
+          },
+          {
+            foreignKeyName: "commerce_shipments_shipping_fee_identity_fkey"
+            columns: [
+              "shipping_fee_payment_id",
+              "member_id",
+              "shipping_request_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "shipping_fee_payments"
+            referencedColumns: ["id", "member_id", "shipping_request_id"]
+          },
+          {
+            foreignKeyName: "commerce_shipments_shipping_request_member_fkey"
+            columns: ["shipping_request_id", "member_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_requests"
+            referencedColumns: ["id", "member_id"]
+          },
+        ]
+      }
       daily_revenue: {
         Row: {
           gross_amount: number
@@ -2540,6 +2913,13 @@ export type Database = {
             referencedRelation: "commerce_orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "shipping_credit_ledger_shipping_request_member_fkey"
+            columns: ["shipping_request_id", "member_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_requests"
+            referencedColumns: ["id", "member_id"]
+          },
         ]
       }
       shipping_fee_payments: {
@@ -2596,6 +2976,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipping_fee_payments_shipping_request_member_fkey"
+            columns: ["shipping_request_id", "member_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_requests"
+            referencedColumns: ["id", "member_id"]
           },
         ]
       }
@@ -3364,6 +3751,17 @@ export type Database = {
           updated_at: string
         }[]
       }
+      correct_commerce_shipment_tracking: {
+        Args: {
+          p_courier: string
+          p_expected_version: number
+          p_idempotency_key: string
+          p_reason: string
+          p_shipment_id: string
+          p_tracking_number: string
+        }
+        Returns: Json
+      }
       count_shipping_work: {
         Args: { p_include_shipped?: boolean }
         Returns: number
@@ -3458,6 +3856,36 @@ export type Database = {
         Returns: {
           active_mode: string
           configured: boolean
+        }[]
+      }
+      get_commerce_shipment_queue: {
+        Args: {
+          p_include_shipped?: boolean
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          address_snapshot: Json
+          block_reason: string
+          business_id: string
+          center_stored_count: number
+          courier: string
+          fulfillment_center_id: string
+          item_count: number
+          items: Json
+          member_id: string
+          order_ids: string[]
+          packed_at: string
+          packed_item_count: number
+          readiness_status: string
+          requested_at: string
+          settlement_method: string
+          shipment_id: string
+          shipped_at: string
+          shipping_request_id: string
+          status: string
+          tracking_number: string
+          version: number
         }[]
       }
       get_current_owner_operator_delegation: {
@@ -4440,6 +4868,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      pack_commerce_shipment: {
+        Args: {
+          p_expected_version: number
+          p_idempotency_key: string
+          p_note?: string | null
+          p_shipment_id: string
+        }
+        Returns: Json
+      }
       place_bid: {
         Args: { p_amount: number; p_product_id: string }
         Returns: {
@@ -4634,6 +5071,19 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      request_commerce_order_shipment: {
+        Args: {
+          p_account_number_snapshot: string | null
+          p_address_id: string
+          p_bank_name_snapshot: string | null
+          p_idempotency_key: string
+          p_member_id: string
+          p_order_id: string
+          p_settlement_method: string
+          p_shipping_fee_amount: number | null
+        }
+        Returns: Json
+      }
       request_my_nickname_change: {
         Args: { p_nickname: string }
         Returns: string
@@ -4748,6 +5198,17 @@ export type Database = {
           membership_version: number
           replayed: boolean
         }[]
+      }
+      ship_commerce_shipment: {
+        Args: {
+          p_courier: string
+          p_expected_version: number
+          p_idempotency_key: string
+          p_note?: string | null
+          p_shipment_id: string
+          p_tracking_number: string
+        }
+        Returns: Json
       }
       start_product_inquiry: {
         Args: { p_body: string; p_client_nonce: string; p_product_id: string }

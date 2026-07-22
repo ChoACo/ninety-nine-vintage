@@ -1,0 +1,22 @@
+name: ninety-nine-canonical-commerce-shipment-test
+
+services:
+  canonical-commerce-shipment-postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: canonical_commerce_shipment_test
+      POSTGRES_USER: canonical_commerce_shipment_test
+      POSTGRES_PASSWORD: canonical_commerce_shipment_test_only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canonical_commerce_shipment_test -d canonical_commerce_shipment_test"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+    tmpfs:
+      - /var/lib/postgresql/data:rw,nosuid,nodev,noexec,size=256m
+      - /var/run/postgresql:rw,nosuid,nodev,noexec,size=16m
+    volumes:
+      - type: bind
+        source: .
+        target: /workspace
+        read_only: true

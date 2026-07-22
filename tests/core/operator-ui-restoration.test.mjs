@@ -5,34 +5,48 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("operator revenue ledger is a first-class route backed by the guarded RPC repository", async () => {
+test("operator revenue ledger is a first-class route backed by the guarded financial-report RPC", async () => {
   await access(new URL("src/app/(admin)/admin/operator/revenue/page.tsx", rootUrl));
-  const [layout, dashboard, revenue] = await Promise.all([
+  const [layout, dashboard, route, revenue] = await Promise.all([
     source("src/app/(admin)/admin/operator/layout.tsx"),
     source("src/components/admin/operator/OperatorConsole.tsx"),
+    source("src/app/api/admin/operator/revenue/route.ts"),
     source("src/components/admin/operator/OperatorRevenueConsole.tsx"),
   ]);
 
   assert.match(layout, /href:\s*"\/admin\/operator\/revenue"/);
   assert.match(dashboard, /href="\/admin\/operator\/revenue"/);
-  assert.match(revenue, /getDailyRevenue\("2000-01-01",\s*today\)/);
-  assert.match(revenue, /upsertDailyRevenue\(\{/);
-  assert.match(revenue, /@\/components\/ui\/Button/);
-  assert.match(revenue, /@\/components\/ui\/FormControls/);
+  assert.match(route, /authenticateStaffRequest\(request\)/);
+  assert.match(route, /auth\.user as unknown as RpcClient/);
+  assert.match(route, /"get_store_financial_report"/);
+  assert.match(route, /p_from:\s*from,\s*p_to:\s*to/);
+  assert.match(route, /days\s*<\s*0\s*\|\|\s*days\s*>\s*365/);
+  assert.match(route, /error\?\.code\s*===\s*"42501"/);
+  assert.doesNotMatch(route, /auth\.admin[\s\S]*\.(?:update|insert|upsert|delete)\(/);
+
+  assert.match(revenue, /new URLSearchParams\(\{\s*from,\s*to\s*\}\)/);
+  assert.match(revenue, /\/api\/admin\/operator\/revenue\?\$\{query\}/);
+  assert.match(revenue, /type="date"\s+value=\{from\}/);
+  assert.match(revenue, /type="date"\s+value=\{to\}/);
+  assert.match(revenue, /store\.storeName/);
+  assert.match(revenue, /store\.grossSales/);
+  assert.match(revenue, /store\.refunds/);
+  assert.match(revenue, /store\.netSales/);
+  assert.match(revenue, /centralShippingFees/);
+  assert.doesNotMatch(revenue, /getDailyRevenue|upsertDailyRevenue/);
   assert.match(revenue, /grid grid-cols-2[^"]*lg:grid-cols-4/);
-  assert.match(revenue, /grid grid-cols-1[^"]*sm:grid-cols-2[^"]*xl:grid-cols-\[180px_1fr_180px_auto\]/);
-  assert.match(revenue, /grid grid-cols-1 gap-8 xl:grid-cols-\[1fr_280px\]/);
 });
 
-test("operator product console restores controlled publishing and schedule metadata", async () => {
-  const [products, productRoute, patchRoute, bulkRoute, publishRoute, publishMigration, mutationMigration, databaseTypes] = await Promise.all([
+test("operator product console publishes directly and manages active listings from explicit store permission", async () => {
+  const [products, productRoute, patchRoute, bulkRoute, publishRoute, publishMigration, mutationMigration, restoredManagementMigration, databaseTypes] = await Promise.all([
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
     source("src/app/api/admin/operator/products/route.ts"),
     source("src/app/api/admin/operator/products/[id]/route.ts"),
     source("src/app/api/admin/operator/products/bulk/route.ts"),
     source("src/app/api/admin/operator/products/[id]/publish/route.ts"),
-    source("supabase/migrations/20260721020000_harden_operator_product_publishing.sql"),
+    source("supabase/migrations/20260722130000_activate_direct_product_publishing.sql"),
     source("supabase/migrations/20260721030000_harden_operator_product_mutations.sql"),
+    source("supabase/migrations/20260722152316_restore_published_product_management.sql"),
     source("src/lib/supabase/database.types.ts"),
   ]);
 
@@ -45,34 +59,43 @@ test("operator product console restores controlled publishing and schedule metad
   assert.match(products, /result\.published_ids\.includes\(productId\)/);
   assert.match(products, /setSelectedPendingIds\(new Set\(failedIds\)\)/);
   assert.match(products, /method:\s*"POST"/);
-  assert.match(products, /publishAt, closesAt/);
+  assert.match(products, /publishAt,\s*closesAt/);
   assert.match(products, /inspectionNotes:\s*splitLines/);
-  assert.match(products, /measurements:\s*\{/);
+  assert.doesNotMatch(products, /measurementShoulder|measurements:\s*\{/);
   assert.match(products, /type="datetime-local"/);
   assert.match(products, /body:\s*JSON\.stringify\(\{\s*expectedUpdatedAt:\s*product\.updated_at\s*\}\)/);
-  assert.match(products, /disabled=\{busy \|\| !permissions\.canMutate \|\| product\.status !== "pending"\}/);
+  assert.match(products, /function isManageableProductStatus\(status: string\)/);
+  assert.match(products, /status === "pending" \|\| status === "active"/);
+  assert.match(products, /edit\(product, "inspection"\)/);
+  assert.match(products, /> 점검<\/button>/);
+  assert.match(products, /사이트에서 즉시 사라집니다/);
   assert.match(products, /status:\s*"pending" \| "active";/);
-  assert.match(products, /permissions\.canPublish && form\.status === "active"/);
-  assert.match(products, /permissions\.canPublish && <option value="active">즉시 공개<\/option>/);
-  assert.match(products, /disabled=\{busy \|\| !permissions\.canPublish \|\| product\.status !== "pending"\}/);
+  assert.match(products, /stores\.find\(\(store\) => store\.id === form\.storeId\)\?\.canPublish === true && form\.status === "active"/);
+  assert.match(products, /form\.status === "active" \|\| stores\.find/);
+  assert.match(products, /disabled=\{busy \|\| !stores\.some\(\(store\) => store\.id === product\.store_id && store\.canPublish\) \|\| product\.status !== "pending"\}/);
   assert.match(products, /grid grid-cols-1 gap-3[^"]*sm:grid-cols-2/);
-  assert.match(products, /grid grid-cols-2 gap-2[^"]*lg:grid-cols-4/);
+  assert.doesNotMatch(products, /measurementShoulder|measurementChest|measurementSleeve|measurementLength/);
   assert.match(products, /grid grid-cols-1 gap-3 sm:grid-cols-3/);
 
   assert.doesNotMatch(productRoute, /getCatalogImageUrl/);
   assert.match(productRoute, /products:\s*products \?\? \[\]/);
   assert.match(productRoute, /auth\.user\.from\("products"\)\.insert/);
-  assert.match(productRoute, /store\.operator_id !== auth\.effectiveOperatorId/);
-  assert.match(productRoute, /const canMutate = auth\.roleCode === "owner" \|\| auth\.roleCode === "operator"/);
-  assert.match(productRoute, /permissions:\s*\{ canCreate: true, canMutate, canPublish: canMutate \}/);
+  assert.match(productRoute, /from\("store_memberships"\)/);
+  assert.match(productRoute, /p_permission:\s*"manage_products"/);
+  assert.match(productRoute, /const canMutate = stores\.length > 0/);
+  assert.match(productRoute, /canCreate:\s*stores\.length > 0/);
+  assert.match(productRoute, /canPublish:\s*stores\.some\(\(store\) => store\.canPublish\)/);
   assert.match(bulkRoute, /auth\.user[\s\S]*\.from\("products"\)[\s\S]*\.insert/);
 
   assert.match(patchRoute, /validInteger\(body\.startingPrice, MAX_PRODUCT_PRICE\)/);
   assert.match(patchRoute, /validInteger\(body\.bidIncrement, MAX_BID_INCREMENT\)/);
   assert.match(patchRoute, /validTimestampVersion\(body\.expectedUpdatedAt\)/);
-  assert.match(patchRoute, /product\.status === "closed"/);
-  assert.match(patchRoute, /product\.status !== "pending"/);
+  assert.match(patchRoute, /product\.status !== "pending" && product\.status !== "active"/);
+  assert.match(patchRoute, /product\.status === "active" && saleSetupFields\.some/);
+  assert.match(patchRoute, /active_sale_setup_immutable/);
   assert.match(patchRoute, /publish_endpoint_required/);
+  assert.doesNotMatch(patchRoute, /pending_product_required|normalizeMeasurements/);
+  assert.match(patchRoute, /p_measurements:\s*product\.measurements/);
   assert.match(patchRoute, /auth\.user[\s\S]*\.rpc\("update_operator_product"/);
   assert.match(patchRoute, /sameUrls\(imageUrls, product\.image_urls\)/);
   assert.match(patchRoute, /p_thumbnail_urls:\s*thumbnailUrls/);
@@ -100,18 +123,26 @@ test("operator product console restores controlled publishing and schedule metad
   assert.match(databaseTypes, /can_manage_product_store:/);
   assert.match(databaseTypes, /update_operator_product:/);
 
-  assert.match(publishRoute, /store\?\.operator_id !== auth\.userId/);
-  assert.match(publishRoute, /auth\.roleCode !== "owner" && auth\.roleCode !== "operator"/);
+  assert.match(restoredManagementMigration, /v_product\.status not in \('pending', 'active'\)/i);
+  assert.match(restoredManagementMigration, /v_product\.status = 'active'[\s\S]*p_store_id is distinct from v_product\.store_id/i);
+  assert.match(restoredManagementMigration, /when v_product\.status = 'pending' then p_starting_price else current_price/i);
+  assert.match(restoredManagementMigration, /create or replace function public\.delete_managed_product/i);
+  assert.match(restoredManagementMigration, /when foreign_key_violation/i);
+  assert.match(restoredManagementMigration, /from public, anon, authenticated, service_role/i);
+  assert.match(restoredManagementMigration, /grant execute[\s\S]*to authenticated/i);
+
+  assert.doesNotMatch(publishRoute, /operator_id|roleCode/);
+  assert.match(publishRoute, /auth\.user[\s\S]*\.rpc\("publish_pending_products_now"/);
   assert.match(publishRoute, /\.rpc\("publish_pending_products_now"/);
   assert.match(publishRoute, /\.single\(\)/);
   assert.match(publishRoute, /data\.published_count === 1/);
   assert.match(publishRoute, /data\.skipped_count === 0/);
   assert.match(publishRoute, /product_not_published/);
 
-  assert.match(publishMigration, /v_role\s*=\s*'owner'/);
-  assert.match(publishMigration, /stores\.operator_id\s*=\s*v_actor/);
-  assert.match(publishMigration, /stores\.is_active/);
+  assert.match(publishMigration, /has_store_permission\(products\.store_id,\s*'publish_products'\)/);
+  assert.doesNotMatch(publishMigration, /v_role|stores\.operator_id/);
   assert.match(publishMigration, /products\.status\s*=\s*'pending'/);
+  assert.match(publishMigration, /publish_at\s*=\s*v_now/);
   assert.match(publishMigration, /auction_feed_expires_at\s*=\s*case/);
   assert.match(publishMigration, /from public, anon, authenticated, service_role/i);
   assert.match(publishMigration, /grant execute[\s\S]*to authenticated/i);

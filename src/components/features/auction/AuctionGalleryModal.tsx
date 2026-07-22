@@ -36,6 +36,7 @@ interface AuctionGalleryModalProps {
   initialIndex?: number;
   onClose: () => void;
   open: boolean;
+  surface?: "desktop" | "mobile";
   title: string;
 }
 
@@ -85,6 +86,7 @@ export function AuctionGalleryModal({
   initialIndex = 0,
   onClose,
   open,
+  surface = "desktop",
   title,
 }: AuctionGalleryModalProps) {
   const startIndex = clampIndex(initialIndex, images.length);
@@ -617,7 +619,7 @@ export function AuctionGalleryModal({
       aria-describedby="gallery-gesture-help"
       aria-labelledby="gallery-lightbox-title"
       aria-modal="true"
-      className="premium-dialog-overlay fixed inset-0 z-[140] flex flex-col overflow-hidden bg-zinc-950 text-white"
+      className="theme-invariant-dark premium-dialog-overlay fixed inset-0 z-[140] flex flex-col overflow-hidden bg-zinc-950 text-white"
       data-premium-modal-layer="nested"
       data-state={visible ? "open" : "closed"}
       ref={dialogRef}
@@ -682,23 +684,22 @@ export function AuctionGalleryModal({
         </div>
 
         {images.length > 1 && <>
-          <button aria-label="이전 사진" className="absolute left-5 top-1/2 hidden size-12 -translate-y-1/2 place-items-center rounded-2xl border border-white/15 bg-black/50 shadow-xl backdrop-blur-md transition-all duration-300 hover:-translate-y-[calc(50%+4px)] hover:bg-white hover:text-zinc-950 active:scale-95 md:grid" onClick={showPrevious} type="button"><ChevronLeft size={24} /></button>
-          <button aria-label="다음 사진" className="absolute right-5 top-1/2 hidden size-12 -translate-y-1/2 place-items-center rounded-2xl border border-white/15 bg-black/50 shadow-xl backdrop-blur-md transition-all duration-300 hover:-translate-y-[calc(50%+4px)] hover:bg-white hover:text-zinc-950 active:scale-95 md:grid" onClick={showNext} type="button"><ChevronRight size={24} /></button>
+          <button aria-label="이전 사진" className={`absolute left-5 top-1/2 size-12 -translate-y-1/2 place-items-center rounded-2xl border border-white/15 bg-black/50 shadow-xl backdrop-blur-md transition-all duration-300 hover:-translate-y-[calc(50%+4px)] hover:bg-white hover:text-zinc-950 active:scale-95 ${surface === "desktop" ? "grid" : "hidden"}`} onClick={showPrevious} type="button"><ChevronLeft size={24} /></button>
+          <button aria-label="다음 사진" className={`absolute right-5 top-1/2 size-12 -translate-y-1/2 place-items-center rounded-2xl border border-white/15 bg-black/50 shadow-xl backdrop-blur-md transition-all duration-300 hover:-translate-y-[calc(50%+4px)] hover:bg-white hover:text-zinc-950 active:scale-95 ${surface === "desktop" ? "grid" : "hidden"}`} onClick={showNext} type="button"><ChevronRight size={24} /></button>
         </>}
 
         <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-2xl border border-white/10 bg-black/55 px-4 py-2 text-center text-[10px] leading-4 text-zinc-300 shadow-xl backdrop-blur-md" id="gallery-gesture-help">
-          <span className="hidden md:inline">휠로 확대 · 확대 후 드래그 · + / − / 0 키</span>
-          <span className="md:hidden">한 손가락 넘기기 · 두 손가락 확대 · 확대 후 드래그</span>
+          <span>{surface === "desktop" ? "휠로 확대 · 확대 후 드래그 · + / − / 0 키" : "한 손가락 넘기기 · 두 손가락 확대 · 확대 후 드래그"}</span>
           {sourceLimited && <span className="ml-2 font-bold text-amber-300">원본 해상도 한계</span>}
         </div>
         <p aria-live="polite" className="sr-only">{announcement}</p>
       </div>
 
       {images.length > 1 && <>
-        <div aria-label="상품 사진 위치" className="flex min-h-12 shrink-0 items-center justify-start overflow-x-auto border-t border-white/10 bg-zinc-950 pb-[env(safe-area-inset-bottom)] pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] md:hidden">{images.map((_, index) => <button aria-current={visibleIndex === index ? "true" : undefined} aria-label={`${index + 1}번째 사진 보기`} className="grid size-11 shrink-0 place-items-center rounded-full active:scale-95" key={index} onClick={() => emblaApi?.scrollTo(index)} type="button"><span aria-hidden="true" className={`size-2 rounded-full transition-transform ${visibleIndex === index ? "scale-125 bg-white" : "bg-white/30"}`} /></button>)}</div>
-        <nav aria-label="상품 사진 선택" className="hidden h-24 shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-white/10 bg-zinc-900/95 px-6 md:flex">
+        {surface === "mobile" && <div aria-label="상품 사진 위치" className="flex min-h-12 shrink-0 items-center justify-start overflow-x-auto border-t border-white/10 bg-zinc-950 pb-[env(safe-area-inset-bottom)] pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))]">{images.map((_, index) => <button aria-current={visibleIndex === index ? "true" : undefined} aria-label={`${index + 1}번째 사진 보기`} className="grid size-11 shrink-0 place-items-center rounded-full active:scale-95" key={index} onClick={() => emblaApi?.scrollTo(index)} type="button"><span aria-hidden="true" className={`size-2 rounded-full transition-transform ${visibleIndex === index ? "scale-125 bg-white" : "bg-white/30"}`} /></button>)}</div>}
+        {surface === "desktop" && <nav aria-label="상품 사진 선택" className="flex h-24 shrink-0 items-center justify-center gap-2 overflow-x-auto border-t border-white/10 bg-zinc-900/95 px-6">
           {images.map((image, index) => <button aria-current={visibleIndex === index ? "true" : undefined} aria-label={`${index + 1}번째 사진 보기`} className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${visibleIndex === index ? "border-white shadow-lg" : "border-transparent opacity-50 hover:opacity-100"}`} key={`${image}-thumb-${index}`} onClick={() => emblaApi?.scrollTo(index)} type="button"><CatalogImage alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" maxDimension={128} sizes="64px" src={image} /></button>)}
-        </nav>
+        </nav>}
       </>}
     </div>,
     document.body,

@@ -15,7 +15,7 @@ interface ChatConversation {
   subject?: string | null;
 }
 
-export function ChatPanel() {
+export function ChatPanel({ basePath = "", surface = "desktop" }: { basePath?: "" | "/m"; surface?: "desktop" | "mobile" }) {
   const [conversation, setConversation] = useState<ChatConversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [message, setMessage] = useState("");
@@ -59,10 +59,10 @@ export function ChatPanel() {
   };
 
   return (
-    <div className="grid min-h-[70svh] grid-cols-1 border border-line md:min-h-[620px] md:grid-cols-[240px_1fr] lg:grid-cols-[260px_1fr]">
-      <aside className="border-b border-line bg-surface p-4 md:border-b-0 md:border-r md:p-5">
+    <div className={`grid border border-line ${surface === "desktop" ? "min-h-[620px] grid-cols-[260px_1fr]" : "min-h-[70svh] grid-cols-1"}`}>
+      <aside className={`bg-surface ${surface === "desktop" ? "border-r border-line p-5" : "border-b border-line p-4"}`}>
         <p className="eyebrow text-muted">고객 상담 / 받은 메시지</p>
-        <div className="mt-4 border border-ink bg-paper p-4 md:mt-8">
+        <div className={`border border-ink bg-paper p-4 ${surface === "desktop" ? "mt-8" : "mt-4"}`}>
           <div className="flex items-center gap-3">
             <span className="grid size-9 place-items-center rounded-full bg-ink text-paper">
               <MessageCircle size={16} />
@@ -78,7 +78,7 @@ export function ChatPanel() {
         </div>
       </aside>
       <section className="flex min-w-0 flex-col">
-        <div className="border-b border-line p-4 sm:p-6">
+        <div className={`border-b border-line ${surface === "desktop" ? "p-6" : "p-4"}`}>
           <p className="text-xs font-bold">
             {conversation?.conversation_type === "product"
               ? conversation.product_title_snapshot ||
@@ -92,13 +92,13 @@ export function ChatPanel() {
               : "상품·주문 정보를 함께 보내면 더 빠르게 확인할 수 있습니다."}
           </p>
         </div>
-        <div className="min-h-64 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+        <div className={`min-h-64 flex-1 space-y-4 overflow-y-auto ${surface === "desktop" ? "p-6" : "p-4"}`}>
           {!token && (
             <div className="bg-surface p-4 text-xs leading-5">
               상담을 시작하려면{" "}
               <Link
                 className="font-bold underline"
-                href="/account/login?next=%2Fchat"
+                href={`${basePath}/account/login?next=${encodeURIComponent(`${basePath}/chat`)}`}
               >
                 카카오 로그인
               </Link>
@@ -113,7 +113,7 @@ export function ChatPanel() {
           )}
           {messages.map((item) => (
             <div
-              className={`max-w-[85%] p-4 text-xs leading-5 sm:max-w-md ${item.sender_id === userId ? "ml-auto bg-ink text-paper" : "bg-surface"}`}
+              className={`max-w-[85%] p-4 text-xs leading-5 ${surface === "desktop" ? "max-w-md" : ""} ${item.sender_id === userId ? "ml-auto bg-ink text-paper" : "bg-surface"}`}
               key={item.id}
             >
               {item.body}
@@ -125,12 +125,12 @@ export function ChatPanel() {
           {notice && <p className="text-xs text-red-700">{notice}</p>}
         </div>
         <form
-          className="flex gap-2 border-t border-line p-3 sm:gap-3 sm:p-5"
+          className={`flex border-t border-line ${surface === "desktop" ? "gap-3 p-5" : "gap-2 p-3"}`}
           onSubmit={send}
         >
           <input
             aria-label="문의 메시지"
-            className="min-w-0 flex-1 border border-line bg-paper px-3 text-xs outline-none focus:border-ink disabled:bg-surface sm:px-4"
+            className={`min-w-0 flex-1 border border-line bg-paper text-xs outline-none focus:border-ink disabled:bg-surface ${surface === "desktop" ? "px-4" : "px-3"}`}
             disabled={!token || busy}
             onChange={(event) => setMessage(event.target.value)}
             placeholder={token ? "메시지를 입력하세요" : "로그인 후 이용할 수 있습니다"}

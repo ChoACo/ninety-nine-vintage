@@ -12,14 +12,14 @@ import { CatalogImage } from "@/components/ui/CatalogImage";
 import { rememberFixedPurchaseIntent } from "@/lib/commerce/purchaseIntent";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 
-interface AuctionCardProps { item: Omit<Item, "bidHistory"> & { closesAt?: string; timeLeft?: string }; }
+interface AuctionCardProps { basePath?: "" | "/m"; item: Omit<Item, "bidHistory"> & { closesAt?: string; timeLeft?: string }; }
 
 export function AuctionCard(props: AuctionCardProps) {
   if (props.item.saleType === "auction" && !LIVE_AUCTION_ENABLED) return null;
   return <EnabledAuctionCard {...props} />;
 }
 
-function EnabledAuctionCard({ item }: AuctionCardProps) {
+function EnabledAuctionCard({ basePath = "", item }: AuctionCardProps) {
   const router = useRouter();
   const isFixed = item.saleType === "fixed";
   const price = isFixed ? (item.fixedPrice ?? item.currentBid) : item.currentBid;
@@ -40,7 +40,7 @@ function EnabledAuctionCard({ item }: AuctionCardProps) {
       if (!session?.access_token) {
         rememberFixedPurchaseIntent(item.id, "cart");
         router.push(
-          `/account/login?next=${encodeURIComponent(`/auction/${item.id}?purchaseIntent=cart`)}`,
+          `${basePath}/account/login?next=${encodeURIComponent(`${basePath}/auction/${item.id}?purchaseIntent=cart`)}`,
         );
         return;
       }
@@ -72,7 +72,7 @@ function EnabledAuctionCard({ item }: AuctionCardProps) {
   };
   return (
     <article className="group min-w-0">
-      <Link className="block" href={`/auction/${item.id}`}>
+      <Link className="block" href={`${basePath}/auction/${item.id}`}>
         <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-lg shadow-black/5 transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl">
           {item.imageUrl ? <CatalogImage alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
           <span className="absolute left-2 top-2 rounded-lg bg-paper/90 px-2 py-1 font-mono text-[9px] font-bold tracking-[0.1em] shadow-sm backdrop-blur-md">{isFixed ? "즉시 구매" : "실시간 입찰"}</span>
@@ -85,13 +85,13 @@ function EnabledAuctionCard({ item }: AuctionCardProps) {
       </Link>
       <div className="pt-3">
         <div className="flex items-center justify-between gap-2 text-[10px] text-muted"><span className="truncate">{item.brand}</span><span className="shrink-0 font-mono tabular-nums">{item.timeLeft ?? "진행 중"}</span></div>
-        <Link className="mt-1 block truncate text-sm font-medium hover:underline" href={`/auction/${item.id}`}>{item.name}</Link>
+        <Link className="mt-1 block truncate text-sm font-medium hover:underline" href={`${basePath}/auction/${item.id}`}>{item.name}</Link>
         <div className="mt-3 flex items-end justify-between gap-2">
           <div><p className="text-[10px] text-muted">{isFixed ? "판매 정가" : "현재 입찰가"}</p><p className="font-mono text-sm font-bold tabular-nums">{price.toLocaleString("ko-KR")}원</p></div>
           <p className="text-[10px] text-muted">{isFixed ? "즉시 구매" : `입찰 ${item.bidCount}건`}</p>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2">
-          {isFixed ? <><button className="flex h-9 items-center justify-center gap-1 rounded-xl border border-line text-[10px] font-bold shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-ink hover:shadow-lg active:scale-95 disabled:opacity-50" disabled={cartBusy} onClick={(event) => { event.preventDefault(); void addFixedToCart(); }} type="button"><ShoppingBag size={13} /> {cartBusy ? "저장 중" : "장바구니"}</button><Link className="flex h-9 items-center justify-center rounded-xl bg-ink text-[10px] font-bold text-paper shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" href={`/auction/${item.id}`}>즉시 구매</Link></> : <><Link className="flex h-9 items-center justify-center gap-1 rounded-xl bg-ink text-[10px] font-bold text-paper shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" href={`/auction/${item.id}/bid`}><Gavel size={13} /> 입찰하기</Link><button className="flex h-9 cursor-not-allowed items-center justify-center gap-1 rounded-xl border border-line text-[10px] font-bold text-muted" disabled title="경매 상품은 장바구니에 담을 수 없습니다." type="button"><ShoppingBag size={13} /> 장바구니</button></>}
+          {isFixed ? <><button className="flex h-9 items-center justify-center gap-1 rounded-xl border border-line text-[10px] font-bold shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-ink hover:shadow-lg active:scale-95 disabled:opacity-50" disabled={cartBusy} onClick={(event) => { event.preventDefault(); void addFixedToCart(); }} type="button"><ShoppingBag size={13} /> {cartBusy ? "저장 중" : "장바구니"}</button><Link className="flex h-9 items-center justify-center rounded-xl bg-ink text-[10px] font-bold text-paper shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" href={`${basePath}/auction/${item.id}`}>즉시 구매</Link></> : <><Link className="flex h-9 items-center justify-center gap-1 rounded-xl bg-ink text-[10px] font-bold text-paper shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" href={`${basePath}/auction/${item.id}/bid`}><Gavel size={13} /> 입찰하기</Link><button className="flex h-9 cursor-not-allowed items-center justify-center gap-1 rounded-xl border border-line text-[10px] font-bold text-muted" disabled title="경매 상품은 장바구니에 담을 수 없습니다." type="button"><ShoppingBag size={13} /> 장바구니</button></>}
         </div>
         {actionMessage && <p aria-live="polite" className="mt-2 text-[10px] font-bold text-emerald-700">{actionMessage}</p>}
       </div>

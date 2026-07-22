@@ -6,20 +6,26 @@ const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 test("the storefront renders separate mobile and desktop presentation trees", async () => {
-  const [home, layout] = await Promise.all([
+  const [home, mobileHome, layout, mobileLayout] = await Promise.all([
     source("src/app/(shop)/home/page.tsx"),
+    source("src/app/(mobile)/m/home/page.tsx"),
     source("src/components/layout/PcLayout.tsx"),
+    source("src/components/mobile/MobileSiteLayout.tsx"),
   ]);
 
-  assert.match(home, /function MobileHome\(/);
-  assert.match(home, /className="block space-y-12 md:hidden"/);
   assert.match(home, /function DesktopHome\(/);
-  assert.match(home, /className="hidden space-y-16 md:block"/);
-  assert.match(home, /<MobileHome auctions=\{auctions\}[\s\S]*?<DesktopHome auctions=\{auctions\}/);
+  assert.doesNotMatch(home, /MobileHome|md:hidden|data-home-presentation="mobile"/);
+  assert.match(home, /<DesktopHome auctions=\{auctions\}/);
+  assert.match(mobileHome, /data-mobile-home/);
+  assert.match(mobileHome, /basePath="\/m"/);
   assert.match(layout, /<PcHeader hasLiveTicker=\{LIVE_AUCTION_ENABLED\} \/>/);
-  assert.match(layout, /<MobileHeader hasLiveTicker=\{LIVE_AUCTION_ENABLED\} \/>/);
-  assert.match(layout, /className="hidden md:block"><PcFooter \/>/);
-  assert.match(layout, /<MobileBottomNav \/>/);
+  assert.match(layout, /data-ui-surface="desktop"/);
+  assert.match(layout, /min-w-\[1024px\]/);
+  assert.doesNotMatch(layout, /MobileHeader|MobileBottomNav|md:hidden/);
+  assert.match(mobileLayout, /data-ui-surface="mobile"/);
+  assert.match(mobileLayout, /<MobileSiteHeader hasLiveTicker=\{LIVE_AUCTION_ENABLED\} \/>/);
+  assert.match(mobileLayout, /<MobileSiteBottomNav \/>/);
+  assert.doesNotMatch(mobileLayout, /PcHeader|PcFooter|PcLayout/);
 });
 
 test("product, login, and bid navigation support intercepted modals and direct full pages", async () => {
@@ -74,10 +80,10 @@ test("product, login, and bid navigation support intercepted modals and direct f
   );
 
   assert.match(interceptedProduct, /<ModalShell label="상품 상세" size="wide"><AuctionDetailView compact id=\{id\} \/><\/ModalShell>/);
-  assert.match(detailView, /grid grid-cols-1 gap-8 md:grid-cols-12/);
-  assert.match(detailView, /md:col-span-7/);
-  assert.match(stickyBidPanel, /md:sticky md:col-span-5/);
-  assert.match(stickyBidPanel, /compact \? "md:top-6" : "md:top-\[100px\]"/);
+  assert.match(detailView, /surface === "desktop" \? "grid-cols-12 gap-12" : "grid-cols-1"/);
+  assert.match(detailView, /surface === "desktop" \? "col-span-7 min-w-0"/);
+  assert.match(stickyBidPanel, /surface === "desktop"[\s\S]*sticky col-span-5/);
+  assert.match(stickyBidPanel, /compact \? "top-6" : "top-\[100px\]"/);
   assert.match(directProduct, /<AuctionDetailView id=\{id\} \/>/);
   assert.match(interceptedLogin, /<ModalShell label="로그인"><LoginPrompt returnTo=\{safeReturnTo\(query\.next\)\} \/><\/ModalShell>/);
   assert.match(directLogin, /<LoginPrompt returnTo=\{safeReturnTo\(query\.next\)\} \/>/);
@@ -88,11 +94,11 @@ test("product, login, and bid navigation support intercepted modals and direct f
   assert.match(interceptedBid, /<ModalShell label="실시간 경매 입찰"><AuctionBidRoute productId=\{id\} \/><\/ModalShell>/);
   assert.match(directBid, /<AuctionBidRoute productId=\{id\} \/>/);
   for (const biddingSurface of [stickyBidPanel, feedCard]) {
-    assert.match(biddingSurface, /href=\{`\/auction\/\$\{item\.id\}\/bid`\}/);
+    assert.match(biddingSurface, /href=\{`\$\{basePath\}\/auction\/\$\{item\.id\}\/bid`\}/);
     assert.doesNotMatch(biddingSurface, /<BidModal/);
   }
   for (const fixedPurchaseSurface of [stickyBidPanel, auctionCard]) {
-    assert.match(fixedPurchaseSurface, /router\.push\(\s*`\/account\/login\?next=/);
+    assert.match(fixedPurchaseSurface, /router\.push\([\s\S]*?\$\{basePath\}\/account\/login\?next=/);
     assert.doesNotMatch(fixedPurchaseSurface, /window\.location\.assign\(/);
   }
 });
@@ -119,13 +125,11 @@ test("gallery, Next Image, and supplied hero banners keep the V2 media contract"
   assert.match(gallery, /loop:\s*true/);
   assert.match(gallery, /emblaApi\?\.scrollPrev\(\)/);
   assert.match(gallery, /emblaApi\?\.scrollNext\(\)/);
-  assert.match(
-    gallery,
-    /className="flex min-h-12[^"]*pb-\[env\(safe-area-inset-bottom\)\][^"]*md:hidden"/,
-  );
-  assert.match(gallery, /className="hidden h-24[^"]*md:flex"/);
+  assert.match(gallery, /surface === "mobile" && <div aria-label="상품 사진 위치"/);
+  assert.match(gallery, /surface === "desktop" && <nav aria-label="상품 사진 선택"/);
 
-  assert.match(home, /src="\/banners\/brand-banner-mobile\.jpg"/);
+  const mobileHome = await source("src/app/(mobile)/m/home/page.tsx");
+  assert.match(mobileHome, /src="\/banners\/brand-banner-mobile\.jpg"/);
   assert.match(home, /src="\/banners\/brand-banner-wide\.png"/);
   assert.ok(mobileBanner.isFile() && mobileBanner.size > 0);
   assert.ok(wideBanner.isFile() && wideBanner.size > 0);
@@ -138,7 +142,7 @@ test("the cache banner opts in only public assets and excludes private commerce 
     source("public/sw.js"),
   ]);
 
-  assert.match(layout, /<CacheConsentBanner \/>/);
+  assert.match(layout, /<CacheConsentBanner surface="desktop" \/>/);
   assert.match(banner, /공개 상품·이미지·정적 리소스만 기기에 저장합니다/);
   assert.match(banner, /계정·주문·결제 정보는 저장하지 않습니다/);
   assert.match(banner, /writeCacheConsent\("accepted"\)/);

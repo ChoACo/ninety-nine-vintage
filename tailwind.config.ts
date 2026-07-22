@@ -26,12 +26,12 @@ const config: Config = {
         ],
       },
       colors: {
-        ink: "#09090B",
-        paper: "#FBFAF7",
-        line: "#E5E2DC",
-        muted: "#71717A",
-        surface: "#F1EFEA",
-        inverse: "#18181B",
+        ink: "rgb(var(--theme-ink) / <alpha-value>)",
+        paper: "rgb(var(--theme-paper) / <alpha-value>)",
+        line: "rgb(var(--theme-line) / <alpha-value>)",
+        muted: "rgb(var(--theme-muted) / <alpha-value>)",
+        surface: "rgb(var(--theme-surface) / <alpha-value>)",
+        inverse: "rgb(var(--theme-inverse) / <alpha-value>)",
       },
       spacing: {
         18: "4.5rem",
@@ -54,7 +54,7 @@ const config: Config = {
         "products-5": "repeat(5, minmax(0, 1fr))",
       },
       boxShadow: {
-        card: "0 1px 2px rgba(0, 0, 0, 0.04)",
+        card: "var(--theme-card-shadow)",
       },
     },
   },

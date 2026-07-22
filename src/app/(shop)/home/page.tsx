@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "오늘의 빈티지 | NINETY-NINE VINTAGE",
   description: "오늘 공개된 빈티지 상품과 실시간 경매를 한눈에 확인하세요.",
-  alternates: { canonical: "/home" },
+  alternates: { canonical: "/home", media: { "only screen and (max-width: 1023px)": "/m/home" } },
 };
 
 async function loadHomeData() {
@@ -43,54 +43,10 @@ interface HomePresentationProps {
   stores: HomeStores;
 }
 
-function MobileHome({ auctions, fixed, stores }: HomePresentationProps) {
-  return (
-    <div className="block space-y-12 md:hidden" data-home-presentation="mobile">
-      <section className="-mx-4 -mt-6 overflow-hidden bg-ink text-paper">
-        <div className="relative aspect-[4/5] min-h-[480px]">
-          <CatalogImage alt="나인티 나인 빈티지" className="h-full w-full object-cover object-center opacity-90" loading="lazy" maxDimension={1200} sizes="100vw" src="/banners/brand-banner-mobile.jpg" />
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent px-5 pb-7 pt-24">
-            <p className="text-[10px] font-bold tracking-[0.14em] text-zinc-300">오늘의 업데이트</p>
-            <h1 className="mt-3 text-4xl font-black leading-[.94] tracking-[-.08em]">시간을 다시 입는<br />한 점의 선택</h1>
-            <p className="mt-4 text-sm leading-6 text-zinc-300">선별된 빈티지를 즉시 구매하거나 실시간 경매로 만나보세요.</p>
-            <div className="mt-6 grid grid-cols-2 gap-2">
-              <Link className="flex h-12 items-center justify-center bg-paper text-xs font-bold text-ink" href="/shop">즉시 구매</Link>
-              {LIVE_AUCTION_ENABLED && <Link className="flex h-12 items-center justify-center border border-white/50 text-xs font-bold" href="/feed">실시간 경매</Link>}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-2 gap-px overflow-hidden border border-line bg-line">
-        <div className="bg-paper p-4"><Clock3 size={16} /><p className="mt-4 text-xs font-bold">상시 즉시 구매</p><p className="mt-1 text-[10px] text-muted">기다림 없이 결제</p></div>
-        <div className="bg-paper p-4"><p className="text-2xl font-black">{stores.length}</p><p className="mt-2 text-xs font-bold">엄선된 숍</p><p className="mt-1 text-[10px] text-muted">하나의 빈티지 아카이브</p></div>
-      </section>
-
-      {LIVE_AUCTION_ENABLED && <ProductRail eyebrow="실시간 경매" title="오늘 마감하는 경매" products={auctions} />}
-
-      <section>
-        <SectionHeading action={<Link className="text-xs font-bold underline" href="/shop">전체 보기</Link>} className="mb-5" eyebrow="엄선된 숍" title="각자의 시선으로 고른 빈티지" titleClassName="mt-2 text-2xl font-black tracking-[-0.06em]" />
-        <div className="-mx-4 grid auto-cols-[82%] grid-flow-col gap-3 overflow-x-auto px-4 pb-2 snap-x snap-mandatory">
-          {stores.map((store, index) => <Link className="min-h-56 snap-center p-6" href={`/stores/${store.slug}`} key={store.id} style={{ backgroundColor: ["#c7b9a5", "#9fa9a2", "#b8a7a1"][index % 3] }}><p className="text-[10px] font-bold tracking-[0.14em]">엄선된 숍 {String(index + 1).padStart(2, "0")}</p><h3 className="mt-16 text-2xl font-black tracking-[-.06em]">{store.name}</h3><p className="mt-3 line-clamp-2 text-xs leading-5">{store.description}</p></Link>)}
-          {stores.length === 0 && <div className="border border-dashed border-line py-12 text-center text-sm text-muted">공개된 숍이 없습니다.</div>}
-        </div>
-      </section>
-
-      <ProductRail eyebrow="즉시 구매" title="지금 구매할 수 있는 상품" products={fixed} href="/shop" />
-
-      <section className="border-t border-ink pt-10">
-        <p className="text-[10px] font-bold tracking-[0.14em] text-muted">나인티 나인 안내</p>
-        <h2 className="mt-4 text-3xl font-black leading-none tracking-[-.07em]">좋은 빈티지는<br />보관하는 시간까지 포함합니다.</h2>
-        <p className="mt-5 text-sm leading-6 text-muted">결제한 상품은 다른 날의 구매·낙찰품과 묶어 배송을 요청할 수 있습니다.</p>
-      </section>
-    </div>
-  );
-}
-
 function DesktopHome({ auctions, feature, fixed, stores }: HomePresentationProps) {
   return (
-    <div className="hidden space-y-16 md:block" data-home-presentation="desktop">
-      <section className="grid min-h-[560px] grid-cols-[1.05fr_.95fr] overflow-hidden bg-ink text-paper">
+    <div className="space-y-16" data-home-presentation="desktop">
+      <section className="theme-invariant-dark grid min-h-[560px] grid-cols-[1.05fr_.95fr] overflow-hidden bg-ink text-paper">
         <div className="flex flex-col justify-between p-10 lg:p-16">
           <div>
             <p className="text-[10px] font-bold tracking-[0.16em] text-zinc-400">오늘의 업데이트</p>
@@ -121,7 +77,7 @@ function DesktopHome({ auctions, feature, fixed, stores }: HomePresentationProps
       <section>
         <SectionHeading action={<Link className="shrink-0 text-xs font-bold underline" href="/shop">전체 숍 보기</Link>} className="mb-6 gap-4" eyebrow="엄선된 숍" title="각자의 시선, 하나의 아카이브" titleClassName="mt-2 text-2xl font-black tracking-[-0.06em]" />
         <div className="grid grid-cols-3 gap-3">
-          {stores.map((store, index) => <Link className="min-h-52 p-6 transition-transform hover:-translate-y-1" href={`/stores/${store.slug}`} key={store.id} style={{ backgroundColor: ["#c7b9a5", "#9fa9a2", "#b8a7a1"][index % 3] }}><p className="text-[10px] font-bold tracking-[0.14em]">엄선된 숍 {String(index + 1).padStart(2, "0")}</p><h3 className="mt-14 text-2xl font-black tracking-[-.06em]">{store.name}</h3><p className="mt-2 max-w-[18rem] text-xs leading-5">{store.description}</p></Link>)}
+          {stores.map((store, index) => <Link className="min-h-52 p-6 transition-transform hover:-translate-y-1" href={`/stores/${store.slug}`} key={store.id} style={{ backgroundColor: `var(--store-card-${(index % 3) + 1})` }}><p className="text-[10px] font-bold tracking-[0.14em]">엄선된 숍 {String(index + 1).padStart(2, "0")}</p><h3 className="mt-14 text-2xl font-black tracking-[-.06em]">{store.name}</h3><p className="mt-2 max-w-[18rem] text-xs leading-5">{store.description}</p></Link>)}
           {stores.length === 0 && <div className="col-span-full border border-dashed border-line py-12 text-center text-sm text-muted">공개된 숍이 없습니다.</div>}
         </div>
       </section>
@@ -143,7 +99,6 @@ export default async function HomePage() {
   return (
     <div>
       {(catalogUnavailable || storesUnavailable) && <StatusNotice className="mb-6 px-5 py-4 leading-5" variant="warning">{catalogUnavailable ? "상품 정보를 일시적으로 불러오지 못했습니다. 잠시 후 새로고침해 주세요." : "숍 정보를 일시적으로 불러오지 못했습니다. 즉시 구매 상품은 계속 확인할 수 있습니다."}</StatusNotice>}
-      <MobileHome auctions={auctions} feature={feature} fixed={fixed} stores={stores} />
       <DesktopHome auctions={auctions} feature={feature} fixed={fixed} stores={stores} />
     </div>
   );

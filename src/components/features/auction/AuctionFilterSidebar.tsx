@@ -9,7 +9,7 @@ const categories = ["구제 의류"];
 type Sort = "latest" | "ending" | "price_asc" | "price_desc";
 interface CatalogFilters { sizes: string[]; categories: string[]; liveOnly: boolean; closingOnly: boolean; sort: Sort; }
 
-export function AuctionFilterSidebar({ saleType = "auction" }: { saleType?: "auction" | "fixed" }) {
+export function AuctionFilterSidebar({ saleType = "auction", surface = "mobile" }: { saleType?: "auction" | "fixed"; surface?: "desktop" | "mobile" }) {
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [liveOnly, setLiveOnly] = useState(true);
@@ -41,10 +41,10 @@ export function AuctionFilterSidebar({ saleType = "auction" }: { saleType?: "auc
   const filterContent = (
     <>
       <div className="flex items-center justify-between border-b border-zinc-200 py-4">
-        <h2 className="text-xs font-bold tracking-[0.12em]">필터·정렬 <span className="font-normal text-muted md:hidden">· 모바일</span></h2>
+        <h2 className="text-xs font-bold tracking-[0.12em]">필터·정렬 {surface === "mobile" && <span className="font-normal text-muted">· 모바일</span>}</h2>
         <div className="flex items-center gap-3">
           <button className="flex items-center gap-1 text-[11px] text-zinc-500 transition-colors hover:text-zinc-950" onClick={resetFilters} type="button"><RotateCcw size={12} /> 초기화</button>
-          <button aria-label="모바일 필터 닫기" className="md:hidden" onClick={() => setMobileOpen(false)} type="button"><X size={18} /></button>
+          {surface === "mobile" && <button aria-label="모바일 필터 닫기" onClick={() => setMobileOpen(false)} type="button"><X size={18} /></button>}
         </div>
       </div>
 
@@ -89,19 +89,23 @@ export function AuctionFilterSidebar({ saleType = "auction" }: { saleType?: "auc
 
   return (
     <>
-      <button aria-expanded={mobileOpen} aria-haspopup="dialog" className="mb-4 flex h-12 w-full items-center justify-between rounded-2xl border border-zinc-950 px-4 text-xs font-bold shadow-sm transition-all duration-300 active:scale-95 md:hidden" onClick={() => setMobileOpen(true)} type="button"><span className="flex items-center gap-2"><SlidersHorizontal size={15} /> 필터·정렬</span><span className="text-[10px] text-muted">{selectedSizes.length + selectedCategories.length}개 선택</span></button>
-      <aside className="sticky top-[100px] hidden w-[240px] flex-shrink-0 self-start border-t border-zinc-950 md:block">{filterContent}</aside>
-      <PremiumDialog
-        ariaLabel="모바일 필터 바텀시트"
-        onClose={() => setMobileOpen(false)}
-        open={mobileOpen}
-        overlayClassName="md:hidden"
-        panelClassName="px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
-        placement="sheet-bottom"
-        zIndexClassName="z-[80]"
-      >
-        {filterContent}
-      </PremiumDialog>
+      {surface === "desktop" ? (
+        <aside className="sticky top-[100px] block w-[240px] flex-shrink-0 self-start border-t border-zinc-950">{filterContent}</aside>
+      ) : (
+        <>
+          <button aria-expanded={mobileOpen} aria-haspopup="dialog" className="mb-4 flex h-12 w-full items-center justify-between rounded-2xl border border-zinc-950 px-4 text-xs font-bold shadow-sm transition-all duration-300 active:scale-95" onClick={() => setMobileOpen(true)} type="button"><span className="flex items-center gap-2"><SlidersHorizontal size={15} /> 필터·정렬</span><span className="text-[10px] text-muted">{selectedSizes.length + selectedCategories.length}개 선택</span></button>
+          <PremiumDialog
+            ariaLabel="모바일 필터 바텀시트"
+            onClose={() => setMobileOpen(false)}
+            open={mobileOpen}
+            panelClassName="px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+            placement="sheet-bottom"
+            zIndexClassName="z-[80]"
+          >
+            {filterContent}
+          </PremiumDialog>
+        </>
+      )}
     </>
   );
 }

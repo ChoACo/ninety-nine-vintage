@@ -27,7 +27,7 @@ async function clearPublicCache() {
   await caches.delete(CACHE_NAME);
 }
 
-export function CacheConsentBanner() {
+export function CacheConsentBanner({ surface = "mobile" }: { surface?: "desktop" | "mobile" }) {
   const pathname = usePathname();
   const [consent, setConsent] = useState<CacheConsent>("unknown");
 
@@ -45,7 +45,8 @@ export function CacheConsentBanner() {
   const mobileBottom = detailHasFixedMobileAction
     ? "bottom-[calc(9rem+env(safe-area-inset-bottom))]"
     : "bottom-[calc(5rem+env(safe-area-inset-bottom))]";
-  return <aside className={`fixed inset-x-3 z-[60] mx-auto flex max-w-xl items-start gap-3 border border-line bg-paper p-4 text-ink shadow-lg md:inset-x-auto md:bottom-6 md:right-6 ${mobileBottom}`}><Database className="mt-0.5 shrink-0" size={18} /><div className="min-w-0 flex-1"><p className="text-xs font-bold">빠른 로딩을 위한 공개 캐시</p><p className="mt-1 text-[11px] leading-5 text-muted">공개 상품·이미지·정적 리소스만 기기에 저장합니다. 계정·주문·결제 정보는 저장하지 않습니다.</p><div className="mt-3 flex gap-2"><button className="inline-flex items-center gap-1 bg-ink px-3 py-2 text-[11px] font-bold text-paper" onClick={accept} type="button"><Check size={13} /> 허용</button><button className="inline-flex items-center gap-1 border border-line px-3 py-2 text-[11px] font-bold" onClick={decline} type="button"><X size={13} /> 거부</button></div></div></aside>;
+  const placement = surface === "desktop" ? "bottom-6 right-6" : `inset-x-3 mx-auto ${mobileBottom}`;
+  return <aside className={`fixed z-[60] flex max-w-xl items-start gap-3 border border-line bg-paper p-4 text-ink shadow-lg ${placement}`}><Database className="mt-0.5 shrink-0" size={18} /><div className="min-w-0 flex-1"><p className="text-xs font-bold">빠른 로딩을 위한 공개 캐시</p><p className="mt-1 text-[11px] leading-5 text-muted">공개 상품·이미지·정적 리소스만 기기에 저장합니다. 계정·주문·결제 정보는 저장하지 않습니다.</p><div className="mt-3 flex gap-2"><button className="inline-flex items-center gap-1 bg-ink px-3 py-2 text-[11px] font-bold text-paper" onClick={accept} type="button"><Check size={13} /> 허용</button><button className="inline-flex items-center gap-1 border border-line px-3 py-2 text-[11px] font-bold" onClick={decline} type="button"><X size={13} /> 거부</button></div></div></aside>;
 }
 
 export function CacheConsentSettings() {

@@ -377,7 +377,7 @@ function reservationRemainingLabel(
   return `재고 점유 ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")} 남음`;
 }
 
-export function CartView() {
+export function CartView({ basePath = "", selectedProductId, surface = "mobile" }: { basePath?: "" | "/m"; selectedProductId?: string; surface?: "desktop" | "mobile" }) {
   const hydrate = useCommerceStore((state) => state.hydrate);
   const cartIds = useCommerceStore((state) => state.cartIds);
   const removeFromCart = useCommerceStore((state) => state.removeFromCart);
@@ -649,10 +649,12 @@ export function CartView() {
       restoredCheckoutProducts.map((product) => [product.id, product]),
     );
     for (const product of liveProducts) productById.set(product.id, product);
-    return visibleIds
+    const visibleProducts = visibleIds
       .map((productId) => productById.get(productId))
       .filter((product): product is CartProduct => Boolean(product));
-  }, [cartIds, heldCheckoutIds, liveProducts, restoredCheckoutProducts]);
+    if (heldCheckoutIds.length > 0 || !selectedProductId) return visibleProducts;
+    return visibleProducts.filter((product) => product.id === selectedProductId);
+  }, [cartIds, heldCheckoutIds, liveProducts, restoredCheckoutProducts, selectedProductId]);
   const total = products.reduce((sum, product) => sum + product.price, 0);
   const hasPendingCheckout = heldCheckoutIds.length > 0;
   const reservationNow = reservationClock + serverClockOffset;
@@ -818,7 +820,7 @@ export function CartView() {
           ? `주문 ${checkout.order.id}의 입금 확인이 완료되었습니다.`
           : transfer.status === "partially_paid"
             ? `주문 ${checkout.order.id}의 일부 입금이 확인되었습니다. 내 정보에서 남은 금액을 확인해 주세요.`
-            : `주문 ${checkout.order.id} 생성 완료 · ${transfer.expected_amount.toLocaleString("ko-KR")}원 · ${transfer.bank_name_snapshot} ${transfer.account_number_snapshot}로 입금해 주세요.`,
+            : `입금 대기 중 · 주문 ${checkout.order.id} · ${transfer.expected_amount.toLocaleString("ko-KR")}원 · ${transfer.bank_name_snapshot} ${transfer.account_number_snapshot}로 입금해 주세요.`,
       );
     } catch (error) {
       if (
@@ -873,11 +875,11 @@ export function CartView() {
 
   return (
     <div className="space-y-10">
-      <div className="flex flex-col items-start gap-3 border-b border-ink pb-6 sm:flex-row sm:items-end sm:justify-between">
+      <div className={`flex items-start gap-3 border-b border-ink pb-6 ${surface === "desktop" ? "flex-row items-end justify-between" : "flex-col"}`}>
         <div>
-          <p className="eyebrow text-muted">장바구니 / 즉시구매</p>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.08em] md:text-4xl">
-            장바구니
+          <p className="eyebrow text-muted">{selectedProductId ? "즉시구매 / 단일 상품" : "장바구니 / 즉시구매"}</p>
+          <h1 className={`mt-3 font-black tracking-[-0.08em] ${surface === "desktop" ? "text-4xl" : "text-3xl"}`}>
+            {selectedProductId ? "바로 결제" : "장바구니"}
           </h1>
         </div>
         <span className="font-mono text-xs text-muted">
@@ -935,7 +937,7 @@ export function CartView() {
                 결제 요청 해제
               </button>
             )}
-            <Link className="font-bold underline" href="/account#orders">
+            <Link className="font-bold underline" href={`${basePath}/account/orders`}>
               주문 상태 확인
             </Link>
           </div>
@@ -952,7 +954,7 @@ export function CartView() {
         >
           {message}{" "}
           {messageKind === "success" && (
-            <Link className="ml-2 font-bold underline" href="/account#orders">
+            <Link className="ml-2 font-bold underline" href={`${basePath}/account/orders`}>
               내 주문 확인
             </Link>
           )}
@@ -970,7 +972,7 @@ export function CartView() {
           </p>
           <Link
             className="mt-5 inline-flex border border-ink px-5 py-3 text-xs font-bold"
-            href="/account/login?next=%2Fcart"
+            href={`${basePath}/account/login?next=${encodeURIComponent(selectedProductId ? `${basePath}/checkout?productId=${selectedProductId}` : `${basePath}/cart`)}`}
           >
             카카오 로그인
           </Link>
@@ -980,19 +982,19 @@ export function CartView() {
           <p className="text-sm font-bold">장바구니가 비어 있습니다.</p>
           <Link
             className="mt-5 inline-flex items-center gap-2 text-xs font-bold underline"
-            href="/shop"
+            href={`${basePath}/shop`}
           >
             상품 둘러보기 <ArrowRight size={14} />
           </Link>
         </div>
       ) : (
-        <div className="grid gap-10 lg:grid-cols-[1fr_360px]">
+        <div className={`grid gap-10 ${surface === "desktop" ? "grid-cols-[1fr_360px]" : "grid-cols-1"}`}>
           <div className="divide-y divide-line border-y border-line">
             {products.map((product) => (
-              <div className="flex gap-4 py-5 md:gap-5" key={product.id}>
+              <div className={`flex py-5 ${surface === "desktop" ? "gap-5" : "gap-4"}`} key={product.id}>
                 <CatalogImage
                   alt={product.title}
-                  className="size-24 shrink-0 object-cover md:size-28"
+                  className={`${surface === "desktop" ? "size-28" : "size-24"} shrink-0 object-cover`}
                   loading="lazy"
                   sizes="112px"
                   src={product.imageUrls[0]}
@@ -1049,7 +1051,7 @@ export function CartView() {
               </div>
             ))}
           </div>
-          <aside className="h-fit border-t-2 border-ink bg-surface p-5 sm:p-6 lg:sticky lg:top-28">
+          <aside className={`h-fit border-t-2 border-ink bg-surface p-6 ${surface === "desktop" ? "sticky top-28" : ""}`}>
             <div className="flex justify-between text-xs">
               <span>상품 금액</span>
               <strong className="font-mono">

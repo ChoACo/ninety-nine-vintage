@@ -76,7 +76,7 @@ function getNativeImageSrcSet(
   }
 }
 
-/** Restore the uploaded inspection master for the zoom gallery instead of chaining
+/** Restore the uploaded high-resolution source for the zoom gallery instead of chaining
  * a previously generated 800px Supabase render through Next Image. */
 function getRequestedImageSource(source: string, maxDimension: number): string {
   if (maxDimension <= CATALOG_TRANSFORM_MAX_DIMENSION) {
@@ -177,7 +177,7 @@ export function CatalogImage({
         decoding={props.decoding}
         fetchPriority={props.fetchPriority}
         height={height ?? maxDimension}
-        loading={loading}
+        loading={props.priority ? "eager" : loading}
         onError={props.onError}
         onLoad={(event) => {
           setLoadedNativeSource(requestedSource);
@@ -215,7 +215,7 @@ export function CatalogImage({
       alt={alt}
       blurDataURL={blurDataURL}
       height={height ?? maxDimension}
-      loading={loading}
+      loading={props.priority ? undefined : loading}
       placeholder={placeholder}
       sizes={sizes}
       src={requestedSource}

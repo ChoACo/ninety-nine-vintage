@@ -64,7 +64,7 @@ test("auction detail restores inquiry, route-based bidding, full ledger, specifi
   assert.match(panel, /item\.category/);
   assert.match(panel, /item\.conditionGrade/);
   assert.match(inquiry, /productId/);
-  assert.match(inquiry, /router\.push\(`\/chat\?conversationId=/);
+  assert.match(inquiry, /router\.push\(`\$\{basePath\}\/chat\?conversationId=/);
   assert.match(chatRoute, /rpc\("start_product_inquiry"/);
   assert.match(chatRoute, /p_client_nonce/);
   assert.match(chatPanel, /conversationId/);
@@ -94,5 +94,5 @@ test("auction detail restores inquiry, route-based bidding, full ledger, specifi
   assert.match(bidStore, /finalBidId:\s*payload\.bid\.finalBidId/);
   assert.match(bidStore, /participantCount:\s*payload\.bid\.participantCount/);
   assert.doesNotMatch(productService, /data\?\.final_bid_id !== null/);
-  assert.match(panel, /href=\{`\/auction\/\$\{item\.id\}\/bid`\}/);
+  assert.match(panel, /href=\{`\$\{basePath\}\/auction\/\$\{item\.id\}\/bid`\}/);
 });

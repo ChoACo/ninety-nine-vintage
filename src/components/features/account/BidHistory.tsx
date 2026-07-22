@@ -29,7 +29,7 @@ const stateLabels: Record<BidItem["state"], string> = {
   closed: "경매 종료",
 };
 
-export function BidHistory() {
+export function BidHistory({ basePath = "", surface = "mobile" }: { basePath?: "" | "/m"; surface?: "desktop" | "mobile" }) {
   const { loading, revision, session } = useSupabaseSession();
   const [result, setResult] = useState<{
     revision: number;
@@ -77,14 +77,14 @@ export function BidHistory() {
   const summary = payload.summary;
   return (
     <section id="bids">
-      <div className="mb-5 flex flex-col items-start gap-3 border-b border-ink pb-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className={`mb-5 flex items-start gap-3 border-b border-ink pb-4 ${surface === "desktop" ? "flex-row items-end justify-between" : "flex-col"}`}>
         <div>
           <p className="eyebrow text-muted">실시간 경매 / 나의 입찰</p>
           <h2 className="mt-2 text-xl font-black tracking-[-0.05em]">
             입찰 현황
           </h2>
         </div>
-        <Link className="text-xs font-bold underline" href="/feed">
+        <Link className="text-xs font-bold underline" href={`${basePath}/feed`}>
           실시간 경매 보기
         </Link>
       </div>
@@ -119,7 +119,7 @@ export function BidHistory() {
             <article className="flex gap-3 py-4 sm:gap-4" key={item.id}>
               <Link
                 className="size-20 shrink-0 bg-surface"
-                href={`/auction/${item.productId}`}
+                href={`${basePath}/auction/${item.productId}`}
               >
                 <CatalogImage
                   alt=""
@@ -128,10 +128,10 @@ export function BidHistory() {
                 />
               </Link>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-4">
+                <div className={`flex items-start gap-2 ${surface === "desktop" ? "flex-row justify-between gap-4" : "flex-col"}`}>
                   <Link
                     className="max-w-full truncate text-sm font-bold hover:underline"
-                    href={`/auction/${item.productId}`}
+                    href={`${basePath}/auction/${item.productId}`}
                   >
                     {item.title}
                   </Link>

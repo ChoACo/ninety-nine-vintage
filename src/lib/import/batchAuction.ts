@@ -1,5 +1,4 @@
 import type { NewAuctionDraft } from "@/src/core/contracts/productDraft";
-import type { ProductSaleType } from "@/src/types/auction";
 import { isSupportedProductImageMimeType } from "@/src/lib/supabase/productImagePolicy";
 
 export type BatchAuctionCanonicalField =
@@ -62,8 +61,6 @@ export interface ParsedAuctionWorkbook {
 export interface BatchAuctionDraftOptions {
   publishAt: string;
   bidIncrement: number;
-  /** 기존 호출부는 경매로 유지하고 운영자 UI에서 정가 일괄 등록을 선택할 수 있습니다. */
-  saleType?: ProductSaleType;
 }
 
 export type ImageMatchStrategy = "relative-path" | "basename" | "unique-stem";
@@ -105,7 +102,6 @@ const MAX_RAW_WORKSHEET_ROWS = 1_000;
 const MAX_WORKSHEET_COLUMNS = 256;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_PRODUCT_IMAGES = 12;
-const HEADER_SCAN_LIMIT = 30;
 export const FIRST_PRODUCT_ROW = 6;
 const FIXED_TEMPLATE_COLUMNS = {
   title: 1,
@@ -115,72 +111,6 @@ const FIXED_TEMPLATE_COLUMNS = {
   startingPrice: 25,
   imageNames: 34,
 } as const;
-
-const HEADER_ALIASES: Record<BatchAuctionCanonicalField, readonly string[]> = {
-  description: [
-    "상품설명",
-    "설명",
-    "상세설명",
-    "상세내용",
-    "상품내용",
-    "description",
-    "detail",
-    "details",
-  ],
-  title: [
-    "상품명",
-    "상품제목",
-    "제목",
-    "품명",
-    "title",
-    "productname",
-    "name",
-  ],
-  startingPrice: [
-    "시작가",
-    "시작가격",
-    "경매시작가",
-    "최저가",
-    "가격",
-    "startingprice",
-    "startprice",
-    "startingbid",
-  ],
-  imageNames: [
-    "이미지명",
-    "이미지파일명",
-    "이미지파일",
-    "사진명",
-    "사진파일명",
-    "사진파일",
-    "이미지",
-    "사진",
-    "imagename",
-    "imagenames",
-    "imagefile",
-    "imagefiles",
-    "images",
-    "photo",
-    "photos",
-    "filename",
-    "filenames",
-  ],
-};
-
-const NORMALIZED_HEADER_ALIASES = Object.fromEntries(
-  Object.entries(HEADER_ALIASES).map(([field, aliases]) => [
-    field,
-    new Set(aliases.map(normalizeHeader)),
-  ]),
-) as Record<BatchAuctionCanonicalField, Set<string>>;
-
-function normalizeHeader(value: string): string {
-  return value
-    .normalize("NFKC")
-    .trim()
-    .toLocaleLowerCase("en-US")
-    .replace(/[\s_\-()[\]{}./\\]+/g, "");
-}
 
 export function normalizeWorkbookCellValue(
   value: unknown,
@@ -223,26 +153,6 @@ function cellAsText(value: ParsedWorkbookCell | undefined): string {
   if (value === null || value === undefined) return "";
   if (value instanceof Date) return value.toISOString();
   return String(value).trim();
-}
-
-function detectCanonicalField(header: string): BatchAuctionCanonicalField | null {
-  const normalized = normalizeHeader(header);
-  if (!normalized) return null;
-
-  for (const field of Object.keys(
-    NORMALIZED_HEADER_ALIASES,
-  ) as BatchAuctionCanonicalField[]) {
-    if (NORMALIZED_HEADER_ALIASES[field].has(normalized)) return field;
-  }
-
-  if (
-    /^(이미지|사진|image|photo)(파일)?(명)?\d+$/.test(normalized) ||
-    /^(image|photo)\d+(name|file)?$/.test(normalized)
-  ) {
-    return "imageNames";
-  }
-
-  return null;
 }
 
 interface HeaderCandidate {
@@ -403,99 +313,6 @@ function detectFixedTemplateForSheet(
   };
 }
 
-function detectHeadersForRow(
-  sheetName: string,
-  row: ParsedAuctionWorkbookRow,
-): HeaderCandidate {
-  const detectedByField: Record<BatchAuctionCanonicalField, DetectedHeaderColumn[]> = {
-    description: [],
-    title: [],
-    startingPrice: [],
-    imageNames: [],
-  };
-  const allHeaders: DetectedHeaderColumn[] = [];
-
-  row.cells.forEach((cell, index) => {
-    const header = cellAsText(cell);
-    if (!header) return;
-    const column = { columnNumber: index + 1, header };
-    allHeaders.push(column);
-    const field = detectCanonicalField(header);
-    if (field) detectedByField[field].push(column);
-  });
-
-  const duplicateFields = (
-    ["description", "title", "startingPrice"] as const
-  ).flatMap((field) =>
-    detectedByField[field].length > 1
-      ? [{ field, columns: detectedByField[field] }]
-      : [],
-  );
-  const detectedColumnNumbers = new Set(
-    Object.values(detectedByField)
-      .flat()
-      .map((column) => column.columnNumber),
-  );
-  const hasDescription =
-    detectedByField.description.length > 0 || detectedByField.title.length > 0;
-  const hasPrice = detectedByField.startingPrice.length > 0;
-  const hasImages = detectedByField.imageNames.length > 0;
-  const score =
-    detectedByField.description.length * 4 +
-    detectedByField.title.length * 3 +
-    detectedByField.startingPrice.length * 5 +
-    Math.min(detectedByField.imageNames.length, 8) * 4 +
-    (hasDescription && hasPrice && hasImages ? 30 : 0) -
-    duplicateFields.length * 4;
-
-  return {
-    score,
-    rowNumber: row.rowNumber,
-    headers: {
-      sheetName,
-      headerRowNumber: row.rowNumber,
-      description: detectedByField.description[0] ?? null,
-      title: detectedByField.title[0] ?? null,
-      size: null,
-      conditionScore: null,
-      startingPrice: detectedByField.startingPrice[0] ?? null,
-      imageNames: detectedByField.imageNames,
-      duplicateFields,
-      unusedHeaders: allHeaders.filter(
-        (header) => !detectedColumnNumbers.has(header.columnNumber),
-      ),
-    },
-  };
-}
-
-function countValidDataRows(
-  rows: readonly ParsedAuctionWorkbookRow[],
-  candidate: HeaderCandidate,
-): number {
-  const detected = candidate.headers;
-
-  return rows.filter((row) => {
-    if (
-      row.rowNumber < FIRST_PRODUCT_ROW ||
-      row.rowNumber <= candidate.rowNumber
-    ) {
-      return false;
-    }
-
-    const hasDescription = Boolean(
-      cellAsText(valueAt(row, detected.description)) ||
-        cellAsText(valueAt(row, detected.title)),
-    );
-    const hasStartingPrice =
-      parseStartingPrice(valueAt(row, detected.startingPrice)) !== null;
-    const hasImageName = detected.imageNames.some((column) =>
-      Boolean(cellAsText(valueAt(row, column))),
-    );
-
-    return hasDescription && hasStartingPrice && hasImageName;
-  }).length;
-}
-
 function rowsFromWorksheet(worksheet: {
   name: string;
   rowCount: number;
@@ -559,7 +376,7 @@ function rowsFromWorksheet(worksheet: {
   return rows;
 }
 
-/** 브라우저에서 ExcelJS를 지연 로드해 가장 가능성 높은 시트와 헤더 행을 찾습니다. */
+/** 브라우저에서 ExcelJS를 지연 로드해 기존 고정 열 양식의 상품 시트를 찾습니다. */
 export async function parseAuctionWorkbook(
   file: File,
 ): Promise<ParsedAuctionWorkbook> {
@@ -589,15 +406,6 @@ export async function parseAuctionWorkbook(
   if (parsedSheets.length === 0) {
     throw new Error("Excel 파일에서 데이터가 있는 시트를 찾지 못했습니다.");
   }
-
-  let best:
-    | {
-        sheetName: string;
-        rows: ParsedAuctionWorkbookRow[];
-        candidate: HeaderCandidate;
-        validDataRowCount: number;
-      }
-    | undefined;
 
   let fixedTemplateBest:
     | {
@@ -630,31 +438,9 @@ export async function parseAuctionWorkbook(
     }
   });
 
-  if (!fixedTemplateBest) {
-    parsedSheets.forEach((sheet) => {
-      sheet.rows.slice(0, HEADER_SCAN_LIMIT).forEach((row) => {
-        const candidate = detectHeadersForRow(sheet.name, row);
-        const validDataRowCount = countValidDataRows(sheet.rows, candidate);
-        if (
-          !best ||
-          candidate.score > best.candidate.score ||
-          (candidate.score === best.candidate.score &&
-            validDataRowCount > best.validDataRowCount)
-        ) {
-          best = {
-            sheetName: sheet.name,
-            rows: sheet.rows,
-            candidate,
-            validDataRowCount,
-          };
-        }
-      });
-    });
-  }
-
-  const selectedSheet = fixedTemplateBest ?? best;
+  const selectedSheet = fixedTemplateBest;
   if (!selectedSheet) {
-    throw new Error("Excel 헤더 행을 확인하지 못했습니다.");
+    throw new Error("기존 Excel 고정 양식(A/D/W/X/Y/AH 열, 6행 시작)을 확인하지 못했습니다.");
   }
 
   const dataRows = selectedSheet.rows
@@ -1017,14 +803,6 @@ export function buildBatchAuctionPreview(
     ...imageIndex.issues,
   ];
   const publishAt = new Date(options.publishAt);
-  const saleType: ProductSaleType = options.saleType ?? "auction";
-  if (saleType !== "auction" && saleType !== "fixed") {
-    globalIssues.push({
-      code: "invalid_sale_type",
-      message: "판매 방식을 확인해 주세요.",
-      severity: "error",
-    });
-  }
   if (Number.isNaN(publishAt.getTime())) {
     globalIssues.push({
       code: "invalid_publish_at",
@@ -1122,7 +900,7 @@ export function buildBatchAuctionPreview(
     if (startingPrice === null) {
       issues.push({
         code: "invalid_starting_price",
-        message: `${saleType === "fixed" ? "정가" : "시작가"}는 1원 이상 10억원 이하의 정수여야 합니다.`,
+        message: "시작가는 1원 이상 10억원 이하의 정수여야 합니다.",
         severity: "error",
       });
     }
@@ -1224,8 +1002,8 @@ export function buildBatchAuctionPreview(
     row.draft = {
       title: row.title,
       description: row.description,
-      saleType,
-      fixedPrice: saleType === "fixed" ? row.startingPrice : null,
+      saleType: "auction",
+      fixedPrice: null,
       startingPrice: row.startingPrice,
       bidIncrement: options.bidIncrement,
       imageFiles: row.imageMatches.map((match) => match.file),

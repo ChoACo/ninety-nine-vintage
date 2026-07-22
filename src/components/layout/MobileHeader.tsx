@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthStatus } from "@/components/layout/AuthStatus";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
@@ -67,6 +68,7 @@ export function MobileHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolea
               {access.canAccessOwner && <Link className="border-b border-line py-4 text-base font-bold" href="/admin/owner" onClick={close}>소유자 센터</Link>}
             </nav>
             <div className="mt-6 grid gap-3">
+              <ThemeToggle className="w-full" showLabel />
               <AuthStatus />
               <Link className="flex h-11 items-center justify-center gap-2 border border-line text-xs font-bold" href="/chat" onClick={close}><Headphones size={16} /> 상담·채팅</Link>
             </div>

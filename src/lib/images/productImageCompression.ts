@@ -27,7 +27,7 @@ export class ProductImageCompressionError extends Error {
 }
 
 /**
- * Fit an image inside a 2560px inspection master without cropping or
+ * Fit an image inside a 2560px high-resolution source without cropping or
  * enlarging it. Feed surfaces request a transformed 720/800px rendition while
  * the lightbox receives this higher-resolution storage object directly.
  * Keeping this calculation independent of browser APIs makes the boundary
@@ -309,7 +309,7 @@ function elapsedMilliseconds(startedAt: number, finishedAt: number): number {
 }
 
 /**
- * Build the inspection master and thumbnail variants from a single decoded source. This
+ * Build the high-resolution source and thumbnail variants from one decoded image. This
  * keeps EXIF orientation identical and avoids decoding large phone photos
  * twice during batch registration.
  */
@@ -348,7 +348,7 @@ export async function compressProductImageVariantsForUpload(
   } catch (error) {
     if (error instanceof ProductImageCompressionError) throw error;
     throw new ProductImageCompressionError(
-      `\"${file.name}\" 사진의 2560px 검수본과 360p 미리보기를 만들지 못했어요. 다른 사진으로 다시 시도해 주세요.`,
+      `\"${file.name}\" 사진의 2560px 고해상도 원본과 360p 미리보기를 만들지 못했어요. 다른 사진으로 다시 시도해 주세요.`,
       { cause: error },
     );
   } finally {
@@ -372,7 +372,7 @@ export async function compressProductImageForUpload(file: File): Promise<File> {
   } catch (error) {
     if (error instanceof ProductImageCompressionError) throw error;
     throw new ProductImageCompressionError(
-      `\"${file.name}\" 사진의 2560px 검수본을 만들지 못했어요. 다른 사진으로 다시 시도해 주세요.`,
+      `\"${file.name}\" 사진의 2560px 고해상도 원본을 만들지 못했어요. 다른 사진으로 다시 시도해 주세요.`,
       { cause: error },
     );
   } finally {

@@ -9,6 +9,7 @@ import { formatProductDisplayNumber } from "@/lib/productDisplayNumber";
 interface ItemGalleryProps {
   compact?: boolean;
   item: ItemDetail;
+  surface?: "desktop" | "mobile";
 }
 
 const FULL_PAGE_IMAGE_SIZES =
@@ -20,7 +21,7 @@ const FULL_PAGE_THUMBNAIL_SIZES =
 const COMPACT_THUMBNAIL_SIZES =
   "(max-width: 767px) calc(25vw - 0.875rem), (max-width: 815px) calc(25vw - 1.875rem), 10.875rem";
 
-export function ItemGallery({ compact = false, item }: ItemGalleryProps) {
+export function ItemGallery({ compact = false, item, surface = "desktop" }: ItemGalleryProps) {
   const [activeImage, setActiveImage] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const images = item.images.filter(Boolean);
@@ -41,7 +42,7 @@ export function ItemGallery({ compact = false, item }: ItemGalleryProps) {
         {images.map((image, index) => (
           <button
             aria-label={`${item.name} 이미지 ${index + 1} 보기`}
-            className={`relative aspect-square overflow-hidden rounded-2xl bg-zinc-100 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${activeImage === index ? "ring-2 ring-zinc-950 ring-offset-2" : "opacity-60 hover:opacity-100"}`}
+            className={`relative aspect-square overflow-hidden rounded-2xl bg-zinc-100 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${activeImage === index ? "ring-2 ring-zinc-950 ring-offset-2 ring-offset-paper" : "opacity-60 hover:opacity-100"}`}
             key={image}
             onClick={() => setActiveImage(index)}
             type="button"
@@ -50,7 +51,7 @@ export function ItemGallery({ compact = false, item }: ItemGalleryProps) {
           </button>
         ))}
       </div>
-      <AuctionGalleryModal images={images} initialIndex={activeImage} key={activeImage} onClose={() => setGalleryOpen(false)} open={galleryOpen} title={item.name} />
+      <AuctionGalleryModal images={images} initialIndex={activeImage} key={activeImage} onClose={() => setGalleryOpen(false)} open={galleryOpen} surface={surface} title={item.name} />
     </section>
   );
 }

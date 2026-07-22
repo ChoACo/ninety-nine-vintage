@@ -34,7 +34,7 @@ interface PastProductResponse {
 }
 
 function productStatusLabel(status: string) {
-  if (status === "pending") return "공개 대기";
+  if (status === "pending") return "초안";
   if (status === "active") return "공개 중";
   if (status === "closed") return "마감";
   if (status === "sold") return "판매 완료";

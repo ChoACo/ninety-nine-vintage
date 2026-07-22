@@ -39,11 +39,13 @@ async function workbookFile({ condition = 2, price = 25_000, imageName = "boss.j
   worksheet.getCell("A1").value = "상품명";
   worksheet.getCell("D1").value = "사이즈 및 추천 사이즈";
   worksheet.getCell("W1").value = "상태점수";
+  worksheet.getCell("X1").value = "상품 설명";
   worksheet.getCell("Y1").value = "시작가";
   worksheet.getCell("AH1").value = "이미지명";
   worksheet.getCell("A6").value = "[M] BOSS 빈티지 셔츠";
   worksheet.getCell("D6").value = "100 / 추천 M";
   worksheet.getCell("W6").value = condition;
+  worksheet.getCell("X6").value = "기존 엑셀 원문";
   worksheet.getCell("Y6").value = price;
   worksheet.getCell("AH6").value = imageName;
   const bytes = await workbook.xlsx.writeBuffer();
@@ -76,6 +78,9 @@ test("operator XLSX UI parses in the browser, highlights Korean row errors, and 
   assert.match(modal, /확인 브랜드/);
   assert.match(modal, /inferBrandFromTitle\(row\.title\)\.brand/);
   assert.match(modal, /stores\.map\(\(store\)/);
+  assert.match(modal, /기존 고정 양식만 사용합니다/);
+  assert.match(modal, /A열 상품명[\s\S]*D열 사이즈[\s\S]*W열 상태점수[\s\S]*X열 원문[\s\S]*Y열 시작가[\s\S]*AH열 이미지명/);
+  assert.doesNotMatch(modal, /setSaleType|즉시 구매/);
 
   assert.match(consoleSource, /uploadProductImages\(/);
   assert.match(consoleSource, /crypto\.randomUUID\(\)/);
@@ -89,7 +94,8 @@ test("operator XLSX UI parses in the browser, highlights Korean row errors, and 
   assert.match(bulkRoute, /authenticateStaffRequest\(request, true\)/);
   assert.match(bulkRoute, /auth\.user[\s\S]*\.from\("products"\)[\s\S]*\.insert/);
   assert.doesNotMatch(bulkRoute, /auth\.admin[\s\S]*\.from\("products"\)[\s\S]*\.insert/);
-  assert.match(bulkRoute, /auth\.effectiveOperatorId/);
+  assert.match(bulkRoute, /p_permission:\s*"manage_products"/);
+  assert.doesNotMatch(bulkRoute, /effectiveOperatorId|operator_id/);
   assert.match(bulkRoute, /const normalizedBrand = normalizeProductBrand\(body\.brand\)/);
   assert.match(bulkRoute, /brand_source: "explicit"/);
   assert.match(bulkRoute, /thumbnail_urls: thumbnailUrls/);
@@ -101,13 +107,15 @@ test("golden XLSX parser accepts a valid row and reports Korean validation failu
   const preview = buildBatchAuctionPreview(parsed, [imageFile("boss.jpg")], {
     publishAt: "2030-01-01T01:00:00.000Z",
     bidIncrement: 1_000,
-    saleType: "auction",
   });
 
   assert.equal(preview.canSubmit, true);
   assert.equal(preview.rows[0].rowNumber, 6);
   assert.equal(preview.rows[0].title, "BOSS 빈티지 셔츠");
   assert.equal(preview.rows[0].condition, "상태 좋음");
+  assert.equal(preview.rows[0].sourceDescription, "기존 엑셀 원문");
+  assert.equal(preview.drafts[0].saleType, "auction");
+  assert.equal(preview.drafts[0].fixedPrice, null);
   assert.equal(preview.drafts[0].status, "pending");
 
   const invalidParsed = await parseAuctionWorkbook(await workbookFile({
@@ -118,7 +126,6 @@ test("golden XLSX parser accepts a valid row and reports Korean validation failu
   const invalid = buildBatchAuctionPreview(invalidParsed, [imageFile("other.jpg")], {
     publishAt: "2030-01-01T01:00:00.000Z",
     bidIncrement: 1_000,
-    saleType: "auction",
   });
 
   assert.equal(invalid.canSubmit, false);
@@ -128,6 +135,23 @@ test("golden XLSX parser accepts a valid row and reports Korean validation failu
   assert.match(messages, /사진을 찾지 못했습니다/);
 });
 
+test("parser rejects a rewritten generic spreadsheet instead of changing the existing fixed-column contract", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("새 양식");
+  worksheet.addRow(["title", "description", "startingPrice", "imageNames"]);
+  worksheet.addRow(["임의 상품", "임의 설명", 25_000, "arbitrary.jpg"]);
+  const bytes = await workbook.xlsx.writeBuffer();
+  const file = new File([bytes], "rewritten.xlsx", {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const { parseAuctionWorkbook } = await loadBatchAuctionModule();
+
+  await assert.rejects(
+    () => parseAuctionWorkbook(file),
+    /기존 Excel 고정 양식\(A\/D\/W\/X\/Y\/AH 열, 6행 시작\)/,
+  );
+});
+
 test("preview rejects more images than the guarded bulk API accepts", async () => {
   const { buildBatchAuctionPreview, parseAuctionWorkbook } = await loadBatchAuctionModule();
   const names = Array.from({ length: 13 }, (_, index) => `image-${index + 1}.jpg`);
@@ -135,7 +159,6 @@ test("preview rejects more images than the guarded bulk API accepts", async () =
   const preview = buildBatchAuctionPreview(parsed, names.map(imageFile), {
     publishAt: "2030-01-01T01:00:00.000Z",
     bidIncrement: 1_000,
-    saleType: "auction",
   });
 
   assert.equal(preview.canSubmit, false);

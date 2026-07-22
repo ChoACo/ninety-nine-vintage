@@ -50,7 +50,7 @@ interface Order {
 }
 
 const statusLabels: Record<string, string> = {
-  awaiting_payment: "입금 대기",
+  awaiting_payment: "입금 대기 중",
   paid: "결제 완료·보관 중",
   partially_paid: "부분 취소·환불 조정 중",
   shipped: "배송 완료",
@@ -74,7 +74,7 @@ function formatDueAt(value: string | null): string | null {
     : null;
 }
 
-function OrderProductCard({ item }: { item: OrderItem }) {
+function OrderProductCard({ basePath, item, surface }: { basePath: "" | "/m"; item: OrderItem; surface: "desktop" | "mobile" }) {
   const product = item.products;
   const content = (
     <>
@@ -103,7 +103,7 @@ function OrderProductCard({ item }: { item: OrderItem }) {
 
   if (!product || product.status !== "active") {
     return (
-      <div className="flex w-full items-center gap-3 border border-line p-2 sm:w-[220px]">
+      <div className={`flex items-center gap-3 border border-line p-2 ${surface === "desktop" ? "w-[220px]" : "w-full"}`}>
         {content}
       </div>
     );
@@ -111,15 +111,15 @@ function OrderProductCard({ item }: { item: OrderItem }) {
 
   return (
     <Link
-      className="flex w-full items-center gap-3 border border-line p-2 sm:w-[220px]"
-      href={`/auction/${product.id}`}
+      className={`flex items-center gap-3 border border-line p-2 ${surface === "desktop" ? "w-[220px]" : "w-full"}`}
+      href={`${basePath}/auction/${product.id}`}
     >
       {content}
     </Link>
   );
 }
 
-export function OrderHistory() {
+export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?: "" | "/m"; surface?: "desktop" | "mobile" }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -241,14 +241,14 @@ export function OrderHistory() {
 
   return (
     <section id="orders">
-      <div className="mb-5 flex flex-col items-start gap-3 border-b border-ink pb-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className={`mb-5 flex items-start gap-3 border-b border-ink pb-4 ${surface === "desktop" ? "flex-row items-end justify-between" : "flex-col"}`}>
         <div>
           <p className="eyebrow text-muted">주문 내역 / 즉시구매</p>
           <h2 className="mt-2 text-xl font-black tracking-[-0.05em]">
             즉시구매 주문
           </h2>
         </div>
-        <Link className="text-xs font-bold underline" href="/shop">
+        <Link className="text-xs font-bold underline" href={`${basePath}/shop`}>
           즉시구매 상품 더 보기
         </Link>
       </div>
@@ -258,7 +258,7 @@ export function OrderHistory() {
           const dueAt = formatDueAt(virtualAccount?.dueAt ?? null);
           return (
             <article className="py-5" key={order.id}>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div className={`flex gap-3 ${surface === "desktop" ? "flex-row items-center justify-between gap-4" : "flex-col"}`}>
                 <div className="min-w-0">
                   <p className="break-all font-mono text-[10px] text-muted">
                     {new Date(order.created_at).toLocaleString("ko-KR")} ·{" "}
@@ -274,7 +274,7 @@ export function OrderHistory() {
               </div>
               <div className="mt-4 flex flex-wrap gap-3">
                 {(order.commerce_order_items ?? []).map((item) => (
-                  <OrderProductCard item={item} key={item.id} />
+                  <OrderProductCard basePath={basePath} item={item} key={item.id} surface={surface} />
                 ))}
               </div>
               {order.status === "awaiting_payment" && order.transfer && (
@@ -282,7 +282,7 @@ export function OrderHistory() {
                   {order.transfer.expected_amount.toLocaleString("ko-KR")}원 ·{" "}
                   {order.transfer.bank_name_snapshot}{" "}
                   {order.transfer.account_number_snapshot}로 입금해 주세요. 입금
-                  확인 후 보관 기간이 시작됩니다.
+                  확인 후 상품이 보관함으로 이동하며, 보관 기간은 중앙센터의 실물 보관 완료 시 시작됩니다.
                 </p>
               )}
               {order.status === "awaiting_payment" && virtualAccount && (
@@ -290,7 +290,7 @@ export function OrderHistory() {
                   가상계좌 · {virtualAccount.bank ? `${virtualAccount.bank} ` : ""}
                   {virtualAccount.accountNumber}로 입금해 주세요.
                   {dueAt ? ` 입금 기한은 ${dueAt}입니다.` : ""} 입금 확인 후
-                  보관 기간이 시작됩니다.
+                  상품이 보관함으로 이동하며, 보관 기간은 중앙센터의 실물 보관 완료 시 시작됩니다.
                 </p>
               )}
               {order.portonePayment?.canResume && (

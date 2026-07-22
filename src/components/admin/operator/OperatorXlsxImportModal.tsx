@@ -24,32 +24,22 @@ import {
   type ParsedAuctionWorkbook,
 } from "@/lib/import/batchAuction";
 import {
-  PRODUCT_IMAGE_COMPRESSION_TARGET_MS,
-  type ProductImageCompressionMeasurement,
-  type ProductImageCompressionReporter,
-} from "@/lib/images/productImageCompression";
-import {
   PRODUCT_IMAGE_FORMAT_LABEL,
   PRODUCT_IMAGE_HEIC_CONVERSION_NOTE,
   PRODUCT_IMAGE_INPUT_ACCEPT,
 } from "@/lib/supabase/productImagePolicy";
-import type { ProductSaleType } from "@/types/auction";
 import { formatKRW, getNextAuctionPublishAt } from "@/utils/formatters";
 
 interface StoreOption {
   id: string;
   name: string;
+  canPublish: boolean;
 }
 
 interface SubmitProgress {
   completed: number;
   total: number;
   phase: BatchAuctionProgressPhase;
-}
-
-interface ReportedCompressionMeasurement {
-  measurement: ProductImageCompressionMeasurement;
-  sequence: number;
 }
 
 export interface OperatorXlsxImportModalProps {
@@ -60,7 +50,6 @@ export interface OperatorXlsxImportModalProps {
     preview: BatchAuctionPreview,
     storeId: string,
     onProgress: BatchAuctionProgressReporter,
-    onCompressionMeasured: ProductImageCompressionReporter,
   ) => Promise<number>;
 }
 
@@ -88,15 +77,6 @@ function resetInput(input: HTMLInputElement | null) {
   if (input) input.value = "";
 }
 
-const millisecondsFormatter = new Intl.NumberFormat("ko-KR", {
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 0,
-});
-
-function formatMilliseconds(value: number) {
-  return millisecondsFormatter.format(value);
-}
-
 export function OperatorXlsxImportModal({
   open,
   stores,
@@ -107,7 +87,6 @@ export function OperatorXlsxImportModal({
   const [parsedWorkbook, setParsedWorkbook] = useState<ParsedAuctionWorkbook | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [storeId, setStoreId] = useState("");
-  const [saleType, setSaleType] = useState<ProductSaleType>("auction");
   const [bidIncrement, setBidIncrement] = useState("1000");
   const [confirmed, setConfirmed] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
@@ -115,10 +94,6 @@ export function OperatorXlsxImportModal({
   const [submittedCount, setSubmittedCount] = useState(0);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState<SubmitProgress | null>(null);
-  const [compressionMeasurements, setCompressionMeasurements] = useState<
-    ReportedCompressionMeasurement[]
-  >([]);
-  const [compressionTotal, setCompressionTotal] = useState(0);
   const parseRequestRef = useRef(0);
   const workbookInputRef = useRef<HTMLInputElement>(null);
   const directoryInputRef = useRef<HTMLInputElement>(null);
@@ -126,46 +101,23 @@ export function OperatorXlsxImportModal({
   const workbookId = useId();
   const directoryId = useId();
   const multipleImagesId = useId();
-  const saleTypeName = useId();
 
   const preview = useMemo(() => {
     if (!parsedWorkbook) return null;
     return buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
       publishAt: PREVIEW_PUBLISH_AT,
       bidIncrement: Number(bidIncrement),
-      saleType,
     });
-  }, [bidIncrement, imageFiles, parsedWorkbook, saleType]);
+  }, [bidIncrement, imageFiles, parsedWorkbook]);
   const selectedStoreId = stores.some((store) => store.id === storeId)
     ? storeId
     : stores[0]?.id ?? "";
-  const compressionSummary = useMemo(() => {
-    if (compressionMeasurements.length === 0) return null;
-    const targetMetCount = compressionMeasurements.filter(
-      ({ measurement }) => measurement.targetMet,
-    ).length;
-    const totalMs = compressionMeasurements.reduce(
-      (sum, { measurement }) => sum + measurement.totalMs,
-      0,
-    );
-    const slowestMs = Math.max(
-      ...compressionMeasurements.map(({ measurement }) => measurement.totalMs),
-    );
-    return {
-      averageMs: totalMs / compressionMeasurements.length,
-      slowestMs,
-      targetExceededCount: compressionMeasurements.length - targetMetCount,
-      targetMetCount,
-    };
-  }, [compressionMeasurements]);
-
+  const selectedStoreCanPublish = stores.find((store) => store.id === selectedStoreId)?.canPublish === true;
   const resetResult = useCallback(() => {
     setConfirmed(false);
     setSubmittedCount(0);
     setError("");
     setProgress(null);
-    setCompressionMeasurements([]);
-    setCompressionTotal(0);
   }, []);
 
   const reset = useCallback(() => {
@@ -174,7 +126,6 @@ export function OperatorXlsxImportModal({
     setParsedWorkbook(null);
     setImageFiles([]);
     setStoreId(stores[0]?.id ?? "");
-    setSaleType("auction");
     setBidIncrement("1000");
     setConfirmed(false);
     setIsParsing(false);
@@ -182,8 +133,6 @@ export function OperatorXlsxImportModal({
     setSubmittedCount(0);
     setError("");
     setProgress(null);
-    setCompressionMeasurements([]);
-    setCompressionTotal(0);
     resetInput(workbookInputRef.current);
     resetInput(directoryInputRef.current);
     resetInput(multipleInputRef.current);
@@ -247,7 +196,6 @@ export function OperatorXlsxImportModal({
     const finalPreview = buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
       publishAt: getNextAuctionPublishAt(new Date()).toISOString(),
       bidIncrement: Number(bidIncrement),
-      saleType,
     });
     if (!finalPreview.canSubmit || finalPreview.drafts.length === 0) {
       setConfirmed(false);
@@ -262,8 +210,6 @@ export function OperatorXlsxImportModal({
     setIsSubmitting(true);
     setSubmittedCount(0);
     setError("");
-    setCompressionMeasurements([]);
-    setCompressionTotal(totalImages);
     setProgress({ completed: 0, total: Math.max(1, totalImages), phase: "uploading" });
     try {
       const count = await onSubmit(
@@ -275,13 +221,6 @@ export function OperatorXlsxImportModal({
             total: Math.max(1, total),
             phase,
           });
-        },
-        (measurement, completed, total) => {
-          setCompressionTotal(total);
-          setCompressionMeasurements((current) => [
-            ...current.filter(({ sequence }) => sequence !== completed),
-            { measurement, sequence: completed },
-          ].sort((left, right) => left.sequence - right.sequence));
         },
       );
       setSubmittedCount(count);
@@ -342,8 +281,8 @@ export function OperatorXlsxImportModal({
                 type="file"
               />
               <p className="mt-3 text-[11px] leading-5 text-muted">
-                1~5행은 안내로 제외하고 6행부터 읽습니다. A열 상품명, D열 사이즈, W열 상태점수,
-                Y열 가격, AH열 이미지명을 우선 인식합니다.
+                기존 고정 양식만 사용합니다. 1~5행은 안내로 제외하고 6행부터 A열 상품명,
+                D열 사이즈, W열 상태점수, X열 원문, Y열 시작가, AH열 이미지명을 읽습니다.
               </p>
               {isParsing && <p className="mt-3 text-xs font-bold" role="status">엑셀 파일을 분석하는 중…</p>}
               {workbookFileName && !isParsing && <p className="mt-3 truncate bg-paper px-3 py-2 text-xs font-bold">{workbookFileName}</p>}
@@ -385,7 +324,7 @@ export function OperatorXlsxImportModal({
 
           <section aria-label="일괄 등록 옵션" className="border border-line p-4">
             <h3 className="text-sm font-bold">3. 등록 옵션</h3>
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
               <label className="text-xs font-bold">
                 저장할 숍
                 <select
@@ -399,30 +338,11 @@ export function OperatorXlsxImportModal({
                   {stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
                 </select>
               </label>
-              <fieldset>
-                <legend className="text-xs font-bold">판매 방식</legend>
-                <div className="mt-2 flex h-[42px] border border-line">
-                  {([ ["auction", "실시간 경매"], ["fixed", "즉시 구매"] ] as const).map(([value, label]) => (
-                    <label className={`flex flex-1 cursor-pointer items-center justify-center text-xs font-bold ${saleType === value ? "bg-ink text-paper" : "bg-paper"}`} key={value}>
-                      <input
-                        checked={saleType === value}
-                        className="sr-only"
-                        disabled={isSubmitting || completed}
-                        name={saleTypeName}
-                        onChange={() => { setSaleType(value); resetResult(); }}
-                        type="radio"
-                        value={value}
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
               <label className="text-xs font-bold">
                 전체 입찰 단위
                 <input
                   className="mt-2 block w-full border border-line bg-paper px-3 py-3 text-xs disabled:opacity-40"
-                  disabled={saleType === "fixed" || isSubmitting || completed}
+                  disabled={isSubmitting || completed}
                   max="100000000"
                   min="1"
                   onChange={(event) => { setBidIncrement(event.target.value); resetResult(); }}
@@ -433,7 +353,9 @@ export function OperatorXlsxImportModal({
               </label>
             </div>
             <p className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-900">
-              상품은 공개 대기로 저장되며 가장 가까운 한국시간 오전 10시에 예약됩니다. 숍 선택지는 현재 계정의 서버 검증 권한 범위만 표시됩니다.
+              {selectedStoreCanPublish
+                ? "등록이 끝난 상품은 즉시 공개됩니다."
+                : "공개 권한이 없으면 상품은 초안으로 저장됩니다."} 숍 선택지는 현재 계정의 서버 검증 권한 범위만 표시됩니다.
             </p>
           </section>
 
@@ -477,7 +399,7 @@ export function OperatorXlsxImportModal({
                       <th className="px-3 py-3">행</th>
                       <th className="px-3 py-3">상품</th>
                       <th className="px-3 py-3">확인 브랜드</th>
-                      <th className="px-3 py-3">{saleType === "fixed" ? "정가" : "시작가"}</th>
+                      <th className="px-3 py-3">시작가</th>
                       <th className="px-3 py-3">연결 사진</th>
                       <th className="px-3 py-3">검증 결과</th>
                     </tr>
@@ -534,56 +456,6 @@ export function OperatorXlsxImportModal({
             </section>
           )}
 
-          {compressionSummary && (
-            <section
-              aria-label="사진 압축 성능 실측"
-              aria-live="polite"
-              className="border border-line bg-surface p-4"
-            >
-              <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-                <div>
-                  <h3 className="text-sm font-bold">사진 압축 기기 실측</h3>
-                  <p className="mt-1 text-[11px] leading-5 text-muted">
-                    2560px 고해상도 검수본·360p 미리보기를 동시에 인코딩한 뒤 두 파일을 동시에 업로드합니다. {PRODUCT_IMAGE_COMPRESSION_TARGET_MS}ms는 성능 목표이며, 느린 기기에서 초과해도 업로드는 계속됩니다.
-                  </p>
-                </div>
-                <span className="shrink-0 border border-line bg-paper px-3 py-2 text-xs font-bold">
-                  {compressionMeasurements.length.toLocaleString("ko-KR")} / {compressionTotal.toLocaleString("ko-KR")}장 측정
-                </span>
-              </div>
-              <dl className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-                <div className="border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">
-                  <dt className="text-[10px] font-bold">100ms 목표 달성</dt>
-                  <dd className="mt-1 font-mono text-base font-black">{compressionSummary.targetMetCount.toLocaleString("ko-KR")}장</dd>
-                </div>
-                <div className="border border-amber-200 bg-amber-50 p-3 text-amber-900">
-                  <dt className="text-[10px] font-bold">100ms 목표 초과</dt>
-                  <dd className="mt-1 font-mono text-base font-black">{compressionSummary.targetExceededCount.toLocaleString("ko-KR")}장</dd>
-                </div>
-                <div className="border border-line bg-paper p-3">
-                  <dt className="text-[10px] font-bold text-muted">평균 전체 시간</dt>
-                  <dd className="mt-1 font-mono text-base font-black">{formatMilliseconds(compressionSummary.averageMs)}ms</dd>
-                </div>
-                <div className="border border-line bg-paper p-3">
-                  <dt className="text-[10px] font-bold text-muted">최장 전체 시간</dt>
-                  <dd className="mt-1 font-mono text-base font-black">{formatMilliseconds(compressionSummary.slowestMs)}ms</dd>
-                </div>
-              </dl>
-              <ul className="mt-3 max-h-44 divide-y divide-line overflow-y-auto border-y border-line text-[11px]">
-                {compressionMeasurements.map(({ measurement, sequence }) => (
-                  <li className="flex flex-col justify-between gap-1 px-2 py-2 sm:flex-row sm:items-center" key={sequence}>
-                    <span className="font-bold">
-                      사진 {sequence.toLocaleString("ko-KR")} · 전체 {formatMilliseconds(measurement.totalMs)}ms
-                    </span>
-                    <span className={measurement.targetMet ? "text-emerald-700" : "text-amber-800"}>
-                      디코딩 {formatMilliseconds(measurement.decodeMs)}ms · 동시 인코딩 {formatMilliseconds(measurement.encodeMs)}ms · {measurement.targetMet ? "100ms 목표 달성" : `100ms 목표 ${formatMilliseconds(measurement.totalMs - measurement.targetMs)}ms 초과`}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
           {error && <p className="border border-red-300 bg-red-50 px-4 py-3 text-xs font-bold text-red-800" role="alert">{error}</p>}
 
           {!completed && (
@@ -594,7 +466,7 @@ export function OperatorXlsxImportModal({
                 onChange={(event) => { setConfirmed(event.target.checked); setError(""); }}
                 type="checkbox"
               />
-              검증 결과, 자동 추출 브랜드, 저장할 숍, 판매 방식과 {preview?.rows.length ?? 0}개 상품을 모두 확인했습니다. 이제 데이터베이스 저장을 허용합니다.
+              검증 결과, 자동 추출 브랜드, 저장할 숍과 {preview?.rows.length ?? 0}개 경매 상품을 모두 확인했습니다. 이제 데이터베이스 저장을 허용합니다.
             </label>
           )}
 

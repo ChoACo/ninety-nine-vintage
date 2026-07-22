@@ -20,7 +20,7 @@ const bounds = {
   viewportWidth: 800,
 };
 
-test("pan and zoom preserve the cursor anchor and clamp inspection edges", () => {
+test("pan and zoom preserve the cursor anchor and clamp image edges", () => {
   const initial = { scale: 1, x: 0, y: 0 };
   const anchor = { x: 120, y: -80 };
   const zoomed = zoomAtPoint(initial, 2, anchor, bounds);
@@ -95,7 +95,10 @@ test("premium detail actions stay in layered rounded dialogs before server mutat
   assert.match(modal, /createPortal/);
   assert.match(modal, /lockBodyScroll/);
   assert.match(condition, /PremiumDialog/);
-  assert.match(condition, /검수 상세 보고서 보기/);
+  assert.match(condition, /상품 상태 상세 보기/);
+  assert.match(condition, /상품 상태 정보/);
+  assert.match(condition, /상태 등급 \{item\.conditionGrade\}/);
+  assert.doesNotMatch(condition, /전문가 검수 완료|정품·상태 확인|검수 보고서|상세 보고서|BadgeCheck/);
   assert.match(cart, /PremiumDialog/);
   assert.match(cart, /간편 장바구니/);
   assert.match(bid, /setConfirmOpen\(true\)/);
@@ -136,7 +139,7 @@ test("premium detail actions stay in layered rounded dialogs before server mutat
   );
   assert.match(quickCartAction, /setQuickCartOpen\(false\)/);
   assert.doesNotMatch(quickCartAction, /router\.push\("\/cart"\)/);
-  assert.match(sticky, /p-5 pb-32[\s\S]*md:pb-6/);
+  assert.match(sticky, /surface === "desktop"[\s\S]*sticky col-span-5 p-6 pb-6[\s\S]*: "p-5 pb-32"/);
   assert.match(scrollLock, /activeBodyScrollLocks \+= 1/);
   assert.match(scrollLock, /activeBodyScrollLocks === 0/);
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   COMMERCE_CHECKOUT_STORAGE_KEY,
@@ -96,6 +96,8 @@ function clearCheckoutForPayment(paymentId: string, buyerId: string): void {
 }
 
 function PaymentCompletion() {
+  const pathname = usePathname();
+  const basePath = pathname.startsWith("/m/") ? "/m" : "";
   const searchParams = useSearchParams();
   const paymentId = searchParams.get("paymentId");
   const redirectErrorCode = searchParams.get("code");
@@ -178,7 +180,7 @@ function PaymentCompletion() {
         </h1>
         <Link
           className="mt-8 inline-flex border border-ink px-5 py-3 text-xs font-bold"
-          href={failed ? "/cart" : "/account#orders"}
+          href={failed ? `${basePath}/cart` : `${basePath}/account/orders`}
         >
           {failed ? "장바구니로 돌아가기" : "주문 내역 확인"}
         </Link>

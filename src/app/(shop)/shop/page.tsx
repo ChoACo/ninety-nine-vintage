@@ -5,7 +5,7 @@ import { AuctionFilterSidebar } from "@/components/features/auction/AuctionFilte
 import { fetchPublishedProducts } from "@/services/products";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "즉시 구매 | NINETY-NINE VINTAGE", alternates: { canonical: "/shop" } };
+export const metadata: Metadata = { title: "즉시 구매 | NINETY-NINE VINTAGE", alternates: { canonical: "/shop", media: { "only screen and (max-width: 1023px)": "/m/shop" } } };
 
 function toPayload(products: Awaited<ReturnType<typeof fetchPublishedProducts>>): ProductPayload[] {
   return products.map((product) => ({
@@ -39,5 +39,5 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
     sort: "latest",
     search: typeof query === "string" ? query : "",
   }));
-  return <div className="md:flex md:items-start md:gap-10"><AuctionFilterSidebar saleType="fixed" /><Suspense fallback={<div className="min-w-0 flex-1" />}><AuctionFeedGrid className="min-w-0 flex-1" initialProducts={initialProducts} saleType="fixed" title="상시 즉시 구매" /></Suspense></div>;
+  return <div className="flex items-start gap-10"><AuctionFilterSidebar saleType="fixed" surface="desktop" /><Suspense fallback={<div className="min-w-0 flex-1" />}><AuctionFeedGrid className="min-w-0 flex-1" initialProducts={initialProducts} saleType="fixed" surface="desktop" title="상시 즉시 구매" /></Suspense></div>;
 }

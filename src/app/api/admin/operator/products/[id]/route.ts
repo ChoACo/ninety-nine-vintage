@@ -1,6 +1,5 @@
 import { normalizeProductBrand } from "@/lib/catalog/brand";
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
-import type { Json } from "@/lib/supabase/database.types";
 
 const MAX_PRODUCT_PRICE = 1_000_000_000;
 const MAX_BID_INCREMENT = 100_000_000;
@@ -58,19 +57,6 @@ function normalizeImageUrls(value: unknown): string[] | null {
   return urls.length > 0 && urls.length === value.length ? urls : null;
 }
 
-function normalizeMeasurements(value: unknown): Json | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const source = value as Record<string, unknown>;
-  const result: Record<string, number> = {};
-  for (const key of ["shoulder", "chest", "sleeve", "length"]) {
-    if (!hasOwn(source, key)) continue;
-    const measurement = Number(source[key]);
-    if (!Number.isFinite(measurement) || measurement <= 0) return null;
-    result[key] = measurement;
-  }
-  return result;
-}
-
 function sameUrls(left: string[], right: string[]) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
@@ -119,7 +105,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { data: product, error: lookupError } = await auth.user
     .from("products")
-    .select("id, store_id, updated_at, status, sale_type, starting_price, fixed_price, bid_increment, participant_count, final_bid_id, title, description, category, brand, image_urls, thumbnail_urls, size_label, condition_grade, storage_class, publish_at, inspection_notes, measurements")
+    .select("id, store_id, updated_at, status, sale_type, starting_price, fixed_price, bid_increment, title, description, category, brand, image_urls, thumbnail_urls, size_label, condition_grade, storage_class, publish_at, inspection_notes, measurements")
     .eq("id", id)
     .maybeSingle();
   if (lookupError) return commerceJson({ error: "product_unavailable" }, 503);
@@ -140,10 +126,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }, 409);
     }
   }
-  if (product.status === "closed") return commerceJson({ error: "closed_product_immutable" }, 409);
-  if (product.status !== "pending") return commerceJson({ error: "pending_product_required" }, 409);
-  if (product.participant_count > 0 || product.final_bid_id) {
-    return commerceJson({ error: "product_has_bid_history" }, 409);
+  if (product.status !== "pending" && product.status !== "active") {
+    return commerceJson({ error: "completed_product_immutable" }, 409);
+  }
+  const saleSetupFields = [
+    "storeId",
+    "saleType",
+    "startingPrice",
+    "fixedPrice",
+    "bidIncrement",
+    "publishAt",
+    "closesAt",
+  ];
+  if (product.status === "active" && saleSetupFields.some((field) => hasOwn(body, field))) {
+    return commerceJson({ error: "active_sale_setup_immutable" }, 409);
   }
 
   const title = hasOwn(body, "title") ? requiredText(body.title, 160) : product.title;
@@ -204,17 +200,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   let inspectionNotes = product.inspection_notes;
   if (hasOwn(body, "inspectionNotes")) {
     if (!Array.isArray(body.inspectionNotes) || !body.inspectionNotes.every((value) => typeof value === "string")) {
-      return commerceJson({ error: "검수 메모를 확인해 주세요." }, 400);
+      return commerceJson({ error: "상태·하자 메모를 확인해 주세요." }, 400);
     }
     inspectionNotes = body.inspectionNotes.map((value) => value.trim()).filter(Boolean);
   }
-  const measurements = hasOwn(body, "measurements")
-    ? normalizeMeasurements(body.measurements)
-    : product.measurements;
-  if (!measurements || typeof measurements !== "object" || Array.isArray(measurements)) {
-    return commerceJson({ error: "실측값을 확인해 주세요." }, 400);
-  }
-
   const { data: updated, error } = await auth.user
     .rpc("update_operator_product", {
       p_product_id: id,
@@ -233,7 +222,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       p_size_label: sizeLabel,
       p_condition_grade: conditionGrade,
       p_storage_class: storageClass,
-      p_measurements: measurements,
+      p_measurements: product.measurements,
       p_inspection_notes: inspectionNotes,
     })
     .single();

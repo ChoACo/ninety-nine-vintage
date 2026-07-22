@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const title = `${brand?.brand ?? slug} 빈티지 판매 기록 | NINETY-NINE VINTAGE`;
   const description = `${brand?.brand ?? slug} 빈티지 상품의 낙찰가와 판매 기록을 확인하세요.`;
   const url = `/sold/brand/${encodeURIComponent(slug)}`;
-  return { title, description, alternates: { canonical: url }, openGraph: { title, description, url, type: "website" } };
+  return { title, description, alternates: { canonical: url, media: { "only screen and (max-width: 1023px)": `/m${url}` } }, openGraph: { title, description, url, type: "website" } };
 }
 
 export default async function SoldBrandPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ before?: string; beforeId?: string }> }) {

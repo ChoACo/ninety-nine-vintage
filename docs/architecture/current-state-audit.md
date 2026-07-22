@@ -10,6 +10,8 @@
 
 > 2026-07-22 운영 추적: `20260721134000`~`20260721143000`은 운영 DB에 적용했고 `06519e5`를 Production에 배포했다. 이어 `20260722010000_shared_commerce_payment_queue_snapshot.sql`을 운영 DB에 적용하고 코드 커밋 `625942c`를 Vercel Production 배포 `dpl_9d3ghP2GQNTLaT3tpdK8itjT81Tr`로 공개 도메인에 연결했다. 마이그레이션 parity, 함수 ACL, 유효 인덱스 2개, `active_count=0`, `active_overflow=false`, `integrity_error=false`, 공개 통합 검사, `site/status` DB 연결, 비인증 운영자 API 401, 인증된 운영자 주문 화면과 대시보드 읽기 검증은 통과했다. 처리 대기 건이 없어 실제 입금 mutation은 운영 환경에서 실행하지 않았다. 구매 제안 연결 입금의 잘못된 부분입금을 되돌려 자동 만료로 복귀시키는 Owner 재정산 상태와 경매·배송비 원장 이력/정정 UI는 아직 없다.
 
+> 2026-07-22 역분개 후속 운영 추적: `20260722020000_harden_manual_transfer_reversal.sql`을 운영 DB에 적용하고 코드 커밋 `fe88ae9`를 Vercel Production 배포 `dpl_8CnZjNxyCLFcW6WxAHf67Cyvp99j`로 공개 도메인에 연결했다. 역분개 RPC는 URL의 transfer 종류·ID와 원본 ledger를 같은 mutation 안에서 결박하고, 화면이 관찰한 signed 원장 합계·행 수 CAS와 처리자별 멱등 재시도를 강제한다. PostgreSQL 18.4 격리 환경에서 계약과 실제 다중 세션 경쟁 검증을 통과했다. 공개 통합 검사, `site/status` DB 연결, 비인증 mutation 차단과 인증된 운영자 주문·대시보드 읽기 검증도 통과했다. Docker Desktop과 Compose 실행 경로는 준비했으나 Windows 기능 활성화 뒤 재부팅이 필요해 엔진 smoke는 대기 중이다. 운영 원장이 비어 있어 실제 역분개 mutation은 실행하지 않았다.
+
 ## 요약
 
 조사 기준선의 코드는 통합 장바구니, 매장 정보가 포함된 통합 주문, 수동 계좌이체 원장, 직원/운영자 역할, 고객 보관과 배송 요청을 이미 갖고 있다. 그러나 확정 목표에 필요한 중앙 출고지, 매장→중앙 인계 상태, 주문당 단일 송장 제약, 매장 멤버십 기반 세부 권한은 없다. 기준선에서 PortOne은 격리된 미래 코드가 아니라 런타임에서 전환 가능한 완전한 결제 경로였다. 후속 P0-2는 운영 DB와 Production까지 반영해 수동이체만 활성화했고 PortOne 어댑터와 기록은 비활성 상태로 보존한다.
@@ -54,6 +56,7 @@
 - 단순 확인 API는 의도적으로 차단되고 실제 입금자명·금액을 원장에 쓰도록 요구한다. 근거: `src/app/api/admin/operator/orders/[id]/confirm/route.ts`, `src/app/api/admin/operator/transfers/[id]/ledger/route.ts`.
 - 경매 부분입금은 첫 입금 시 주문 기한과 구매 제안 기한의 정확한 원값을 주문 행에 보존한 뒤 현재 기한만 `NULL`로 보류한다. 원기한 자체가 `NULL`인 면제 주문도 hold 시각으로 미보류 상태와 구분한다. 구매 제안 미연결 주문의 순원장이 0원이 되면 저장한 원값을 복원하며, 구매 제안 연결 역분개는 전용 Owner 재정산 계약 전까지 실패-폐쇄한다. 근거: `supabase/migrations/20260721140000_harden_manual_transfer_confirmation.sql`.
 - 숨은 Owner 테스트 회원은 Owner 전용 proxy 계약을 유지한다. 일반 운영자는 대기 목록뿐 아니라 ID를 알고 있어도 경매 잔액 조회·입금 기록·역분개 RPC에서 차단된다. 근거: `supabase/migrations/20260718060000_hidden_owner_delegation_and_test_member.sql`, `supabase/migrations/20260721140000_harden_manual_transfer_confirmation.sql`.
+- 후속 P1의 두 역분개 RPC는 요청 종류와 URL 대상 ID, 원본 ledger의 종류·transfer ID를 부모 행 잠금 안에서 함께 검증하고, signed 원장 합계와 원장 행 수가 화면 snapshot과 일치할 때만 반대 원장을 추가한다. 새 역분개 재시도 키는 처리자별 UUIDv4로 격리하며 같은 대상·원장·사유 replay만 같은 역분개 ID로 재확인하고, 다른 payload의 키 재사용은 실패-폐쇄한다. 브라우저는 대상·원장·사유·CAS snapshot을 포함한 fingerprint에 키를 보존하고 엄격한 성공 응답 뒤에만 제거한다. 근거: `supabase/migrations/20260722020000_harden_manual_transfer_reversal.sql`, `src/app/api/admin/operator/transfers/[id]/ledger/route.ts`, `src/lib/manualTransferReceipt.ts`.
 
 ### PortOne
 

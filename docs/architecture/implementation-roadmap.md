@@ -43,7 +43,7 @@
 
 ### P0-5. 통합 입금의 공동 조회·멱등 확인
 
-상태: `20260721134000`~`20260721143000`과 큐 snapshot `20260722010000` 운영 DB 적용, 코드 `625942c` Production 배포, 공개 검증과 인증된 Owner/운영자 읽기 화면 검증 완료. 운영 대기 건이 없어 실제 입금 mutation은 미검증이며, 경매·배송비 원장 이력/정정 UI는 후속 P1이다.
+상태: `20260721134000`~`20260721143000`과 큐 snapshot `20260722010000` 운영 DB 적용, 코드 `625942c` Production 배포에 이어 역분개 결박 `20260722020000` 운영 DB 적용과 코드 `fe88ae9` Vercel Production 배포 `dpl_8CnZjNxyCLFcW6WxAHf67Cyvp99j`까지 완료했다. 공개 검증과 인증된 Owner/운영자 읽기 화면 검증은 완료했지만 운영 원장이 비어 실제 입금·역분개 mutation은 미검증이며, 경매·배송비 원장 이력/정정 UI는 후속 P1이다.
 
 - 확정된 공개 범위로 공용 입금 큐를 제공한다.
 - 원장 기록과 주문 결제 확정을 원자적으로 검증한다.
@@ -62,8 +62,9 @@
 - 숨은 Owner 테스트 회원은 Owner 전용 proxy로만 조작한다. 운영자 공용 경매 목록, 잔액 RPC, 입금 기록, 역분개는 같은 제외 조건을 강제한다.
 - 격리 검증은 기존 64개 마이그레이션 재생 후 새 6개를 PostgreSQL 17.10에 적용해 수행했다. 별도 fixture에서 구 0원 역분개 stranded 상태의 실패-폐쇄·DDL rollback·cron 비활성 유지, 멱등 replay의 원장 버전 응답과 현재 매장 권한 재검사도 확인했다. 실제 Supabase/PostgREST, 운영 PostgreSQL patch 버전, pg_cron C 확장 worker, 인증 브라우저 세션을 사용하지 않았으므로 운영 검증과 구분한다.
 - 운영 반영 P1: 완료된 고정가 주문은 요청 시각 100건 절단 대신 요청·확정·최신 원장 시각의 최댓값과 UUID를 묶은 cursor로 조회한다. 활성/완료 소속, CAS 합계·버전, 최근 원장은 한 SQL 문장 snapshot이지만 상품 요약 보강과 다음 cursor 호출은 별도 snapshot이다. live pagination 중 첫 cursor 위에 새로 생긴 완료 건은 새로고침으로 회수한다. 현재 `cancelled_at`이 없어 원장 없는 취소 건의 정확한 전이 시각은 후속 상태 모델에서 보강해야 한다. Owner의 경매·배송비 화면도 원장 ID·행위자·시각·사유 이력과 허용된 정정 동선을 제공해야 한다.
-- 후속 P1에서 역분개 API의 URL transfer ID와 대상 ledger의 transfer ID를 DB mutation 전에 같은 RPC 안에서 결박한다. 현재 구현은 공용 commerce 권한 범위 안에서 다른 transfer의 ledger ID를 보내면 URL 대상과 무관한 원장을 정정할 수 있으므로, 사후 응답 검증만 추가하지 않고 RPC 입력·행 잠금·관계 검증을 함께 바꾼다.
+- 후속 P1의 역분개 안전화는 `20260722020000_harden_manual_transfer_reversal.sql`로 완료했다. 두 RPC는 URL transfer 종류·ID와 원본 ledger 관계를 같은 mutation 안에서 결박하고 canonical 부모 행 잠금 뒤 signed 원장 합계·행 수 CAS를 검사한다. 새 역분개는 처리자별 UUIDv4 멱등 키를 사용하며 같은 대상·원장·사유 replay만 같은 역분개 행으로 재확인하고, 앱은 `reversal_of`를 포함한 엄격한 결과 계약을 확인한 뒤에만 재시도 키를 제거한다.
 - P1 배포 기록: 운영 큐·최근 ledger writer·충돌 잠금이 모두 0임을 사전 확인하고 DB 마이그레이션을 먼저 적용했다. 400/401 경계는 격리 PostgreSQL fixture에서 검증했으며, 운영 DB의 함수 권한·유효 인덱스 2개·`active_count=0`·`active_overflow=false`·`integrity_error=false`를 읽기 전용으로 확인한 뒤 앱을 배포했다. Vercel source dry-run에서 발견한 로컬 `.env`·`.dev.vars`·사용자 설정·`work/` 산출물은 `.vercelignore`로 차단하고 재검증했다. 앱 smoke에서 503 또는 지연이 발생하면 앱만 `06519e5`로 되돌리고 additive 함수·인덱스는 유지한 채 원인을 조사한다. live 운영 중 하향 마이그레이션이나 함수/인덱스 삭제로 롤백하지 않는다.
+- 역분개 결박 P1 배포 기록: 운영 원장이 비어 있고 관련 writer·잠금이 없음을 확인한 뒤 `20260722020000`을 DB 먼저 적용하고 코드 `fe88ae9`를 Vercel Production 배포 `dpl_8CnZjNxyCLFcW6WxAHf67Cyvp99j`로 공개했다. PostgreSQL 18.4 격리 환경에서 계약과 실제 다중 세션 경쟁을 검증했다. 공개 통합 검사, `site/status` DB 연결, 비인증 원장 mutation 차단과 인증된 운영자 주문·대시보드 읽기도 재검증했다. Docker Desktop 설치와 Compose runner 작성은 완료했으나 Windows 재부팅 전에는 엔진을 시작할 수 없어 Docker smoke는 대기 중이다. 운영 데이터가 없어 실제 입금·역분개 mutation은 실행하지 않았다.
 - 성공 조건: 어느 권한 운영자가 확인해도 주문 전체에 한 번만 반영되고 감사 기록이 남는다.
 
 ## P1 — 중앙 집하·보관·단일 출고

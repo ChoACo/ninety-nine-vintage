@@ -1,6 +1,117 @@
 @import "tailwindcss";
 @config "../../tailwind.config.ts";
 
+:root {
+  color-scheme: light;
+  --theme-paper: 251 250 247;
+  --theme-surface: 241 239 234;
+  --theme-ink: 9 9 11;
+  --theme-muted: 113 113 122;
+  --theme-line: 229 226 220;
+  --theme-inverse: 24 24 27;
+  --theme-scrollbar: 212 208 200;
+  --theme-card-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  --theme-lift-shadow: 0 14px 30px rgb(9 9 11 / 0.10);
+  --theme-mobile-cta-shadow: 0 -8px 20px rgb(255 255 255 / 0.80);
+  --store-card-1: #c7b9a5;
+  --store-card-2: #9fa9a2;
+  --store-card-3: #b8a7a1;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --theme-paper: 21 24 28;
+  --theme-surface: 31 36 42;
+  --theme-ink: 241 236 226;
+  --theme-muted: 174 181 191;
+  --theme-line: 64 71 80;
+  --theme-inverse: 233 226 213;
+  --theme-scrollbar: 83 91 101;
+  --theme-card-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+  --theme-lift-shadow: 0 16px 34px rgb(0 0 0 / 0.34);
+  --theme-mobile-cta-shadow: 0 -10px 24px rgb(8 10 13 / 0.72);
+  --store-card-1: #554b40;
+  --store-card-2: #3f504b;
+  --store-card-3: #554548;
+
+  /* Legacy Tailwind palette utilities are still used by feature and admin
+     screens. Reversing their neutral ramp keeps those surfaces readable
+     without turning the dark theme into flat black. */
+  --color-white: #20252b;
+  --color-zinc-50: #20252b;
+  --color-zinc-100: #272d34;
+  --color-zinc-200: #404750;
+  --color-zinc-300: #59616b;
+  --color-zinc-400: #929aa5;
+  --color-zinc-500: #aeb5bf;
+  --color-zinc-600: #c2c8d0;
+  --color-zinc-700: #d6d9de;
+  --color-zinc-800: #e8e6e0;
+  --color-zinc-900: #f0ece3;
+  --color-zinc-950: #f7f2e8;
+
+  --color-red-50: #3a2225;
+  --color-red-100: #48272b;
+  --color-red-200: #714048;
+  --color-red-300: #95535e;
+  --color-red-700: #ff9da7;
+  --color-red-800: #ffb2ba;
+  --color-red-900: #ffc7cc;
+  --color-rose-50: #392329;
+  --color-rose-200: #70414c;
+  --color-rose-300: #945565;
+  --color-rose-600: #ff8fa5;
+  --color-rose-700: #ff9daf;
+  --color-rose-800: #ffb4c1;
+  --color-amber-50: #362d1e;
+  --color-amber-100: #463923;
+  --color-amber-200: #6d5930;
+  --color-amber-300: #92763d;
+  --color-amber-700: #f5c76f;
+  --color-amber-800: #f8d38a;
+  --color-amber-900: #fbe0aa;
+  --color-amber-950: #fff0c8;
+  --color-emerald-50: #183229;
+  --color-emerald-200: #2d614d;
+  --color-emerald-300: #3d8065;
+  --color-emerald-700: #70d9ad;
+  --color-emerald-800: #8ee6c1;
+  --color-emerald-900: #aaeecf;
+  --color-sky-50: #1d303b;
+  --color-sky-200: #386078;
+  --color-sky-700: #7cc8ed;
+  --color-sky-800: #98d7f3;
+  --color-sky-900: #b7e4f7;
+  --color-blue-50: #1e2e46;
+  --color-blue-200: #3f628e;
+  --color-blue-900: #bed7ff;
+}
+
+/* Photo and broadcast stages intentionally keep a cinematic palette in both
+   themes. Local variables prevent the global compatibility ramp from
+   brightening those already-dark surfaces. */
+html[data-theme="dark"] .theme-invariant-dark {
+  color-scheme: dark;
+  --theme-paper: 251 250 247;
+  --theme-surface: 39 39 42;
+  --theme-ink: 9 9 11;
+  --theme-muted: 161 161 170;
+  --theme-line: 63 63 70;
+  --theme-inverse: 24 24 27;
+  --color-white: #ffffff;
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #52525b;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
+  --color-zinc-950: #09090b;
+}
+
 @layer base {
   *,
   *::before,
@@ -10,7 +121,7 @@
 
   html {
     min-width: 320px;
-    background-color: #fbfaf7;
+    background-color: rgb(var(--theme-paper));
     scrollbar-gutter: stable;
   }
 
@@ -20,14 +131,14 @@
     margin: 0;
     padding: 0;
     overflow-x: hidden;
-    background-color: #fbfaf7;
-    color: #09090b;
+    background-color: rgb(var(--theme-paper));
+    color: rgb(var(--theme-ink));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
 
-  ::selection { background: #09090b; color: #ffffff; }
+  ::selection { background: rgb(var(--theme-ink)); color: rgb(var(--theme-paper)); }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
@@ -88,8 +199,8 @@
   }
 
   ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track { background: #fbfaf7; }
-  ::-webkit-scrollbar-thumb { background: #d4d0c8; border: 3px solid #fbfaf7; border-radius: 999px; }
+  ::-webkit-scrollbar-track { background: rgb(var(--theme-paper)); }
+  ::-webkit-scrollbar-thumb { background: rgb(var(--theme-scrollbar)); border: 3px solid rgb(var(--theme-paper)); border-radius: 999px; }
 
   img,
   svg,
@@ -102,7 +213,7 @@
 
 @layer components {
   .eyebrow { font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
-  .focus-ring:focus-visible { outline: 2px solid #09090b; outline-offset: 3px; }
+  .focus-ring:focus-visible { outline: 2px solid rgb(var(--theme-ink)); outline-offset: 3px; }
 
   .premium-interaction {
     transition: transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease, background-color 300ms ease, color 300ms ease;
@@ -110,7 +221,7 @@
 
   .premium-interaction:hover {
     transform: translateY(-0.25rem);
-    box-shadow: 0 14px 30px rgb(9 9 11 / 0.10);
+    box-shadow: var(--theme-lift-shadow);
   }
 
   .premium-interaction:active { transform: scale(0.95); }
@@ -156,7 +267,7 @@
   [class~="grid-cols-[1fr_360px]"],
   [class~="grid-cols-[300px_1fr]"],
   [class~="grid-cols-[1.25fr_.75fr]"] { grid-template-columns: minmax(0, 1fr) !important; }
-  [class~="grid-cols-[300px_1fr]"] > aside { border-right-width: 0 !important; border-bottom: 1px solid #d4d0c8; }
+  [class~="grid-cols-[300px_1fr]"] > aside { border-right-width: 0 !important; border-bottom: 1px solid rgb(var(--theme-line)); }
 }
 
 @media (max-width: 479px) {
@@ -179,7 +290,7 @@
     z-index: 20;
     margin-inline: 0;
     padding: 0.5rem max(0.5rem, env(safe-area-inset-right)) 0.5rem max(0.5rem, env(safe-area-inset-left));
-    background: rgb(255 255 255 / 0.96);
-    box-shadow: 0 -8px 20px rgb(255 255 255 / 0.8);
+    background: rgb(var(--theme-paper) / 0.96);
+    box-shadow: var(--theme-mobile-cta-shadow);
   }
 }

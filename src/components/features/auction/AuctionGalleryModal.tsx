@@ -617,7 +617,7 @@ export function AuctionGalleryModal({
       aria-describedby="gallery-gesture-help"
       aria-labelledby="gallery-lightbox-title"
       aria-modal="true"
-      className="premium-dialog-overlay fixed inset-0 z-[140] flex flex-col overflow-hidden bg-zinc-950 text-white"
+      className="theme-invariant-dark premium-dialog-overlay fixed inset-0 z-[140] flex flex-col overflow-hidden bg-zinc-950 text-white"
       data-premium-modal-layer="nested"
       data-state={visible ? "open" : "closed"}
       ref={dialogRef}

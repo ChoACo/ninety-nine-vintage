@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminAccessBoundary } from "@/components/admin/AdminAccessBoundary";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 export const metadata: Metadata = {
   robots: {
@@ -23,9 +24,12 @@ export default function AdminLayout({
           >
             NINETY-NINE 관리자
           </Link>
-          <Link className="text-xs font-bold underline" href="/">
-            쇼핑 화면으로 이동
-          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle className="size-10 px-0 sm:w-auto sm:px-3" />
+            <Link className="text-xs font-bold underline" href="/">
+              쇼핑 화면으로 이동
+            </Link>
+          </div>
         </div>
       </header>
       <main className="mx-auto min-h-[calc(100vh-4.5rem)] max-w-[1680px] px-4 py-6 sm:px-6 md:px-10 md:py-8">

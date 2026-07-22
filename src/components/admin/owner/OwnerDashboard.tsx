@@ -89,7 +89,7 @@ export function OwnerDashboard() {
         <div className="mb-4 border-b border-ink pb-4"><p className="eyebrow text-muted">숍 운영자</p><h2 className="mt-2 text-xl font-black">숍별 운영 현황</h2></div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {stores.map((store, index) => (
-            <Link className="min-w-0 border border-line p-5 transition-transform hover:-translate-y-1" href={`/stores/${store.slug}`} key={store.id} style={{ borderTopColor: ["#c7b9a5", "#9fa9a2", "#b8a7a1"][index % 3], borderTopWidth: 4 }}>
+            <Link className="min-w-0 border border-line p-5 transition-transform hover:-translate-y-1" href={`/stores/${store.slug}`} key={store.id} style={{ borderTopColor: `var(--store-card-${(index % 3) + 1})`, borderTopWidth: 4 }}>
               <p className="truncate text-xs font-bold">{store.name}</p>
               <p className="mt-2 break-all text-[11px] text-muted">운영자 {store.operator_id.slice(0, 8)}</p>
               <div className="mt-8 flex items-end justify-between"><span className="font-mono text-2xl font-bold">{products.filter((product) => product.store_id === store.id).length}<small className="ml-1 font-sans text-xs font-normal text-muted">개 상품</small></span></div>

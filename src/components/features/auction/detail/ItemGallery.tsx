@@ -41,7 +41,7 @@ export function ItemGallery({ compact = false, item }: ItemGalleryProps) {
         {images.map((image, index) => (
           <button
             aria-label={`${item.name} 이미지 ${index + 1} 보기`}
-            className={`relative aspect-square overflow-hidden rounded-2xl bg-zinc-100 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${activeImage === index ? "ring-2 ring-zinc-950 ring-offset-2" : "opacity-60 hover:opacity-100"}`}
+            className={`relative aspect-square overflow-hidden rounded-2xl bg-zinc-100 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${activeImage === index ? "ring-2 ring-zinc-950 ring-offset-2 ring-offset-paper" : "opacity-60 hover:opacity-100"}`}
             key={image}
             onClick={() => setActiveImage(index)}
             type="button"

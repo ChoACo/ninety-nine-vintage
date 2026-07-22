@@ -13,7 +13,7 @@ function EnabledLiveTickerBar() {
   const { label, status, timeLeft } = useAuctionTimer();
 
   return (
-    <aside className="sticky top-0 z-50 h-9 border-b border-zinc-800 bg-zinc-950 text-white">
+    <aside className="theme-invariant-dark sticky top-0 z-50 h-9 border-b border-zinc-800 bg-zinc-950 text-white">
       <div className="mx-auto flex h-full max-w-[1680px] items-center justify-between gap-3 px-4 text-[10px] md:px-10 md:text-xs xl:px-12">
         <div className="flex min-w-0 items-center gap-2 font-medium">
           <span className="flex items-center gap-1.5 tracking-[0.12em] text-emerald-400">

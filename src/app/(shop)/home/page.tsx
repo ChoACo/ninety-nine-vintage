@@ -46,7 +46,7 @@ interface HomePresentationProps {
 function MobileHome({ auctions, fixed, stores }: HomePresentationProps) {
   return (
     <div className="block space-y-12 md:hidden" data-home-presentation="mobile">
-      <section className="-mx-4 -mt-6 overflow-hidden bg-ink text-paper">
+      <section className="theme-invariant-dark -mx-4 -mt-6 overflow-hidden bg-ink text-paper">
         <div className="relative aspect-[4/5] min-h-[480px]">
           <CatalogImage alt="나인티 나인 빈티지" className="h-full w-full object-cover object-center opacity-90" loading="lazy" maxDimension={1200} sizes="100vw" src="/banners/brand-banner-mobile.jpg" />
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent px-5 pb-7 pt-24">
@@ -71,7 +71,7 @@ function MobileHome({ auctions, fixed, stores }: HomePresentationProps) {
       <section>
         <SectionHeading action={<Link className="text-xs font-bold underline" href="/shop">전체 보기</Link>} className="mb-5" eyebrow="엄선된 숍" title="각자의 시선으로 고른 빈티지" titleClassName="mt-2 text-2xl font-black tracking-[-0.06em]" />
         <div className="-mx-4 grid auto-cols-[82%] grid-flow-col gap-3 overflow-x-auto px-4 pb-2 snap-x snap-mandatory">
-          {stores.map((store, index) => <Link className="min-h-56 snap-center p-6" href={`/stores/${store.slug}`} key={store.id} style={{ backgroundColor: ["#c7b9a5", "#9fa9a2", "#b8a7a1"][index % 3] }}><p className="text-[10px] font-bold tracking-[0.14em]">엄선된 숍 {String(index + 1).padStart(2, "0")}</p><h3 className="mt-16 text-2xl font-black tracking-[-.06em]">{store.name}</h3><p className="mt-3 line-clamp-2 text-xs leading-5">{store.description}</p></Link>)}
+          {stores.map((store, index) => <Link className="min-h-56 snap-center p-6" href={`/stores/${store.slug}`} key={store.id} style={{ backgroundColor: `var(--store-card-${(index % 3) + 1})` }}><p className="text-[10px] font-bold tracking-[0.14em]">엄선된 숍 {String(index + 1).padStart(2, "0")}</p><h3 className="mt-16 text-2xl font-black tracking-[-.06em]">{store.name}</h3><p className="mt-3 line-clamp-2 text-xs leading-5">{store.description}</p></Link>)}
           {stores.length === 0 && <div className="border border-dashed border-line py-12 text-center text-sm text-muted">공개된 숍이 없습니다.</div>}
         </div>
       </section>
@@ -90,7 +90,7 @@ function MobileHome({ auctions, fixed, stores }: HomePresentationProps) {
 function DesktopHome({ auctions, feature, fixed, stores }: HomePresentationProps) {
   return (
     <div className="hidden space-y-16 md:block" data-home-presentation="desktop">
-      <section className="grid min-h-[560px] grid-cols-[1.05fr_.95fr] overflow-hidden bg-ink text-paper">
+      <section className="theme-invariant-dark grid min-h-[560px] grid-cols-[1.05fr_.95fr] overflow-hidden bg-ink text-paper">
         <div className="flex flex-col justify-between p-10 lg:p-16">
           <div>
             <p className="text-[10px] font-bold tracking-[0.16em] text-zinc-400">오늘의 업데이트</p>
@@ -121,7 +121,7 @@ function DesktopHome({ auctions, feature, fixed, stores }: HomePresentationProps
       <section>
         <SectionHeading action={<Link className="shrink-0 text-xs font-bold underline" href="/shop">전체 숍 보기</Link>} className="mb-6 gap-4" eyebrow="엄선된 숍" title="각자의 시선, 하나의 아카이브" titleClassName="mt-2 text-2xl font-black tracking-[-0.06em]" />
         <div className="grid grid-cols-3 gap-3">
-          {stores.map((store, index) => <Link className="min-h-52 p-6 transition-transform hover:-translate-y-1" href={`/stores/${store.slug}`} key={store.id} style={{ backgroundColor: ["#c7b9a5", "#9fa9a2", "#b8a7a1"][index % 3] }}><p className="text-[10px] font-bold tracking-[0.14em]">엄선된 숍 {String(index + 1).padStart(2, "0")}</p><h3 className="mt-14 text-2xl font-black tracking-[-.06em]">{store.name}</h3><p className="mt-2 max-w-[18rem] text-xs leading-5">{store.description}</p></Link>)}
+          {stores.map((store, index) => <Link className="min-h-52 p-6 transition-transform hover:-translate-y-1" href={`/stores/${store.slug}`} key={store.id} style={{ backgroundColor: `var(--store-card-${(index % 3) + 1})` }}><p className="text-[10px] font-bold tracking-[0.14em]">엄선된 숍 {String(index + 1).padStart(2, "0")}</p><h3 className="mt-14 text-2xl font-black tracking-[-.06em]">{store.name}</h3><p className="mt-2 max-w-[18rem] text-xs leading-5">{store.description}</p></Link>)}
           {stores.length === 0 && <div className="col-span-full border border-dashed border-line py-12 text-center text-sm text-muted">공개된 숍이 없습니다.</div>}
         </div>
       </section>

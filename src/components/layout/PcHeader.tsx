@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { CommerceToolbar } from "@/components/features/commerce/CommerceToolbar";
 import { AuthStatus } from "@/components/layout/AuthStatus";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
 
@@ -32,6 +33,7 @@ export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean })
           {access.canAccessOwner && <Link className="border-b-2 border-transparent py-2 text-sm font-bold tracking-[0.02em] transition-colors hover:border-ink" href="/admin/owner">소유자 센터</Link>}
         </nav>
         <div className="ml-2 flex shrink-0 items-center justify-end gap-2">
+          <ThemeToggle className="size-10 px-0" />
           <Link aria-label="상담" className="hidden size-10 shrink-0 place-items-center border border-line lg:grid" href="/chat"><Headphones size={17} /></Link>
           {authenticating ? <span aria-label="로그인 상태 확인 중" className="inline-flex h-10 w-[193px] shrink-0 border border-line bg-surface" role="status" /> : <><span className="inline-flex"><AuthStatus /></span><CommerceToolbar /></>}
           <form className="hidden h-10 items-center gap-2 border border-line bg-surface px-3 text-muted xl:flex" onSubmit={(event) => { event.preventDefault(); const value = query.trim(); router.push(value ? `/shop?q=${encodeURIComponent(value)}` : "/shop"); }}><Search size={16} /><input aria-label="상품 검색" className="w-32 bg-transparent text-xs text-ink outline-none placeholder:text-muted" onChange={(event) => setQuery(event.target.value)} placeholder="검색 후 Enter" value={query} /></form>

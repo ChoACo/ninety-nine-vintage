@@ -101,3 +101,9 @@ seed files run, so an empty local Auth schema fails closed. This is a pre-existi
 fresh-environment reproducibility gap, not a failure in the fulfillment
 foundation; the isolated PostgreSQL suites remain the executable contract until
 the Owner bootstrap is separated from schema migration replay.
+
+The linked production rollout on 2026-07-22 had exactly one pending migration,
+`20260722030000`, in dry-run. After applying it transactionally, migration parity
+passed with 73 linked migrations. A fresh remote schema dump confirmed all five
+tables, forced RLS, the five Owner-only SELECT policies, authenticated SELECT-only
+grants, and no direct `service_role` table grant on the foundation tables.

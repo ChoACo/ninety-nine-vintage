@@ -2,6 +2,9 @@
 -- data. Remove the dependent test payment/bid/audit rows first, then remove the
 -- products and the two inactive legacy stores left by the role/store rebuild.
 
+alter table public.payment_orders
+  drop constraint if exists payment_orders_current_attempt_fkey;
+
 delete from public.payment_attempts as attempts
 using public.payment_orders as orders
 where attempts.order_id = orders.id
@@ -9,6 +12,13 @@ where attempts.order_id = orders.id
 
 delete from public.payment_orders
 where product_id in (select id from public.products);
+
+alter table public.payment_orders
+  add constraint payment_orders_current_attempt_fkey
+  foreign key (payment_id, id)
+  references public.payment_attempts(payment_id, order_id)
+  on delete restrict
+  deferrable initially deferred;
 
 -- Auction action audit is append-only during normal application traffic. The
 -- immutable trigger is restored immediately after this one-off catalog purge.

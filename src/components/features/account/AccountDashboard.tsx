@@ -783,12 +783,12 @@ function AccountDashboardForSession({
       <div className={`grid gap-px border border-line bg-line ${surface === "desktop" ? "grid-cols-4" : "grid-cols-2"}`}>
         {cards.map(([label, value, description, href, Icon]) => (
           <Link
-            className="group bg-paper p-4 transition-colors hover:bg-surface sm:p-5"
+            className={`group bg-paper transition-colors hover:bg-surface ${surface === "desktop" ? "p-5" : "p-4"}`}
             href={href}
             key={label}
           >
             <Icon size={17} />
-            <p className="mt-6 text-xs text-muted sm:mt-8">{label}</p>
+            <p className={`text-xs text-muted ${surface === "desktop" ? "mt-8" : "mt-6"}`}>{label}</p>
             <p className="mt-2 font-mono text-3xl font-bold">{value}</p>
             <p className="mt-2 text-[11px] text-muted group-hover:text-ink">
               {description}
@@ -798,7 +798,7 @@ function AccountDashboardForSession({
       </div>
       <div className={`grid gap-10 ${surface === "desktop" ? "grid-cols-[1.4fr_.8fr]" : "grid-cols-1"}`}>
         <section id="storage">
-          <div className="mb-5 flex flex-col items-start gap-3 border-b border-ink pb-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className={`mb-5 flex items-start gap-3 border-b border-ink pb-4 ${surface === "desktop" ? "flex-row items-end justify-between" : "flex-col"}`}>
             <div>
               <p className="eyebrow text-muted">상품 보관 / 합배송</p>
               <h2 className="mt-2 text-xl font-black tracking-[-0.05em]">
@@ -846,7 +846,7 @@ function AccountDashboardForSession({
                   const isSelected = selectedInventoryItemIds.includes(item.id);
                   return (
                     <div
-                      className={`flex gap-3 px-1 py-4 sm:gap-4 ${disabled ? "opacity-60" : ""}`}
+                      className={`flex px-1 py-4 ${surface === "desktop" ? "gap-4" : "gap-3"} ${disabled ? "opacity-60" : ""}`}
                       key={item.id}
                     >
                       <input
@@ -863,11 +863,12 @@ function AccountDashboardForSession({
                       />
                       <CatalogImage
                         alt=""
-                        className="size-16 shrink-0 object-cover sm:size-20"
+                        className={`${surface === "desktop" ? "size-20" : "size-16"} shrink-0 object-cover`}
+                        sizes={surface === "desktop" ? "80px" : "64px"}
                         src={item.imageUrl}
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="flex justify-between gap-3 sm:gap-4">
+                        <div className={`flex justify-between ${surface === "desktop" ? "gap-4" : "gap-3"}`}>
                           <p className="truncate text-sm font-bold">
                             {item.title}
                           </p>
@@ -918,12 +919,13 @@ function AccountDashboardForSession({
                         </span>
                       </span>
                     </span>
-                    <span className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <span className={`mt-4 grid gap-3 ${surface === "desktop" ? "grid-cols-2" : "grid-cols-1"}`}>
                       {order.items.map((item) => (
                         <span className="flex min-w-0 items-center gap-3 border border-line p-3" key={item.id}>
                           <CatalogImage
                             alt=""
                             className="size-12 shrink-0 object-cover"
+                            sizes="48px"
                             src={item.products?.image_urls?.[0] ?? ""}
                           />
                           <span className="min-w-0">
@@ -941,12 +943,13 @@ function AccountDashboardForSession({
               <div className="bg-surface px-3 py-5">
                 <p className="text-xs font-bold">기존 낙찰 보관 현황</p>
                 <p className="mt-1 text-[11px] text-muted">전환 전 낙찰 상태를 읽기 전용으로 보존하며, 기존 주문 배송 선택에는 포함하지 않습니다.</p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className={`mt-4 grid gap-3 ${surface === "desktop" ? "grid-cols-2" : "grid-cols-1"}`}>
                   {legacyAuctionWins.map((win) => (
                     <div className="flex min-w-0 items-center gap-3 border border-line bg-paper p-3" key={win.product_id}>
                       <CatalogImage
                         alt=""
                         className="size-12 shrink-0 object-cover"
+                        sizes="48px"
                         src={win.image_urls[0] ?? ""}
                       />
                       <div className="min-w-0">
@@ -986,7 +989,7 @@ function AccountDashboardForSession({
                 </option>
               ))}
             </select>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className={`mt-3 grid gap-2 ${surface === "desktop" ? "grid-cols-2" : "grid-cols-1"}`}>
               <input
                 aria-label="배송지 이름"
                 className="border border-line bg-paper px-3 py-2 text-xs"
@@ -1019,7 +1022,7 @@ function AccountDashboardForSession({
               />
               <input
                 aria-label="주소"
-                className="border border-line bg-paper px-3 py-2 text-xs sm:col-span-2"
+                className={`border border-line bg-paper px-3 py-2 text-xs ${surface === "desktop" ? "col-span-2" : ""}`}
                 onChange={(event) =>
                   setAddressForm({
                     ...addressForm,
@@ -1061,7 +1064,7 @@ function AccountDashboardForSession({
         </section>
         <section
           id="shipping-credit"
-          className="border border-line bg-surface p-5 sm:p-6"
+          className={`border border-line bg-surface ${surface === "desktop" ? "p-6" : "p-5"}`}
         >
           <p className="eyebrow text-muted">배송 크레딧</p>
           <p className="mt-6 font-mono text-5xl font-bold">{credits}</p>
@@ -1096,7 +1099,7 @@ function AccountDashboardForSession({
             const needsAccount = refund.status === "requested" &&
               (!refund.accountSubmitted || accountExpired);
             return (
-              <article className="grid gap-5 py-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)]" key={subjectKey}>
+              <article className={`grid gap-5 py-5 ${surface === "desktop" ? "grid-cols-[minmax(0,1fr)_minmax(280px,420px)]" : "grid-cols-1"}`} key={subjectKey}>
                 <div>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <p className="text-sm font-bold">{title}</p>
@@ -1110,11 +1113,11 @@ function AccountDashboardForSession({
                   {accountExpired && <p className="mt-2 text-[11px] font-bold text-amber-700">보호를 위해 계좌 등록 기간이 만료되었습니다. 다시 입력해 주세요.</p>}
                 </div>
                 {needsAccount && (
-                  <div className="grid gap-2 border border-line bg-surface p-4 sm:grid-cols-2">
+                  <div className={`grid gap-2 border border-line bg-surface p-4 ${surface === "desktop" ? "grid-cols-2" : "grid-cols-1"}`}>
                     <input aria-label={`${title} 환불 은행`} className="border border-line bg-paper px-3 py-2 text-xs" maxLength={40} onChange={(event) => updateRefundDraft(subjectKey, "bankName", event.target.value)} placeholder="은행" value={draft.bankName} />
                     <input aria-label={`${title} 환불 예금주`} className="border border-line bg-paper px-3 py-2 text-xs" maxLength={80} onChange={(event) => updateRefundDraft(subjectKey, "accountHolder", event.target.value)} placeholder="예금주" value={draft.accountHolder} />
-                    <input aria-label={`${title} 환불 계좌번호`} className="border border-line bg-paper px-3 py-2 text-xs sm:col-span-2" inputMode="numeric" maxLength={50} onChange={(event) => updateRefundDraft(subjectKey, "accountNumber", event.target.value)} placeholder="계좌번호" value={draft.accountNumber} />
-                    <button className="bg-ink px-4 py-3 text-xs font-bold text-paper disabled:opacity-40 sm:col-span-2" disabled={Boolean(refundBusyId)} onClick={() => void submitRefundAccount(refund)} type="button">{refundBusyId === subjectKey ? "암호화 저장 중" : "환불 계좌 등록"}</button>
+                    <input aria-label={`${title} 환불 계좌번호`} className={`border border-line bg-paper px-3 py-2 text-xs ${surface === "desktop" ? "col-span-2" : ""}`} inputMode="numeric" maxLength={50} onChange={(event) => updateRefundDraft(subjectKey, "accountNumber", event.target.value)} placeholder="계좌번호" value={draft.accountNumber} />
+                    <button className={`bg-ink px-4 py-3 text-xs font-bold text-paper disabled:opacity-40 ${surface === "desktop" ? "col-span-2" : ""}`} disabled={Boolean(refundBusyId)} onClick={() => void submitRefundAccount(refund)} type="button">{refundBusyId === subjectKey ? "암호화 저장 중" : "환불 계좌 등록"}</button>
                   </div>
                 )}
               </article>
@@ -1134,7 +1137,7 @@ function AccountDashboardForSession({
           {shipments.length === 0 && <p className="py-12 text-center text-sm text-muted">배송 신청 내역이 없습니다.</p>}
           {shipments.map((shipment) => (
             <article className="py-5" key={shipment.id}>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className={`flex gap-3 ${surface === "desktop" ? "flex-row items-start justify-between" : "flex-col"}`}>
                 <div>
                   <p className="text-sm font-bold">배송 {shipmentStatusLabels[shipment.status] ?? shipment.status} · 상품 {shipment.activeItemCount}/{shipment.itemCount}개</p>
                   <p className="mt-2 text-[11px] text-muted">{shipment.requestedAt ? new Date(shipment.requestedAt).toLocaleString("ko-KR") : "요청 시각 확인 중"} · 배송비 {feeStatusLabels[shipment.shippingFeeStatus] ?? shipment.shippingFeeStatus}</p>
@@ -1171,6 +1174,7 @@ function AccountDashboardForSession({
                 <CatalogImage
                   alt=""
                   className="aspect-[4/5] w-full object-cover"
+                  sizes={surface === "desktop" ? "270px" : "(max-width: 699px) 50vw, 33vw"}
                   src={product.image_urls?.[0] ?? product.imageUrls?.[0] ?? ""}
                 />
                 <p className="mt-3 truncate text-xs font-bold">

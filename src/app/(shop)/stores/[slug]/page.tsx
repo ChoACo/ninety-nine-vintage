@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const title = `${store.name} | NINETY-NINE VINTAGE`;
   const description = store.description.slice(0, 160);
   const url = `/stores/${encodeURIComponent(slug)}`;
-  return { title, description, alternates: { canonical: url, media: { "only screen and (max-width: 1023px)": `/m${url}` } }, openGraph: { title, description, url, type: "website" } };
+  return { title, description, alternates: { canonical: url, media: { "only screen and (max-width: 1279px)": `/m${url}` } }, openGraph: { title, description, url, type: "website" } };
 }
 
 export default async function StorePage({ params }: { params: Promise<{ slug: string }> }) {

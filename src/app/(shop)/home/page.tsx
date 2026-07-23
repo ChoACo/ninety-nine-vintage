@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "오늘의 빈티지 | NINETY-NINE VINTAGE",
   description: "오늘 공개된 빈티지 상품과 실시간 경매를 한눈에 확인하세요.",
-  alternates: { canonical: "/home", media: { "only screen and (max-width: 1023px)": "/m/home" } },
+  alternates: { canonical: "/home", media: { "only screen and (max-width: 1279px)": "/m/home" } },
 };
 
 async function loadHomeData() {
@@ -47,10 +47,10 @@ function DesktopHome({ auctions, feature, fixed, stores }: HomePresentationProps
   return (
     <div className="space-y-16" data-home-presentation="desktop">
       <section className="theme-invariant-dark grid min-h-[560px] grid-cols-[1.05fr_.95fr] overflow-hidden bg-ink text-paper">
-        <div className="flex flex-col justify-between p-10 lg:p-16">
+        <div className="flex flex-col justify-between p-16">
           <div>
             <p className="text-[10px] font-bold tracking-[0.16em] text-zinc-400">오늘의 업데이트</p>
-            <h1 className="mt-16 max-w-3xl text-[clamp(4rem,8vw,7.4rem)] font-black leading-[.88] tracking-[-.1em]">시간을<br />다시 입는<br /><span className="text-zinc-500">선택.</span></h1>
+            <h1 className="mt-16 max-w-3xl text-[6.5rem] font-black leading-[.88] tracking-[-.1em]">시간을<br />다시 입는<br /><span className="text-zinc-500">선택.</span></h1>
           </div>
           <div className="mt-14 flex max-w-lg items-end justify-between gap-8">
             <p className="text-sm leading-6 text-zinc-400">선별된 빈티지 한 점을<br />기다림 없이 바로 만나보세요.</p>
@@ -58,7 +58,7 @@ function DesktopHome({ auctions, feature, fixed, stores }: HomePresentationProps
           </div>
         </div>
         <Link className="group relative min-h-[560px] overflow-hidden bg-black" href={feature ? `/auction/${feature.id}` : "/shop"}>
-          <CatalogImage alt="나인티 나인 빈티지 배너" className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.02]" loading="lazy" maxDimension={1600} sizes="48vw" src="/banners/brand-banner-wide.png" />
+          <CatalogImage alt="나인티 나인 빈티지 배너" className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.02]" loading="lazy" maxDimension={1600} sizes="570px" src="/banners/brand-banner-wide.png" />
           <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 bg-gradient-to-t from-black/90 to-transparent p-8 pt-28">
             <div className="min-w-0"><p className="text-[10px] font-bold tracking-[0.14em] text-zinc-400">{feature ? "오늘의 대표 상품" : "새 상품 준비 중"}</p><p className="mt-2 truncate text-sm font-bold">{feature?.title ?? "새로운 상품을 준비 중입니다"}</p></div>
             <span className="grid size-12 shrink-0 place-items-center rounded-full border border-white"><ArrowDownRight size={18} /></span>

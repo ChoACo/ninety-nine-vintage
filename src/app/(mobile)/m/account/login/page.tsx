@@ -10,5 +10,5 @@ function safeReturnTo(value: string | string[] | undefined) {
 
 export default async function MobileLoginPage({ searchParams }: { searchParams: Promise<{ next?: string | string[] }> }) {
   const query = await searchParams;
-  return <div className="grid min-h-[60svh] place-items-center"><LoginPrompt returnTo={safeReturnTo(query.next)} /></div>;
+  return <div className="grid min-h-[60svh] place-items-center"><LoginPrompt returnTo={safeReturnTo(query.next)} surface="mobile" /></div>;
 }

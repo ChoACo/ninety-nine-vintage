@@ -5,12 +5,15 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("the storefront renders separate mobile and desktop presentation trees", async () => {
-  const [home, mobileHome, layout, mobileLayout] = await Promise.all([
+test("the storefront renders separate mobile and fixed desktop presentation trees", async () => {
+  const [home, mobileHome, layout, mobileLayout, header, productRail, css] = await Promise.all([
     source("src/app/(shop)/home/page.tsx"),
     source("src/app/(mobile)/m/home/page.tsx"),
     source("src/components/layout/PcLayout.tsx"),
     source("src/components/mobile/MobileSiteLayout.tsx"),
+    source("src/components/layout/PcHeader.tsx"),
+    source("src/components/features/catalog/ProductRail.tsx"),
+    source("src/app/globals.css"),
   ]);
 
   assert.match(home, /function DesktopHome\(/);
@@ -20,8 +23,21 @@ test("the storefront renders separate mobile and desktop presentation trees", as
   assert.match(mobileHome, /basePath="\/m"/);
   assert.match(layout, /<PcHeader hasLiveTicker=\{LIVE_AUCTION_ENABLED\} \/>/);
   assert.match(layout, /data-ui-surface="desktop"/);
-  assert.match(layout, /min-w-\[1024px\]/);
+  assert.match(layout, /w-\[1280px\]/);
+  assert.match(layout, /min-w-\[1280px\]/);
+  assert.match(layout, /data-desktop-canvas="1280"/);
+  assert.match(layout, /w-\[1200px\]/);
+  assert.match(layout, /data-desktop-content="1200"/);
   assert.doesNotMatch(layout, /MobileHeader|MobileBottomNav|md:hidden/);
+  assert.match(header, /w-\[1200px\]/);
+  assert.match(header, /form className="flex h-10 w-40/);
+  assert.doesNotMatch(header, /(?:sm|md|lg|xl):/);
+  assert.match(productRail, /surface === "desktop" \? "grid grid-cols-3 gap-2"/);
+  assert.match(productRail, /surface === "desktop" \? "grid grid-cols-5 gap-x-3 gap-y-9"/);
+  assert.doesNotMatch(home, /clamp\(|(?:sm|md|lg|xl):/);
+  assert.match(home, /text-\[6\.5rem\]/);
+  assert.match(home, /"only screen and \(max-width: 1279px\)": "\/m\/home"/);
+  assert.match(css, /\[data-ui-surface="desktop"\][\s\S]*word-break: keep-all/);
   assert.match(mobileLayout, /data-ui-surface="mobile"/);
   assert.match(mobileLayout, /<MobileSiteHeader hasLiveTicker=\{LIVE_AUCTION_ENABLED\} \/>/);
   assert.match(mobileLayout, /<MobileSiteBottomNav \/>/);

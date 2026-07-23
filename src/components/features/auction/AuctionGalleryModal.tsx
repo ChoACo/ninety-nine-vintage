@@ -619,13 +619,13 @@ export function AuctionGalleryModal({
       aria-describedby="gallery-gesture-help"
       aria-labelledby="gallery-lightbox-title"
       aria-modal="true"
-      className="theme-invariant-dark premium-dialog-overlay fixed inset-0 z-[140] flex flex-col overflow-hidden bg-zinc-950 text-white"
+      className={`theme-invariant-dark premium-dialog-overlay fixed inset-0 z-[140] flex flex-col overflow-hidden bg-zinc-950 text-white ${surface === "desktop" ? "min-w-[1280px]" : ""}`}
       data-premium-modal-layer="nested"
       data-state={visible ? "open" : "closed"}
       ref={dialogRef}
       role="dialog"
     >
-      <header className="flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-zinc-950/90 pb-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-md md:h-18 md:px-6 md:py-0">
+      <header className={`flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-zinc-950/90 backdrop-blur-md ${surface === "desktop" ? "h-18 px-6" : "min-h-16 pb-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[max(0.75rem,env(safe-area-inset-top))]"}`}>
         <div className="min-w-0">
           <p className="truncate text-xs font-bold tracking-tight" id="gallery-lightbox-title">{title}</p>
           <p className="mt-1 font-mono text-[10px] text-zinc-400">사진 {visibleIndex + 1} / {images.length} · {Math.round(transform.scale * 100)}%</p>
@@ -676,7 +676,7 @@ export function AuctionGalleryModal({
                     width: `${content.width}px`,
                   }}
                 >
-                  <CatalogImage alt={`${title} 사진 ${index + 1}`} className="h-full w-full select-none object-contain" decoding="async" draggable={false} fetchPriority={active ? "high" : "auto"} loading={active ? "eager" : "lazy"} maxDimension={3200} onDragStart={(event) => event.preventDefault()} onLoad={(event) => onImageLoad(index, event)} sizes="100vw" src={image} unoptimized />
+                  <CatalogImage alt={`${title} 사진 ${index + 1}`} className="h-full w-full select-none object-contain" decoding="async" draggable={false} fetchPriority={active ? "high" : "auto"} loading={active ? "eager" : "lazy"} maxDimension={3200} onDragStart={(event) => event.preventDefault()} onLoad={(event) => onImageLoad(index, event)} sizes={surface === "desktop" ? "1180px" : "100vw"} src={image} unoptimized />
                 </div>
               </div>
             );

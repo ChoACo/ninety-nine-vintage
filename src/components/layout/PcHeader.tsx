@@ -25,18 +25,25 @@ export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean })
   const authenticating = pathname === "/auth/callback";
   return (
     <header className={`sticky ${hasLiveTicker ? "top-9" : "top-0"} z-[60] block border-b border-line bg-paper/95 text-ink backdrop-blur-md`}>
-      <div className="mx-auto flex h-20 max-w-[1680px] items-center justify-between gap-3 px-10 xl:px-12">
-        <Link className="min-w-0 w-[230px] shrink text-lg font-black tracking-[-0.06em]" href="/home">NINETY-NINE VINTAGE</Link>
-        <nav className="flex flex-1 items-center justify-center gap-6 xl:gap-10" aria-label="주요 메뉴">
+      <div className="mx-auto flex h-20 w-[1200px] items-center gap-5">
+        <Link className="w-[210px] shrink-0 whitespace-nowrap text-lg font-black tracking-[-0.06em]" href="/home">NINETY-NINE VINTAGE</Link>
+        <nav className="flex min-w-0 flex-1 items-center justify-center gap-5 whitespace-nowrap" aria-label="주요 메뉴">
           {navigation.map((item) => <Link className="border-b-2 border-transparent py-2 text-sm font-bold tracking-[0.02em] transition-colors hover:border-ink" href={item.href} key={item.href}>{item.label}</Link>)}
-          {access.canAccessOperator && <Link className="border-b-2 border-transparent py-2 text-sm font-bold tracking-[0.02em] transition-colors hover:border-ink" href="/admin/operator">운영자 센터</Link>}
-          {access.canAccessOwner && <Link className="border-b-2 border-transparent py-2 text-sm font-bold tracking-[0.02em] transition-colors hover:border-ink" href="/admin/owner">소유자 센터</Link>}
         </nav>
-        <div className="ml-2 flex shrink-0 items-center justify-end gap-2">
+        <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
+          {(access.canAccessOperator || access.canAccessOwner) && (
+            <details className="group relative shrink-0">
+              <summary className="flex h-10 cursor-pointer list-none items-center border border-line px-3 text-[11px] font-bold">관리</summary>
+              <div className="absolute right-0 top-12 grid w-36 border border-line bg-paper p-2 shadow-lg">
+                {access.canAccessOperator && <Link className="px-3 py-2 text-xs font-bold hover:bg-surface" href="/admin/operator">운영자 센터</Link>}
+                {access.canAccessOwner && <Link className="px-3 py-2 text-xs font-bold hover:bg-surface" href="/admin/owner">소유자 센터</Link>}
+              </div>
+            </details>
+          )}
           <ThemeToggle className="size-10 px-0" />
           <Link aria-label="상담" className="grid size-10 shrink-0 place-items-center border border-line" href="/chat"><Headphones size={17} /></Link>
           {authenticating ? <span aria-label="로그인 상태 확인 중" className="inline-flex h-10 w-[193px] shrink-0 border border-line bg-surface" role="status" /> : <><span className="inline-flex"><AuthStatus /></span><CommerceToolbar /></>}
-          <form className="hidden h-10 items-center gap-2 border border-line bg-surface px-3 text-muted xl:flex" onSubmit={(event) => { event.preventDefault(); const value = query.trim(); router.push(value ? `/shop?q=${encodeURIComponent(value)}` : "/shop"); }}><Search size={16} /><input aria-label="상품 검색" className="w-32 bg-transparent text-xs text-ink outline-none placeholder:text-muted" onChange={(event) => setQuery(event.target.value)} placeholder="검색 후 Enter" value={query} /></form>
+          <form className="flex h-10 w-40 shrink-0 items-center gap-2 border border-line bg-surface px-3 text-muted" onSubmit={(event) => { event.preventDefault(); const value = query.trim(); router.push(value ? `/shop?q=${encodeURIComponent(value)}` : "/shop"); }}><Search size={16} /><input aria-label="상품 검색" className="min-w-0 flex-1 bg-transparent text-xs text-ink outline-none placeholder:text-muted" onChange={(event) => setQuery(event.target.value)} placeholder="검색 후 Enter" value={query} /></form>
         </div>
       </div>
     </header>

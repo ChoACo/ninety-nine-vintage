@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthStatus } from "@/components/layout/AuthStatus";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { UiModeSwitcher } from "@/components/mobile/UiModeSwitcher";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
 
 const links = [
@@ -50,7 +49,7 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
       <PremiumDialog ariaLabel="모바일 전체 메뉴" onClose={() => setMenuOpen(false)} open={menuOpen} panelClassName="px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]" placement="drawer-left" zIndexClassName="z-[100]">
         <div className="flex items-center justify-between border-b border-line pb-5"><span className="text-xs font-black tracking-[0.08em]">NINETY-NINE VINTAGE</span><button aria-label="전체 메뉴 닫기" className="grid size-11 place-items-center" onClick={() => setMenuOpen(false)} type="button"><X size={20} /></button></div>
         <nav aria-label="모바일 전체 메뉴" className="mt-4 grid">{links.map(([label, href]) => <Link className="border-b border-line py-4 text-base font-bold" href={href} key={href} onClick={() => setMenuOpen(false)}>{label}</Link>)}</nav>
-        <div className="mt-6 grid gap-3"><ThemeToggle className="w-full" showLabel /><AuthStatus basePath="/m" /><UiModeSwitcher className="w-full" targetMode="desktop" /></div>
+        <div className="mt-6 grid gap-3"><ThemeToggle className="w-full" showLabel /><AuthStatus basePath="/m" /></div>
       </PremiumDialog>
     </>
   );

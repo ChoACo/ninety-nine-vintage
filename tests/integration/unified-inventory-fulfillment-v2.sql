@@ -214,6 +214,33 @@ insert into public.shipping_addresses (
 
 -- A/B stores, the B shipping center, and explicit permissions/routes -------
 
+-- The production cutover removes every non-owner role. Recreate only the
+-- isolated fixture operators after that cutover so the legacy fulfillment
+-- contracts are still exercised without depending on production identities.
+select set_config(
+  'request.jwt.claim.sub',
+  '30be08c2-6259-42c6-af26-4ded6362de12',
+  false
+);
+
+update public.profiles
+set
+  deleted_at = null,
+  anonymized_reference = null,
+  updated_at = clock_timestamp()
+where id in (
+  '4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',
+  '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d'
+);
+
+insert into public.account_access_roles (user_id, role_code)
+values
+  ('4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee', 'operator'),
+  ('9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d', 'operator')
+on conflict (user_id) do update set
+  role_code = excluded.role_code,
+  updated_at = clock_timestamp();
+
 update public.fulfillment_centers
 set
   code = 'center-b',
@@ -2200,3 +2227,39 @@ select test_support.assert_true(
   'financial report must split A/B revenue and keep shipping fees central'
 );
 reset role;
+
+-- Buyer-safe command wrappers must reject mixed-buyer batches before any
+-- underlying inventory transition can run, including manipulated RPC calls.
+begin;
+create temporary table buyer_mixing_items on commit drop as
+select i.id,f.version,row_number() over(order by i.id) ordinal
+from public.customer_inventory_items i
+join public.inventory_item_fulfillments f on f.inventory_item_id=i.id
+where not exists(select 1 from public.inventory_shipment_items x where x.inventory_item_id=i.id)
+order by i.id limit 2;
+grant select on buyer_mixing_items to authenticated;
+select test_support.assert_true((select count(*) from buyer_mixing_items)=2,'mixed-buyer fixture requires two unshipped inventory items');
+alter table public.customer_inventory_items disable trigger customer_inventory_items_guard_snapshot;
+update public.customer_inventory_items set member_id='4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee'
+where id=(select id from buyer_mixing_items where ordinal=1);
+alter table public.customer_inventory_items enable trigger customer_inventory_items_guard_snapshot;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','30be08c2-6259-42c6-af26-4ded6362de12',true);
+do $$
+declare v_ids uuid[]; v_versions bigint[];
+begin
+  select array_agg(m.id order by m.id),array_agg(m.version order by m.id)
+  into v_ids,v_versions from buyer_mixing_items m;
+  begin
+    perform public.release_buyer_paid_inventory_items(v_ids,v_versions,gen_random_uuid(),'혼합 구매자 거부 검증');
+    raise exception 'mixed buyer release should fail';
+  exception when sqlstate '22023' then null;
+  end;
+  begin
+    perform public.record_buyer_inventory_center_items('receive',v_ids,v_versions,null,gen_random_uuid(),'혼합 구매자 거부 검증');
+    raise exception 'mixed buyer center work should fail';
+  exception when sqlstate '22023' then null;
+  end;
+end;
+$$;
+rollback;

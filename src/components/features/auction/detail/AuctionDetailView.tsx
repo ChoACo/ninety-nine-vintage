@@ -64,5 +64,5 @@ export async function AuctionDetailView({ id, compact = false, surface = "deskto
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) notFound();
   const item = mapPublishedProductToDetail(await fetchPublishedProduct(id));
   if (!item) notFound();
-  return <div className={`grid gap-8 ${surface === "desktop" ? "grid-cols-12 gap-12" : "grid-cols-1"}`} data-detail-layout={compact ? "intercepted" : "page"} data-detail-surface={surface}><div className={surface === "desktop" ? "col-span-7 min-w-0" : "min-w-0"}><ItemGallery compact={compact} item={item} surface={surface} /><ConditionReport item={item} /></div><StickyBidPanel basePath={surface === "mobile" ? "/m" : ""} compact={compact} item={item} key={item.id} surface={surface} /></div>;
+  return <div className={`grid gap-8 ${surface === "desktop" ? "grid-cols-12 gap-12" : "grid-cols-1"}`} data-detail-layout={compact ? "intercepted" : "page"} data-detail-surface={surface}><div className={surface === "desktop" ? "col-span-7 min-w-0" : "min-w-0"}><ItemGallery compact={compact} item={item} surface={surface} /><ConditionReport item={item} surface={surface} /></div><StickyBidPanel basePath={surface === "mobile" ? "/m" : ""} compact={compact} item={item} key={item.id} surface={surface} /></div>;
 }

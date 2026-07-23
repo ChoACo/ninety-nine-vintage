@@ -12,14 +12,14 @@ import { CatalogImage } from "@/components/ui/CatalogImage";
 import { rememberFixedPurchaseIntent } from "@/lib/commerce/purchaseIntent";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 
-interface AuctionCardProps { basePath?: "" | "/m"; item: Omit<Item, "bidHistory"> & { closesAt?: string; timeLeft?: string }; }
+interface AuctionCardProps { basePath?: "" | "/m"; item: Omit<Item, "bidHistory"> & { closesAt?: string; timeLeft?: string }; surface?: "desktop" | "mobile"; }
 
 export function AuctionCard(props: AuctionCardProps) {
   if (props.item.saleType === "auction" && !LIVE_AUCTION_ENABLED) return null;
   return <EnabledAuctionCard {...props} />;
 }
 
-function EnabledAuctionCard({ basePath = "", item }: AuctionCardProps) {
+function EnabledAuctionCard({ basePath = "", item, surface = basePath === "/m" ? "mobile" : "desktop" }: AuctionCardProps) {
   const router = useRouter();
   const isFixed = item.saleType === "fixed";
   const price = isFixed ? (item.fixedPrice ?? item.currentBid) : item.currentBid;
@@ -74,7 +74,7 @@ function EnabledAuctionCard({ basePath = "", item }: AuctionCardProps) {
     <article className="group min-w-0">
       <Link className="block" href={`${basePath}/auction/${item.id}`}>
         <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-lg shadow-black/5 transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl">
-          {item.imageUrl ? <CatalogImage alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
+          {item.imageUrl ? <CatalogImage alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" sizes={surface === "desktop" ? "220px" : "(max-width: 699px) 50vw, 33vw"} src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
           <span className="absolute left-2 top-2 rounded-lg bg-paper/90 px-2 py-1 font-mono text-[9px] font-bold tracking-[0.1em] shadow-sm backdrop-blur-md">{isFixed ? "즉시 구매" : "실시간 입찰"}</span>
           <button aria-label={liked ? "찜 해제" : "찜하기"} className={`absolute right-2 top-2 grid size-9 place-items-center rounded-xl bg-paper/90 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${liked ? "text-red-700" : "text-ink"}`} onClick={(event) => { event.preventDefault(); void updateWishlist(); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>
           <div className="absolute inset-x-0 bottom-0 translate-y-full bg-ink/95 px-3 py-3 text-paper opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">

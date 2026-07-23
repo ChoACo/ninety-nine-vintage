@@ -15,24 +15,17 @@ test("operator fulfillment splits store and center work through v2 user-context 
 
   assert.match(route, /authenticateStaffRequest\(request,\s*true\)/);
   assert.match(route, /auth\.user as unknown as RpcClient/);
-  assert.match(route, /"get_paid_inventory_store_queue"/);
-  assert.match(route, /"get_inventory_store_work_queue"/);
-  assert.match(route, /"get_inventory_center_queue"/);
-  assert.match(route, /"release_paid_inventory_items"/);
-  assert.match(route, /"release_inventory_shipment_items"/);
-  assert.match(route, /"record_inventory_center_items"/);
-  assert.match(route, /inventoryItemIds\.length\s*<=\s*100/);
-  assert.match(route, /new Set\(inventoryItemIds\)\.size\s*===\s*inventoryItemIds\.length/);
+  assert.match(route, /"get_central_fulfillment_buyer_groups"/);
+  assert.match(route, /"release_buyer_paid_inventory_items"/);
+  assert.match(route, /"release_buyer_inventory_shipment_items"/);
+  assert.match(route, /"record_buyer_inventory_center_items"/);
+  assert.match(route, /value\.length<=100/);
+  assert.match(route, /new Set\(value\)\.size===value\.length/);
   assert.match(route, /p_expected_work_version:\s*body\.expectedWorkVersion/);
-  assert.match(route, /const\s+expectedVersions\s*=\s*body\.expectedVersions\s+as\s+number\[\]/);
-  assert.match(route, /\.map\(\(id,\s*index\)\s*=>\s*\(\{\s*id,\s*version:\s*expectedVersions\[index\]/);
-  assert.match(route, /\.sort\(\(left,\s*right\)\s*=>\s*left\.id\.localeCompare\(right\.id\)\)/);
-  assert.match(route, /p_inventory_item_ids:\s*orderedItems\.map\(\(item\)\s*=>\s*item\.id\)/);
-  assert.match(route, /p_expected_versions:\s*orderedItems\.map\(\(item\)\s*=>\s*item\.version\)/);
-  assert.match(route, /const\s+centerExpectedVersions\s*=\s*body\.expectedVersions\s+as\s+number\[\]/);
-  assert.match(route, /const\s+orderedCenterItems\s*=\s*inventoryItemIds[\s\S]*?\.sort\(\(left,\s*right\)\s*=>\s*left\.id\.localeCompare\(right\.id\)\)/);
-  assert.match(route, /p_inventory_item_ids:\s*orderedCenterItems\.map\(\(item\)\s*=>\s*item\.id\)/);
-  assert.match(route, /p_expected_versions:\s*orderedCenterItems\.map\(\(item\)\s*=>\s*item\.version\)/);
+  assert.match(route, /const ordered=body\.inventoryItemIds\.map/);
+  assert.match(route, /\.sort\(\(a,b\)=>a\.id\.localeCompare\(b\.id\)\)/);
+  assert.match(route, /p_inventory_item_ids:ordered\.map\(\(item\)=>item\.id\)/);
+  assert.match(route, /p_expected_versions:ordered\.map\(\(item\)=>item\.version\)/);
   assert.match(route, /p_idempotency_key:\s*body\.idempotencyKey/);
   assert.doesNotMatch(route, /auth\.admin[\s\S]*\.(?:update|insert|upsert|delete)\(/);
   assert.doesNotMatch(
@@ -40,16 +33,13 @@ test("operator fulfillment splits store and center work through v2 user-context 
     /get_store_fulfillment_queue|advance_store_fulfillment_work|mark_shipping_request_shipped|get_shipping_work/,
   );
 
-  assert.match(consoleSource, /inventoryItemIds:\s*selected/);
-  assert.match(consoleSource, /action:\s*"release_paid_items"/);
-  assert.match(consoleSource, /expectedWorkVersion:\s*work\.version/);
-  assert.match(consoleSource, /expectedVersions:\s*candidates\.map\(\(item\)\s*=>\s*item\.version\)/);
-  assert.match(consoleSource, /getOrCreateIdempotencyKey\(actorId,\s*scope\)/);
-  assert.match(consoleSource, /action:\s*"release_store_items"/);
-  assert.match(consoleSource, /action:\s*action\s*===\s*"receive"\s*\?\s*"center_receive"\s*:\s*"center_store"/);
-  assert.match(consoleSource, /response\.status\s*===\s*409/);
-  assert.match(consoleSource, /다른 담당자가 먼저 처리했습니다/);
-  assert.match(consoleSource, /toggleCenterAll/);
+  assert.match(consoleSource, /inventoryItemIds:items\.map/);
+  assert.match(consoleSource, /action:group\.action/);
+  assert.match(consoleSource, /expectedWorkVersion:group\.workVersion/);
+  assert.match(consoleSource, /expectedVersions:items\.map/);
+  assert.match(consoleSource, /crypto\.randomUUID\(\)/);
+  assert.match(consoleSource, /센터 → 구매자 → 상품|구매자별 출고·입고·보관/);
+  assert.match(consoleSource, /이 구매자 상품 전체 선택/);
   assert.match(consoleSource, /item\.isBlocked/);
   assert.match(consoleSource, /결제 완료[\s\S]{0,80}(?:보관|상품)/);
   assert.match(layout, /href:\s*"\/admin\/operator\/fulfillment"/);
@@ -70,7 +60,8 @@ test("owner fulfillment explicitly maps every real store to a center and handoff
   assert.match(route, /"configure_fulfillment_center_staff_assignment"/);
   assert.match(route, /"get_owner_fulfillment_staff_directory"/);
   assert.doesNotMatch(route, /"configure_fulfillment_center"/);
-  assert.doesNotMatch(route, /postalCode|addressLine1|contactName|contactPhone/);
+  assert.match(route, /"configure_managed_fulfillment_center"/);
+  assert.match(route, /postalCode|addressLine1|contactName|contactPhone/);
   assert.match(route, /p_store_id:\s*body\.storeId/);
   assert.match(route, /p_fulfillment_center_id:\s*body\.centerId/);
   assert.match(route, /p_user_id:\s*body\.userId/);
@@ -93,8 +84,10 @@ test("owner fulfillment explicitly maps every real store to a center and handoff
   assert.match(consoleSource, /createShipments:\s*assignmentShip/);
   assert.match(consoleSource, /운영자·직원 센터 배정/);
   assert.match(consoleSource, /매장 이름이나 식별자를 자동으로 추론하지 않습니다/);
-  assert.match(consoleSource, /발송인 센터 주소는 수집하지 않습니다/);
-  assert.doesNotMatch(consoleSource, /센터 실제 주소/);
+  assert.match(consoleSource, /우편번호/);
+  assert.match(consoleSource, /기본 주소/);
+  assert.match(consoleSource, /담당자/);
+  assert.match(consoleSource, /연락처/);
   assert.match(consoleSource, /센터로 이동/);
   assert.match(consoleSource, /같은 장소 즉시 센터 입고/);
   assert.match(consoleSource, /reconciliation_required/);

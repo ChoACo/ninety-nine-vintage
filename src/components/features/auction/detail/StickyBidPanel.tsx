@@ -528,7 +528,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
         <h1 className="text-3xl font-black leading-snug tracking-tight text-zinc-950 [text-wrap:balance]">
           {item.name}
         </h1>
-        <dl className="mt-5 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 text-[11px] xl:grid-cols-3">
+        <dl className={`mt-5 grid gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 text-[11px] ${surface === "desktop" ? "grid-cols-3" : "grid-cols-1"}`}>
           <div className="bg-white px-3 py-3">
             <dt className="text-zinc-500">카테고리</dt>
             <dd className="mt-1 truncate font-bold">
@@ -549,7 +549,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
         <p className="mt-5 whitespace-pre-line text-xs leading-relaxed text-zinc-600">
           {item.description || "상세 사진과 컨디션 리포트를 확인해 주세요."}
         </p>
-        <div className="mt-8 flex flex-col items-start gap-3 xl:flex-row xl:items-end xl:justify-between">
+        <div className={`mt-8 flex items-start gap-3 ${surface === "desktop" ? "flex-row items-end justify-between" : "flex-col"}`}>
           <div>
             <p className="mb-2 text-xs text-zinc-500">
               {item.saleType === "fixed" ? "판매 정가" : "현재 최고 입찰가"}

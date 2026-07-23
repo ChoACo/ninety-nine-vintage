@@ -12,4 +12,4 @@ export const LIVE_AUCTION_ENABLED = true;
 export const MOBILE_SITE_ENABLED =
   process.env.MOBILE_SITE_ENABLED?.trim().toLowerCase() !== "false";
 export const MOBILE_AUTO_REDIRECT_ENABLED =
-  process.env.MOBILE_AUTO_REDIRECT_ENABLED?.trim().toLowerCase() === "true";
+  process.env.MOBILE_AUTO_REDIRECT_ENABLED?.trim().toLowerCase() !== "false";

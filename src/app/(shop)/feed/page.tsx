@@ -5,7 +5,7 @@ import { AuctionFeedGrid } from "@/components/features/auction/AuctionFeedGrid";
 import { AuctionFilterSidebar } from "@/components/features/auction/AuctionFilterSidebar";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 
-export const metadata: Metadata = { title: "라이브 경매 | NINETY-NINE VINTAGE", alternates: { canonical: "/feed", media: { "only screen and (max-width: 1023px)": "/m/feed" } } };
+export const metadata: Metadata = { title: "라이브 경매 | NINETY-NINE VINTAGE", alternates: { canonical: "/feed", media: { "only screen and (max-width: 1279px)": "/m/feed" } } };
 
 export default function FeedPage() {
   if (!LIVE_AUCTION_ENABLED) {

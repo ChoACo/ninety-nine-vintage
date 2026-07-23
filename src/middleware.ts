@@ -6,10 +6,9 @@ import {
 import {
   isCustomerPagePath,
   isMobilePath,
-  resolveUiMode,
+  resolveAutomaticUiMode,
   toDesktopPath,
   toMobilePath,
-  UI_MODE_COOKIE,
 } from "@/lib/uiMode";
 
 // Keep this entrypoint on the Edge middleware convention: the current
@@ -22,6 +21,7 @@ const SKIPPED_PATHS = [
   "/robots.txt",
   "/sitemap.xml",
 ];
+const LEGACY_UI_MODE_COOKIE = "ninety-nine-ui-mode";
 
 function getTrustedClientIp(request: NextRequest): string | null {
   const vercelForwarded = request.headers.get("x-vercel-forwarded-for");
@@ -106,10 +106,7 @@ function mobileSiteRedirect(request: NextRequest): NextResponse | null {
     return null;
   }
 
-  const resolvedMode = resolveUiMode(
-    request.headers,
-    request.cookies.get(UI_MODE_COOKIE)?.value,
-  );
+  const resolvedMode = resolveAutomaticUiMode(request.headers);
   const mobilePath = isMobilePath(request.nextUrl.pathname);
   if (
     (resolvedMode === "mobile" && mobilePath) ||
@@ -125,7 +122,17 @@ function mobileSiteRedirect(request: NextRequest): NextResponse | null {
       : toDesktopPath(destination.pathname);
   const response = NextResponse.redirect(destination, 307);
   response.headers.set("Cache-Control", "private, no-store, max-age=0");
-  response.headers.set("Vary", "Cookie, Sec-CH-UA-Mobile, User-Agent");
+  response.headers.set("Vary", "Sec-CH-UA-Mobile, User-Agent");
+  return response;
+}
+
+function expireLegacyUiModeCookie(request: NextRequest, response: NextResponse): NextResponse {
+  if (
+    isCustomerPagePath(request.nextUrl.pathname) &&
+    request.cookies.has(LEGACY_UI_MODE_COOKIE)
+  ) {
+    response.cookies.delete(LEGACY_UI_MODE_COOKIE);
+  }
   return response;
 }
 
@@ -137,7 +144,10 @@ export async function middleware(request: NextRequest) {
     return blockedResponse(request);
   }
 
-  return mobileSiteRedirect(request) ?? NextResponse.next();
+  return expireLegacyUiModeCookie(
+    request,
+    mobileSiteRedirect(request) ?? NextResponse.next(),
+  );
 }
 
 export const config = {

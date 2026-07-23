@@ -89,19 +89,19 @@ export function BidHistory({ basePath = "", surface = "mobile" }: { basePath?: "
         </Link>
       </div>
       <div className="mb-4 grid grid-cols-3 gap-px border border-line bg-line">
-        <div className="bg-paper p-3 sm:p-4">
+        <div className={`bg-paper ${surface === "desktop" ? "p-4" : "p-3"}`}>
           <p className="text-[10px] text-muted">최고 입찰</p>
           <p className="mt-2 font-mono text-xl font-bold">
             {summary?.leading ?? 0}
           </p>
         </div>
-        <div className="bg-paper p-3 sm:p-4">
+        <div className={`bg-paper ${surface === "desktop" ? "p-4" : "p-3"}`}>
           <p className="text-[10px] text-muted">낙찰·결제</p>
           <p className="mt-2 font-mono text-xl font-bold">
             {summary?.final ?? 0}
           </p>
         </div>
-        <div className="bg-paper p-3 sm:p-4">
+        <div className={`bg-paper ${surface === "desktop" ? "p-4" : "p-3"}`}>
           <p className="text-[10px] text-muted">확인 필요</p>
           <p className="mt-2 font-mono text-xl font-bold">
             {summary?.outbid ?? 0}
@@ -116,7 +116,7 @@ export function BidHistory({ basePath = "", surface = "mobile" }: { basePath?: "
       ) : (
         <div className="divide-y divide-line border-y border-line">
           {items.map((item) => (
-            <article className="flex gap-3 py-4 sm:gap-4" key={item.id}>
+            <article className={`flex py-4 ${surface === "desktop" ? "gap-4" : "gap-3"}`} key={item.id}>
               <Link
                 className="size-20 shrink-0 bg-surface"
                 href={`${basePath}/auction/${item.productId}`}
@@ -124,6 +124,7 @@ export function BidHistory({ basePath = "", surface = "mobile" }: { basePath?: "
                 <CatalogImage
                   alt=""
                   className="h-full w-full object-cover"
+                  sizes="80px"
                   src={item.imageUrl}
                 />
               </Link>

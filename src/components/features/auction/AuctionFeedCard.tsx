@@ -32,6 +32,7 @@ interface AuctionFeedCardProps {
   item: AuctionFeedItem;
   onBidPlaced?: () => void;
   participationState?: AccountAuctionBidState;
+  surface?: "desktop" | "mobile";
 }
 
 const participationLabels: Record<AccountAuctionBidState, string> = {
@@ -46,7 +47,7 @@ export function AuctionFeedCard(props: AuctionFeedCardProps) {
   return <EnabledAuctionFeedCard {...props} />;
 }
 
-function EnabledAuctionFeedCard({ basePath = "", bidCapability, item, participationState }: AuctionFeedCardProps) {
+function EnabledAuctionFeedCard({ basePath = "", bidCapability, item, participationState, surface = basePath === "/m" ? "mobile" : "desktop" }: AuctionFeedCardProps) {
   const liked = useCommerceStore((state) => state.likedIds.includes(item.id));
   const toggleLike = useCommerceStore((state) => state.toggleLike);
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -102,7 +103,7 @@ function EnabledAuctionFeedCard({ basePath = "", bidCapability, item, participat
     <article className="group min-w-0 border-b border-line pb-5" data-auction-phase={phase} data-bid-capability={bidCapability} data-participation-state={participationState ?? "none"}>
       <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-lg shadow-black/5 transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl">
         <Link className="block h-full" href={`${basePath}/auction/${item.id}`}>
-          {item.imageUrl ? <CatalogImage alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
+          {item.imageUrl ? <CatalogImage alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" sizes={surface === "desktop" ? "220px" : "(max-width: 699px) 50vw, 33vw"} src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
           <span className="absolute left-2 top-2 rounded-lg bg-paper/90 px-2 py-1 font-mono text-[9px] font-bold tracking-[0.1em] shadow-sm backdrop-blur-md">실시간 입찰</span>
           <div className="absolute inset-x-0 bottom-0 translate-y-full bg-ink/95 px-3 py-3 text-paper opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100"><p className="text-[10px] text-zinc-400">경매 상품 상세</p><p className="mt-1 text-xs font-bold">상태·실측·현재가를 확인하세요.</p></div>
         </Link>
@@ -124,7 +125,7 @@ function EnabledAuctionFeedCard({ basePath = "", bidCapability, item, participat
 
       <AuctionBidHistoryModal history={history} itemTitle={item.name} onClose={() => setHistoryOpen(false)} open={historyOpen} />
       <ProductInquiryModal basePath={basePath} onClose={() => setInquiryOpen(false)} open={inquiryOpen} productId={item.id} productTitle={item.name} />
-      <AuctionGalleryModal images={galleryImages} key={item.id} onClose={() => setGalleryOpen(false)} open={galleryOpen} surface={basePath === "/m" ? "mobile" : "desktop"} title={item.name} />
+      <AuctionGalleryModal images={galleryImages} key={item.id} onClose={() => setGalleryOpen(false)} open={galleryOpen} surface={surface} title={item.name} />
     </article>
   );
 }

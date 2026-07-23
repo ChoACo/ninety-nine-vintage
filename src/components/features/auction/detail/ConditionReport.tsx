@@ -7,9 +7,10 @@ import type { ItemDetail } from "@/types/detail";
 
 interface ConditionReportProps {
   item: ItemDetail;
+  surface?: "desktop" | "mobile";
 }
 
-export function ConditionReport({ item }: ConditionReportProps) {
+export function ConditionReport({ item, surface = "desktop" }: ConditionReportProps) {
   const [open, setOpen] = useState(false);
   const rows = [
     ["어깨", item.measurements.shoulder],
@@ -27,7 +28,7 @@ export function ConditionReport({ item }: ConditionReportProps) {
 
   return (
     <section className="mt-10 border-t border-zinc-950 pt-6">
-      <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white to-zinc-50 p-5 shadow-xl shadow-black/5 md:p-6">
+      <div className={`rounded-3xl border border-white/10 bg-gradient-to-br from-white to-zinc-50 shadow-xl shadow-black/5 ${surface === "desktop" ? "p-6" : "p-5"}`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="mb-2 text-[11px] font-bold tracking-[0.15em] text-zinc-500">상품 상태 정보</p>

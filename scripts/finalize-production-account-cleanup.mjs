@@ -1,0 +1,15 @@
+import { createClient } from "@supabase/supabase-js";
+
+const url = process.env.SUPABASE_URL?.trim();
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+if (!url || !serviceRoleKey) throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.");
+
+const client = createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+const { data: tombstones, error } = await client.from("profiles").select("id,anonymized_reference").not("deleted_at", "is", null);
+if (error) throw error;
+
+for (const tombstone of tombstones ?? []) {
+  const { error: deleteError } = await client.auth.admin.deleteUser(tombstone.id);
+  if (deleteError && !/not found/i.test(deleteError.message)) throw deleteError;
+  process.stdout.write(`deleted-auth-subject ${tombstone.anonymized_reference}\n`);
+}

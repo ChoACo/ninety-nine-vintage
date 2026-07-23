@@ -18,6 +18,7 @@ interface AuctionBidRoutePanelProps {
 }
 
 export function AuctionBidRoutePanel({ basePath = "", bidIncrement, currentPrice, minimumBid, productId, productTitle }: AuctionBidRoutePanelProps) {
+  const surface = basePath === "/m" ? "mobile" : "desktop";
   const { loading, session } = useSupabaseSession();
   const [amount, setAmount] = useState(String(minimumBid));
   const [agreed, setAgreed] = useState(false);
@@ -76,13 +77,13 @@ export function AuctionBidRoutePanel({ basePath = "", bidIncrement, currentPrice
 
   return (
     <>
-    <section className="mx-auto w-full max-w-xl rounded-3xl border border-white/10 bg-paper p-1 shadow-xl shadow-black/5 md:p-3">
+    <section className={`mx-auto w-full max-w-xl rounded-3xl border border-white/10 bg-paper shadow-xl shadow-black/5 ${surface === "desktop" ? "p-3" : "p-1"}`}>
       <div className="border-b border-ink pb-5">
         <p className="text-[10px] font-bold tracking-[0.14em] text-muted">{formatProductDisplayNumber(productId)}</p>
         <h1 className="mt-3 text-2xl font-black tracking-[-0.05em]">실시간 경매 입찰</h1>
         <p className="mt-2 truncate text-sm text-muted">{productTitle}</p>
       </div>
-      <dl className="mt-6 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-line bg-line text-sm sm:grid-cols-2">
+      <dl className={`mt-6 grid gap-px overflow-hidden rounded-2xl border border-line bg-line text-sm ${surface === "desktop" ? "grid-cols-2" : "grid-cols-1"}`}>
         <div className="bg-paper p-4"><dt className="text-xs text-muted">현재 최고 입찰가</dt><dd className="mt-2 font-mono text-lg font-bold tracking-tight">{currentPrice.toLocaleString("ko-KR")}원</dd></div>
         <div className="bg-paper p-4"><dt className="text-xs text-muted">최소 입찰가</dt><dd className="mt-2 font-mono text-lg font-bold tracking-tight">{minimumBid.toLocaleString("ko-KR")}원</dd></div>
       </dl>

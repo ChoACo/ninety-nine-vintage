@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const links = [
   { exact: true, href: "/admin/owner", label: "전체 현황" },
   { exact: false, href: "/admin/owner/products", label: "상품 관리" },
+  { exact: false, href: "/admin/owner/members", label: "회원·권한" },
   { exact: false, href: "/admin/owner/fulfillment", label: "중앙 물류" },
   { exact: false, href: "/admin/owner/refunds", label: "환불" },
   { exact: false, href: "/admin/owner/operations", label: "배송·결제" },

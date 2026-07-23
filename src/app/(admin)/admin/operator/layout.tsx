@@ -7,7 +7,7 @@ const links = [
   { exact: true, href: "/admin/operator", label: "대시보드" },
   { exact: true, href: "/admin/operator/products", label: "상품" },
   { exact: false, href: "/admin/operator/products/past", label: "지난 상품" },
-  { exact: false, href: "/admin/operator/members", label: "회원" },
+  { exact: false, href: "/admin/operator/members", label: "하위 역할·제재" },
   { exact: false, href: "/admin/operator/orders", label: "주문" },
   { exact: false, href: "/admin/operator/payments", label: "입금 확인" },
   { exact: false, href: "/admin/operator/exceptions", label: "상품 예외" },

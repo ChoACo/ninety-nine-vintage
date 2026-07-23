@@ -58,13 +58,18 @@ function isStore(value: unknown) {
 
 function isCenter(value: unknown) {
   if (!isRecord(value)) return false;
-  return hasExactKeys(value, ["id", "business_id", "code", "name", "status", "is_default", "version", "updated_at"]) &&
+  return hasExactKeys(value, ["id", "business_id", "code", "name", "status", "is_default", "postal_code", "address_line1", "address_line2", "contact_name", "contact_phone", "version", "updated_at"]) &&
     isUuid(value.id) &&
     isUuid(value.business_id) &&
     typeof value.code === "string" &&
     typeof value.name === "string" &&
     typeof value.status === "string" &&
     typeof value.is_default === "boolean" &&
+    isNullableText(value.postal_code) &&
+    isNullableText(value.address_line1) &&
+    isNullableText(value.address_line2) &&
+    isNullableText(value.contact_name) &&
+    isNullableText(value.contact_phone) &&
     nonNegativeInteger(value.version) &&
     typeof value.updated_at === "string";
 }
@@ -89,7 +94,7 @@ function isStaff(value: unknown) {
     isUuid(value.id) &&
     typeof value.display_name === "string" &&
     isNullableText(value.email) &&
-    ["operator", "employee"].includes(String(value.role_code)) &&
+    ["owner", "operator", "employee"].includes(String(value.role_code)) &&
     isNullableText(value.last_seen_at);
 }
 
@@ -195,6 +200,15 @@ function isConfiguredAssignment(value: unknown) {
     nonNegativeInteger(value.version) && typeof value.idempotent_replay === "boolean";
 }
 
+function isConfiguredCenter(value: unknown) {
+  return isRecord(value) && hasExactKeys(value, [
+    "id", "businessId", "code", "name", "status", "isDefault", "version", "idempotent_replay",
+  ]) && isUuid(value.id) && isUuid(value.businessId) &&
+    typeof value.code === "string" && typeof value.name === "string" &&
+    typeof value.status === "string" && typeof value.isDefault === "boolean" &&
+    nonNegativeInteger(value.version) && typeof value.idempotent_replay === "boolean";
+}
+
 function normalizedText(value: unknown, minimum: number, maximum: number) {
   if (typeof value !== "string") return null;
   const normalized = value.trim();
@@ -288,6 +302,41 @@ export async function POST(request: Request) {
   try {
     const access = await authenticateOwnerAccessRequest(request);
     const body = await readSmallJsonBody(request);
+    if (["create_center", "update_center", "archive_center"].includes(String(body.action))) {
+      if (!hasOnlyKeys(body, ["action", "centerId", "code", "name", "isDefault", "postalCode", "addressLine1", "addressLine2", "contactName", "contactPhone", "expectedVersion", "idempotencyKey"]) ||
+        !isUuid(body.idempotencyKey) ||
+        (body.action !== "create_center" && !isUuid(body.centerId)) ||
+        !nonNegativeInteger(body.expectedVersion) ||
+        (body.action !== "archive_center" && (!normalizedText(body.code, 2, 80) || !normalizedText(body.name, 1, 120))) ||
+        optionalText(body.postalCode, 20) === undefined ||
+        optionalText(body.addressLine1, 240) === undefined ||
+        optionalText(body.addressLine2, 240) === undefined ||
+        optionalText(body.contactName, 80) === undefined ||
+        optionalText(body.contactPhone, 40) === undefined ||
+        typeof body.isDefault !== "boolean") {
+        return ownerAccessJsonResponse({ error: "invalid_center_request", message: "센터 입력 내용을 확인해 주세요." }, 400);
+      }
+      const { data, error } = await (access.userClient as unknown as RpcClient).rpc(
+        "configure_managed_fulfillment_center",
+        {
+          p_action: body.action === "create_center" ? "create" : body.action === "update_center" ? "update" : "archive",
+          p_center_id: body.action === "create_center" ? null : body.centerId,
+          p_code: body.code,
+          p_name: body.name,
+          p_is_default: body.isDefault,
+          p_postal_code: optionalText(body.postalCode, 20),
+          p_address_line1: optionalText(body.addressLine1, 240),
+          p_address_line2: optionalText(body.addressLine2, 240),
+          p_contact_name: optionalText(body.contactName, 80),
+          p_contact_phone: optionalText(body.contactPhone, 40),
+          p_expected_version: body.expectedVersion,
+          p_idempotency_key: body.idempotencyKey,
+        },
+      );
+      if (error) return rpcFailure(error, "center_configuration_unavailable");
+      if (!isConfiguredCenter(data)) return ownerAccessJsonResponse({ error: "center_configuration_unavailable" }, 503);
+      return ownerAccessJsonResponse({ center: data });
+    }
     if (body.action === "reconcile_item") {
       if (!hasOnlyKeys(body, [
         "action", "inventoryItemId", "expectedVersion", "reason", "idempotencyKey",

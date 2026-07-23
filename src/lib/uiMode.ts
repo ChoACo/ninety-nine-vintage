@@ -1,7 +1,4 @@
-export const UI_MODE_COOKIE = "ninety-nine-ui-mode";
-
-export type UiMode = "auto" | "mobile" | "desktop";
-export type ResolvedUiMode = Exclude<UiMode, "auto">;
+export type ResolvedUiMode = "mobile" | "desktop";
 
 const CUSTOMER_ROOT_SEGMENTS = new Set([
   "account",
@@ -23,10 +20,6 @@ const CUSTOMER_ROOT_SEGMENTS = new Set([
 
 const BOT_USER_AGENT = /bot|crawler|spider|slurp|bingpreview|facebookexternalhit|kakaotalk-scrap/i;
 const MOBILE_USER_AGENT = /android|iphone|ipad|ipod|mobile|tablet|silk|kindle|playbook/i;
-
-export function isUiMode(value: unknown): value is UiMode {
-  return value === "auto" || value === "mobile" || value === "desktop";
-}
 
 export function isCustomerPagePath(pathname: string): boolean {
   if (pathname === "/") return true;
@@ -63,12 +56,4 @@ export function resolveAutomaticUiMode(headers: Pick<Headers, "get">): ResolvedU
   if (headers.get("sec-ch-ua-mobile") === "?1") return "mobile";
   if (MOBILE_USER_AGENT.test(userAgent)) return "mobile";
   return "desktop";
-}
-
-export function resolveUiMode(
-  headers: Pick<Headers, "get">,
-  savedMode: string | null | undefined,
-): ResolvedUiMode {
-  if (savedMode === "mobile" || savedMode === "desktop") return savedMode;
-  return resolveAutomaticUiMode(headers);
 }

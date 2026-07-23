@@ -83,6 +83,7 @@ function OrderProductCard({ basePath, item, surface }: { basePath: "" | "/m"; it
           alt=""
           className="size-12 object-cover"
           loading="lazy"
+          sizes="48px"
           src={product.image_urls[0]}
         />
       ) : (

@@ -14,7 +14,7 @@ function EnabledLiveTickerBar({ surface }: { surface: "desktop" | "mobile" }) {
 
   return (
     <aside className="theme-invariant-dark sticky top-0 z-50 h-9 border-b border-zinc-800 bg-zinc-950 text-white">
-      <div className={`mx-auto flex h-full max-w-[1680px] items-center justify-between gap-3 xl:px-12 ${surface === "desktop" ? "px-10 text-xs" : "px-4 text-[10px]"}`}>
+      <div className={`mx-auto flex h-full items-center justify-between gap-3 ${surface === "desktop" ? "w-[1200px] text-xs" : "max-w-5xl px-4 text-[10px]"}`}>
         <div className="flex min-w-0 items-center gap-2 font-medium">
           <span className="flex items-center gap-1.5 tracking-[0.12em] text-emerald-400">
             <CircleDot size={14} strokeWidth={2.5} />

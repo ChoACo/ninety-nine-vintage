@@ -171,7 +171,7 @@ test("uploads overlap both variants without adding device measurements to produc
   }
 });
 
-test("zoom and fallback images keep responsive sizing, blur, and the proxy boundary", async () => {
+test("zoom and fallback images keep fixed desktop sizing, responsive mobile sizing, blur, and the proxy boundary", async () => {
   const [catalogImage, detailView, itemGallery] = await Promise.all([
     source("src/components/ui/CatalogImage.tsx"),
     source("src/components/features/auction/detail/AuctionDetailView.tsx"),
@@ -195,11 +195,13 @@ test("zoom and fallback images keep responsive sizing, blur, and the proxy bound
   assert.match(catalogImage, /getCatalogImageSrcSet\(source, maxDimension\)/);
 
   assert.match(detailView, /<ItemGallery compact=\{compact\} item=\{item\} surface=\{surface\} \/>/);
-  assert.match(itemGallery, /const FULL_PAGE_IMAGE_SIZES/);
-  assert.match(itemGallery, /const COMPACT_IMAGE_SIZES/);
+  assert.match(itemGallery, /const MOBILE_FULL_PAGE_IMAGE_SIZES/);
+  assert.match(itemGallery, /const MOBILE_COMPACT_IMAGE_SIZES/);
   assert.match(itemGallery, /\(max-width: 767px\) calc\(100vw - 2rem\)/);
   assert.match(itemGallery, /56\.5rem/);
   assert.match(itemGallery, /44rem/);
+  assert.match(itemGallery, /surface === "desktop"[\s\S]*?compact \? "650px" : "680px"/);
+  assert.match(itemGallery, /surface === "desktop"[\s\S]*?compact \? "156px" : "164px"/);
   assert.match(itemGallery, /maxDimension=\{1280\} sizes=\{imageSizes\}/);
   assert.match(itemGallery, /maxDimension=\{480\} sizes=\{thumbnailSizes\}/);
   assert.doesNotMatch(itemGallery, /sizes="58vw"/);

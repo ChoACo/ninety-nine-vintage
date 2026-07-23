@@ -5,7 +5,7 @@ import { AuctionFilterSidebar } from "@/components/features/auction/AuctionFilte
 import { fetchPublishedProducts } from "@/services/products";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "즉시 구매 | NINETY-NINE VINTAGE", alternates: { canonical: "/shop", media: { "only screen and (max-width: 1023px)": "/m/shop" } } };
+export const metadata: Metadata = { title: "즉시 구매 | NINETY-NINE VINTAGE", alternates: { canonical: "/shop", media: { "only screen and (max-width: 1279px)": "/m/shop" } } };
 
 function toPayload(products: Awaited<ReturnType<typeof fetchPublishedProducts>>): ProductPayload[] {
   return products.map((product) => ({

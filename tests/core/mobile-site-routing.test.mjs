@@ -77,7 +77,7 @@ test("middleware enforces device routing, expires legacy choices, and keeps roll
   for (const surface of [footer, mobileHeader, mobileSettings]) {
     assert.doesNotMatch(surface, /UiModeSwitcher|ui-mode/);
   }
-  assert.match(wrangler, /"run_worker_first"\s*:\s*true/);
+  assert.match(wrangler, /"run_worker_first"[\s\S]*"\/\*"[\s\S]*"!\/_next\/\*"/);
   await assert.rejects(source("src/app/api/ui-mode/route.ts"), { code: "ENOENT" });
   await assert.rejects(source("src/components/mobile/UiModeSwitcher.tsx"), { code: "ENOENT" });
 });

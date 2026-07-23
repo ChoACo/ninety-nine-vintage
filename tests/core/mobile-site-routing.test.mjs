@@ -54,12 +54,13 @@ test("path conversion is reversible, loop-safe, and leaves excluded surfaces alo
 });
 
 test("middleware enforces device routing, expires legacy choices, and keeps rollout controls", async () => {
-  const [middleware, flags, footer, mobileHeader, mobileSettings] = await Promise.all([
+  const [middleware, flags, footer, mobileHeader, mobileSettings, wrangler] = await Promise.all([
     source("src/middleware.ts"),
     source("src/lib/featureFlags.ts"),
     source("src/components/layout/PcFooter.tsx"),
     source("src/components/mobile/MobileSiteHeader.tsx"),
     source("src/app/(mobile)/m/account/settings/page.tsx"),
+    source("wrangler.jsonc"),
   ]);
 
   assert.match(middleware, /MOBILE_SITE_ENABLED[\s\S]*MOBILE_AUTO_REDIRECT_ENABLED/);
@@ -76,6 +77,7 @@ test("middleware enforces device routing, expires legacy choices, and keeps roll
   for (const surface of [footer, mobileHeader, mobileSettings]) {
     assert.doesNotMatch(surface, /UiModeSwitcher|ui-mode/);
   }
+  assert.match(wrangler, /"run_worker_first"\s*:\s*true/);
   await assert.rejects(source("src/app/api/ui-mode/route.ts"), { code: "ENOENT" });
   await assert.rejects(source("src/components/mobile/UiModeSwitcher.tsx"), { code: "ENOENT" });
 });

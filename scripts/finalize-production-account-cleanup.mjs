@@ -11,5 +11,12 @@ if (error) throw error;
 for (const tombstone of tombstones ?? []) {
   const { error: deleteError } = await client.auth.admin.deleteUser(tombstone.id);
   if (deleteError && !/not found/i.test(deleteError.message)) throw deleteError;
+
+  const { data: remaining, error: verificationError } = await client.auth.admin.getUserById(tombstone.id);
+  const missing = verificationError && (verificationError.status === 404 || /not found/i.test(verificationError.message));
+  if (!missing && remaining?.user) {
+    throw new Error(`Auth subject ${tombstone.anonymized_reference} still exists after deletion.`);
+  }
+  if (verificationError && !missing) throw verificationError;
   process.stdout.write(`deleted-auth-subject ${tombstone.anonymized_reference}\n`);
 }

@@ -43,6 +43,21 @@ where product_id in (select id from public.products);
 
 delete from public.products;
 
+drop trigger if exists store_membership_permission_audits_append_only
+on public.store_membership_permission_audits;
+
+delete from public.store_membership_permission_audits
+where membership_id in (
+  select memberships.id
+  from public.store_memberships as memberships
+  join public.stores as stores on stores.id = memberships.store_id
+  where not stores.is_active
+);
+
+create trigger store_membership_permission_audits_append_only
+before update or delete or truncate on public.store_membership_permission_audits
+for each statement execute function app_private.reject_store_membership_audit_mutation();
+
 delete from public.store_memberships
 where store_id in (
   select id

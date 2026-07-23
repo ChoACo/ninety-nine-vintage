@@ -5833,6 +5833,10 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: Json
       }
+      create_member_24_hour_sanction: {
+        Args: { p_member_id: string; p_reason: string }
+        Returns: Json
+      }
       current_access_role: { Args: never; Returns: string }
       current_owner_delegated_operator: { Args: never; Returns: string }
       decline_my_second_chance_offer: {
@@ -6034,6 +6038,20 @@ export type Database = {
           suspended_until: string
           suspension_reason: string
           warning_count: number
+        }[]
+      }
+      get_owner_withdrawn_member_retention: {
+        Args: { p_limit?: number; p_offset?: number }
+        Returns: {
+          anonymized_reference: string
+          attempt_count: number
+          deleted_at: string
+          deletion_reason: string
+          last_attempt_at: string | null
+          last_error_code: string | null
+          member_id: string
+          purge_due_at: string
+          retention_status: string
         }[]
       }
       get_manual_refund_queue: {
@@ -7546,6 +7564,10 @@ export type Database = {
           p_ledger_id: string
           p_reason: string
         }
+        Returns: Json
+      }
+      retry_withdrawn_member_cleanup: {
+        Args: { p_member_id: string }
         Returns: Json
       }
       review_manual_refund: {

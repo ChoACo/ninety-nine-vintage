@@ -27,6 +27,15 @@ begin
     raise exception 'cutover must remove owner and anonymous center assignments';
   end if;
   if not exists(
+    select 1
+    from pg_catalog.pg_constraint as constraints
+    where constraints.contype='f'
+      and constraints.conrelid='public.profiles'::regclass
+      and constraints.confrelid='app_private.ledger_principals'::regclass
+  ) then
+    raise exception 'profiles must belong to a ledger principal after auth separation';
+  end if;
+  if not exists(
     select 1 from public.stores s join public.store_fulfillment_routes r on r.store_id=s.id
     join public.fulfillment_centers c on c.id=r.fulfillment_center_id
     where s.name='나인티 나인 빈티지' and c.name='다미네 옷가게' and r.route_mode='transfer' and r.status='active'
@@ -152,32 +161,175 @@ $$;
 rollback;
 
 begin;
-insert into public.profiles(id,display_name,deleted_at,anonymized_reference)
-values(
-  'a3000000-0000-4000-8000-000000000001',
-  '탈퇴 회원 검증',
-  clock_timestamp(),
-  'deleted-preflight-purge'
-);
-update public.member_accounts
-set account_status='deleted'
-where member_id='a3000000-0000-4000-8000-000000000001';
 select set_config('request.jwt.claim.sub',(select user_id::text from public.account_access_roles where role_code='owner'),true);
+update public.profiles
+set deleted_at=null,anonymized_reference=null
+where id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+update public.member_accounts
+set account_status='active',suspended_until=null,suspension_reason=null
+where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+insert into public.account_access_roles(user_id,role_code)
+values('9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d','member');
+delete from public.member_sanction_events
+where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+delete from public.member_bid_sanctions
+where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+delete from public.member_warnings
+where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+delete from app_private.withdrawn_member_retention
+where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+update app_private.ledger_principals
+set principal_kind='account',anonymized_at=null
+where id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
 set local role authenticated;
 do $$
-declare v_purged jsonb;
+declare
+  v_member uuid := '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+  v_sanction jsonb;
+  v_status_result jsonb;
 begin
-  v_purged:=public.purge_deleted_member_record(
-    'a3000000-0000-4000-8000-000000000001',
-    '배포 전 완전 삭제 검증'
+  v_status_result:=public.set_managed_member_status(
+    v_member,
+    'suspended',
+    null,
+    '무기한 정지 버튼 검증'
   );
-  if not (v_purged->>'purged')::boolean
-    or exists(
-      select 1 from public.profiles
-      where id='a3000000-0000-4000-8000-000000000001'
+  if v_status_result->>'status'<>'suspended'
+    or not exists(
+      select 1 from public.get_manager_member_directory(500,0)
+      where id=v_member and account_status='suspended'
     )
   then
-    raise exception 'withdrawn member purge failed';
+    raise exception 'member suspended action failed';
+  end if;
+
+  v_status_result:=public.set_managed_member_status(
+    v_member,
+    'temporary_suspended',
+    clock_timestamp()+interval '2 hours',
+    '일시 정지 버튼 검증'
+  );
+  if v_status_result->>'status'<>'temporary_suspended'
+    or not exists(
+      select 1 from public.get_manager_member_directory(500,0)
+      where id=v_member and account_status='temporary_suspended'
+        and suspended_until>clock_timestamp()
+    )
+  then
+    raise exception 'member temporary suspension action failed';
+  end if;
+
+  v_status_result:=public.set_managed_member_status(
+    v_member,
+    'active',
+    null,
+    '활성 버튼 검증'
+  );
+  if v_status_result->>'status'<>'active'
+    or not exists(
+      select 1 from public.get_manager_member_directory(500,0)
+      where id=v_member and account_status='active'
+        and suspended_until is null and suspension_reason is null
+    )
+  then
+    raise exception 'member activation action failed';
+  end if;
+
+  perform public.add_member_warning(v_member,'manual','경고 버튼 검증');
+  perform public.create_member_24_hour_sanction(v_member,'24시간 제재 버튼 검증');
+  select active_sanctions->0 into strict v_sanction
+  from public.get_manager_member_directory(500,0)
+  where id=v_member;
+  if (v_sanction->>'endsAt')::timestamptz
+      -(v_sanction->>'startsAt')::timestamptz<>interval '24 hours'
+  then
+    raise exception '24 hour sanction must use the database clock exactly';
+  end if;
+
+  perform public.clear_member_enforcement_history(
+    v_member,
+    'warnings',
+    '경고 누적 삭제 버튼 검증'
+  );
+  perform public.clear_member_enforcement_history(
+    v_member,
+    'sanctions',
+    '제재 누적 삭제 버튼 검증'
+  );
+  if exists(
+    select 1 from public.get_manager_member_directory(500,0)
+    where id=v_member and (warning_count<>0 or sanction_count<>0)
+  )
+  then
+    raise exception 'enforcement reset actions failed';
+  end if;
+
+  perform public.prepare_managed_member_deletion(
+    v_member,
+    '탈퇴 회원 7일 보관 검증'
+  );
+  if exists(
+    select 1 from public.get_manager_member_directory(500,0)
+    where id=v_member
+  ) or not exists(
+    select 1 from public.get_owner_withdrawn_member_retention(500,0)
+    where member_id=v_member and retention_status='retained'
+  ) then
+    raise exception 'withdrawn member separation failed';
+  end if;
+
+  begin
+    perform public.retry_withdrawn_member_cleanup(v_member);
+    raise exception 'retention cleanup before seven days should have failed';
+  exception when sqlstate '55000' then null;
+  end;
+end;
+$$;
+reset role;
+
+delete from auth.users
+where id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+
+do $$
+begin
+  if exists(
+    select 1 from auth.users
+    where id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d'
+  ) or not exists(
+    select 1 from public.profiles
+    where id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d'
+      and deleted_at is not null
+  ) then
+    raise exception 'auth deletion must retain the anonymized profile for seven days';
+  end if;
+end;
+$$;
+
+update app_private.withdrawn_member_retention
+set
+  deleted_at=statement_timestamp()-interval '8 days',
+  purge_due_at=statement_timestamp()-interval '1 day'
+where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+
+set local role authenticated;
+select public.retry_withdrawn_member_cleanup(
+  '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d'
+);
+reset role;
+do $$
+declare v_member uuid := '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+begin
+  if exists(select 1 from public.profiles where id=v_member)
+    or exists(
+      select 1 from app_private.withdrawn_member_retention
+      where member_id=v_member
+    )
+    or not exists(
+      select 1 from app_private.ledger_principals
+      where id=v_member and principal_kind='anonymous_ledger'
+    )
+  then
+    raise exception 'withdrawn member retained cleanup failed';
   end if;
 end;
 $$;

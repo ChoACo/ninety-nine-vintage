@@ -1,4 +1,8 @@
 import { authenticateOwnerAccessRequest, ownerAccessErrorResponse, ownerAccessJsonResponse, readSmallJsonBody } from "@/lib/ownerAccess/server";
+import {
+  isManagedMemberStatus,
+  normalizeManagementReason,
+} from "@/lib/memberManagement/contracts";
 
 function rpcError(
   error: { code?: string; message?: string } | null,
@@ -82,12 +86,19 @@ export async function PATCH(request: Request) {
       return ownerAccessJsonResponse({ member: data });
     }
     if (action === "status") {
-      const status = typeof body.status === "string" ? body.status : "";
+      const status = body.status;
+      const reason = normalizeManagementReason(body.reason);
+      if (!isManagedMemberStatus(status) || !reason) {
+        return ownerAccessJsonResponse(
+          { error: "invalid_status_request", message: "상태와 처리 사유를 확인해 주세요." },
+          400,
+        );
+      }
       const { data, error } = await access.userClient.rpc("set_managed_member_status", {
         p_member_id: memberId,
         p_status: status,
         p_suspended_until: typeof body.suspendedUntil === "string" ? body.suspendedUntil : null,
-        p_reason: typeof body.reason === "string" ? body.reason : null,
+        p_reason: reason,
       });
       if (error) return rpcError(error, "status_update_failed");
       return ownerAccessJsonResponse({ member: data });
@@ -110,45 +121,79 @@ export async function PATCH(request: Request) {
       return ownerAccessJsonResponse({ memberId, shippingCreditCount: data });
     }
     if (action === "warning") {
+      const reason = normalizeManagementReason(body.reason);
+      if (!reason) {
+        return ownerAccessJsonResponse(
+          { error: "invalid_warning_reason", message: "경고 사유를 입력해 주세요." },
+          400,
+        );
+      }
       const { data, error } = await access.userClient.rpc("add_member_warning", {
         p_member_id: memberId,
         p_category: typeof body.category === "string" ? body.category : "manual",
-        p_reason: typeof body.reason === "string" ? body.reason : "",
+        p_reason: reason,
       });
       if (error) return rpcError(error, "warning_create_failed");
       return ownerAccessJsonResponse({ memberId, enforcement: data });
     }
     if (action === "enforcement_clear") {
       const scope = typeof body.scope === "string" ? body.scope : "";
-      if (!["warnings", "sanctions", "all"].includes(scope)) {
-        return ownerAccessJsonResponse({ error: "invalid_enforcement_scope" }, 400);
+      const reason = normalizeManagementReason(body.reason);
+      if (!["warnings", "sanctions", "all"].includes(scope) || !reason) {
+        return ownerAccessJsonResponse(
+          {
+            error: "invalid_enforcement_request",
+            message: "초기화 범위와 처리 사유를 확인해 주세요.",
+          },
+          400,
+        );
       }
       const { data, error } = await access.userClient.rpc(
         "clear_member_enforcement_history",
         {
           p_member_id: memberId,
           p_scope: scope,
-          p_reason: typeof body.reason === "string" ? body.reason : "",
+          p_reason: reason,
         },
       );
       if (error) return rpcError(error, "enforcement_clear_failed");
       return ownerAccessJsonResponse({ memberId, enforcement: data });
     }
     if (["sanction_create", "sanction_update", "sanction_cancel"].includes(action)) {
-      const { data, error } = await access.userClient.rpc("manage_member_sanction", {
-        p_action: action.replace("sanction_", ""), p_member_id: memberId,
-        p_sanction_id: typeof body.sanctionId === "string" ? body.sanctionId : null,
-        p_starts_at: typeof body.startsAt === "string" ? body.startsAt : null,
-        p_ends_at: typeof body.endsAt === "string" ? body.endsAt : null,
-        p_reason: typeof body.reason === "string" ? body.reason : null,
-      });
+      const reason = normalizeManagementReason(body.reason);
+      if (!reason) {
+        return ownerAccessJsonResponse(
+          { error: "invalid_sanction_reason", message: "제재 처리 사유를 입력해 주세요." },
+          400,
+        );
+      }
+      const { data, error } = action === "sanction_create"
+        ? await access.userClient.rpc("create_member_24_hour_sanction", {
+            p_member_id: memberId,
+            p_reason: reason,
+          })
+        : await access.userClient.rpc("manage_member_sanction", {
+            p_action: action.replace("sanction_", ""),
+            p_member_id: memberId,
+            p_sanction_id: typeof body.sanctionId === "string" ? body.sanctionId : null,
+            p_starts_at: typeof body.startsAt === "string" ? body.startsAt : null,
+            p_ends_at: typeof body.endsAt === "string" ? body.endsAt : null,
+            p_reason: reason,
+          });
       if (error) return rpcError(error, "sanction_update_failed");
       return ownerAccessJsonResponse({ memberId, sanction: data });
     }
     if (action === "delete") {
+      const reason = normalizeManagementReason(body.reason);
+      if (!reason) {
+        return ownerAccessJsonResponse(
+          { error: "invalid_deletion_reason", message: "탈퇴 처리 사유를 입력해 주세요." },
+          400,
+        );
+      }
       const { data, error } = await access.userClient.rpc("prepare_managed_member_deletion", {
         p_member_id: memberId,
-        p_reason: typeof body.reason === "string" ? body.reason : "관리자 삭제",
+        p_reason: reason,
       });
       if (error) return rpcError(error, "member_delete_prepare_failed");
       const { error: deleteError } = await access.admin.auth.admin.deleteUser(memberId);
@@ -156,11 +201,18 @@ export async function PATCH(request: Request) {
       return ownerAccessJsonResponse({ member: data, deleted: true });
     }
     if (action === "purge") {
+      const reason = normalizeManagementReason(body.reason);
+      if (!reason) {
+        return ownerAccessJsonResponse(
+          { error: "invalid_cleanup_reason", message: "정리 재시도 사유를 입력해 주세요." },
+          400,
+        );
+      }
       const { data, error } = await access.userClient.rpc(
         "purge_deleted_member_record",
         {
           p_member_id: memberId,
-          p_reason: typeof body.reason === "string" ? body.reason : "",
+          p_reason: reason,
         },
       );
       if (error) return rpcError(error, "member_purge_failed");

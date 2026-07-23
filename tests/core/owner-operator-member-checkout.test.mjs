@@ -7,12 +7,28 @@ const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 const migrationPath =
   "supabase/migrations/20260723120000_owner_operator_member_fulfillment_checkout.sql";
+const retentionMigrationPath =
+  "supabase/migrations/20260723130000_owner_member_management_retention.sql";
+const profileLedgerMigrationPath =
+  "supabase/migrations/20260723140000_link_profiles_to_ledger_principals.sql";
 
-test("owner nickname and member management cover self-edit, separated states, enforcement reset, and safe purge", async () => {
-  const [migration, route, consoleSource] = await Promise.all([
+test("owner member management actions use confirmed reasons and separate seven-day withdrawn retention", async () => {
+  const [
+    migration,
+    retentionMigration,
+    profileLedgerMigration,
+    route,
+    archiveRoute,
+    consoleSource,
+    archiveConsole,
+  ] = await Promise.all([
     source(migrationPath),
+    source(retentionMigrationPath),
+    source(profileLedgerMigrationPath),
     source("src/app/api/admin/owner/members/route.ts"),
+    source("src/app/api/admin/owner/members/withdrawn/route.ts"),
     source("src/components/admin/owner/OwnerMembersConsole.tsx"),
+    source("src/components/admin/owner/WithdrawnMembersConsole.tsx"),
   ]);
 
   assert.match(
@@ -26,22 +42,61 @@ test("owner nickname and member management cover self-edit, separated states, en
   assert.match(migration, /function public\.clear_member_enforcement_history/i);
   assert.match(migration, /delete from public\.member_warnings/i);
   assert.match(migration, /delete from public\.member_bid_sanctions/i);
-  assert.match(migration, /function public\.purge_deleted_member_record/i);
   assert.match(
-    migration,
-    /exception[\s\S]*when foreign_key_violation[\s\S]*거래 또는 감사 이력/i,
+    retentionMigration,
+    /function public\.set_managed_member_status[\s\S]*target_role = 'owner'/i,
+  );
+  assert.match(
+    retentionMigration,
+    /function public\.create_member_24_hour_sanction[\s\S]*started_at \+ interval '24 hours'/i,
+  );
+  assert.match(
+    retentionMigration,
+    /create table app_private\.withdrawn_member_retention[\s\S]*purge_due_at = deleted_at \+ interval '7 days'/i,
+  );
+  assert.match(
+    retentionMigration,
+    /profiles[\s\S]*auth\.users[\s\S]*ledger_principals[\s\S]*연쇄 삭제 연결/i,
+  );
+  assert.match(
+    profileLedgerMigration,
+    /alter table public\.profiles[\s\S]*foreign key \(id\)[\s\S]*references app_private\.ledger_principals\(id\)/i,
+  );
+  assert.match(
+    retentionMigration,
+    /get_manager_member_directory[\s\S]*profiles\.deleted_at is null[\s\S]*accounts\.account_status <> 'deleted'/i,
+  );
+  assert.match(
+    retentionMigration,
+    /withdrawn-member-retention-cleanup[\s\S]*17 \* \* \* \*/i,
   );
   assert.match(route, /action === "enforcement_clear"/);
-  assert.match(route, /action === "purge"/);
-  assert.match(route, /"purge_deleted_member_record"/);
-  for (const label of ["전체", "활성", "정지", "탈퇴"]) {
+  assert.match(route, /action === "status"/);
+  assert.match(route, /action === "warning"/);
+  assert.match(route, /action === "sanction_create"/);
+  assert.match(route, /"create_member_24_hour_sanction"/);
+  assert.match(route, /action === "delete"/);
+  assert.match(route, /normalizeManagementReason/);
+  assert.match(archiveRoute, /"get_owner_withdrawn_member_retention"/);
+  assert.match(archiveRoute, /"retry_withdrawn_member_cleanup"/);
+  for (const label of ["전체", "활성", "정지"]) {
     assert.match(consoleSource, new RegExp(`:\\s*"${label}"`));
   }
+  assert.doesNotMatch(consoleSource, /:\\s*"탈퇴"/);
+  for (const label of ["활성", "정지", "일시 정지", "경고"]) {
+    assert.match(consoleSource, new RegExp(`>\\s*${label}\\s*<`));
+  }
+  assert.match(consoleSource, /24시간 제재/);
   assert.match(consoleSource, /경고 누적 삭제/);
   assert.match(consoleSource, /제재 누적 삭제/);
-  assert.match(consoleSource, /완전 삭제/);
+  assert.match(consoleSource, /탈퇴 보관함/);
+  assert.match(consoleSource, /role="dialog"/);
+  assert.match(consoleSource, /처리 사유/);
   assert.match(consoleSource, /member\.access_role === "owner"/);
-  assert.doesNotMatch(consoleSource, /disabled=\{member\.access_role === "owner"\}/);
+  assert.match(consoleSource, /소유자 계정은[\s\S]*정지·제재·탈퇴/);
+  assert.match(archiveConsole, /익명 회원/);
+  assert.match(archiveConsole, /정리 재시도/);
+  assert.doesNotMatch(archiveConsole, /member\.email|member\.phone|legal_name/);
 });
 
 test("center assignments derive capabilities from operator and employee roles and can be edited or deleted", async () => {

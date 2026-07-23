@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import {
   authenticateStaffRequest,
   commerceJson,
@@ -8,12 +10,62 @@ import { getCatalogImageUrl } from "@/lib/images";
 export async function GET(request: Request) {
   const auth = await authenticateStaffRequest(request);
   if (!auth.ok) return auth.response;
-  let storeQuery = auth.admin
+  if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
+    return commerceJson({ error: "past_products_forbidden" }, 403);
+  }
+  const admin = auth.admin as unknown as SupabaseClient;
+  let allowedStoreIds: string[] | null = null;
+  if (auth.roleCode === "operator") {
+    const [membershipResult, assignmentResult] = await Promise.all([
+      admin
+        .from("store_memberships")
+        .select("store_id")
+        .eq("user_id", auth.userId)
+        .eq("status", "active")
+        .eq("manage_products", true),
+      admin
+        .from("fulfillment_center_staff_assignments")
+        .select("fulfillment_center_id")
+        .eq("user_id", auth.userId)
+        .eq("status", "active"),
+    ]);
+    if (membershipResult.error || assignmentResult.error) {
+      return commerceJson({ error: "past_products_unavailable" }, 503);
+    }
+    const membershipStoreIds = (membershipResult.data ?? []).map(
+      (membership) => membership.store_id,
+    );
+    const centerIds = (assignmentResult.data ?? []).map(
+      (assignment) => assignment.fulfillment_center_id,
+    );
+    let centerStoreIds: string[] = [];
+    if (centerIds.length > 0) {
+      const { data, error } = await admin
+        .from("stores")
+        .select("id")
+        .eq("is_active", true)
+        .in("home_fulfillment_center_id", centerIds);
+      if (error) return commerceJson({ error: "past_products_unavailable" }, 503);
+      centerStoreIds = (data ?? []).map((store) => store.id);
+    }
+    allowedStoreIds = [...new Set([...membershipStoreIds, ...centerStoreIds])];
+  }
+  let storeQuery = admin
     .from("stores")
     .select("id, name, slug, operator_id")
     .eq("is_active", true);
-  if (auth.roleCode !== "owner")
-    storeQuery = storeQuery.eq("operator_id", auth.userId);
+  if (allowedStoreIds) {
+    if (allowedStoreIds.length === 0) {
+      return commerceJson({
+        canProcessSecondChance: false,
+        closedAuctions: [],
+        paymentMode: null,
+        products: [],
+        stores: [],
+      });
+    }
+    storeQuery = storeQuery.in("id", allowedStoreIds);
+  }
   const { data: stores, error: storeError } = await storeQuery.order("name");
   if (storeError)
     return commerceJson({ error: "past_products_unavailable" }, 503);

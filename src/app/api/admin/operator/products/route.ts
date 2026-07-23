@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
 import { normalizeProductBrand } from "@/lib/catalog/brand";
 
@@ -26,26 +28,59 @@ function images(value: unknown) {
 export async function GET(request: Request) {
   const auth = await authenticateStaffRequest(request);
   if (!auth.ok) return auth.response;
+  if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
+    return commerceJson({ error: "operator_products_forbidden" }, 403);
+  }
+  const admin = auth.admin as unknown as SupabaseClient;
   const membershipPermissions = new Map<string, { canManage: boolean; canPublish: boolean }>();
   if (auth.roleCode !== "owner") {
-    const { data: memberships, error: membershipError } = await auth.user
-      .from("store_memberships")
-      .select("store_id, manage_products, publish_products")
-      .eq("user_id", auth.userId)
-      .eq("status", "active");
-    if (membershipError) return commerceJson({ error: "operator_products_unavailable" }, 503);
+    const [membershipResult, assignmentResult] = await Promise.all([
+      admin
+        .from("store_memberships")
+        .select("store_id, manage_products, publish_products")
+        .eq("user_id", auth.userId)
+        .eq("status", "active"),
+      admin
+        .from("fulfillment_center_staff_assignments")
+        .select("fulfillment_center_id")
+        .eq("user_id", auth.userId)
+        .eq("status", "active"),
+    ]);
+    if (membershipResult.error || assignmentResult.error) {
+      return commerceJson({ error: "operator_products_unavailable" }, 503);
+    }
+    const memberships = membershipResult.data;
     for (const membership of memberships ?? []) {
       membershipPermissions.set(membership.store_id, {
         canManage: membership.manage_products,
         canPublish: membership.publish_products,
       });
     }
+    const centerIds = (assignmentResult.data ?? []).map(
+      (assignment) => assignment.fulfillment_center_id,
+    );
+    if (centerIds.length > 0) {
+      const { data: centerStores, error: centerStoreError } = await admin
+        .from("stores")
+        .select("id")
+        .eq("is_active", true)
+        .in("home_fulfillment_center_id", centerIds);
+      if (centerStoreError) {
+        return commerceJson({ error: "operator_products_unavailable" }, 503);
+      }
+      for (const store of centerStores ?? []) {
+        membershipPermissions.set(store.id, {
+          canManage: true,
+          canPublish: true,
+        });
+      }
+    }
   }
 
   const manageableStoreIds = [...membershipPermissions]
     .filter(([, permission]) => permission.canManage)
     .map(([storeId]) => storeId);
-  let storeQuery = auth.user
+  let storeQuery = admin
     .from("stores")
     .select("id, name, slug, operator_id, is_active")
     .eq("is_active", true);
@@ -64,7 +99,7 @@ export async function GET(request: Request) {
   const storeIds = (stores ?? []).map((store) => store.id);
   const { data: products, error: productError } = storeIds.length === 0
     ? { data: [], error: null }
-    : await auth.user.from("products").select("*, stores(id, name, slug)").in("store_id", storeIds).order("created_at", { ascending: false });
+    : await admin.from("products").select("*, stores(id, name, slug)").in("store_id", storeIds).order("created_at", { ascending: false });
   if (productError) return commerceJson({ error: "operator_products_unavailable" }, 503);
   const canMutate = stores.length > 0;
   return commerceJson({
@@ -81,6 +116,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await authenticateStaffRequest(request, true);
   if (!auth.ok) return auth.response;
+  if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
+    return commerceJson({ error: "operator_products_forbidden" }, 403);
+  }
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const title = text(body?.title);
   const description = text(body?.description);

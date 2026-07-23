@@ -53,7 +53,12 @@ begin
     'public.can_manage_members()'::regprocedure,
     'public.get_manager_member_directory(integer,integer)'::regprocedure,
     'public.get_operator_member_directory(integer,integer)'::regprocedure,
-    'public.configure_managed_fulfillment_center(text,uuid,text,text,boolean,text,text,text,text,text,bigint,uuid)'::regprocedure
+    'public.configure_managed_fulfillment_center(text,uuid,text,text,boolean,text,text,text,text,text,bigint,uuid)'::regprocedure,
+    'public.get_my_center_management()'::regprocedure,
+    'public.configure_assigned_fulfillment_center(text,uuid,text,text,boolean,text,text,text,text,text,bigint)'::regprocedure,
+    'public.pause_managed_product(uuid,timestamptz)'::regprocedure,
+    'public.set_site_status(text,text)'::regprocedure,
+    'public.set_managed_staff_role(uuid,text,uuid)'::regprocedure
   ] loop
     if has_function_privilege('anon',v_signature,'execute') then
       raise exception 'anonymous role must not execute manager RPC %',v_signature;
@@ -78,7 +83,12 @@ select set_config('request.jwt.claim.sub',(select user_id::text from public.acco
 set local role authenticated;
 
 do $$
-declare v_owner uuid:=auth.uid(); v_created jsonb; v_replay jsonb; v_updated jsonb;
+declare
+  v_owner uuid:=auth.uid();
+  v_created jsonb;
+  v_replay jsonb;
+  v_updated jsonb;
+  v_site jsonb;
 begin
   if not exists(select 1 from public.get_manager_member_directory(500,0) d where d.id=v_owner and d.access_role='owner') then
     raise exception 'owner directory must include the owner row';
@@ -88,6 +98,14 @@ begin
     raise exception 'owner status mutation should have failed';
   exception when sqlstate '42501' then null;
   end;
+
+  v_site := public.set_site_status('maintenance', '관리자 저장 검증');
+  if v_site->>'status' <> 'maintenance'
+    or v_site->>'message' <> '관리자 저장 검증'
+    or (v_site->>'updatedBy')::uuid <> v_owner
+  then
+    raise exception 'site status RPC must persist the authenticated owner save';
+  end if;
 
   v_created:=public.configure_managed_fulfillment_center(
     'create',null,'preflight-center','배포 전 검증 센터',false,'12345','서울시 검증로 1','2층','검증 담당','010-0000-0000',0,
@@ -123,15 +141,46 @@ insert into public.account_access_roles(user_id,role_code) values('4132c4b2-87e0
 update public.profiles set deleted_at=null,anonymized_reference=null where id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
 insert into public.account_access_roles(user_id,role_code) values('9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d','member');
 update public.member_accounts set account_status='active',suspended_until=null where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+update public.profiles
+set
+  display_name='가입 전 이름',
+  nickname_initialized_at=null,
+  nickname_self_change_used_at=null
+where id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
 delete from public.member_sanction_events where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
 delete from public.member_bid_sanctions where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
 delete from public.member_warnings where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
 
 set local role authenticated;
+select set_config('request.jwt.claim.sub','9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d',true);
+do $$
+declare v_request uuid;
+begin
+  if public.set_my_initial_nickname('첫 닉네임') <> '첫 닉네임' then
+    raise exception 'initial nickname save failed';
+  end if;
+  if exists(
+    select 1 from public.get_my_nickname_state()
+    where not is_initialized or can_change_once
+  ) then
+    raise exception 'initial nickname state must require review for every later change';
+  end if;
+  v_request := public.request_my_nickname_change('승인 닉네임');
+  if v_request is null then raise exception 'nickname review request was not created'; end if;
+end;
+$$;
 select set_config('request.jwt.claim.sub','4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',true);
 do $$
 declare v_member uuid:='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d'; v_sanction uuid;
 begin
+  if public.review_nickname_change_request(
+    (select request_id from public.get_pending_nickname_change_requests()
+      where member_id=v_member limit 1),
+    true,
+    '운영자 승인 검증'
+  ) <> 'approved' then
+    raise exception 'operator nickname approval failed';
+  end if;
   if public.can_manage_members() or not public.can_manage_member_enforcement() then raise exception 'operator privilege split is invalid'; end if;
   begin perform * from public.get_manager_member_directory(10,0); raise exception 'operator full directory should fail'; exception when sqlstate '42501' then null; end;
   if not exists(select 1 from public.get_operator_member_directory(50,0) where id=v_member) then raise exception 'operator limited directory must include a normal member'; end if;
@@ -149,6 +198,9 @@ $$;
 reset role;
 do $$
 begin
+  if (select display_name from public.profiles where id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d') <> '승인 닉네임' then
+    raise exception 'approved nickname was not persisted';
+  end if;
   if (select count(*) from public.member_sanction_events where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d')<>3 then
     raise exception 'sanction lifecycle audit is incomplete';
   end if;
@@ -156,4 +208,74 @@ end;
 $$;
 update public.member_accounts set account_status='temporary_suspended',suspended_until=clock_timestamp()-interval '1 minute' where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
 do $$ begin if public.effective_member_account_status('9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d')<>'active' then raise exception 'expired temporary suspension must resolve to active'; end if; end $$;
+rollback;
+
+begin;
+select set_config('request.jwt.claim.sub',(select user_id::text from public.account_access_roles where role_code='owner'),true);
+update public.profiles set deleted_at=null,anonymized_reference=null where id='4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee';
+insert into public.account_access_roles(user_id,role_code) values('4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee','operator');
+update public.profiles set deleted_at=null,anonymized_reference=null where id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+insert into public.account_access_roles(user_id,role_code) values('9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d','band_member');
+delete from public.member_sanction_events where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+delete from public.member_bid_sanctions where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+delete from public.member_warnings where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+set local role authenticated;
+select set_config('request.jwt.claim.sub','4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',true);
+select * from public.add_member_warning(
+  '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d',
+  'late_payment',
+  '자동 미입금 검증'
+);
+reset role;
+do $$
+declare
+  v_band uuid := '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+begin
+  if exists(select 1 from public.member_warnings where member_id=v_band) then
+    raise exception 'band late payment must not create an automatic warning';
+  end if;
+end;
+$$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',true);
+select * from public.add_member_warning(
+  '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d',
+  'manual',
+  '운영자 수동 경고'
+);
+reset role;
+do $$
+declare
+  v_band uuid := '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+begin
+  if (select count(*) from public.member_warnings where member_id=v_band)<>1
+    or exists(select 1 from public.member_bid_sanctions where member_id=v_band)
+  then
+    raise exception 'band manual warning must persist without automatic sanction';
+  end if;
+end;
+$$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',true);
+select public.manage_member_sanction(
+  'create',
+  '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d',
+  null,
+  clock_timestamp(),
+  clock_timestamp()+interval '1 day',
+  '운영자 수동 제재'
+);
+reset role;
+do $$
+declare
+  v_band uuid := '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
+begin
+  if not exists(
+    select 1 from public.member_bid_sanctions
+    where member_id=v_band and source='manual' and status='active'
+  ) then
+    raise exception 'band manual sanction must remain available';
+  end if;
+end;
+$$;
 rollback;

@@ -5,16 +5,13 @@ import { usePathname } from "next/navigation";
 
 const links = [
   { exact: true, href: "/admin/operator", label: "대시보드" },
+  { exact: false, href: "/admin/operator/center", label: "센터 관리" },
   { exact: true, href: "/admin/operator/products", label: "상품" },
-  { exact: false, href: "/admin/operator/products/past", label: "지난 상품" },
-  { exact: false, href: "/admin/operator/members", label: "하위 역할·제재" },
-  { exact: false, href: "/admin/operator/orders", label: "주문" },
-  { exact: false, href: "/admin/operator/payments", label: "입금 확인" },
-  { exact: false, href: "/admin/operator/exceptions", label: "상품 예외" },
-  { exact: false, href: "/admin/operator/fulfillment", label: "중앙 출고" },
-  { exact: false, href: "/admin/operator/revenue", label: "매출" },
-  { exact: false, href: "/admin/operator/shipping", label: "배송" },
-  { exact: false, href: "/admin/operator/chat", label: "상담" },
+  { exact: false, href: "/admin/operator/payments", label: "주문·입금 확인" },
+  { exact: false, href: "/admin/operator/fulfillment", label: "출고·입고" },
+  { exact: false, href: "/admin/operator/shipping", label: "택배·송장" },
+  { exact: false, href: "/admin/operator/products/past", label: "기록 · 지난 상품" },
+  { exact: false, href: "/admin/operator/exceptions", label: "기록 · 예외" },
 ] as const;
 
 export default function OperatorLayout({ children }: Readonly<{ children: React.ReactNode }>) {

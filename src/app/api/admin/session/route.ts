@@ -10,8 +10,9 @@ export async function GET(request: Request) {
   if (profileError || roleError) return commerceJson({ error: "session_unavailable" }, 503);
   const roleCode = role?.role_code ?? "member";
   const isOwner = roleCode === "owner";
-  const isStaff = isOwner || roleCode === "operator" || roleCode === "employee" || roleCode === "band_member";
-  const canAccessOperator = isOwner || roleCode === "operator" || roleCode === "employee";
+  const isStaff = isOwner || roleCode === "operator" || roleCode === "employee";
+  const canAccessOperator = isOwner || roleCode === "operator";
+  const canAccessEmployee = isOwner || roleCode === "employee";
   return commerceJson({
     session: {
       userId: auth.userId,
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
       isStaff,
       isOwner,
       canAccessOperator,
+      canAccessEmployee,
       canAccessOwner: isOwner,
     },
   });

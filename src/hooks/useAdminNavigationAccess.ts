@@ -4,15 +4,19 @@ import { useEffect, useState } from "react";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 
 interface AdminNavigationSnapshot {
+  canAccessEmployee: boolean;
   canAccessOperator: boolean;
   canAccessOwner: boolean;
+  roleCode: string;
   revision: number;
   userId: string;
 }
 
 const EMPTY_SNAPSHOT: AdminNavigationSnapshot = {
+  canAccessEmployee: false,
   canAccessOperator: false,
   canAccessOwner: false,
+  roleCode: "",
   revision: -1,
   userId: "",
 };
@@ -36,8 +40,10 @@ export function useAdminNavigationAccess() {
       .then(async (response) => {
         const payload = (await response.json()) as {
           session?: {
+            canAccessEmployee?: boolean;
             canAccessOperator?: boolean;
             canAccessOwner?: boolean;
+            roleCode?: string;
             userId?: string;
           };
         };
@@ -45,8 +51,10 @@ export function useAdminNavigationAccess() {
           throw new Error("admin-navigation-unavailable");
         }
         setSnapshot({
+          canAccessEmployee: payload.session.canAccessEmployee === true,
           canAccessOperator: payload.session.canAccessOperator === true,
           canAccessOwner: payload.session.canAccessOwner === true,
+          roleCode: payload.session.roleCode ?? "",
           revision: expectedRevision,
           userId: expectedUserId,
         });
@@ -54,8 +62,10 @@ export function useAdminNavigationAccess() {
       .catch(() => {
         if (controller.signal.aborted) return;
         setSnapshot({
+          canAccessEmployee: false,
           canAccessOperator: false,
           canAccessOwner: false,
+          roleCode: "",
           revision: expectedRevision,
           userId: expectedUserId,
         });
@@ -68,8 +78,10 @@ export function useAdminNavigationAccess() {
     && snapshot.userId === userId
     && snapshot.revision === revision;
   return {
+    canAccessEmployee: current && snapshot.canAccessEmployee,
     canAccessOperator: current && snapshot.canAccessOperator,
     canAccessOwner: current && snapshot.canAccessOwner,
+    roleCode: current ? snapshot.roleCode : "",
     loading: loading || (Boolean(userId) && !current),
   };
 }

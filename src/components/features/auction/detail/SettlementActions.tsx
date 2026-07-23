@@ -12,6 +12,9 @@ interface ManualTransfer {
   bankName: string;
   accountNumber: string;
   status: string;
+  dueAt: string | null;
+  timedOut: boolean;
+  deadlineEnforcementExempt: boolean;
 }
 
 export function SettlementActions({ productId }: SettlementActionsProps) {
@@ -84,6 +87,21 @@ export function SettlementActions({ productId }: SettlementActionsProps) {
             {transfer.expectedAmount.toLocaleString("ko-KR")}원 ·{" "}
             {transfer.status === "confirmed" ? "입금 확인 완료" : "입금 대기 중"}
           </p>
+          {transfer.dueAt && (
+            <p>
+              입금 마감{" "}
+              {new Intl.DateTimeFormat("ko-KR", {
+                dateStyle: "medium",
+                timeStyle: "short",
+                timeZone: "Asia/Seoul",
+              }).format(new Date(transfer.dueAt))}
+            </p>
+          )}
+          {transfer.timedOut && transfer.deadlineEnforcementExempt && (
+            <p className="mt-1 font-bold text-red-700">
+              입금 시간이 초과되었습니다. 밴드 회원은 지금도 결제할 수 있습니다.
+            </p>
+          )}
         </div>
       )}
       {message && <p className="mt-3 text-xs text-zinc-500">{message}</p>}

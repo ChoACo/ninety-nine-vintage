@@ -5,7 +5,7 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("operator revenue ledger is a first-class route backed by the guarded financial-report RPC", async () => {
+test("operator revenue is summarized on the dashboard and retains a guarded detail route", async () => {
   await access(new URL("src/app/(admin)/admin/operator/revenue/page.tsx", rootUrl));
   const [layout, dashboard, route, revenue] = await Promise.all([
     source("src/app/(admin)/admin/operator/layout.tsx"),
@@ -14,8 +14,11 @@ test("operator revenue ledger is a first-class route backed by the guarded finan
     source("src/components/admin/operator/OperatorRevenueConsole.tsx"),
   ]);
 
-  assert.match(layout, /href:\s*"\/admin\/operator\/revenue"/);
+  assert.doesNotMatch(layout, /href:\s*"\/admin\/operator\/revenue"/);
   assert.match(dashboard, /href="\/admin\/operator\/revenue"/);
+  assert.match(dashboard, /\/api\/admin\/operator\/revenue\?from=/);
+  assert.match(dashboard, /이번 달 순매출/);
+  assert.match(dashboard, /store\.netSales/);
   assert.match(route, /authenticateStaffRequest\(request\)/);
   assert.match(route, /auth\.user as unknown as RpcClient/);
   assert.match(route, /"get_store_financial_report"/);
@@ -72,7 +75,9 @@ test("operator product console publishes directly and manages active listings fr
   assert.match(products, /status:\s*"pending" \| "active";/);
   assert.match(products, /stores\.find\(\(store\) => store\.id === form\.storeId\)\?\.canPublish === true && form\.status === "active"/);
   assert.match(products, /form\.status === "active" \|\| stores\.find/);
-  assert.match(products, /disabled=\{busy \|\| !stores\.some\(\(store\) => store\.id === product\.store_id && store\.canPublish\) \|\| product\.status !== "pending"\}/);
+  assert.match(products, /disabled=\{busy \|\| !canPublishStore \|\| product\.status !== "pending"\}/);
+  assert.match(products, /\/products\/\$\{product\.id\}\/pause/);
+  assert.match(products, /> 일시중지<\/button>/);
   assert.match(products, /grid grid-cols-1 gap-3[^"]*sm:grid-cols-2/);
   assert.doesNotMatch(products, /measurementShoulder|measurementChest|measurementSleeve|measurementLength/);
   assert.match(products, /grid grid-cols-1 gap-3 sm:grid-cols-3/);
@@ -81,6 +86,8 @@ test("operator product console publishes directly and manages active listings fr
   assert.match(productRoute, /products:\s*products \?\? \[\]/);
   assert.match(productRoute, /auth\.user\.from\("products"\)\.insert/);
   assert.match(productRoute, /from\("store_memberships"\)/);
+  assert.match(productRoute, /from\("fulfillment_center_staff_assignments"\)/);
+  assert.match(productRoute, /home_fulfillment_center_id/);
   assert.match(productRoute, /p_permission:\s*"manage_products"/);
   assert.match(productRoute, /const canMutate = stores\.length > 0/);
   assert.match(productRoute, /canCreate:\s*stores\.length > 0/);

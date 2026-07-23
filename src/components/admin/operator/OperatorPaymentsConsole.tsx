@@ -2,6 +2,7 @@
 
 import { CheckCircle2, Clock3, Landmark, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CatalogImage } from "@/components/ui/CatalogImage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type PaymentKind = "commerce" | "auction" | "shipping_fee";
@@ -24,6 +25,14 @@ interface PaymentRow {
   confirmedAt: string | null;
   confirmedBy: string | null;
   lastDepositorName: string | null;
+  buyerName: string;
+  products: PaymentProduct[];
+}
+
+interface PaymentProduct {
+  id: string;
+  title: string;
+  imageUrl: string | null;
 }
 
 interface PaymentQueueResponse {
@@ -93,13 +102,23 @@ function isTextOrNull(value: unknown): value is string | null {
   return value === null || typeof value === "string";
 }
 
+function isPaymentProduct(value: unknown): value is PaymentProduct {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 3 &&
+    typeof value.id === "string" &&
+    typeof value.title === "string" &&
+    isTextOrNull(value.imageUrl)
+  );
+}
+
 function isPaymentRow(value: unknown): value is PaymentRow {
   if (!isRecord(value)) return false;
   const fields = [
     "paymentKind", "paymentId", "businessId", "memberId", "reference",
     "expectedAmount", "receivedAmount", "remainingAmount", "ledgerEntryCount",
     "version", "status", "bankNameSnapshot", "accountNumberSnapshot", "requestedAt",
-    "confirmedAt", "confirmedBy", "lastDepositorName",
+    "confirmedAt", "confirmedBy", "lastDepositorName", "buyerName", "products",
   ];
   return Object.keys(value).length === fields.length &&
     fields.every((field) => Object.hasOwn(value, field)) &&
@@ -119,7 +138,10 @@ function isPaymentRow(value: unknown): value is PaymentRow {
     typeof value.requestedAt === "string" &&
     isTextOrNull(value.confirmedAt) &&
     isTextOrNull(value.confirmedBy) &&
-    isTextOrNull(value.lastDepositorName);
+    isTextOrNull(value.lastDepositorName) &&
+    typeof value.buyerName === "string" &&
+    Array.isArray(value.products) &&
+    value.products.every(isPaymentProduct);
 }
 
 function isQueueResponse(value: unknown): value is PaymentQueueResponse {
@@ -281,14 +303,33 @@ export function OperatorPaymentsConsole() {
     pending: payments.filter((payment) => payment.remainingAmount > 0).length,
     confirmed: payments.filter((payment) => payment.remainingAmount === 0).length,
   }), [payments]);
+  const buyerGroups = useMemo(() => {
+    const grouped = new Map<
+      string,
+      { memberId: string; buyerName: string; payments: PaymentRow[] }
+    >();
+    for (const payment of payments) {
+      const current = grouped.get(payment.memberId);
+      if (current) {
+        current.payments.push(payment);
+      } else {
+        grouped.set(payment.memberId, {
+          memberId: payment.memberId,
+          buyerName: payment.buyerName,
+          payments: [payment],
+        });
+      }
+    }
+    return [...grouped.values()];
+  }, [payments]);
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col items-stretch justify-between gap-5 border-b border-ink pb-6 sm:flex-row sm:items-end">
         <div>
-          <p className="eyebrow text-muted">운영자 / 공용 입금 확인</p>
-          <h1 className="mt-3 text-3xl font-black tracking-[-.06em] sm:text-4xl sm:tracking-[-.08em]">입금 확인</h1>
-          <p className="mt-3 text-sm text-muted">모든 센터가 같은 대기열을 확인하고, 잔액 전액을 한 번에 결제 확정합니다.</p>
+          <p className="eyebrow text-muted">운영자 / 주문·입금 확인</p>
+          <h1 className="mt-3 text-3xl font-black tracking-[-.06em] sm:text-4xl sm:tracking-[-.08em]">주문·입금 확인</h1>
+          <p className="mt-3 text-sm text-muted">구매자별 주문 상품을 확인하고 잔액 전액을 한 번에 결제 확정합니다.</p>
         </div>
         <button className="flex items-center justify-center gap-2 border border-line px-4 py-3 text-xs font-bold" onClick={refresh} type="button">
           <RefreshCw size={13} /> 새로고침
@@ -307,8 +348,21 @@ export function OperatorPaymentsConsole() {
         <p className="text-[11px] text-muted">서버 기준 {formatAt(serverTime)}</p>
       </div>
 
-      <div className="border border-line">
-        {payments.map((payment) => {
+      <div className="space-y-5">
+        {buyerGroups.map((group) => (
+          <section className="border border-line" key={group.memberId}>
+            <header className="flex items-end justify-between gap-4 border-b border-ink bg-surface px-5 py-4">
+              <div>
+                <p className="text-base font-black">{group.buyerName}</p>
+                <p className="mt-1 break-all font-mono text-[10px] text-muted">
+                  {group.memberId}
+                </p>
+              </div>
+              <p className="text-xs font-bold">
+                주문·입금 {group.payments.length}건
+              </p>
+            </header>
+            {group.payments.map((payment) => {
           const key = sessionKey(payment);
           const pending = payment.remainingAmount > 0;
           const confirmable = payment.receivedAmount >= 0 && (
@@ -327,6 +381,25 @@ export function OperatorPaymentsConsole() {
                   <div className="flex flex-wrap items-center gap-2"><span className="border border-line px-2 py-1 text-[10px] font-bold">{kindLabel(payment.paymentKind)}</span><span className="border border-line px-2 py-1 text-[10px] font-bold">{statusLabel(payment.status)}</span></div>
                   <p className="mt-3 break-words text-sm font-bold">{payment.reference}</p>
                   <p className="mt-1 break-all font-mono text-[10px] text-muted">{payment.paymentId}</p>
+                  {payment.products.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {payment.products.map((product) => (
+                        <div
+                          className="flex max-w-xs items-center gap-2 border border-line bg-paper p-2"
+                          key={product.id}
+                        >
+                          <CatalogImage
+                            alt=""
+                            className="size-10 object-cover"
+                            src={product.imageUrl ?? ""}
+                          />
+                          <span className="line-clamp-2 text-[11px] font-bold">
+                            {product.title}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="w-full max-w-sm border border-line p-3 text-xs sm:w-80">
                   <p className="flex items-center gap-2 font-bold"><Landmark size={13} /> 입금 계좌</p>
@@ -358,7 +431,9 @@ export function OperatorPaymentsConsole() {
               )}
             </article>
           );
-        })}
+            })}
+          </section>
+        ))}
         {payments.length === 0 && <p className="py-16 text-center text-sm text-muted">표시할 입금 요청이 없습니다.</p>}
       </div>
 

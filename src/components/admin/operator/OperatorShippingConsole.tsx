@@ -172,7 +172,9 @@ function sessionKey(shipment: InventoryShipment, action: ShipmentAction, form?: 
     : `${SESSION_KEY_PREFIX}${shipmentScope}`;
 }
 
-export function OperatorShippingConsole() {
+export function OperatorShippingConsole({
+  staffLabel = "운영자",
+}: Readonly<{ staffLabel?: string }>) {
   const [token, setToken] = useState<string | null>(null);
   const [shipments, setShipments] = useState<InventoryShipment[]>([]);
   const [includeShipped, setIncludeShipped] = useState(false);
@@ -304,7 +306,7 @@ export function OperatorShippingConsole() {
     <div className="space-y-8">
       <div className="flex flex-col items-stretch justify-between gap-5 border-b border-ink pb-6 sm:flex-row sm:items-end">
         <div>
-          <p className="eyebrow text-muted">운영자 / 중앙 출고</p>
+          <p className="eyebrow text-muted">{staffLabel} / 중앙 출고</p>
           <h1 className="mt-3 text-3xl font-black tracking-[-.06em] sm:text-4xl sm:tracking-[-.08em]">배송 업무</h1>
           <p className="mt-3 text-sm text-muted">구매자별 배송 요청을 확인하고, 모든 활성 상품이 준비된 경우에만 포장과 송장을 처리합니다.</p>
         </div>

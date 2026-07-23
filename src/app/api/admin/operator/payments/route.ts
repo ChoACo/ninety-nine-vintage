@@ -14,6 +14,26 @@ interface RpcClient {
   ): PromiseLike<{ data: unknown; error: RpcError | null }>;
 }
 
+interface QueuePayment {
+  paymentKind: "commerce" | "auction" | "shipping_fee";
+  paymentId: string;
+  businessId: string;
+  memberId: string;
+  reference: string;
+  expectedAmount: number;
+  receivedAmount: number;
+  remainingAmount: number;
+  ledgerEntryCount: number;
+  version: number;
+  status: string;
+  bankNameSnapshot: string | null;
+  accountNumberSnapshot: string | null;
+  requestedAt: string;
+  confirmedAt: string | null;
+  confirmedBy: string | null;
+  lastDepositorName: string | null;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -56,7 +76,7 @@ function parsePage(request: Request) {
   return { includeHistory: includeHistory === "true", limit, offset };
 }
 
-function isQueuePayment(value: unknown): value is Record<string, unknown> {
+function isQueuePayment(value: unknown): value is QueuePayment {
   if (!isRecord(value)) return false;
   const fields = [
     "paymentKind",
@@ -98,7 +118,10 @@ function isQueuePayment(value: unknown): value is Record<string, unknown> {
     isNullableText(value.lastDepositorName);
 }
 
-function isQueueResponse(value: unknown): value is { payments: Record<string, unknown>[]; serverTime: string } {
+function isQueueResponse(value: unknown): value is {
+  payments: QueuePayment[];
+  serverTime: string;
+} {
   if (!isRecord(value) || Object.keys(value).length !== 2) return false;
   return Array.isArray(value.payments) && value.payments.every(isQueuePayment) &&
     typeof value.serverTime === "string";
@@ -126,6 +149,9 @@ function rpcFailure(error: RpcError) {
 export async function GET(request: Request) {
   const auth = await authenticateStaffRequest(request);
   if (!auth.ok) return auth.response;
+  if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
+    return commerceJson({ error: "payment_forbidden" }, 403);
+  }
 
   const page = parsePage(request);
   if (!page) {
@@ -144,5 +170,137 @@ export async function GET(request: Request) {
   if (!isQueueResponse(data)) {
     return commerceJson({ error: "payment_queue_unavailable", message: "입금 대기열을 확인하지 못했습니다." }, 503);
   }
-  return commerceJson(data);
+
+  const memberIds = [...new Set(data.payments.map((payment) => payment.memberId))];
+  const auctionIds = data.payments
+    .filter((payment) => payment.paymentKind === "auction")
+    .map((payment) => payment.paymentId);
+  const commerceIds = data.payments
+    .filter((payment) => payment.paymentKind === "commerce")
+    .map((payment) => payment.paymentId);
+  const [profileResult, auctionResult, commerceTransferResult] =
+    await Promise.all([
+      memberIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : auth.admin
+            .from("profiles")
+            .select("id, display_name")
+            .in("id", memberIds),
+      auctionIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : auth.admin
+            .from("manual_transfer_orders")
+            .select("id, product_id")
+            .in("id", auctionIds),
+      commerceIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : auth.admin
+            .from("commerce_order_transfers")
+            .select("id, order_id")
+            .in("id", commerceIds),
+    ]);
+  if (
+    profileResult.error ||
+    auctionResult.error ||
+    commerceTransferResult.error
+  ) {
+    return commerceJson(
+      { error: "payment_queue_unavailable", message: "구매자와 상품 정보를 불러오지 못했습니다." },
+      503,
+    );
+  }
+
+  const commerceOrderIds = (commerceTransferResult.data ?? []).map(
+    (transfer) => transfer.order_id,
+  );
+  const commerceItemResult =
+    commerceOrderIds.length === 0
+      ? { data: [], error: null }
+      : await auth.admin
+          .from("commerce_order_items")
+          .select("order_id, product_id")
+          .in("order_id", commerceOrderIds);
+  if (commerceItemResult.error) {
+    return commerceJson(
+      { error: "payment_queue_unavailable", message: "주문 상품을 불러오지 못했습니다." },
+      503,
+    );
+  }
+
+  const productIds = [
+    ...(auctionResult.data ?? []).map((order) => order.product_id),
+    ...(commerceItemResult.data ?? []).map((item) => item.product_id),
+  ];
+  const uniqueProductIds = [...new Set(productIds)];
+  const productResult =
+    uniqueProductIds.length === 0
+      ? { data: [], error: null }
+      : await auth.admin
+          .from("products")
+          .select("id, title, image_urls, thumbnail_urls")
+          .in("id", uniqueProductIds);
+  if (productResult.error) {
+    return commerceJson(
+      { error: "payment_queue_unavailable", message: "상품 정보를 불러오지 못했습니다." },
+      503,
+    );
+  }
+
+  const buyerNames = new Map(
+    (profileResult.data ?? []).map((profile) => [
+      profile.id,
+      profile.display_name,
+    ]),
+  );
+  const productById = new Map(
+    (productResult.data ?? []).map((product) => [
+      product.id,
+      {
+        id: product.id,
+        title: product.title,
+        imageUrl:
+          product.thumbnail_urls[0] ?? product.image_urls[0] ?? null,
+      },
+    ]),
+  );
+  const auctionProduct = new Map(
+    (auctionResult.data ?? []).map((order) => [order.id, order.product_id]),
+  );
+  const orderByCommercePayment = new Map(
+    (commerceTransferResult.data ?? []).map((transfer) => [
+      transfer.id,
+      transfer.order_id,
+    ]),
+  );
+  const commerceProductIds = new Map<string, string[]>();
+  for (const item of commerceItemResult.data ?? []) {
+    commerceProductIds.set(item.order_id, [
+      ...(commerceProductIds.get(item.order_id) ?? []),
+      item.product_id,
+    ]);
+  }
+
+  return commerceJson({
+    serverTime: data.serverTime,
+    payments: data.payments.map((payment) => {
+      const linkedProductIds =
+        payment.paymentKind === "auction"
+          ? [auctionProduct.get(payment.paymentId)].filter(
+              (id): id is string => Boolean(id),
+            )
+          : payment.paymentKind === "commerce"
+            ? commerceProductIds.get(
+                orderByCommercePayment.get(payment.paymentId) ?? "",
+              ) ?? []
+            : [];
+      return {
+        ...payment,
+        buyerName: buyerNames.get(payment.memberId) ?? "이름 미확인 구매자",
+        products: linkedProductIds.flatMap((id) => {
+          const product = productById.get(id);
+          return product ? [product] : [];
+        }),
+      };
+    }),
+  });
 }

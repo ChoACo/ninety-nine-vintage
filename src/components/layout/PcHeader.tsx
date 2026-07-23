@@ -8,7 +8,6 @@ import { CommerceToolbar } from "@/components/features/commerce/CommerceToolbar"
 import { AuthStatus } from "@/components/layout/AuthStatus";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
-import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
 
 const navigation = [
   { label: "홈", href: "/home" },
@@ -21,7 +20,6 @@ export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean })
   const [query, setQuery] = useState("");
   const pathname = usePathname();
   const router = useRouter();
-  const access = useAdminNavigationAccess();
   const authenticating = pathname === "/auth/callback";
   return (
     <header className={`sticky ${hasLiveTicker ? "top-9" : "top-0"} z-[60] block border-b border-line bg-paper/95 text-ink backdrop-blur-md`}>
@@ -31,15 +29,6 @@ export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean })
           {navigation.map((item) => <Link className="border-b-2 border-transparent py-2 text-sm font-bold tracking-[0.02em] transition-colors hover:border-ink" href={item.href} key={item.href}>{item.label}</Link>)}
         </nav>
         <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
-          {(access.canAccessOperator || access.canAccessOwner) && (
-            <details className="group relative shrink-0">
-              <summary className="flex h-10 cursor-pointer list-none items-center border border-line px-3 text-[11px] font-bold">관리</summary>
-              <div className="absolute right-0 top-12 grid w-36 border border-line bg-paper p-2 shadow-lg">
-                {access.canAccessOperator && <Link className="px-3 py-2 text-xs font-bold hover:bg-surface" href="/admin/operator">운영자 센터</Link>}
-                {access.canAccessOwner && <Link className="px-3 py-2 text-xs font-bold hover:bg-surface" href="/admin/owner">소유자 센터</Link>}
-              </div>
-            </details>
-          )}
           <ThemeToggle className="size-10 px-0" />
           <Link aria-label="상담" className="grid size-10 shrink-0 place-items-center border border-line" href="/chat"><Headphones size={17} /></Link>
           {authenticating ? <span aria-label="로그인 상태 확인 중" className="inline-flex h-10 w-[193px] shrink-0 border border-line bg-surface" role="status" /> : <><span className="inline-flex"><AuthStatus /></span><CommerceToolbar /></>}

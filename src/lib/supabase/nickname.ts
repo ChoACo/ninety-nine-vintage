@@ -91,15 +91,6 @@ export async function setMyInitialNickname(nickname: string): Promise<string> {
   return String(data);
 }
 
-export async function changeMyNicknameOnce(nickname: string): Promise<string> {
-  const { data, error } = await getNicknameClient().rpc(
-    "change_my_nickname_once",
-    { p_nickname: assertNickname(nickname) },
-  );
-  if (error) throw toNicknameError(error, "닉네임을 변경하지 못했습니다.");
-  return String(data);
-}
-
 export async function requestMyNicknameChange(nickname: string): Promise<string> {
   const { data, error } = await getNicknameClient().rpc(
     "request_my_nickname_change",

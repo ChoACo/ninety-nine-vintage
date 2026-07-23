@@ -12,7 +12,29 @@ export async function GET(request: Request) {
     const offset = Math.max(0, Number(url.searchParams.get("offset") || 0));
     const { data, error } = await access.userClient.rpc("get_manager_member_directory", { p_limit: limit, p_offset: offset });
     if (error) return rpcError(error, "member_directory_unavailable");
-    return ownerAccessJsonResponse({ members: data ?? [], limit, offset });
+    const rows = Array.isArray(data) ? data as Record<string, unknown>[] : [];
+    const memberIds = rows.flatMap((row) =>
+      typeof row.id === "string" ? [row.id] : []
+    );
+    const { data: roleRows, error: roleError } = memberIds.length === 0
+      ? { data: [], error: null }
+      : await access.admin
+        .from("account_access_roles")
+        .select("user_id,reports_to_operator_id")
+        .in("user_id", memberIds);
+    if (roleError) return rpcError(roleError, "member_directory_unavailable");
+    const managers = new Map(
+      (roleRows ?? []).map((row) => [row.user_id, row.reports_to_operator_id]),
+    );
+    return ownerAccessJsonResponse({
+      members: rows.map((row) => ({
+        ...row,
+        reports_to_operator_id:
+          typeof row.id === "string" ? managers.get(row.id) ?? null : null,
+      })),
+      limit,
+      offset,
+    });
   } catch (error) {
     return ownerAccessErrorResponse(error);
   }
@@ -29,9 +51,20 @@ export async function PATCH(request: Request) {
     if (action === "role") {
       const roleCode = typeof body.roleCode === "string" ? body.roleCode : "";
       if (!["operator", "employee", "band_member", "member"].includes(roleCode)) return ownerAccessJsonResponse({ error: "invalid_role" }, 400);
-      const { data, error } = await access.userClient.rpc("set_member_access_role", { p_member_id: memberId, p_role_code: roleCode });
+      const reportsToOperatorId =
+        typeof body.reportsToOperatorId === "string"
+          ? body.reportsToOperatorId
+          : null;
+      if (roleCode === "employee" && !reportsToOperatorId) {
+        return ownerAccessJsonResponse({ error: "operator_required" }, 400);
+      }
+      const { data, error } = await access.userClient.rpc("set_managed_staff_role", {
+        p_member_id: memberId,
+        p_role_code: roleCode,
+        p_reports_to_operator_id: reportsToOperatorId,
+      });
       if (error) return rpcError(error, "role_update_failed");
-      return ownerAccessJsonResponse({ memberId, accessRole: data });
+      return ownerAccessJsonResponse({ member: data });
     }
     if (action === "status") {
       const status = typeof body.status === "string" ? body.status : "";
@@ -45,9 +78,12 @@ export async function PATCH(request: Request) {
       return ownerAccessJsonResponse({ member: data });
     }
     if (action === "profile") {
-      const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
       const phone = typeof body.phone === "string" ? body.phone.trim() : "";
-      const { error } = await access.userClient.rpc("update_managed_member", { p_member_id: memberId, p_display_name: displayName, p_phone: phone });
+      const { error } = await access.userClient.rpc("update_managed_member", {
+        p_member_id: memberId,
+        p_display_name: "",
+        p_phone: phone,
+      });
       if (error) return rpcError(error, "profile_update_failed");
       return ownerAccessJsonResponse({ memberId, updated: true });
     }

@@ -94,7 +94,7 @@ function isStaff(value: unknown) {
     isUuid(value.id) &&
     typeof value.display_name === "string" &&
     isNullableText(value.email) &&
-    ["owner", "operator", "employee"].includes(String(value.role_code)) &&
+    ["operator", "employee"].includes(String(value.role_code)) &&
     isNullableText(value.last_seen_at);
 }
 
@@ -198,6 +198,17 @@ function isConfiguredAssignment(value: unknown) {
     typeof value.createShipments === "boolean" &&
     ["active", "inactive"].includes(String(value.status)) &&
     nonNegativeInteger(value.version) && typeof value.idempotent_replay === "boolean";
+}
+
+function isDeletedAssignment(value: unknown) {
+  return isRecord(value) && hasExactKeys(value, [
+    "id", "centerId", "userId", "deleted", "idempotent_replay",
+  ]) &&
+    isUuid(value.id) &&
+    isUuid(value.centerId) &&
+    isUuid(value.userId) &&
+    value.deleted === true &&
+    typeof value.idempotent_replay === "boolean";
 }
 
 function isConfiguredCenter(value: unknown) {
@@ -371,10 +382,9 @@ export async function POST(request: Request) {
     }
     if (body.action === "configure_assignment") {
       if (!hasOnlyKeys(body, [
-        "action", "centerId", "userId", "receiveAtCenter", "createShipments",
-        "status", "expectedVersion", "idempotencyKey",
+        "action", "centerId", "userId", "status", "expectedVersion",
+        "idempotencyKey",
       ]) || !isUuid(body.centerId) || !isUuid(body.userId) ||
-        typeof body.receiveAtCenter !== "boolean" || typeof body.createShipments !== "boolean" ||
         !["active", "inactive"].includes(String(body.status)) ||
         !nonNegativeInteger(body.expectedVersion) || !isUuid(body.idempotencyKey)) {
         return ownerAccessJsonResponse(
@@ -387,8 +397,8 @@ export async function POST(request: Request) {
         {
           p_fulfillment_center_id: body.centerId,
           p_user_id: body.userId,
-          p_receive_at_center: body.receiveAtCenter,
-          p_create_shipments: body.createShipments,
+          p_receive_at_center: true,
+          p_create_shipments: true,
           p_status: body.status,
           p_expected_version: body.expectedVersion,
           p_idempotency_key: body.idempotencyKey,
@@ -397,6 +407,34 @@ export async function POST(request: Request) {
       if (error) return rpcFailure(error, "center_assignment_unavailable");
       if (!isConfiguredAssignment(data)) {
         return ownerAccessJsonResponse({ error: "center_assignment_unavailable" }, 503);
+      }
+      return ownerAccessJsonResponse({ assignment: data });
+    }
+    if (body.action === "delete_assignment") {
+      if (!hasOnlyKeys(body, [
+        "action", "centerId", "userId", "expectedVersion", "idempotencyKey",
+      ]) ||
+        !isUuid(body.centerId) ||
+        !isUuid(body.userId) ||
+        !nonNegativeInteger(body.expectedVersion) ||
+        !isUuid(body.idempotencyKey)) {
+        return ownerAccessJsonResponse(
+          { error: "invalid_fulfillment_request", message: "삭제할 센터 배정을 확인해 주세요." },
+          400,
+        );
+      }
+      const { data, error } = await (access.userClient as unknown as RpcClient).rpc(
+        "delete_fulfillment_center_staff_assignment",
+        {
+          p_fulfillment_center_id: body.centerId,
+          p_user_id: body.userId,
+          p_expected_version: body.expectedVersion,
+          p_idempotency_key: body.idempotencyKey,
+        },
+      );
+      if (error) return rpcFailure(error, "center_assignment_delete_unavailable");
+      if (!isDeletedAssignment(data)) {
+        return ownerAccessJsonResponse({ error: "center_assignment_delete_unavailable" }, 503);
       }
       return ownerAccessJsonResponse({ assignment: data });
     }

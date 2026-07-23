@@ -1,7 +1,22 @@
 import { authenticateOwnerAccessRequest, ownerAccessErrorResponse, ownerAccessJsonResponse, readSmallJsonBody } from "@/lib/ownerAccess/server";
 
-function rpcError(error: { message?: string } | null, fallback: string) {
-  return ownerAccessJsonResponse({ error: fallback, message: error?.message ?? fallback }, 403);
+function rpcError(
+  error: { code?: string; message?: string } | null,
+  fallback: string,
+) {
+  const status = error?.code === "42501"
+    ? 403
+    : error?.code === "P0002"
+      ? 404
+      : ["PT409", "23503", "23505", "55000"].includes(error?.code ?? "")
+        ? 409
+        : ["22023", "23514"].includes(error?.code ?? "")
+          ? 422
+          : 503;
+  return ownerAccessJsonResponse(
+    { error: fallback, message: error?.message ?? fallback },
+    status,
+  );
 }
 
 export async function GET(request: Request) {
@@ -103,6 +118,22 @@ export async function PATCH(request: Request) {
       if (error) return rpcError(error, "warning_create_failed");
       return ownerAccessJsonResponse({ memberId, enforcement: data });
     }
+    if (action === "enforcement_clear") {
+      const scope = typeof body.scope === "string" ? body.scope : "";
+      if (!["warnings", "sanctions", "all"].includes(scope)) {
+        return ownerAccessJsonResponse({ error: "invalid_enforcement_scope" }, 400);
+      }
+      const { data, error } = await access.userClient.rpc(
+        "clear_member_enforcement_history",
+        {
+          p_member_id: memberId,
+          p_scope: scope,
+          p_reason: typeof body.reason === "string" ? body.reason : "",
+        },
+      );
+      if (error) return rpcError(error, "enforcement_clear_failed");
+      return ownerAccessJsonResponse({ memberId, enforcement: data });
+    }
     if (["sanction_create", "sanction_update", "sanction_cancel"].includes(action)) {
       const { data, error } = await access.userClient.rpc("manage_member_sanction", {
         p_action: action.replace("sanction_", ""), p_member_id: memberId,
@@ -123,6 +154,17 @@ export async function PATCH(request: Request) {
       const { error: deleteError } = await access.admin.auth.admin.deleteUser(memberId);
       if (deleteError) return ownerAccessJsonResponse({ error: "auth_delete_failed", message: "개인정보는 익명화했지만 인증 계정 삭제를 완료하지 못했습니다." }, 503);
       return ownerAccessJsonResponse({ member: data, deleted: true });
+    }
+    if (action === "purge") {
+      const { data, error } = await access.userClient.rpc(
+        "purge_deleted_member_record",
+        {
+          p_member_id: memberId,
+          p_reason: typeof body.reason === "string" ? body.reason : "",
+        },
+      );
+      if (error) return rpcError(error, "member_purge_failed");
+      return ownerAccessJsonResponse({ member: data, purged: true });
     }
     return ownerAccessJsonResponse({ error: "unsupported_action" }, 400);
   } catch (error) {

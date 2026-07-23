@@ -8,10 +8,11 @@ import { mapPublishedProduct } from "@/services/products";
 export async function GET(request: Request) {
   const auth = await authenticateMemberRlsRequest(request);
   if (!auth.ok) return auth.response;
+  const { admin } = createSupabaseServerClients();
   const { data, error } = await auth.user.rpc("get_my_cart_reservations");
   if (error) return commerceJson({ error: "cart_unavailable" }, 503);
   try {
-    await getManualTransferAccount(createSupabaseServerClients().admin);
+    await getManualTransferAccount(admin);
   } catch {
     return commerceJson({ error: "payment_status_unavailable" }, 503);
   }
@@ -25,6 +26,7 @@ export async function GET(request: Request) {
       productIds: [],
       reservations: [],
       serverTime: null,
+      shippingFee: 0,
     });
   }
   const { data: products, error: productError } = await auth.user
@@ -36,6 +38,44 @@ export async function GET(request: Request) {
     .lte("publish_at", new Date().toISOString());
   if (productError) return commerceJson({ error: "cart_unavailable" }, 503);
   const liveIds = (products ?? []).map((product) => product.id);
+  const storeIds = [
+    ...new Set((products ?? []).flatMap((product) =>
+      typeof product.store_id === "string" ? [product.store_id] : []
+    )),
+  ];
+  const { data: stores, error: storesError } = storeIds.length === 0
+    ? { data: [], error: null }
+    : await admin
+      .from("stores")
+      .select("id,business_id")
+      .in("id", storeIds);
+  const businessIds = [
+    ...new Set((stores ?? []).flatMap((store) =>
+      typeof store.business_id === "string" ? [store.business_id] : []
+    )),
+  ];
+  const { data: shippingSettings, error: settingsError } =
+    businessIds.length === 0
+      ? { data: [], error: null }
+      : await admin
+        .from("inventory_fulfillment_rollout_settings")
+        .select("business_id,shipping_fee_amount")
+        .in("business_id", businessIds);
+  if (
+    storesError ||
+    settingsError ||
+    storeIds.length !== (stores ?? []).length ||
+    businessIds.length !== (shippingSettings ?? []).length
+  ) {
+    return commerceJson({ error: "shipping_fee_unavailable" }, 503);
+  }
+  const shippingFee = (shippingSettings ?? []).reduce(
+    (sum, setting) => sum + Number(setting.shipping_fee_amount),
+    0,
+  );
+  if (!Number.isSafeInteger(shippingFee) || shippingFee < 1) {
+    return commerceJson({ error: "shipping_fee_unavailable" }, 503);
+  }
   const reservationByProduct = new Map(
     reservations.map((reservation) => [
       reservation.product_id,
@@ -61,6 +101,7 @@ export async function GET(request: Request) {
       reservedUntil: reservation.reserved_until,
     })),
     serverTime: reservations[0]?.server_time ?? null,
+    shippingFee,
     staleProductIds: ids.filter((id) => !liveIds.includes(id)),
   });
 }

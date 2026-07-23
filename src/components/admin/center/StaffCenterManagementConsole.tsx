@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPinned, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { MapPinned, Plus, RefreshCw, Route, Save, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -25,9 +25,14 @@ interface Center {
 
 interface Store {
   id: string;
+  business_id: string;
   name: string;
   slug: string;
   home_fulfillment_center_id: string | null;
+  route_center_id: string | null;
+  route_mode: "transfer" | "co_located" | null;
+  route_status: string | null;
+  route_version: number;
 }
 
 interface Draft {
@@ -69,6 +74,9 @@ export function StaffCenterManagementConsole() {
   const [centers, setCenters] = useState<Center[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [storeCenters, setStoreCenters] = useState<Record<string, string>>({});
+  const [storeModes, setStoreModes] = useState<Record<string, "transfer" | "co_located">>({});
+  const [storeReasons, setStoreReasons] = useState<Record<string, string>>({});
   const [newCenter, setNewCenter] = useState<Draft>(emptyDraft);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -91,8 +99,17 @@ export function StaffCenterManagementConsole() {
       const nextCenters = payload.centers ?? [];
       setRoleCode(payload.roleCode ?? "");
       setCenters(nextCenters);
-      setStores(payload.stores ?? []);
+      const nextStores = payload.stores ?? [];
+      setStores(nextStores);
       setDrafts(Object.fromEntries(nextCenters.map((center) => [center.id, toDraft(center)])));
+      setStoreCenters(Object.fromEntries(nextStores.map((store) => [
+        store.id,
+        store.route_center_id ?? store.home_fulfillment_center_id ?? "",
+      ])));
+      setStoreModes(Object.fromEntries(nextStores.map((store) => [
+        store.id,
+        store.route_mode ?? "transfer",
+      ])));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "센터 정보를 불러오지 못했습니다.");
     } finally {
@@ -154,6 +171,50 @@ export function StaffCenterManagementConsole() {
     }
   };
 
+  const saveStoreRoute = async (store: Store) => {
+    if (!token || busy || roleCode !== "operator") return;
+    const centerId = storeCenters[store.id] ?? "";
+    const routeMode = storeModes[store.id] ?? "transfer";
+    const compatible = centers.some(
+      (center) => center.id === centerId && center.business_id === store.business_id,
+    );
+    if (!compatible) {
+      setNotice("같은 사업자의 배정된 센터를 선택해 주세요.");
+      return;
+    }
+    setBusy(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/centers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: "configure_store_route",
+          storeId: store.id,
+          centerId,
+          routeMode,
+          expectedVersion: store.route_version,
+          idempotencyKey: crypto.randomUUID(),
+          reason: storeReasons[store.id]?.trim() || null,
+        }),
+      });
+      const payload = await response.json() as { message?: string };
+      if (!response.ok) {
+        throw new Error(payload.message ?? "매장 센터 연결을 저장하지 못했습니다.");
+      }
+      setStoreReasons((current) => ({ ...current, [store.id]: "" }));
+      setNotice(`${store.name} 매장의 센터 연결을 저장했습니다.`);
+      await load();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "매장 센터 연결을 저장하지 못했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const updateDraft = (centerId: string, field: keyof Draft, value: string) => {
     setDrafts((current) => ({
       ...current,
@@ -201,6 +262,104 @@ export function StaffCenterManagementConsole() {
             {field("담당자", newCenter.contactName, (value) => setNewCenter((current) => ({ ...current, contactName: value })), "담당자")}
             {field("연락처", newCenter.contactPhone, (value) => setNewCenter((current) => ({ ...current, contactPhone: value })), "연락처")}
             <button className="h-10 self-end bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40" disabled={busy || newCenter.code.length < 2 || !newCenter.name.trim()} onClick={() => void mutate("create", null)} type="button">센터 추가</button>
+          </div>
+        </section>
+      )}
+
+      {roleCode === "operator" && stores.length > 0 && (
+        <section className="border border-line bg-surface p-5">
+          <div className="flex items-center gap-2">
+            <Route size={16} />
+            <div>
+              <h2 className="text-sm font-black">각 매장별 센터 연결</h2>
+              <p className="mt-1 text-xs text-muted">
+                운영 중인 매장을 배정된 센터에 연결하고 입고 방식을 정합니다.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-4">
+            {stores.map((store) => {
+              const compatibleCenters = centers.filter(
+                (center) => center.business_id === store.business_id,
+              );
+              const selectedCenter = storeCenters[store.id] ?? "";
+              const selectedMode = storeModes[store.id] ?? "transfer";
+              return (
+                <article className="grid gap-3 border border-line bg-paper p-4 lg:grid-cols-[minmax(180px,1fr)_minmax(220px,1fr)_auto]" key={store.id}>
+                  <div>
+                    <p className="text-sm font-black">{store.name}</p>
+                    <p className="mt-1 text-[10px] text-muted">
+                      {store.route_status === "active"
+                        ? `연결됨 · v${store.route_version}`
+                        : "센터 연결 필요"}
+                    </p>
+                  </div>
+                  <div className="grid gap-2">
+                    <select
+                      aria-label={`${store.name} 연결 센터`}
+                      className="h-10 border border-line bg-paper px-3 text-xs"
+                      onChange={(event) => setStoreCenters((current) => ({
+                        ...current,
+                        [store.id]: event.target.value,
+                      }))}
+                      value={selectedCenter}
+                    >
+                      <option value="">배정 센터 선택</option>
+                      {compatibleCenters.map((center) => (
+                        <option key={center.id} value={center.id}>
+                          {center.name} · {center.code}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex flex-wrap gap-4 text-xs">
+                      <label className="flex items-center gap-2">
+                        <input
+                          checked={selectedMode === "transfer"}
+                          name={`store-route-${store.id}`}
+                          onChange={() => setStoreModes((current) => ({
+                            ...current,
+                            [store.id]: "transfer",
+                          }))}
+                          type="radio"
+                        />
+                        센터로 이동
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          checked={selectedMode === "co_located"}
+                          name={`store-route-${store.id}`}
+                          onChange={() => setStoreModes((current) => ({
+                            ...current,
+                            [store.id]: "co_located",
+                          }))}
+                          type="radio"
+                        />
+                        같은 장소 즉시 입고
+                      </label>
+                    </div>
+                    <input
+                      aria-label={`${store.name} 센터 연결 변경 사유`}
+                      className="h-10 border border-line bg-paper px-3 text-xs"
+                      maxLength={1_000}
+                      onChange={(event) => setStoreReasons((current) => ({
+                        ...current,
+                        [store.id]: event.target.value,
+                      }))}
+                      placeholder="변경 사유 (선택)"
+                      value={storeReasons[store.id] ?? ""}
+                    />
+                  </div>
+                  <button
+                    className="h-10 self-end bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40"
+                    disabled={busy || !selectedCenter}
+                    onClick={() => void saveStoreRoute(store)}
+                    type="button"
+                  >
+                    연결 저장
+                  </button>
+                </article>
+              );
+            })}
           </div>
         </section>
       )}

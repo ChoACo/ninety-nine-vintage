@@ -23,11 +23,8 @@ begin
   if exists(select 1 from public.products) then
     raise exception 'cutover must remove every test product';
   end if;
-  if (select count(*) from public.fulfillment_center_staff_assignments a
-      join public.account_access_roles r on r.user_id=a.user_id and r.role_code='owner'
-      join public.fulfillment_centers c on c.id=a.fulfillment_center_id and c.status='active'
-      where a.status='active')<>2 then
-    raise exception 'owner must be assigned to both canonical centers';
+  if exists(select 1 from public.fulfillment_center_staff_assignments) then
+    raise exception 'cutover must remove owner and anonymous center assignments';
   end if;
   if not exists(
     select 1 from public.stores s join public.store_fulfillment_routes r on r.store_id=s.id
@@ -80,11 +77,17 @@ $$;
 
 begin;
 select set_config('request.jwt.claim.sub',(select user_id::text from public.account_access_roles where role_code='owner'),true);
+delete from public.nickname_change_requests
+where member_id=(select user_id from public.account_access_roles where role_code='owner');
+update public.profiles
+set nickname_initialized_at=null,nickname_self_change_used_at=null
+where id=(select user_id from public.account_access_roles where role_code='owner');
 set local role authenticated;
 
 do $$
 declare
   v_owner uuid:=auth.uid();
+  v_nickname_request uuid;
   v_created jsonb;
   v_replay jsonb;
   v_updated jsonb;
@@ -92,6 +95,20 @@ declare
 begin
   if not exists(select 1 from public.get_manager_member_directory(500,0) d where d.id=v_owner and d.access_role='owner') then
     raise exception 'owner directory must include the owner row';
+  end if;
+  if public.set_my_initial_nickname('소유자 검증')<>'소유자 검증' then
+    raise exception 'owner initial nickname save failed';
+  end if;
+  v_nickname_request:=public.request_my_nickname_change('소유자 검증 변경');
+  if v_nickname_request is null then
+    raise exception 'owner nickname review request failed';
+  end if;
+  perform public.update_managed_member(v_owner,'','010-1234-5678');
+  if not exists(
+    select 1 from public.member_accounts
+    where member_id=v_owner and phone='010-1234-5678'
+  ) then
+    raise exception 'owner self contact update failed';
   end if;
   begin
     perform public.set_managed_member_status(v_owner,'suspended',null,'owner protection test');
@@ -129,6 +146,109 @@ begin
   );
   if not exists(select 1 from public.fulfillment_centers where id=(v_created->>'id')::uuid and status='archived') then
     raise exception 'center archival failed';
+  end if;
+end;
+$$;
+rollback;
+
+begin;
+insert into public.profiles(id,display_name,deleted_at,anonymized_reference)
+values(
+  'a3000000-0000-4000-8000-000000000001',
+  '탈퇴 회원 검증',
+  clock_timestamp(),
+  'deleted-preflight-purge'
+);
+update public.member_accounts
+set account_status='deleted'
+where member_id='a3000000-0000-4000-8000-000000000001';
+select set_config('request.jwt.claim.sub',(select user_id::text from public.account_access_roles where role_code='owner'),true);
+set local role authenticated;
+do $$
+declare v_purged jsonb;
+begin
+  v_purged:=public.purge_deleted_member_record(
+    'a3000000-0000-4000-8000-000000000001',
+    '배포 전 완전 삭제 검증'
+  );
+  if not (v_purged->>'purged')::boolean
+    or exists(
+      select 1 from public.profiles
+      where id='a3000000-0000-4000-8000-000000000001'
+    )
+  then
+    raise exception 'withdrawn member purge failed';
+  end if;
+end;
+$$;
+rollback;
+
+begin;
+select set_config('request.jwt.claim.sub',(select user_id::text from public.account_access_roles where role_code='owner'),true);
+update public.profiles
+set deleted_at=null,anonymized_reference=null
+where id='4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee';
+insert into public.account_access_roles(user_id,role_code)
+values('4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee','operator');
+set local role authenticated;
+do $$
+declare
+  v_center uuid := (
+    select id from public.fulfillment_centers
+    where status='active'
+    order by name,id
+    limit 1
+  );
+  v_user uuid := '4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee';
+  v_created jsonb;
+  v_updated jsonb;
+  v_deleted jsonb;
+begin
+  v_created := public.configure_fulfillment_center_staff_assignment(
+    v_center,
+    v_user,
+    false,
+    false,
+    'active',
+    0,
+    'a2000000-0000-4000-8000-000000000001'
+  );
+  if not (v_created->>'receiveAtCenter')::boolean
+    or not (v_created->>'createShipments')::boolean
+  then
+    raise exception 'center capabilities must derive from the staff role';
+  end if;
+  v_updated := public.configure_fulfillment_center_staff_assignment(
+    v_center,
+    v_user,
+    false,
+    false,
+    'inactive',
+    (v_created->>'version')::bigint,
+    'a2000000-0000-4000-8000-000000000002'
+  );
+  if v_updated->>'status'<>'inactive' then
+    raise exception 'center assignment edit failed';
+  end if;
+  v_deleted := public.delete_fulfillment_center_staff_assignment(
+    v_center,
+    v_user,
+    (v_updated->>'version')::bigint,
+    'a2000000-0000-4000-8000-000000000003'
+  );
+  if not (v_deleted->>'deleted')::boolean then
+    raise exception 'center assignment delete failed';
+  end if;
+end;
+$$;
+reset role;
+do $$
+begin
+  if exists(
+    select 1 from public.fulfillment_center_staff_assignments
+    where user_id='4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee'
+  ) then
+    raise exception 'deleted center assignment row must not remain';
   end if;
 end;
 $$;

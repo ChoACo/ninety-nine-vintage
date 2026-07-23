@@ -75,6 +75,8 @@ interface StoredCheckoutRequest {
   productIds: string[];
   productSnapshots: CartProduct[];
   ledgerMayExist: boolean;
+  includeShippingFee: boolean;
+  shippingFeeQuote: number;
 }
 
 const UUID_PATTERN =
@@ -303,7 +305,13 @@ function readStoredCheckoutRequest(options?: {
       (!options?.productSignature ||
         parsed.productSignature === options.productSignature) &&
       createProductSignature(snapshots.map((snapshot) => snapshot.id)) ===
-        parsed.productSignature
+        parsed.productSignature &&
+      (parsed.includeShippingFee === undefined ||
+        typeof parsed.includeShippingFee === "boolean") &&
+      (parsed.shippingFeeQuote === undefined ||
+        (Number.isSafeInteger(parsed.shippingFeeQuote) &&
+          Number(parsed.shippingFeeQuote) >= 0 &&
+          Number(parsed.shippingFeeQuote) <= 50_000_000))
     ) {
       return {
         buyerId: parsed.buyerId,
@@ -314,6 +322,10 @@ function readStoredCheckoutRequest(options?: {
         // Older saved requests may already have reached the server. Treat an
         // absent marker as ambiguous and only permit an explicit resume.
         ledgerMayExist: parsed.ledgerMayExist !== false,
+        // A request persisted by the previous UI had no shipping selector and
+        // therefore represents a product-only order.
+        includeShippingFee: parsed.includeShippingFee === true,
+        shippingFeeQuote: Number(parsed.shippingFeeQuote ?? 0),
       };
     }
   } catch {
@@ -399,6 +411,8 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const [serverClockOffset, setServerClockOffset] = useState(0);
   const [reservationClock, setReservationClock] = useState(() => Date.now());
   const [paymentMode, setPaymentMode] = useState<CartPaymentMode>("loading");
+  const [shippingFee, setShippingFee] = useState(0);
+  const [includeShippingFee, setIncludeShippingFee] = useState(true);
   const [heldCheckoutIds, setHeldCheckoutIds] = useState<string[]>([]);
   const [releaseCheckoutAllowed, setReleaseCheckoutAllowed] = useState(false);
   const [restoredCheckoutProducts, setRestoredCheckoutProducts] = useState<
@@ -451,6 +465,8 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
       setStaleCount(0);
       setServerClockOffset(0);
       setPaymentMode("loading");
+      setShippingFee(0);
+      setIncludeShippingFee(true);
       setMessage("");
       setMessageKind("success");
       setBusy(false);
@@ -494,6 +510,8 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           setHeldCheckoutIds(activeRequest.productIds);
           setRestoredCheckoutProducts(activeRequest.productSnapshots);
           setReleaseCheckoutAllowed(!activeRequest.ledgerMayExist);
+          setIncludeShippingFee(activeRequest.includeShippingFee);
+          setShippingFee(activeRequest.shippingFeeQuote);
         } else {
           checkoutRequest.current = null;
           setHeldCheckoutIds([]);
@@ -541,6 +559,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           serverTime?: string | null;
           staleProductIds?: string[];
           items?: PublishedFixedProduct[];
+          shippingFee?: unknown;
         };
         if (!isCurrent()) return;
         if (payload.paymentMode !== "manual_transfer") {
@@ -553,6 +572,14 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           setPaymentMode(payload.paymentMode);
         }
         const cartProducts = (payload.items ?? []).map(toCartProduct);
+        const nextShippingFee = Number(payload.shippingFee);
+        if (
+          cartProducts.length > 0 &&
+          (!Number.isSafeInteger(nextShippingFee) || nextShippingFee < 1)
+        ) {
+          throw new Error("배송비 설정을 확인하지 못했습니다.");
+        }
+        if (!activeRequest) setShippingFee(cartProducts.length > 0 ? nextShippingFee : 0);
         const serverTime =
           typeof payload.serverTime === "string"
             ? Date.parse(payload.serverTime)
@@ -655,7 +682,9 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
     if (heldCheckoutIds.length > 0 || !selectedProductId) return visibleProducts;
     return visibleProducts.filter((product) => product.id === selectedProductId);
   }, [cartIds, heldCheckoutIds, liveProducts, restoredCheckoutProducts, selectedProductId]);
-  const total = products.reduce((sum, product) => sum + product.price, 0);
+  const productTotal = products.reduce((sum, product) => sum + product.price, 0);
+  const expectedTotal =
+    productTotal + (includeShippingFee ? shippingFee : 0);
   const hasPendingCheckout = heldCheckoutIds.length > 0;
   const reservationNow = reservationClock + serverClockOffset;
   const reservationExpired =
@@ -711,6 +740,11 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
         pendingRequest?.productIds ??
         checkoutProducts.map((product) => product.id);
       const productSnapshots = checkoutProducts.map(createProductSnapshot);
+      const requestIncludesShipping =
+        pendingRequest?.includeShippingFee ?? includeShippingFee;
+      const requestShippingFee =
+        pendingRequest?.shippingFeeQuote ??
+        (requestIncludesShipping ? shippingFee : 0);
       // The order RPC reserves products and removes the server cart. Retain the
       // current rows locally until payment is actually verified or abandoned.
       setHeldCheckoutIds(productIds);
@@ -722,6 +756,8 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           productSignature,
           idempotencyKey: crypto.randomUUID(),
           ledgerMayExist: false,
+          includeShippingFee: requestIncludesShipping,
+          shippingFeeQuote: requestShippingFee,
         }),
         productIds,
         productSnapshots,
@@ -741,6 +777,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           productIds,
           idempotencyKey: currentRequest.idempotencyKey,
           expectedPaymentMode,
+          includeShippingFee: currentRequest.includeShippingFee,
         }),
       });
       const payload = (await response.json().catch(() => null)) as unknown;
@@ -1055,17 +1092,35 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
             <div className="flex justify-between text-xs">
               <span>상품 금액</span>
               <strong className="font-mono">
-                {total.toLocaleString("ko-KR")}원
+                {productTotal.toLocaleString("ko-KR")}원
               </strong>
             </div>
-            <div className="mt-4 flex justify-between text-xs">
-              <span>배송비</span>
-              <span className="text-muted">배송 요청 시 계산</span>
+            <div className="mt-4 flex items-start justify-between gap-4 text-xs">
+              <label className="flex items-start gap-2 font-bold">
+                <input
+                  checked={includeShippingFee}
+                  className="mt-0.5"
+                  disabled={busy || hasPendingCheckout || shippingFee < 1}
+                  onChange={(event) => setIncludeShippingFee(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>
+                  배송비 함께 결제
+                  <small className="mt-1 block font-normal text-muted">
+                    기본 선택 · 이후 배송 신청 시 다시 청구하지 않습니다.
+                  </small>
+                </span>
+              </label>
+              <strong className="shrink-0 font-mono">
+                {includeShippingFee
+                  ? `${shippingFee.toLocaleString("ko-KR")}원`
+                  : "나중에 결제"}
+              </strong>
             </div>
             <div className="mt-6 flex justify-between border-t border-line pt-5">
               <span className="text-sm font-bold">예상 결제 금액</span>
               <strong className="font-mono text-xl">
-                {total.toLocaleString("ko-KR")}원
+                {expectedTotal.toLocaleString("ko-KR")}원
               </strong>
             </div>
             {paymentMode === "manual_transfer" ? (

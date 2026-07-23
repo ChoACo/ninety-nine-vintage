@@ -65,8 +65,8 @@ test("owner fulfillment explicitly maps every real store to a center and handoff
   assert.match(route, /p_store_id:\s*body\.storeId/);
   assert.match(route, /p_fulfillment_center_id:\s*body\.centerId/);
   assert.match(route, /p_user_id:\s*body\.userId/);
-  assert.match(route, /p_receive_at_center:\s*body\.receiveAtCenter/);
-  assert.match(route, /p_create_shipments:\s*body\.createShipments/);
+  assert.match(route, /p_receive_at_center:\s*true/);
+  assert.match(route, /p_create_shipments:\s*true/);
   assert.match(route, /p_route_mode:\s*body\.routeMode/);
   assert.match(route, /p_expected_version:\s*body\.expectedVersion/);
   assert.match(route, /ROUTE_MODES\s*=\s*new Set\(\["transfer",\s*"co_located"\]\)/);
@@ -80,8 +80,12 @@ test("owner fulfillment explicitly maps every real store to a center and handoff
   assert.match(consoleSource, /routeMode:\s*"transfer"\s*\|\s*"co_located"/);
   assert.match(consoleSource, /draft\.routeMode\s*===\s*"transfer"/);
   assert.match(consoleSource, /draft\.routeMode\s*===\s*"co_located"/);
-  assert.match(consoleSource, /receiveAtCenter:\s*assignmentReceive/);
-  assert.match(consoleSource, /createShipments:\s*assignmentShip/);
+  assert.doesNotMatch(
+    consoleSource,
+    /assignmentReceive|assignmentShip|receiveAtCenter:\s*true|createShipments:\s*true/,
+  );
+  assert.match(consoleSource, /delete_assignment/);
+  assert.match(consoleSource, /역할에서 자동 결정/);
   assert.match(consoleSource, /운영자·직원 센터 배정/);
   assert.match(consoleSource, /매장 이름이나 식별자를 자동으로 추론하지 않습니다/);
   assert.match(consoleSource, /우편번호/);

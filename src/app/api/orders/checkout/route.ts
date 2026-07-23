@@ -32,6 +32,7 @@ interface CommerceCheckoutBody {
   idempotencyKey?: unknown;
   payMethod?: unknown;
   expectedPaymentMode?: unknown;
+  includeShippingFee?: unknown;
 }
 
 interface PreparedCommercePaymentRow {
@@ -194,6 +195,7 @@ async function checkoutWithManualTransfer(
   auth: MemberCommerceAuth,
   productIds: string[],
   idempotencyKey: string,
+  includeShippingFee: boolean,
 ) {
   try {
     await getManualTransferAccount(auth.admin);
@@ -235,6 +237,7 @@ async function checkoutWithManualTransfer(
       p_product_ids: productIds,
       p_idempotency_key: idempotencyKey,
       p_apply_shipping_credit: false,
+      p_include_shipping_fee: includeShippingFee,
     },
   );
   if (error) {
@@ -269,6 +272,7 @@ async function checkoutWithPortOne(
   productIds: string[],
   idempotencyKey: string,
   payMethod: PortOnePayMethod,
+  includeShippingFee: boolean,
 ) {
   // Read every required credential before the stock-locking transaction. A
   // partially configured deployment must not create an unpayable order.
@@ -287,6 +291,7 @@ async function checkoutWithPortOne(
       p_product_ids: productIds,
       p_requested_method: payMethod,
       p_store_id: storeId,
+      p_include_shipping_fee: includeShippingFee,
     },
   );
   if (error) {
@@ -428,6 +433,12 @@ export async function POST(request: Request) {
   const expectedPaymentMode = readCommercePaymentMode(
     body?.expectedPaymentMode,
   );
+  // Older browser builds did not display this choice. Preserve their previous
+  // product-only behavior while the new UI always sends an explicit boolean.
+  const includeShippingFee =
+    typeof body?.includeShippingFee === "boolean"
+      ? body.includeShippingFee
+      : false;
   if (
     productIds.length === 0 ||
     !idempotencyKey ||
@@ -466,6 +477,7 @@ export async function POST(request: Request) {
           productIds,
           idempotencyKey,
           body.payMethod,
+          includeShippingFee,
         );
       }
     }
@@ -473,6 +485,7 @@ export async function POST(request: Request) {
       auth,
       productIds,
       idempotencyKey,
+      includeShippingFee,
     );
   } catch (error) {
     logPortOneServerError("commerce_checkout", error);

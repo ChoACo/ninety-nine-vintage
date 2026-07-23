@@ -1,6 +1,6 @@
 "use client";
 
-import { Database, PackagePlus, ShieldCheck, Store, Truck, Warehouse } from "lucide-react";
+import { Database, Settings, ShieldCheck, Store, UsersRound, Warehouse } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -68,7 +68,7 @@ export function OwnerDashboard() {
         <div>
           <p className="eyebrow text-muted">소유자 · 전체 숍</p>
           <h1 className="mt-3 text-3xl font-black tracking-[-.07em] md:text-4xl md:tracking-[-.08em]">소유자 센터</h1>
-          <p className="mt-3 text-sm text-muted">모든 숍과 운영 데이터를 한 곳에서 확인합니다.</p>
+          <p className="mt-3 text-sm text-muted">사이트 설정과 권한, 전체 구조와 감사 로그를 관리합니다. 상품·입금·배송 실무는 운영자 센터에서 처리합니다.</p>
         </div>
         <span className="flex items-center gap-2 border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-bold text-emerald-800"><ShieldCheck size={13} /> 소유자 권한</span>
       </div>
@@ -81,9 +81,9 @@ export function OwnerDashboard() {
       <OwnerManualTransferAccountPanel />
       <OwnerSiteStatusPanel />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/owner/products"><PackagePlus size={18} /> 상품 등록·수정·일괄등록</Link>
-        <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/owner/fulfillment"><Warehouse size={18} /> 중앙 입고·보관 관리</Link>
-        <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/owner/operations"><Truck size={18} /> 배송 대기·결제 현황</Link>
+        <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/owner/members"><UsersRound size={18} /> 회원·운영자·직원 권한</Link>
+        <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/owner/fulfillment"><Warehouse size={18} /> 센터·매장 구조 설정</Link>
+        <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/operator"><Settings size={18} /> 운영자 실무 화면 확인</Link>
       </div>
       <section>
         <div className="mb-4 border-b border-ink pb-4"><p className="eyebrow text-muted">숍 운영자</p><h2 className="mt-2 text-xl font-black">숍별 운영 현황</h2></div>

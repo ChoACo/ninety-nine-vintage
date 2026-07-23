@@ -693,7 +693,8 @@ test("manual transfer is the only live checkout mode while PortOne stays archive
   assert.match(ownerConsole, /PortOne 코드는 향후 재도입을 위해 보관 중/);
   assert.doesNotMatch(ownerConsole, /changePaymentMode/);
   assert.doesNotMatch(ownerConsole, /window\.confirm\(/);
-  assert.match(cartRoute, /getManualTransferAccount\(createSupabaseServerClients\(\)\.admin\)/);
+  assert.match(cartRoute, /const\s*\{\s*admin\s*\}\s*=\s*createSupabaseServerClients\(\)/);
+  assert.match(cartRoute, /getManualTransferAccount\(admin\)/);
   assert.match(cartRoute, /ACTIVE_COMMERCE_PAYMENT_MODE/);
   assert.doesNotMatch(cartRoute, /get_commerce_payment_status/);
   assert.match(cartView, /주문하고 입금계좌 확인/);

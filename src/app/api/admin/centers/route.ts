@@ -67,6 +67,41 @@ export async function POST(request: Request) {
   }
   const body = await request.json().catch(() => null) as unknown;
   if (!record(body)) return commerceJson({ error: "invalid_center" }, 422);
+  if (body.action === "configure_store_route") {
+    if (auth.roleCode !== "operator") {
+      return commerceJson({ error: "center_forbidden" }, 403);
+    }
+    if (
+      typeof body.storeId !== "string" ||
+      !UUID.test(body.storeId) ||
+      typeof body.centerId !== "string" ||
+      !UUID.test(body.centerId) ||
+      !["transfer", "co_located"].includes(String(body.routeMode)) ||
+      !Number.isSafeInteger(body.expectedVersion) ||
+      Number(body.expectedVersion) < 0 ||
+      typeof body.idempotencyKey !== "string" ||
+      !UUID.test(body.idempotencyKey) ||
+      optionalText(body.reason, 1_000) === undefined
+    ) {
+      return commerceJson({ error: "invalid_center_route" }, 422);
+    }
+    const { data, error } = await (auth.user as unknown as RpcClient).rpc(
+      "configure_store_fulfillment_route",
+      {
+        p_store_id: body.storeId,
+        p_fulfillment_center_id: body.centerId,
+        p_route_mode: body.routeMode,
+        p_expected_version: body.expectedVersion,
+        p_idempotency_key: body.idempotencyKey,
+        p_reason: optionalText(body.reason, 1_000),
+      },
+    );
+    if (error) return failure(error);
+    if (!record(data) || typeof data.id !== "string" || typeof data.version !== "number") {
+      return commerceJson({ error: "center_unavailable" }, 503);
+    }
+    return commerceJson({ route: data });
+  }
   const action =
     body.action === "create" || body.action === "update" || body.action === "archive"
       ? body.action

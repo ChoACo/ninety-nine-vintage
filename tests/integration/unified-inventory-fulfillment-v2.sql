@@ -443,6 +443,69 @@ insert into public.commerce_order_items (
   clock_timestamp()-interval '6 days'
 );
 
+begin;
+insert into public.commerce_orders (
+  id, member_id, status, subtotal, shipping_fee, total,
+  shipping_credit_applied, idempotency_key
+) values (
+  '40000000-0000-4000-8000-000000000099',
+  '10000000-0000-4000-8000-000000000001',
+  'awaiting_payment', 10000, 0, 10000, false,
+  'shipping-fee-with-product-runtime'
+);
+insert into public.commerce_order_items (
+  id, order_id, product_id, store_id, unit_price, payment_status
+) values (
+  '41000000-0000-4000-8000-000000000099',
+  '40000000-0000-4000-8000-000000000099',
+  '30000000-0000-4000-8000-000000000002',
+  '20000000-0000-4000-8000-000000000001',
+  10000,
+  'awaiting_payment'
+);
+select test_support.assert_true(
+  (
+    app_private.apply_commerce_checkout_shipping_fee(
+      '40000000-0000-4000-8000-000000000099',
+      true,
+      true
+    )->>'shipping_fee'
+  )::bigint=(
+    select shipping_fee_amount
+    from public.inventory_fulfillment_rollout_settings
+    where business_id='99000000-0000-4000-8000-000000000001'
+  ),
+  'product checkout must snapshot the selected business shipping fee'
+);
+select test_support.assert_true(
+  (
+    select total=subtotal+shipping_fee and shipping_fee>0
+    from public.commerce_orders
+    where id='40000000-0000-4000-8000-000000000099'
+  ) and (
+    select count(*)=1
+    from public.commerce_order_shipping_fee_allocations
+    where order_id='40000000-0000-4000-8000-000000000099'
+  ),
+  'selected checkout shipping fee must be allocated once per business'
+);
+update public.commerce_orders
+set status='paid'
+where id='40000000-0000-4000-8000-000000000099';
+select test_support.assert_true(
+  exists(
+    select 1
+    from public.shipping_fee_waiver_entitlements
+    where commerce_order_id='40000000-0000-4000-8000-000000000099'
+      and member_id='10000000-0000-4000-8000-000000000001'
+      and business_id='99000000-0000-4000-8000-000000000001'
+      and status='available'
+      and prepaid_amount>0
+  ),
+  'paid product shipping fee must become one later-shipment entitlement'
+);
+rollback;
+
 select set_config(
   'request.jwt.claim.sub',
   '30be08c2-6259-42c6-af26-4ded6362de12',

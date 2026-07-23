@@ -47,7 +47,7 @@ interface StaffAccount {
   id: string;
   display_name: string;
   email: string | null;
-  role_code: "owner" | "operator" | "employee";
+  role_code: "operator" | "employee";
   last_seen_at: string | null;
 }
 
@@ -187,8 +187,6 @@ export function OwnerFulfillmentConsole() {
   const [rolloutDrafts, setRolloutDrafts] = useState<Record<string, RolloutDraft>>({});
   const [assignmentCenterId, setAssignmentCenterId] = useState("");
   const [assignmentUserId, setAssignmentUserId] = useState("");
-  const [assignmentReceive, setAssignmentReceive] = useState(false);
-  const [assignmentShip, setAssignmentShip] = useState(false);
   const [assignmentStatus, setAssignmentStatus] = useState<"active" | "inactive">("active");
   const [newCenter, setNewCenter] = useState<CenterDraft>(emptyCenterDraft);
   const [centerDrafts, setCenterDrafts] = useState<Record<string, CenterDraft>>({});
@@ -263,8 +261,6 @@ export function OwnerFulfillmentConsole() {
     );
     setAssignmentCenterId(assignmentCenter?.id ?? "");
     setAssignmentUserId(assignmentStaff?.id ?? "");
-    setAssignmentReceive(assignment?.receive_at_center ?? false);
-    setAssignmentShip(assignment?.create_shipments ?? false);
     setAssignmentStatus(assignment?.status ?? "active");
   }, []);
 
@@ -327,8 +323,6 @@ export function OwnerFulfillmentConsole() {
     );
     setAssignmentCenterId(centerId);
     setAssignmentUserId(userId);
-    setAssignmentReceive(existing?.receive_at_center ?? false);
-    setAssignmentShip(existing?.create_shipments ?? false);
     setAssignmentStatus(existing?.status ?? "active");
   };
 
@@ -438,17 +432,13 @@ export function OwnerFulfillmentConsole() {
       setNotice("사용 중인 센터와 담당 운영자 또는 직원 계정을 선택해 주세요.");
       return;
     }
-    if (assignmentStatus === "active" && !assignmentReceive && !assignmentShip) {
-      setNotice("활성 담당자에게 입고·보관 또는 포장·송장 권한을 하나 이상 부여해 주세요.");
-      return;
-    }
     const existing = assignments.find((assignment) =>
       assignment.fulfillment_center_id === center.id && assignment.user_id === member.id
     );
     const expectedVersion = existing?.version ?? 0;
     const idempotency = requestKey(
       actorId,
-      `assignment:${center.id}:${member.id}:${expectedVersion}:${assignmentReceive}:${assignmentShip}:${assignmentStatus}`,
+      `assignment:${center.id}:${member.id}:${expectedVersion}:${member.role_code}:${assignmentStatus}`,
     );
     setBusyTarget(`assignment:${center.id}:${member.id}`);
     setNotice("");
@@ -463,8 +453,6 @@ export function OwnerFulfillmentConsole() {
           action: "configure_assignment",
           centerId: center.id,
           userId: member.id,
-          receiveAtCenter: assignmentReceive,
-          createShipments: assignmentShip,
           status: assignmentStatus,
           expectedVersion,
           idempotencyKey: idempotency.value,
@@ -483,6 +471,56 @@ export function OwnerFulfillmentConsole() {
       await load(token, center.id, member.id);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "센터 담당자 권한을 저장하지 못했습니다.");
+    } finally {
+      setBusyTarget(null);
+    }
+  };
+
+  const deleteAssignment = async (assignment: CenterAssignment) => {
+    if (!token || !actorId || busyTarget) return;
+    const center = centers.find(
+      (candidate) => candidate.id === assignment.fulfillment_center_id,
+    );
+    const member = staff.find((candidate) => candidate.id === assignment.user_id);
+    if (!window.confirm(
+      `${member?.display_name ?? assignment.user_id} 담당자의 ${center?.name ?? "센터"} 배정을 삭제할까요?`,
+    )) {
+      return;
+    }
+    const idempotency = requestKey(
+      actorId,
+      `assignment-delete:${assignment.id}:${assignment.version}`,
+    );
+    setBusyTarget(`assignment-delete:${assignment.id}`);
+    setNotice("");
+    try {
+      const response = await fetch("/api/admin/owner/fulfillment", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "delete_assignment",
+          centerId: assignment.fulfillment_center_id,
+          userId: assignment.user_id,
+          expectedVersion: assignment.version,
+          idempotencyKey: idempotency.value,
+        }),
+      });
+      const payload = await response.json() as SetupPayload;
+      if (!response.ok) {
+        if (response.status === 409) {
+          await load(token, assignmentCenterId, assignmentUserId);
+          throw new Error("센터 배정이 변경되어 최신 목록으로 새로고침했습니다.");
+        }
+        throw new Error(payload.message ?? "센터 배정을 삭제하지 못했습니다.");
+      }
+      window.sessionStorage.removeItem(idempotency.key);
+      setNotice("센터 배정을 삭제했습니다.");
+      await load(token);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "센터 배정을 삭제하지 못했습니다.");
     } finally {
       setBusyTarget(null);
     }
@@ -653,7 +691,7 @@ export function OwnerFulfillmentConsole() {
 
       <section className="border border-line p-5 sm:p-6" aria-busy={loading}>
         <div className="flex flex-col justify-between gap-3 border-b border-line pb-5 sm:flex-row sm:items-end">
-          <div><p className="eyebrow text-muted">센터별 최소 권한</p><h2 className="mt-2 text-xl font-black">운영자·직원 센터 배정</h2><p className="mt-2 max-w-2xl text-xs leading-5 text-muted">관리자는 운영자와 직원을 각 센터에 직접 배정하고 가능한 작업을 지정합니다. 입고·보관 권한과 B센터 포장·송장 권한은 서로 독립적입니다.</p></div>
+          <div><p className="eyebrow text-muted">역할 기반 센터 권한</p><h2 className="mt-2 text-xl font-black">운영자·직원 센터 배정</h2><p className="mt-2 max-w-2xl text-xs leading-5 text-muted">소유자는 운영자와 직원을 센터에 배정만 합니다. 입고·보관과 포장·송장 업무 권한은 역할에서 자동 결정되며 개별 체크박스로 바꿀 수 없습니다. 운영자는 센터·매장 운영과 결제를 관리하고, 직원은 배정 센터 실무를 수행합니다.</p></div>
           <MapPinned className="text-muted" size={22} />
         </div>
         {centers.length > 0 && staff.length > 0 ? <div className="mt-5 grid gap-4 lg:grid-cols-2">
@@ -664,12 +702,17 @@ export function OwnerFulfillmentConsole() {
           </label>
           <label className="text-xs font-bold">담당 운영자 또는 직원
             <select className="mt-2 h-11 w-full border border-line bg-paper px-3 text-sm font-normal" onChange={(event) => chooseAssignment(assignmentCenterId, event.target.value)} value={assignmentUserId}>
-              {staff.map((member) => <option key={member.id} value={member.id}>{member.display_name} · {member.role_code === "owner" ? "소유자" : member.role_code === "operator" ? "운영자" : "직원"}{member.email ? ` · ${member.email}` : ""}</option>)}
+              {staff.map((member) => <option key={member.id} value={member.id}>{member.display_name} · {member.role_code === "operator" ? "운영자" : "직원"}{member.email ? ` · ${member.email}` : ""}</option>)}
             </select>
           </label>
-          <fieldset className="border border-line p-4 lg:col-span-2"><legend className="px-2 text-xs font-bold">허용 작업</legend><div className="flex flex-col gap-3 text-xs sm:flex-row sm:gap-8"><label className="flex items-center gap-2"><input checked={assignmentReceive} onChange={(event) => setAssignmentReceive(event.target.checked)} type="checkbox" /> 센터 입고·보관</label><label className="flex items-center gap-2"><input checked={assignmentShip} onChange={(event) => setAssignmentShip(event.target.checked)} type="checkbox" /> 포장·송장 등록</label><label className="flex items-center gap-2"><input checked={assignmentStatus === "active"} onChange={(event) => setAssignmentStatus(event.target.checked ? "active" : "inactive")} type="checkbox" /> 배정 활성</label></div></fieldset>
-          <div className="flex flex-col justify-between gap-3 border border-line bg-surface p-4 text-xs sm:flex-row sm:items-center lg:col-span-2"><p>{selectedAssignment ? `현재 배정 버전 v${selectedAssignment.version}` : "새 센터 배정"} · 포장·송장은 선택한 센터의 담당자만 수행할 수 있습니다.</p><button className="flex shrink-0 items-center justify-center gap-2 bg-ink px-4 py-3 font-bold text-paper disabled:opacity-40" disabled={Boolean(busyTarget) || !assignmentCenterId || !assignmentUserId} onClick={() => void saveAssignment()} type="button"><Save size={14} /> {busyTarget === `assignment:${assignmentCenterId}:${assignmentUserId}` ? "저장 중" : "센터 권한 저장"}</button></div>
-          {assignments.length > 0 && <div className="divide-y divide-line border-y border-line lg:col-span-2">{assignments.map((assignment) => { const center = centers.find((candidate) => candidate.id === assignment.fulfillment_center_id); const member = staff.find((candidate) => candidate.id === assignment.user_id); const roleLabel = member?.role_code === "owner" ? "소유자" : member?.role_code === "operator" ? "운영자" : "직원"; return <div className="flex flex-col justify-between gap-2 py-3 text-xs sm:flex-row sm:items-center" key={assignment.id}><p><strong>{member?.display_name ?? assignment.user_id}</strong>{member ? ` · ${roleLabel}` : ""} · {center?.name ?? assignment.fulfillment_center_id}</p><p className="text-muted">{assignment.status === "active" ? "활성" : "비활성"} · {assignment.receive_at_center ? "입고·보관" : "입고 없음"} · {assignment.create_shipments ? "포장·송장" : "배송 없음"} · v{assignment.version}</p></div>; })}</div>}
+          <label className="text-xs font-bold lg:col-span-2">배정 상태
+            <select className="mt-2 h-11 w-full border border-line bg-paper px-3 text-sm font-normal" onChange={(event) => setAssignmentStatus(event.target.value as "active" | "inactive")} value={assignmentStatus}>
+              <option value="active">활성</option>
+              <option value="inactive">비활성</option>
+            </select>
+          </label>
+          <div className="flex flex-col justify-between gap-3 border border-line bg-surface p-4 text-xs sm:flex-row sm:items-center lg:col-span-2"><p>{selectedAssignment ? `현재 배정 버전 v${selectedAssignment.version}` : "새 센터 배정"} · 선택한 역할의 권한 프로필이 자동 적용됩니다.</p><button className="flex shrink-0 items-center justify-center gap-2 bg-ink px-4 py-3 font-bold text-paper disabled:opacity-40" disabled={Boolean(busyTarget) || !assignmentCenterId || !assignmentUserId} onClick={() => void saveAssignment()} type="button"><Save size={14} /> {busyTarget === `assignment:${assignmentCenterId}:${assignmentUserId}` ? "저장 중" : "센터 배정 저장"}</button></div>
+          {assignments.length > 0 && <div className="divide-y divide-line border-y border-line lg:col-span-2">{assignments.map((assignment) => { const center = centers.find((candidate) => candidate.id === assignment.fulfillment_center_id); const member = staff.find((candidate) => candidate.id === assignment.user_id); const roleLabel = member?.role_code === "operator" ? "운영자" : "직원"; return <div className="flex flex-col justify-between gap-3 py-3 text-xs sm:flex-row sm:items-center" key={assignment.id}><div><p><strong>{member?.display_name ?? assignment.user_id}</strong>{member ? ` · ${roleLabel}` : ""} · {center?.name ?? assignment.fulfillment_center_id}</p><p className="mt-1 text-muted">{assignment.status === "active" ? "활성" : "비활성"} · 역할 기반 입고·보관·포장·송장 · v{assignment.version}</p></div><div className="flex gap-2"><button className="border border-line px-3 py-2 font-bold" disabled={Boolean(busyTarget)} onClick={() => chooseAssignment(assignment.fulfillment_center_id, assignment.user_id)} type="button">수정</button><button className="inline-flex items-center gap-1 border border-rose-300 px-3 py-2 font-bold text-rose-700" disabled={Boolean(busyTarget)} onClick={() => void deleteAssignment(assignment)} type="button"><Trash2 size={12}/> 삭제</button></div></div>; })}</div>}
         </div> : <p className="mt-5 border border-dashed border-line p-5 text-sm text-muted">활성 센터와 운영자 또는 직원 계정이 모두 있어야 센터 권한을 배정할 수 있습니다.</p>}
       </section>
 

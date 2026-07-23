@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     follow: false,
     index: false,
   },
-  title: "관리자 센터 | NINETY-NINE",
+  title: "운영 센터 | NINETY-NINE",
 };
 
 export default function AdminLayout({
@@ -22,7 +22,7 @@ export default function AdminLayout({
             className="text-sm font-black tracking-[0.14em]"
             href="/admin/operator"
           >
-            NINETY-NINE 관리자
+            NINETY-NINE 운영 센터
           </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle className="size-10 px-0 sm:w-auto sm:px-3" />

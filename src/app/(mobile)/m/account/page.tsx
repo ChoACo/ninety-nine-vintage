@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Gavel, Heart, MapPin, PackageCheck, ReceiptText, RotateCcw, Settings, Truck } from "lucide-react";
 import Link from "next/link";
 
+import { NicknameGate } from "@/components/account/NicknameGate";
+
 export const metadata: Metadata = { title: "내 정보", robots: { follow: false, index: false } };
 
 const tasks = [
@@ -16,5 +18,36 @@ const tasks = [
 ] as const;
 
 export default function MobileAccountPage() {
-  return <div><header className="border-b border-ink pb-6"><p className="eyebrow text-muted">내 정보 / 빠른 메뉴</p><h1 className="mt-3 text-3xl font-black tracking-[-.08em]">무엇을 확인할까요?</h1><p className="mt-3 text-sm leading-6 text-muted">긴 화면을 찾지 않고 필요한 업무로 바로 이동하세요.</p></header><nav aria-label="내 정보 업무" className="mt-5 grid grid-cols-2 gap-px border border-line bg-line">{tasks.map(([label, description, href, Icon]) => <Link className="min-h-36 bg-paper p-4 transition-colors active:bg-surface" href={href} key={href}><Icon size={19} /><p className="mt-7 text-sm font-black">{label}</p><p className="mt-2 text-[10px] leading-4 text-muted">{description}</p></Link>)}</nav></div>;
+  return (
+    <div>
+      <NicknameGate />
+      <header className="border-b border-ink pb-6">
+        <p className="eyebrow text-muted">내 정보 / 빠른 메뉴</p>
+        <h1 className="mt-3 text-3xl font-black tracking-[-.08em]">
+          무엇을 확인할까요?
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-muted">
+          긴 화면을 찾지 않고 필요한 업무로 바로 이동하세요.
+        </p>
+      </header>
+      <nav
+        aria-label="내 정보 업무"
+        className="mt-5 grid grid-cols-2 gap-px border border-line bg-line"
+      >
+        {tasks.map(([label, description, href, Icon]) => (
+          <Link
+            className="min-h-36 bg-paper p-4 transition-colors active:bg-surface"
+            href={href}
+            key={href}
+          >
+            <Icon size={19} />
+            <p className="mt-7 text-sm font-black">{label}</p>
+            <p className="mt-2 text-[10px] leading-4 text-muted">
+              {description}
+            </p>
+          </Link>
+        ))}
+      </nav>
+    </div>
+  );
 }

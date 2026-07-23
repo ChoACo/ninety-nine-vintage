@@ -139,7 +139,7 @@ test("premium detail actions stay in layered rounded dialogs before server mutat
   );
   assert.match(quickCartAction, /setQuickCartOpen\(false\)/);
   assert.doesNotMatch(quickCartAction, /router\.push\("\/cart"\)/);
-  assert.match(sticky, /p-5 pb-32[\s\S]*md:pb-6/);
+  assert.match(sticky, /surface === "desktop"[\s\S]*sticky col-span-5 p-6 pb-6[\s\S]*: "p-5 pb-32"/);
   assert.match(scrollLock, /activeBodyScrollLocks \+= 1/);
   assert.match(scrollLock, /activeBodyScrollLocks === 0/);
 });

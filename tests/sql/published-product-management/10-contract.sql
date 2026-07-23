@@ -213,4 +213,3 @@ end;
 $$;
 
 select 'published product management contracts passed' as result;
-

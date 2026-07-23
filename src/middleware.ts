@@ -1,4 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  MOBILE_AUTO_REDIRECT_ENABLED,
+  MOBILE_SITE_ENABLED,
+} from "@/lib/featureFlags";
+import {
+  isCustomerPagePath,
+  isMobilePath,
+  resolveAutomaticUiMode,
+  toDesktopPath,
+  toMobilePath,
+} from "@/lib/uiMode";
 
 // Keep this entrypoint on the Edge middleware convention: the current
 // OpenNext Cloudflare adapter rejects Next.js's Node.js-only proxy runtime.
@@ -10,6 +21,7 @@ const SKIPPED_PATHS = [
   "/robots.txt",
   "/sitemap.xml",
 ];
+const LEGACY_UI_MODE_COOKIE = "ninety-nine-ui-mode";
 
 function getTrustedClientIp(request: NextRequest): string | null {
   const vercelForwarded = request.headers.get("x-vercel-forwarded-for");
@@ -85,6 +97,45 @@ function blockedResponse(request: NextRequest): Response {
   );
 }
 
+function mobileSiteRedirect(request: NextRequest): NextResponse | null {
+  if (
+    !MOBILE_SITE_ENABLED ||
+    !MOBILE_AUTO_REDIRECT_ENABLED ||
+    !isCustomerPagePath(request.nextUrl.pathname)
+  ) {
+    return null;
+  }
+
+  const resolvedMode = resolveAutomaticUiMode(request.headers);
+  const mobilePath = isMobilePath(request.nextUrl.pathname);
+  if (
+    (resolvedMode === "mobile" && mobilePath) ||
+    (resolvedMode === "desktop" && !mobilePath)
+  ) {
+    return null;
+  }
+
+  const destination = request.nextUrl.clone();
+  destination.pathname =
+    resolvedMode === "mobile"
+      ? toMobilePath(destination.pathname)
+      : toDesktopPath(destination.pathname);
+  const response = NextResponse.redirect(destination, 307);
+  response.headers.set("Cache-Control", "private, no-store, max-age=0");
+  response.headers.set("Vary", "Sec-CH-UA-Mobile, User-Agent");
+  return response;
+}
+
+function expireLegacyUiModeCookie(request: NextRequest, response: NextResponse): NextResponse {
+  if (
+    isCustomerPagePath(request.nextUrl.pathname) &&
+    request.cookies.has(LEGACY_UI_MODE_COOKIE)
+  ) {
+    response.cookies.delete(LEGACY_UI_MODE_COOKIE);
+  }
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   if (shouldSkip(request.nextUrl.pathname)) return NextResponse.next();
 
@@ -93,7 +144,10 @@ export async function middleware(request: NextRequest) {
     return blockedResponse(request);
   }
 
-  return NextResponse.next();
+  return expireLegacyUiModeCookie(
+    request,
+    mobileSiteRedirect(request) ?? NextResponse.next(),
+  );
 }
 
 export const config = {

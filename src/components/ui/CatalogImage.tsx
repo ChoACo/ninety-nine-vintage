@@ -177,7 +177,7 @@ export function CatalogImage({
         decoding={props.decoding}
         fetchPriority={props.fetchPriority}
         height={height ?? maxDimension}
-        loading={loading}
+        loading={props.priority ? "eager" : loading}
         onError={props.onError}
         onLoad={(event) => {
           setLoadedNativeSource(requestedSource);
@@ -215,7 +215,7 @@ export function CatalogImage({
       alt={alt}
       blurDataURL={blurDataURL}
       height={height ?? maxDimension}
-      loading={loading}
+      loading={props.priority ? undefined : loading}
       placeholder={placeholder}
       sizes={sizes}
       src={requestedSource}

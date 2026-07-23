@@ -128,6 +128,5 @@ if (testFailure && cleanupFailure) {
   throw new AggregateError([testFailure, cleanupFailure], "Database test and cleanup failed.");
 }
 if (testFailure) throw testFailure;
-if (cleanupFailure) throw cleanupFailure;
-console.log("[published-products-db] temporary cluster removed");
-
+  if (cleanupFailure) throw cleanupFailure;
+  console.log("[published-products-db] temporary cluster removed");

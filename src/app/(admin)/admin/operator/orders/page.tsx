@@ -1,5 +1,5 @@
-import { OperatorOrdersConsole } from "@/components/admin/operator/OperatorOrdersConsole";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default function OperatorOrdersPage() { return <OperatorOrdersConsole />; }
+export default function OperatorOrdersPage() {
+  redirect("/admin/operator/payments");
+}

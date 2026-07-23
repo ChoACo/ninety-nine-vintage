@@ -9,6 +9,7 @@ import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface ProductInquiryModalProps {
+  basePath?: "" | "/m";
   onClose: () => void;
   open: boolean;
   productId: string;
@@ -16,6 +17,7 @@ interface ProductInquiryModalProps {
 }
 
 export function ProductInquiryModal({
+  basePath = "",
   onClose,
   open,
   productId,
@@ -36,7 +38,7 @@ export function ProductInquiryModal({
       const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
       if (!session?.access_token) {
         onClose();
-        router.push(`/account/login?next=${encodeURIComponent(`/auction/${productId}`)}`);
+        router.push(`${basePath}/account/login?next=${encodeURIComponent(`${basePath}/auction/${productId}`)}`);
         return;
       }
       const response = await fetch("/api/chat", {
@@ -59,7 +61,7 @@ export function ProductInquiryModal({
         throw new Error(payload?.error ?? "상품 문의를 보내지 못했습니다.");
       }
       onClose();
-      router.push(`/chat?conversationId=${encodeURIComponent(payload.conversation.id)}`);
+      router.push(`${basePath}/chat?conversationId=${encodeURIComponent(payload.conversation.id)}`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "상품 문의를 보내지 못했습니다.");
     } finally {

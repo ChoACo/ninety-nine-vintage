@@ -108,4 +108,3 @@ $$;
 create trigger products_touch_updated_at
 before update on public.products
 for each row execute function public.touch_product_updated_at();
-

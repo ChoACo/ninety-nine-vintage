@@ -1,9 +1,7 @@
-import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { hasTrustedRequestOrigin } from "@/src/lib/kakao/oidc";
 import { createSupabaseServerClients } from "@/src/lib/supabase/server";
-
-export const OWNER_USER_ID = "30be08c2-6259-42c6-af26-4ded6362de12";
 
 export class OwnerAccessRequestError extends Error {
   readonly status: number;
@@ -28,10 +26,6 @@ function readBearerToken(request: Request): string | null {
   const authorization = request.headers.get("authorization")?.trim();
   if (!authorization?.startsWith("Bearer ")) return null;
   return authorization.slice("Bearer ".length).trim() || null;
-}
-
-function userHasKakaoIdentity(user: User): boolean {
-  return user.identities?.some((identity) => identity.provider === "kakao") === true;
 }
 
 function createUserScopedClient(accessToken: string): SupabaseClient {
@@ -72,9 +66,7 @@ export async function authenticateOwnerAccessRequest(
   const { data, error } = await verifier.auth.getUser(accessToken);
   if (
     error ||
-    !data.user ||
-    data.user.id !== OWNER_USER_ID ||
-    !userHasKakaoIdentity(data.user)
+    !data.user
   ) {
     throw new OwnerAccessRequestError(401, "unauthorized");
   }

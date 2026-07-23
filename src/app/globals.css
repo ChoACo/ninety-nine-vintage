@@ -215,6 +215,15 @@ html[data-theme="dark"] .theme-invariant-dark {
   .eyebrow { font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
   .focus-ring:focus-visible { outline: 2px solid rgb(var(--theme-ink)); outline-offset: 3px; }
 
+  [data-ui-surface="desktop"] {
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
+
+  [data-ui-surface="desktop"] :is(nav a, button, [role="button"], dt, dd) {
+    white-space: nowrap;
+  }
+
   .premium-interaction {
     transition: transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease, background-color 300ms ease, color 300ms ease;
   }
@@ -255,34 +264,34 @@ html[data-theme="dark"] .theme-invariant-dark {
 /* Legacy console rows are intentionally compact on desktop, but become stacked
    work cards on narrow screens. Data tables keep their own horizontal scroller. */
 @media (max-width: 767px) {
-  form.grid-cols-2 { grid-template-columns: minmax(0, 1fr) !important; }
-  form.grid-cols-2 > .col-span-2 { grid-column: auto !important; }
-  form[class~="md:grid-cols-2"] { grid-template-columns: minmax(0, 1fr) !important; }
-  form[class~="md:grid-cols-2"] > [class~="md:col-span-2"] { grid-column: auto !important; }
-  form[class~="md:grid-cols-2"] > div[class~="flex"][class~="gap-2"] > input[class~="flex-1"] { min-width: 0; }
-  form[class~="md:grid-cols-2"] > div[class~="flex"][class~="gap-2"] > input[class~="w-40"] { width: 40%; min-width: 0; }
-  form[class~="md:grid-cols-2"] > div[class~="flex"][class~="gap-2"] > select { width: 40%; min-width: 0; }
-  [class~="grid-cols-4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-  [class~="grid-cols-3"]:not(.md\:grid-cols-3) { grid-template-columns: minmax(0, 1fr) !important; }
-  [class~="grid-cols-[1fr_360px]"],
-  [class~="grid-cols-[300px_1fr]"],
-  [class~="grid-cols-[1.25fr_.75fr]"] { grid-template-columns: minmax(0, 1fr) !important; }
-  [class~="grid-cols-[300px_1fr]"] > aside { border-right-width: 0 !important; border-bottom: 1px solid rgb(var(--theme-line)); }
+  [data-admin-surface] form.grid-cols-2 { grid-template-columns: minmax(0, 1fr) !important; }
+  [data-admin-surface] form.grid-cols-2 > .col-span-2 { grid-column: auto !important; }
+  [data-admin-surface] form[class~="md:grid-cols-2"] { grid-template-columns: minmax(0, 1fr) !important; }
+  [data-admin-surface] form[class~="md:grid-cols-2"] > [class~="md:col-span-2"] { grid-column: auto !important; }
+  [data-admin-surface] form[class~="md:grid-cols-2"] > div[class~="flex"][class~="gap-2"] > input[class~="flex-1"] { min-width: 0; }
+  [data-admin-surface] form[class~="md:grid-cols-2"] > div[class~="flex"][class~="gap-2"] > input[class~="w-40"] { width: 40%; min-width: 0; }
+  [data-admin-surface] form[class~="md:grid-cols-2"] > div[class~="flex"][class~="gap-2"] > select { width: 40%; min-width: 0; }
+  [data-admin-surface] [class~="grid-cols-4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  [data-admin-surface] [class~="grid-cols-3"]:not(.md\:grid-cols-3) { grid-template-columns: minmax(0, 1fr) !important; }
+  [data-admin-surface] [class~="grid-cols-[1fr_360px]"],
+  [data-admin-surface] [class~="grid-cols-[300px_1fr]"],
+  [data-admin-surface] [class~="grid-cols-[1.25fr_.75fr]"] { grid-template-columns: minmax(0, 1fr) !important; }
+  [data-admin-surface] [class~="grid-cols-[300px_1fr]"] > aside { border-right-width: 0 !important; border-bottom: 1px solid rgb(var(--theme-line)); }
 }
 
 @media (max-width: 479px) {
-  [class~="grid-cols-4"],
-  [class~="grid-cols-3"]:not(.md\:grid-cols-3) { grid-template-columns: minmax(0, 1fr) !important; }
+  [data-admin-surface] [class~="grid-cols-4"],
+  [data-admin-surface] [class~="grid-cols-3"]:not(.md\:grid-cols-3) { grid-template-columns: minmax(0, 1fr) !important; }
 }
 
 @media (max-width: 767px) {
-  .detail-thumbnail-grid {
+  [data-ui-surface="mobile"] .detail-thumbnail-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 }
 
 @media (max-width: 767px) {
-  .mobile-detail-cta {
+  [data-ui-surface="mobile"] .mobile-detail-cta {
     position: fixed;
     left: 0;
     right: 0;

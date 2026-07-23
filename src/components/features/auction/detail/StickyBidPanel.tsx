@@ -41,8 +41,10 @@ import {
 } from "@/lib/commerce/purchaseIntent";
 
 interface StickyBidPanelProps {
+  basePath?: "" | "/m";
   compact?: boolean;
   item: ItemDetail;
+  surface?: "desktop" | "mobile";
 }
 
 interface RefreshedAuctionProduct {
@@ -98,7 +100,7 @@ function refreshedBidHistory(
   });
 }
 
-export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
+export function StickyBidPanel({ basePath = "", compact = false, item, surface = "desktop" }: StickyBidPanelProps) {
   const policyNow = useAuctionPolicyClock(item.saleType === "auction");
   const router = useRouter();
   const resumedPurchaseIntent = useRef(false);
@@ -217,7 +219,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
       return;
     }
     resumedPurchaseIntent.current = true;
-    router.replace(`/auction/${item.id}`, { scroll: false });
+    router.replace(`${basePath}/auction/${item.id}`, { scroll: false });
     const intent: FixedPurchaseIntent = requestedIntent;
     if (!consumeFixedPurchaseIntent(item.id, intent)) {
       queueMicrotask(() =>
@@ -240,7 +242,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
         const reservation = await reserveCartProduct(item.id, session.user.id);
         addToCart(item.id);
         if (intent === "buy") {
-          router.push("/cart");
+          router.push(basePath === "/m" ? `/m/checkout?productId=${item.id}` : "/cart");
         } else {
           setBuyNotice(
             `로그인 후 장바구니에 담았습니다. ${new Date(reservation.reservedUntil).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}까지 재고가 점유됩니다.`,
@@ -254,7 +256,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
         setBuying(false);
       }
     })();
-  }, [addToCart, item.id, item.saleType, router]);
+  }, [addToCart, basePath, item.id, item.saleType, router]);
 
   useEffect(() => {
     if (!LIVE_AUCTION_ENABLED || item.saleType !== "auction") return;
@@ -353,7 +355,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
         setQuickCartOpen(false);
         rememberFixedPurchaseIntent(item.id, "cart");
         router.push(
-          `/account/login?next=${encodeURIComponent(`/auction/${item.id}?purchaseIntent=cart`)}`,
+          `${basePath}/account/login?next=${encodeURIComponent(`${basePath}/auction/${item.id}?purchaseIntent=cart`)}`,
         );
         return;
       }
@@ -383,13 +385,13 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
       if (!session?.access_token) {
         rememberFixedPurchaseIntent(item.id, "buy");
         router.push(
-          `/account/login?next=${encodeURIComponent(`/auction/${item.id}?purchaseIntent=buy`)}`,
+          `${basePath}/account/login?next=${encodeURIComponent(`${basePath}/auction/${item.id}?purchaseIntent=buy`)}`,
         );
         return;
       }
       await reserveCartProduct(item.id, session.user.id);
       addToCart(item.id);
-      router.push("/cart");
+      router.push(basePath === "/m" ? `/m/checkout?productId=${item.id}` : "/cart");
     } catch (error) {
       setBuyNotice(
         error instanceof Error ? error.message : "구매 준비에 실패했습니다.",
@@ -516,7 +518,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
 
   return (
     <aside
-      className={`${compact ? "md:top-6" : "md:top-[100px]"} z-10 self-start rounded-3xl border border-white/10 bg-white p-5 pb-32 shadow-xl shadow-black/5 md:sticky md:col-span-5 md:p-6 md:pb-6`}
+      className={`${surface === "desktop" ? `${compact ? "top-6" : "top-[100px]"} sticky col-span-5 p-6 pb-6` : "p-5 pb-32"} z-10 self-start rounded-3xl border border-white/10 bg-white shadow-xl shadow-black/5`}
       data-bid-panel="sticky"
     >
       <div className="border-b border-zinc-200 py-6">
@@ -526,7 +528,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
         <h1 className="text-3xl font-black leading-snug tracking-tight text-zinc-950 [text-wrap:balance]">
           {item.name}
         </h1>
-        <dl className="mt-5 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 text-[11px] xl:grid-cols-3">
+        <dl className={`mt-5 grid gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 text-[11px] ${surface === "desktop" ? "grid-cols-3" : "grid-cols-1"}`}>
           <div className="bg-white px-3 py-3">
             <dt className="text-zinc-500">카테고리</dt>
             <dd className="mt-1 truncate font-bold">
@@ -547,7 +549,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
         <p className="mt-5 whitespace-pre-line text-xs leading-relaxed text-zinc-600">
           {item.description || "상세 사진과 컨디션 리포트를 확인해 주세요."}
         </p>
-        <div className="mt-8 flex flex-col items-start gap-3 xl:flex-row xl:items-end xl:justify-between">
+        <div className={`mt-8 flex items-start gap-3 ${surface === "desktop" ? "flex-row items-end justify-between" : "flex-col"}`}>
           <div>
             <p className="mb-2 text-xs text-zinc-500">
               {item.saleType === "fixed" ? "판매 정가" : "현재 최고 입찰가"}
@@ -642,15 +644,15 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
             {canStartBid ? (
               <Link
                 aria-describedby="auction-settlement-summary"
-                className="mobile-detail-cta mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-950 text-sm font-bold text-white shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:bg-zinc-800 hover:shadow-xl active:scale-95"
-                href={`/auction/${item.id}/bid`}
+                className={`${surface === "mobile" ? "mobile-detail-cta" : ""} mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-950 text-sm font-bold text-white shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:bg-zinc-800 hover:shadow-xl active:scale-95`}
+                href={`${basePath}/auction/${item.id}/bid`}
               >
                 <LockKeyhole size={15} /> {bidButtonLabel}
               </Link>
             ) : (
               <button
                 aria-describedby="auction-settlement-summary"
-                className="mobile-detail-cta mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-300 text-sm font-bold text-white"
+                className={`${surface === "mobile" ? "mobile-detail-cta" : ""} mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-300 text-sm font-bold text-white`}
                 disabled
                 type="button"
               >
@@ -686,7 +688,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
           </div>
         )
       ) : (
-        <div className="mobile-detail-cta mt-6 grid grid-cols-2 gap-2">
+        <div className={`${surface === "mobile" ? "mobile-detail-cta" : ""} mt-6 grid grid-cols-2 gap-2`}>
           <button
             className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-zinc-950 text-sm font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 disabled:opacity-50"
             disabled={buying}
@@ -742,6 +744,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
         />
       )}
       <ProductInquiryModal
+        basePath={basePath}
         onClose={() => setInquiryOpen(false)}
         open={inquiryOpen}
         productId={item.id}
@@ -754,7 +757,7 @@ export function StickyBidPanel({ compact = false, item }: StickyBidPanelProps) {
           notice={buyNotice}
           onClose={() => !buying && setQuickCartOpen(false)}
           onConfirm={() => void addFixedToCart()}
-          onViewCart={() => router.push("/cart")}
+          onViewCart={() => router.push(`${basePath}/cart`)}
           open={quickCartOpen}
           price={displayPrice}
           productTitle={item.name}

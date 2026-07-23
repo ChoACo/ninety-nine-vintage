@@ -64,7 +64,8 @@ export function MobileHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolea
             </form>
             <nav aria-label="모바일 주요 메뉴" className="mt-5 grid">
               {publicNavigation.map((item) => <Link aria-current={pathname === item.href ? "page" : undefined} className="border-b border-line py-4 text-base font-bold" href={item.href} key={item.href} onClick={close}>{item.label}</Link>)}
-              {access.canAccessOperator && <Link className="border-b border-line py-4 text-base font-bold" href="/admin/operator" onClick={close}>운영자 센터</Link>}
+              {access.roleCode === "operator" && <Link className="border-b border-line py-4 text-base font-bold" href="/admin/operator/center" onClick={close}>센터 관리</Link>}
+              {access.roleCode === "employee" && <Link className="border-b border-line py-4 text-base font-bold" href="/admin/employee" onClick={close}>직원센터</Link>}
               {access.canAccessOwner && <Link className="border-b border-line py-4 text-base font-bold" href="/admin/owner" onClick={close}>소유자 센터</Link>}
             </nav>
             <div className="mt-6 grid gap-3">

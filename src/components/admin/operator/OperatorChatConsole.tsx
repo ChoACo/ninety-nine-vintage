@@ -15,7 +15,9 @@ function conversationStatusLabel(status: string) {
   return status;
 }
 
-export function OperatorChatConsole() {
+export function OperatorChatConsole({
+  staffLabel = "운영자",
+}: Readonly<{ staffLabel?: string }>) {
   const [token, setToken] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -55,7 +57,7 @@ export function OperatorChatConsole() {
     <div className="grid grid-cols-1 border border-line md:min-h-[620px] md:grid-cols-[260px_minmax(0,1fr)] lg:grid-cols-[300px_minmax(0,1fr)]">
       <aside className="border-b border-line md:border-b-0 md:border-r">
         <div className="border-b border-line p-4 sm:p-5">
-          <p className="eyebrow text-muted">운영자 / 상담 목록</p>
+          <p className="eyebrow text-muted">{staffLabel} / 상담 목록</p>
           <p className="mt-3 text-sm font-bold">담당 회원 상담</p>
         </div>
         <div className="max-h-64 divide-y divide-line overflow-y-auto md:max-h-none">
@@ -82,7 +84,7 @@ export function OperatorChatConsole() {
           <p className="mt-2 text-[11px] text-muted">회원의 상품·주문 문의에 답변합니다.</p>
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
-          {!token && <p className="bg-surface p-4 text-xs">운영자 로그인이 필요합니다.</p>}
+          {!token && <p className="bg-surface p-4 text-xs">{staffLabel} 로그인이 필요합니다.</p>}
           {token && !selected && <p className="bg-surface p-4 text-xs">위 목록에서 상담을 선택하세요.</p>}
           {messages.map((item) => (
             <div className={`max-w-[85%] p-4 text-xs leading-5 sm:max-w-md ${item.sender_id === staffId ? "ml-auto bg-ink text-paper" : "bg-surface"}`} key={item.id}>

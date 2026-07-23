@@ -203,9 +203,10 @@ test("a server-recorded anti-sniping overtime stays closing-soon during the dail
   }, now, dailyPhase), "CLOSING_SOON");
 });
 
-test("restored feed UI uses responsive V2 routes and authoritative account and product APIs", async () => {
-  const [feedPage, grid, card, summary, bidRoutePanel, interceptedBid, history, gallery, detailPanel, bidApi, productApi, productService, detailView] = await Promise.all([
+test("restored feed UI uses separated desktop and mobile routes with authoritative account and product APIs", async () => {
+  const [feedPage, mobileFeedPage, grid, card, summary, bidRoutePanel, interceptedBid, history, gallery, detailPanel, bidApi, productApi, productService, detailView] = await Promise.all([
     source("src/app/(shop)/feed/page.tsx"),
+    source("src/app/(mobile)/m/feed/page.tsx"),
     source("src/components/features/auction/AuctionFeedGrid.tsx"),
     source("src/components/features/auction/AuctionFeedCard.tsx"),
     source("src/components/features/auction/AuctionBidSummary.tsx"),
@@ -219,7 +220,10 @@ test("restored feed UI uses responsive V2 routes and authoritative account and p
     source("src/services/products.ts"),
     source("src/components/features/auction/detail/AuctionDetailView.tsx"),
   ]);
-  assert.match(feedPage, /className="md:flex md:items-start md:gap-10"/);
+  assert.match(feedPage, /className="flex items-start gap-10"/);
+  assert.match(feedPage, /surface="desktop"/);
+  assert.match(mobileFeedPage, /basePath="\/m"/);
+  assert.match(mobileFeedPage, /surface="mobile"/);
   assert.match(grid, /paginateAuctionFeed\(visibleCards, page\)/);
   assert.match(grid, />브랜드<select/);
   assert.match(grid, />카테고리<select/);
@@ -248,7 +252,7 @@ test("restored feed UI uses responsive V2 routes and authoritative account and p
   assert.match(detailPanel, /canStartAuctionBid\(bidCapability\)/);
   assert.match(
     detailPanel,
-    /canStartBid\s*\?\s*\(?\s*<Link[\s\S]*?href=\{`\/auction\/\$\{item\.id\}\/bid`\}/,
+    /canStartBid\s*\?\s*\(?\s*<Link[\s\S]*?href=\{`\$\{basePath\}\/auction\/\$\{item\.id\}\/bid`\}/,
   );
   assert.doesNotMatch(detailPanel, /\breadOnly\b/);
   assert.match(detailPanel, /participationState === "final"/);
@@ -280,8 +284,8 @@ test("restored feed UI uses responsive V2 routes and authoritative account and p
   assert.match(gallery, /watchDrag: false/);
   assert.match(gallery, /maxDimension=\{3200\}/);
   assert.match(gallery, /unoptimized/);
-  assert.match(gallery, /md:hidden/);
-  assert.match(gallery, /md:grid/);
+  assert.match(gallery, /surface === "mobile"/);
+  assert.match(gallery, /surface === "desktop"/);
 });
 
 test("account auction state is complete and member capability gates the feed", async () => {
@@ -317,7 +321,7 @@ test("account auction state is complete and member capability gates the feed", a
   assert.match(card, /canStartAuctionBid\(bidCapability\)/);
   assert.match(
     card,
-    /canStartBid\s*\?\s*\(?\s*<Link[\s\S]*?href=\{`\/auction\/\$\{item\.id\}\/bid`\}/,
+    /canStartBid\s*\?\s*\(?\s*<Link[\s\S]*?href=\{`\$\{basePath\}\/auction\/\$\{item\.id\}\/bid`\}/,
   );
   assert.doesNotMatch(card, /\breadOnly\b/);
   assert.match(card, /현재 로그인한 계정은 경매 입찰용 회원 계정이 아닙니다\./);

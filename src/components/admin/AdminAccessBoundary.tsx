@@ -8,13 +8,16 @@ import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 interface AdminSessionPayload {
   error?: string;
   session?: {
+    canAccessEmployee?: boolean;
     canAccessOperator?: boolean;
     canAccessOwner?: boolean;
+    roleCode?: string;
     userId?: string;
   };
 }
 
 interface AccessSnapshot {
+  canAccessEmployee: boolean;
   canAccessOperator: boolean;
   canAccessOwner: boolean;
   error: string;
@@ -23,6 +26,7 @@ interface AccessSnapshot {
 }
 
 const EMPTY_ACCESS: AccessSnapshot = {
+  canAccessEmployee: false,
   canAccessOperator: false,
   canAccessOwner: false,
   error: "",
@@ -40,6 +44,8 @@ export function AdminAccessBoundary({
   const userId = session?.user.id ?? "";
   const needsOwnerAccess =
     pathname === "/admin/owner" || pathname.startsWith("/admin/owner/");
+  const needsEmployeeAccess =
+    pathname === "/admin/employee" || pathname.startsWith("/admin/employee/");
   const snapshotIsCurrent =
     Boolean(userId) &&
     access.userId === userId &&
@@ -48,7 +54,9 @@ export function AdminAccessBoundary({
     snapshotIsCurrent &&
     (needsOwnerAccess
       ? access.canAccessOwner
-      : access.canAccessOperator);
+      : needsEmployeeAccess
+        ? access.canAccessEmployee
+        : access.canAccessOperator);
 
   useEffect(() => {
     if (loading || !session) return;
@@ -75,6 +83,7 @@ export function AdminAccessBoundary({
         }
 
         setAccess({
+          canAccessEmployee: payload.session.canAccessEmployee === true,
           canAccessOperator: payload.session.canAccessOperator === true,
           canAccessOwner: payload.session.canAccessOwner === true,
           error: "",
@@ -84,6 +93,7 @@ export function AdminAccessBoundary({
       } catch (error) {
         if (controller.signal.aborted) return;
         setAccess({
+          canAccessEmployee: false,
           canAccessOperator: false,
           canAccessOwner: false,
           error:
@@ -185,6 +195,18 @@ export function AdminAccessBoundary({
             href="/admin/owner"
           >
             소유자
+          </Link>
+        )}
+        {access.canAccessEmployee && (
+          <Link
+            className={
+              pathname.startsWith("/admin/employee")
+                ? "bg-ink px-4 py-2 text-paper"
+                : "border border-line px-4 py-2"
+            }
+            href="/admin/employee"
+          >
+            직원센터
           </Link>
         )}
       </nav>

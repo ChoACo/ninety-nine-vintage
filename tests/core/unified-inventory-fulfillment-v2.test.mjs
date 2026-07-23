@@ -705,7 +705,9 @@ test("operator payment API is shared, nested, strict, and confirms only the obse
   assert.match(consoleSource, /sessionStorage\.getItem\(key\)\s*\?\?\s*crypto\.randomUUID\(\)/);
   assert.match(consoleSource, /잔액 전액 입금 확인 완료/);
   assert.match(consoleSource, /원장 금액 결제 확정/);
-  assert.match(consoleSource, /모든 센터가 같은 대기열/);
+  assert.match(consoleSource, /구매자별 주문 상품/);
+  assert.match(consoleSource, /const buyerGroups = useMemo/);
+  assert.match(consoleSource, /payment\.products\.map/);
   assert.match(consoleSource, /response\.status\s*===\s*409/);
   assert.match(layout, /href:\s*"\/admin\/operator\/payments"/);
 });

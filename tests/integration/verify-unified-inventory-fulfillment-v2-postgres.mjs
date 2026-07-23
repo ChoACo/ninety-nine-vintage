@@ -115,6 +115,14 @@ try {
       root,
       "tests",
       "integration",
+      "role-center-buyer-preflight.sql",
+    ),
+  );
+  await access(
+    path.join(
+      root,
+      "tests",
+      "integration",
       "unified-inventory-fulfillment-v2.sql",
     ),
   );
@@ -217,6 +225,11 @@ try {
     "postgres",
   ];
   console.log("[unified-v2-db] running seeded runtime contracts");
+  run(psql, [
+    ...psqlBase,
+    "-f",
+    path.join(root, "tests", "integration", "role-center-buyer-preflight.sql"),
+  ]);
   run(psql, [
     ...psqlBase,
     "-v",

@@ -80,19 +80,19 @@ export function ModalShell({
 
   const widthClassName =
     size === "wide"
-      ? "md:max-w-6xl xl:max-w-7xl"
-      : "md:max-w-3xl";
+      ? "max-w-7xl"
+      : "max-w-3xl";
 
   return (
-    <div className="premium-dialog-overlay fixed inset-0 z-[110] overflow-hidden bg-black/60 backdrop-blur-md" data-state={closing ? "closed" : "open"} role="presentation">
-      <div className="flex min-h-full items-center justify-center p-2 [padding-bottom:max(.5rem,env(safe-area-inset-bottom))] [padding-top:max(.5rem,env(safe-area-inset-top))] md:p-6" onMouseDown={(event) => event.target === event.currentTarget && close()}>
-        <div aria-label={label} aria-modal="true" className={`premium-dialog-surface flex max-h-[calc(100dvh-1rem)] min-h-0 w-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-paper text-ink shadow-2xl shadow-black/20 outline-none md:max-h-[calc(100vh-3rem)] ${widthClassName}`} data-modal-size={size} data-state={closing ? "closed" : "open"} ref={dialogRef} role="dialog" tabIndex={-1}>
-          <header className="z-20 flex h-14 shrink-0 items-center justify-between border-b border-line bg-paper/95 px-4 backdrop-blur-md md:px-6">
+    <div className="premium-dialog-overlay fixed inset-0 z-[110] overflow-x-auto overflow-y-hidden bg-black/60 backdrop-blur-md" data-state={closing ? "closed" : "open"} role="presentation">
+      <div className="flex min-h-full min-w-[1280px] items-center justify-center p-6" onMouseDown={(event) => event.target === event.currentTarget && close()}>
+        <div aria-label={label} aria-modal="true" className={`premium-dialog-surface flex max-h-[calc(100vh-3rem)] min-h-0 w-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-paper text-ink shadow-2xl shadow-black/20 outline-none ${widthClassName}`} data-modal-size={size} data-state={closing ? "closed" : "open"} ref={dialogRef} role="dialog" tabIndex={-1}>
+          <header className="z-20 flex h-14 shrink-0 items-center justify-between border-b border-line bg-paper/95 px-6 backdrop-blur-md">
             <button className="inline-flex items-center gap-2 rounded-xl px-2 py-2 text-xs font-bold transition-all duration-300 hover:-translate-y-0.5 hover:bg-surface active:scale-95" onClick={close} type="button"><ArrowLeft size={16} /> 뒤로 가기</button>
             <p className="truncate px-4 text-xs font-bold">{label}</p>
             <button aria-label={`${label} 닫기`} className="grid size-10 place-items-center rounded-xl transition-all duration-300 hover:-translate-y-0.5 hover:bg-surface active:scale-95" onClick={close} type="button"><X size={18} /></button>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">{children}</div>
         </div>
       </div>
     </div>

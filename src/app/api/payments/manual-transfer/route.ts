@@ -18,10 +18,44 @@ export async function POST(request: Request) {
   if (!token) return json({ error: "unauthorized" }, 401);
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   try {
-    const { admin } = createSupabaseServerClients();
+    const { verifier, admin } = createSupabaseServerClients();
     await getManualTransferAccount(admin);
     if (body?.action === "begin" && typeof body.productId === "string") {
-      return json({ transfer: await beginManualBankTransfer(token, body.productId) });
+      const { data: authData, error: authError } = await verifier.auth.getUser(token);
+      if (authError || !authData.user) return json({ error: "unauthorized" }, 401);
+      const transfer = await beginManualBankTransfer(token, body.productId);
+      const [deadlineResult, roleResult] = await Promise.all([
+        admin
+          .from("manual_transfer_orders")
+          .select("display_due_at, due_at")
+          .eq("id", transfer.orderId)
+          .maybeSingle(),
+        admin
+          .from("account_access_roles")
+          .select("role_code")
+          .eq("user_id", authData.user.id)
+          .maybeSingle(),
+      ]);
+      if (deadlineResult.error || roleResult.error) {
+        return json({ error: "manual_transfer_deadline_unavailable" }, 503);
+      }
+      const deadline = deadlineResult.data as unknown as {
+        display_due_at: string | null;
+        due_at: string | null;
+      } | null;
+      const dueAt = deadline?.display_due_at ?? deadline?.due_at ?? null;
+      const deadlineEnforcementExempt =
+        roleResult.data?.role_code === "band_member";
+      return json({
+        transfer: {
+          ...transfer,
+          dueAt,
+          timedOut: Boolean(
+            dueAt && Date.parse(dueAt) <= Date.now() && transfer.status !== "confirmed",
+          ),
+          deadlineEnforcementExempt,
+        },
+      });
     }
     if (body?.action === "confirm") {
       return json({ error: "manual_transfer_ledger_required" }, 409);

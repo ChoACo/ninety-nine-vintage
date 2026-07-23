@@ -71,9 +71,11 @@ interface CatalogFilters {
 }
 
 interface AuctionFeedGridProps {
+  basePath?: "" | "/m";
   className?: string;
   initialProducts?: ProductPayload[];
   saleType: ProductSaleType;
+  surface?: "desktop" | "mobile";
   title?: string;
 }
 
@@ -168,7 +170,7 @@ export function AuctionFeedGrid(props: AuctionFeedGridProps) {
   return <EnabledAuctionFeedGrid {...props} />;
 }
 
-function EnabledAuctionFeedGrid({ className = "", initialProducts, saleType, title }: AuctionFeedGridProps) {
+function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts, saleType, surface = "desktop", title }: AuctionFeedGridProps) {
   const routeSearchParams = useSearchParams();
   const routeQuery = routeSearchParams.get("q") ?? "";
   const policyNow = useAuctionPolicyClock(saleType === "auction");
@@ -434,7 +436,7 @@ function EnabledAuctionFeedGrid({ className = "", initialProducts, saleType, tit
             </select>
           </label>
         </div>
-        <div aria-label="상품 상세 필터" className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div aria-label="상품 상세 필터" className={`mt-4 grid gap-2 ${surface === "desktop" ? "grid-cols-3" : "grid-cols-1"}`}>
           <label className="grid gap-1 text-[9px] font-bold tracking-[0.1em] text-muted">브랜드<select className="h-10 border border-line bg-paper px-3 text-xs font-bold text-ink" onChange={(event) => { setSelectedBrand(event.target.value); setPage(1); }} value={effectiveSelectedBrand}>{brandOptions.map((brand) => <option key={brand} value={brand}>{brand === "all" ? "모든 브랜드" : brand}</option>)}</select></label>
           <label className="grid gap-1 text-[9px] font-bold tracking-[0.1em] text-muted">카테고리<select className="h-10 border border-line bg-paper px-3 text-xs font-bold text-ink" onChange={(event) => { setSelectedCatalogCategory(event.target.value as CatalogCategory); setPage(1); }} value={effectiveSelectedCategory}>{CATALOG_CATEGORIES.map((category) => <option key={category} value={category}>{category === "all" ? "모든 카테고리" : category}</option>)}</select></label>
           <label className="grid gap-1 text-[9px] font-bold tracking-[0.1em] text-muted">성별<select className="h-10 border border-line bg-paper px-3 text-xs font-bold text-ink" onChange={(event) => { setSelectedGender(event.target.value as CatalogGender); setPage(1); }} value={effectiveSelectedGender}>{CATALOG_GENDERS.map((gender) => <option key={gender} value={gender}>{gender === "all" ? "모든 성별" : gender}</option>)}</select></label>
@@ -445,9 +447,9 @@ function EnabledAuctionFeedGrid({ className = "", initialProducts, saleType, tit
       {saleType === "auction" && <AuctionBidSummary snapshot={accountBids} />}
 
       {error && <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      {loading && <div className="grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-4 md:gap-x-5">{Array.from({ length: 12 }).map((_, index) => <div aria-hidden="true" className="aspect-[4/5] animate-pulse bg-surface" key={index} />)}</div>}
+      {loading && <div className={`grid grid-cols-2 gap-y-8 ${surface === "desktop" ? "grid-cols-4 gap-x-5" : "gap-x-3 min-[700px]:grid-cols-3"}`}>{Array.from({ length: 12 }).map((_, index) => <div aria-hidden="true" className="aspect-[4/5] animate-pulse bg-surface" key={index} />)}</div>}
       {!loading && !error && visibleCards.length === 0 && <div className="grid min-h-64 place-items-center border border-dashed border-line px-6 text-center"><div><p className="text-sm font-bold">현재 조건에 맞는 상품이 없습니다.</p><p className="mt-2 text-xs text-muted">필터를 초기화하거나 새로운 드롭을 기다려 주세요.</p></div></div>}
-      {!loading && visibleCards.length > 0 && <><div className="grid grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-4 md:gap-x-5">{pagination.items.map((item) => saleType === "auction" ? <AuctionFeedCard bidCapability={accountBidCapability} item={item} key={item.id} onBidPlaced={handleBidPlaced} participationState={bidStateByProduct.get(item.id)} /> : <AuctionCard item={item} key={item.id} />)}</div><nav aria-label="경매 상품 페이지 이동" className="mt-8 flex items-center justify-center gap-2"><button className="h-10 border border-line px-4 text-xs font-bold disabled:opacity-35" disabled={pagination.page <= 1} onClick={() => setPage(pagination.page - 1)} type="button">이전</button>{Array.from({ length: pagination.pageCount }, (_, index) => index + 1).map((pageNumber) => <button aria-current={pageNumber === pagination.page ? "page" : undefined} aria-label={`${pageNumber}페이지`} className={`size-10 border font-mono text-xs font-bold ${pageNumber === pagination.page ? "border-ink bg-ink text-paper" : "border-line"}`} key={pageNumber} onClick={() => setPage(pageNumber)} type="button">{pageNumber}</button>)}<button className="h-10 border border-line px-4 text-xs font-bold disabled:opacity-35" disabled={pagination.page >= pagination.pageCount} onClick={() => setPage(pagination.page + 1)} type="button">다음</button></nav><p className="mt-3 text-center font-mono text-[10px] text-muted">{pagination.page} / {pagination.pageCount}페이지 · 페이지당 {AUCTION_FEED_PAGE_SIZE}개</p></>}
+      {!loading && visibleCards.length > 0 && <><div className={`grid grid-cols-2 gap-y-9 ${surface === "desktop" ? "grid-cols-4 gap-x-5" : "gap-x-3 min-[700px]:grid-cols-3"}`}>{pagination.items.map((item) => saleType === "auction" ? <AuctionFeedCard basePath={basePath} bidCapability={accountBidCapability} item={item} key={item.id} onBidPlaced={handleBidPlaced} participationState={bidStateByProduct.get(item.id)} surface={surface} /> : <AuctionCard basePath={basePath} item={item} key={item.id} surface={surface} />)}</div><nav aria-label="경매 상품 페이지 이동" className="mt-8 flex items-center justify-center gap-2"><button className="h-10 border border-line px-4 text-xs font-bold disabled:opacity-35" disabled={pagination.page <= 1} onClick={() => setPage(pagination.page - 1)} type="button">이전</button>{Array.from({ length: pagination.pageCount }, (_, index) => index + 1).map((pageNumber) => <button aria-current={pageNumber === pagination.page ? "page" : undefined} aria-label={`${pageNumber}페이지`} className={`size-10 border font-mono text-xs font-bold ${pageNumber === pagination.page ? "border-ink bg-ink text-paper" : "border-line"}`} key={pageNumber} onClick={() => setPage(pageNumber)} type="button">{pageNumber}</button>)}<button className="h-10 border border-line px-4 text-xs font-bold disabled:opacity-35" disabled={pagination.page >= pagination.pageCount} onClick={() => setPage(pagination.page + 1)} type="button">다음</button></nav><p className="mt-3 text-center font-mono text-[10px] text-muted">{pagination.page} / {pagination.pageCount}페이지 · 페이지당 {AUCTION_FEED_PAGE_SIZE}개</p></>}
     </section>
   );
 }

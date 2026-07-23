@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const description = product.description.slice(0, 160);
   const url = `/auction/${id}`;
   const images = product.imageUrls[0] ? [{ url: product.imageUrls[0], alt: product.title }] : undefined;
-  return { title, description, alternates: { canonical: url }, openGraph: { title, description, url, type: "website", images } };
+  return { title, description, alternates: { canonical: url, media: { "only screen and (max-width: 1279px)": `/m${url}` } }, openGraph: { title, description, url, type: "website", images } };
 }
 
 export default async function AuctionDetailPage({ params }: { params: Promise<{ id: string }> }) {

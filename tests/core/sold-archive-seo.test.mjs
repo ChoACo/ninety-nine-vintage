@@ -63,7 +63,7 @@ test("sold routes own their canonical, structured data and safe 404 boundary", a
   ]);
   assert.doesNotMatch(shopLayout, /canonical/);
   assert.match(soldPage, /canonical:\s*"\/sold"/);
-  assert.match(brandPage, /alternates:\s*\{ canonical: url \}/);
+  assert.match(brandPage, /alternates:\s*\{ canonical: url, media:/);
   assert.match(brandPage, /decodeURIComponent\(value\)/);
   assert.match(detailPage, /UUID_PATTERN\.test\(id\).*notFound\(\)/s);
   assert.match(detailPage, /"@type":\s*"Product"/);

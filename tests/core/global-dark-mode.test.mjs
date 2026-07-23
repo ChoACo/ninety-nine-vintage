@@ -25,7 +25,7 @@ test("global theme initializes before hydration and persists an accessible user 
     source("src/app/layout.tsx"),
     source("src/components/layout/ThemeToggle.tsx"),
     source("src/components/layout/PcHeader.tsx"),
-    source("src/components/layout/MobileHeader.tsx"),
+    source("src/components/mobile/MobileSiteHeader.tsx"),
     source("src/app/(admin)/admin/layout.tsx"),
   ]);
 

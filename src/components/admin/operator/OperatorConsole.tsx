@@ -3,15 +3,16 @@
 import Link from "next/link";
 import {
   ArrowUpRight,
+  Banknote,
   Clock3,
   FileSpreadsheet,
   Package,
   Plus,
   Truck,
-  Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { OperatorSecondChanceButton } from "@/components/admin/operator/OperatorSecondChanceButton";
+import { OwnerNicknameReviewPanel } from "@/components/admin/owner/OwnerNicknameReviewPanel";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -45,7 +46,7 @@ export function OperatorConsole() {
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState(0);
   const [shipping, setShipping] = useState(0);
-  const [members, setMembers] = useState(0);
+  const [netRevenue, setNetRevenue] = useState(0);
   const [canMutate, setCanMutate] = useState(false);
   const [paymentMode, setPaymentMode] = useState<
     "manual_transfer" | "portone" | null
@@ -60,12 +61,16 @@ export function OperatorConsole() {
         ).data.session;
         if (!session) return;
         const headers = { Authorization: `Bearer ${session.access_token}` };
+        const today = new Date().toLocaleDateString("en-CA", {
+          timeZone: "Asia/Seoul",
+        });
+        const monthStart = `${today.slice(0, 7)}-01`;
         const [
           productResponse,
           pastProductResponse,
           orderResponse,
           shippingResponse,
-          memberResponse,
+          revenueResponse,
         ] = await Promise.all([
           fetch("/api/admin/operator/products", { headers, cache: "no-store" }),
           fetch("/api/admin/operator/products/past", {
@@ -77,10 +82,13 @@ export function OperatorConsole() {
             cache: "no-store",
           }),
           fetch("/api/admin/operator/shipping", { headers, cache: "no-store" }),
-          fetch("/api/admin/operator/members?limit=500", {
+          fetch(
+            `/api/admin/operator/revenue?from=${monthStart}&to=${today}`,
+            {
             headers,
             cache: "no-store",
-          }),
+            },
+          ),
         ]);
         const productData = await productResponse.json() as ProductResponse;
         const pastProductData =
@@ -92,8 +100,8 @@ export function OperatorConsole() {
         const shippingData = await shippingResponse.json() as {
           requests?: unknown[];
         };
-        const memberData = await memberResponse.json() as {
-          members?: unknown[];
+        const revenueData = await revenueResponse.json() as {
+          stores?: { netSales?: number }[];
         };
         if (!productResponse.ok) {
           throw new Error("운영자 권한을 확인할 수 없습니다.");
@@ -110,7 +118,14 @@ export function OperatorConsole() {
         );
         setOrders(orderData.activeCount ?? 0);
         setShipping(shippingData.requests?.length ?? 0);
-        setMembers(memberData.members?.length ?? 0);
+        setNetRevenue(
+          revenueResponse.ok
+            ? (revenueData.stores ?? []).reduce(
+                (sum, store) => sum + (store.netSales ?? 0),
+                0,
+              )
+            : 0,
+        );
       } catch (error) {
         setNotice(
           error instanceof Error
@@ -129,7 +144,7 @@ export function OperatorConsole() {
     ],
     ["공용 입금 확인 대기", orders, Clock3],
     ["배송 요청", shipping, Truck],
-    ["회원 디렉터리", members, Users],
+    ["이번 달 순매출", `${netRevenue.toLocaleString("ko-KR")}원`, Banknote],
   ] as const;
 
   return (
@@ -141,7 +156,7 @@ export function OperatorConsole() {
             운영자 센터
           </h1>
           <p className="mt-3 text-sm text-muted">
-            담당 숍의 상품·회원·배송과 전체 매장의 공용 입금 큐를 확인합니다.
+            소속 센터의 상품 등록, 입금 확인, 출고와 택배 업무를 확인합니다.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex">
@@ -250,15 +265,15 @@ export function OperatorConsole() {
             </Link>
             <Link
               className="flex gap-3 underline"
-              href="/admin/operator/members"
+              href="/admin/operator/center"
             >
-              회원 상태·배송 이용권 관리 <ArrowUpRight size={14} />
+              소속 센터 정보 관리 <ArrowUpRight size={14} />
             </Link>
             <Link
               className="flex gap-3 underline"
-              href="/admin/operator/orders"
+              href="/admin/operator/payments"
             >
-              공용 입금 확인 업무 열기 <ArrowUpRight size={14} />
+              주문·입금 확인 업무 열기 <ArrowUpRight size={14} />
             </Link>
             <Link
               className="flex gap-3 underline"
@@ -274,13 +289,14 @@ export function OperatorConsole() {
             </Link>
             <Link
               className="flex gap-3 underline"
-              href="/admin/operator/chat"
+              href="/admin/operator/fulfillment"
             >
-              상담 메시지 답변 <ArrowUpRight size={14} />
+              입고·보관·출고 업무 열기 <ArrowUpRight size={14} />
             </Link>
           </div>
         </section>
       </div>
+      <OwnerNicknameReviewPanel />
     </div>
   );
 }

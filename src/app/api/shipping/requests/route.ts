@@ -215,7 +215,7 @@ export async function POST(request: Request) {
       accountNumberSnapshot = quote.account_number_snapshot as string;
     }
 
-    const { data, error } = await auth.admin.rpc(
+    const { data, error } = await (auth.admin as unknown as RpcClient).rpc(
       "request_commerce_order_shipment",
       {
         p_member_id: auth.userId,

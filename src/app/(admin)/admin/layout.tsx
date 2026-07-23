@@ -15,7 +15,7 @@ export default function AdminLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="min-h-screen min-w-0 bg-paper text-ink">
+    <div className="min-h-screen min-w-0 bg-paper text-ink" data-admin-surface>
       <header className="border-b border-line bg-paper">
         <div className="mx-auto flex min-h-18 max-w-[1680px] items-center justify-between gap-4 px-4 py-4 sm:px-6 md:px-10">
           <Link

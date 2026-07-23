@@ -148,8 +148,9 @@ test("the former entry gate is absent while live auctions keep their authoritati
   );
   for (const source of [header, mobileNavigation]) {
     assert.match(source, /"\/feed"/);
-    assert.match(source, /"\/admin\/operator"/);
   }
+  assert.match(mobileNavigation, /"\/admin\/operator\/center"/);
+  assert.match(mobileNavigation, /"\/admin\/employee"/);
 });
 
 test("Kakao returnTo accepts only same-origin application paths", () => {
@@ -291,7 +292,9 @@ test("public shop surfaces expose shopper controls while admin links remain sess
   ]);
 
   assert.match(authStatus, /useSupabaseSession\(\)/);
-  assert.match(authStatus, /aria-label="내 정보"/);
+  assert.match(authStatus, /label: "내 정보"/);
+  assert.match(authStatus, /label: "센터 관리"/);
+  assert.match(authStatus, /label: "직원센터"/);
   assert.match(authStatus, /aria-label="로그아웃"/);
   for (const source of [authStatus, accountPage]) {
     assert.doesNotMatch(source, /\/api\/account\/session/);
@@ -300,14 +303,16 @@ test("public shop surfaces expose shopper controls while admin links remain sess
     assert.doesNotMatch(source, /href="\/(?:owner|operator)"/);
     assert.doesNotMatch(source, /AccountSessionPanel/);
   }
-  assert.match(header, /access\.canAccessOperator && <Link[\s\S]*?href="\/admin\/operator"/);
-  assert.match(header, /access\.canAccessOwner && <Link[\s\S]*?href="\/admin\/owner"/);
-  assert.match(mobileHeader, /access\.canAccessOperator && <Link[\s\S]*?href="\/admin\/operator"/);
-  assert.match(mobileNavigation, /access\.canAccessOperator \? \[\["운영자", "\/admin\/operator"/);
+  assert.match(mobileHeader, /access\.roleCode === "operator"[\s\S]*?href="\/admin\/operator\/center"/);
+  assert.match(mobileHeader, /access\.roleCode === "employee"[\s\S]*?href="\/admin\/employee"/);
+  assert.match(mobileHeader, /access\.canAccessOwner[\s\S]*?href="\/admin\/owner"/);
+  assert.match(mobileNavigation, /access\.roleCode === "operator"/);
+  assert.match(mobileNavigation, /access\.roleCode === "employee"/);
   assert.match(accessHook, /useSupabaseSession\(\)/);
   assert.match(accessHook, /fetch\("\/api\/admin\/session"/);
   assert.match(accessHook, /snapshot\.userId === userId[\s\S]*snapshot\.revision === revision/);
-  assert.match(adminSession, /const canAccessOperator = isOwner \|\| roleCode === "operator" \|\| roleCode === "employee"/);
+  assert.match(adminSession, /const canAccessOperator = isOwner \|\| roleCode === "operator"/);
+  assert.match(adminSession, /const canAccessEmployee = isOwner \|\| roleCode === "employee"/);
   assert.match(adminSession, /canAccessOwner: isOwner/);
   assert.match(adminLayout, /<AdminAccessBoundary>\{children\}<\/AdminAccessBoundary>/);
   assert.doesNotMatch(policyPage, /PcLayout/);

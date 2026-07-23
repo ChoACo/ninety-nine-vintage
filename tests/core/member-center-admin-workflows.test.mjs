@@ -5,16 +5,25 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("first-login nickname setup is global and every later change is reviewed", async () => {
-  const [layout, gate, settings, review, migration] = await Promise.all([
+test("first-login nickname setup is limited to Kakao account hubs and every later change is reviewed", async () => {
+  const [layout, desktopAccount, mobileAccount, mobileSettings, gate, settings, review, migration] = await Promise.all([
     source("src/app/layout.tsx"),
+    source("src/app/(shop)/account/page.tsx"),
+    source("src/app/(mobile)/m/account/page.tsx"),
+    source("src/app/(mobile)/m/account/settings/page.tsx"),
     source("src/components/account/NicknameGate.tsx"),
     source("src/components/account/NicknameSettings.tsx"),
     source("src/components/admin/owner/OwnerNicknameReviewPanel.tsx"),
     source("supabase/migrations/20260723043642_member_center_admin_workflows.sql"),
   ]);
 
-  assert.match(layout, /<NicknameGate\s*\/>/);
+  assert.doesNotMatch(layout, /NicknameGate/);
+  assert.match(desktopAccount, /<NicknameGate\s*\/>/);
+  assert.match(mobileAccount, /<NicknameGate\s*\/>/);
+  assert.doesNotMatch(mobileSettings, /NicknameGate/);
+  assert.match(gate, /identity\.provider === "kakao"/);
+  assert.match(gate, /if \(loading \|\| !kakaoUserId\)/);
+  assert.match(gate, /loadedUserId !== kakaoUserId/);
   assert.match(gate, /state\?\.isInitialized !== false/);
   assert.match(gate, /setMyInitialNickname\(nickname\)/);
   assert.doesNotMatch(gate, /onClose|dismiss|닫기/);

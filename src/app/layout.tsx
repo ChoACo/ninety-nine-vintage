@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-import { NicknameGate } from "@/components/account/NicknameGate";
 import "./globals.css";
 
 const geist = Geist({
@@ -41,7 +40,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className="font-sans antialiased">
         {children}
-        <NicknameGate />
       </body>
     </html>
   );

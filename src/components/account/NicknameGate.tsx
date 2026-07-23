@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
@@ -12,16 +11,21 @@ import {
 } from "@/lib/supabase/nickname";
 
 export function NicknameGate() {
-  const pathname = usePathname();
   const { loading, revision, session } = useSupabaseSession();
   const [state, setState] = useState<NicknameState | null>(null);
   const [nickname, setNickname] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
+  const isKakaoSession =
+    session?.user.identities?.some(
+      (identity) => identity.provider === "kakao",
+    ) === true;
+  const kakaoUserId = isKakaoSession ? (session?.user.id ?? null) : null;
 
   useEffect(() => {
     let active = true;
-    if (loading || !session || pathname.startsWith("/auth/")) {
+    if (loading || !kakaoUserId) {
       return () => {
         active = false;
       };
@@ -31,16 +35,26 @@ export function NicknameGate() {
         if (!active) return;
         setState(next);
         setNickname(next.isInitialized ? "" : next.displayName);
+        setLoadedUserId(kakaoUserId);
       })
       .catch(() => {
-        if (active) setState(null);
+        if (active) {
+          setState(null);
+          setLoadedUserId(null);
+        }
       });
     return () => {
       active = false;
     };
-  }, [loading, pathname, revision, session]);
+  }, [kakaoUserId, loading, revision]);
 
-  if (!session || state?.isInitialized !== false) return null;
+  if (
+    !kakaoUserId ||
+    loadedUserId !== kakaoUserId ||
+    state?.isInitialized !== false
+  ) {
+    return null;
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();

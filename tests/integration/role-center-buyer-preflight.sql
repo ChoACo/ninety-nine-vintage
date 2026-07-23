@@ -13,8 +13,15 @@ begin
     raise exception 'cutover must expose exactly the two canonical centers';
   end if;
   if (select count(*) from public.stores where is_active)<>2
-    or (select count(*) from public.stores where is_active and name in ('나인티 나인 빈티지','다미네 옷가게'))<>2 then
+    or (select count(*) from public.stores where is_active and name in ('나인티 나인 빈티지','다미네 옷가게'))<>2
+    or (select count(*) from public.stores where is_active and slug in ('ninety-nine-vintage','dami-clothing-shop-b'))<>2 then
     raise exception 'cutover must expose exactly the two canonical stores';
+  end if;
+  if exists(select 1 from public.stores where not is_active) then
+    raise exception 'cutover must remove every legacy store';
+  end if;
+  if exists(select 1 from public.products) then
+    raise exception 'cutover must remove every test product';
   end if;
   if (select count(*) from public.fulfillment_center_staff_assignments a
       join public.account_access_roles r on r.user_id=a.user_id and r.role_code='owner'

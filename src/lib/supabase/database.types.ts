@@ -5594,6 +5594,122 @@ export type Database = {
           },
         ]
       }
+      web_push_notification_outbox: {
+        Row: {
+          attempts: number
+          body: string
+          created_at: string
+          delivered_at: string | null
+          expires_at: string
+          id: string
+          last_error: string | null
+          locked_at: string | null
+          next_attempt_at: string
+          notification_id: string
+          recipient_user_id: string
+          title: string
+          topic: string
+          url: string
+        }
+        Insert: {
+          attempts?: number
+          body: string
+          created_at?: string
+          delivered_at?: string | null
+          expires_at?: string
+          id?: string
+          last_error?: string | null
+          locked_at?: string | null
+          next_attempt_at?: string
+          notification_id: string
+          recipient_user_id: string
+          title: string
+          topic: string
+          url?: string
+        }
+        Update: {
+          attempts?: number
+          body?: string
+          created_at?: string
+          delivered_at?: string | null
+          expires_at?: string
+          id?: string
+          last_error?: string | null
+          locked_at?: string | null
+          next_attempt_at?: string
+          notification_id?: string
+          recipient_user_id?: string
+          title?: string
+          topic?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "web_push_notification_outbox_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: true
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "web_push_notification_outbox_recipient_user_id_fkey"
+            columns: ["recipient_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      web_push_subscriptions: {
+        Row: {
+          auth_secret: string
+          created_at: string
+          disabled_at: string | null
+          endpoint: string
+          failure_count: number
+          id: string
+          last_success_at: string | null
+          p256dh: string
+          updated_at: string
+          user_agent: string
+          user_id: string
+        }
+        Insert: {
+          auth_secret: string
+          created_at?: string
+          disabled_at?: string | null
+          endpoint: string
+          failure_count?: number
+          id?: string
+          last_success_at?: string | null
+          p256dh: string
+          updated_at?: string
+          user_agent?: string
+          user_id: string
+        }
+        Update: {
+          auth_secret?: string
+          created_at?: string
+          disabled_at?: string | null
+          endpoint?: string
+          failure_count?: number
+          id?: string
+          last_success_at?: string | null
+          p256dh?: string
+          updated_at?: string
+          user_agent?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "web_push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wishlist_items: {
         Row: {
           created_at: string
@@ -5633,6 +5749,19 @@ export type Database = {
     }
     Functions: {
       access_role_for_user: { Args: { p_user_id: string }; Returns: string }
+      claim_web_push_notifications: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          body: string
+          expires_at: string
+          id: string
+          recipient_user_id: string
+          title: string
+          topic: string
+          url: string
+        }[]
+      }
       owner_member_mode_is_active: {
         Args: { p_user_id: string }
         Returns: boolean

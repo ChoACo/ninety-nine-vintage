@@ -42,10 +42,12 @@
     "embla-carousel-react": "^8.6.0",
     "exceljs": "4.4.0",
     "lucide-react": "1.25.0",
-    "next": "16.2.6",
+    "next": "16.2.11",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "server-only": "0.0.1",
+    "sharp": "0.35.3",
+    "web-push": "3.6.7",
     "zustand": "5.0.14"
   },
   "devDependencies": {
@@ -54,6 +56,7 @@
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/web-push": "3.6.4",
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
@@ -63,6 +66,7 @@
   },
   "overrides": {
     "postcss": "8.5.20",
+    "sharp": "0.35.3",
     "uuid": "11.1.1"
   },
   "type": "module"

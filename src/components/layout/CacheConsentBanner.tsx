@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { CACHE_CONSENT_EVENT, clearCacheConsent, readCacheConsent, writeCacheConsent, type CacheConsent } from "@/lib/cacheConsent";
 
-const CACHE_NAME = "ninetynine-public-v1";
+const CACHE_NAME = "ninetynine-public-v2";
+const CACHE_CONSENT_NAME = "ninetynine-cache-consent-v1";
 const subscribeToConsent = (onStoreChange: () => void) => {
   window.addEventListener(CACHE_CONSENT_EVENT, onStoreChange);
   window.addEventListener("storage", onStoreChange);
@@ -16,15 +17,20 @@ const subscribeToConsent = (onStoreChange: () => void) => {
 };
 
 async function registerPublicCache() {
-  if ("serviceWorker" in navigator) await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  if ("serviceWorker" in navigator) {
+    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    const worker = registration.active || registration.waiting || registration.installing;
+    worker?.postMessage({ type: "ENABLE_PUBLIC_CACHE" });
+  }
 }
 
 async function clearPublicCache() {
   if ("serviceWorker" in navigator) {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.filter((registration) => registration.active?.scriptURL.endsWith("/sw.js")).map((registration) => registration.unregister()));
+    const registration = await navigator.serviceWorker.getRegistration("/");
+    const worker = registration?.active || registration?.waiting || registration?.installing;
+    worker?.postMessage({ type: "CLEAR_PUBLIC_CACHE" });
   }
-  await caches.delete(CACHE_NAME);
+  await Promise.all([caches.delete(CACHE_NAME), caches.delete(CACHE_CONSENT_NAME)]);
 }
 
 export function CacheConsentBanner({ surface = "mobile" }: { surface?: "desktop" | "mobile" }) {
@@ -32,7 +38,13 @@ export function CacheConsentBanner({ surface = "mobile" }: { surface?: "desktop"
   const [consent, setConsent] = useState<CacheConsent>("unknown");
 
   useEffect(() => {
-    const sync = () => setConsent(readCacheConsent());
+    const sync = () => {
+      const current = readCacheConsent();
+      setConsent(current);
+      if (current === "accepted") {
+        void registerPublicCache().catch(() => undefined);
+      }
+    };
     sync();
     window.addEventListener(CACHE_CONSENT_EVENT, sync);
     return () => window.removeEventListener(CACHE_CONSENT_EVENT, sync);

@@ -30,6 +30,19 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.ninety-nine-vintage.store"),
   title: "NINETY-NINE VINTAGE",
   description: "선별된 한 점의 빈티지를 바로 만나는 곳",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "NINETY-NINE",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+    icon: [
+      { url: "/pwa-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/pwa-icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

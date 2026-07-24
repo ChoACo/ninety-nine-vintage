@@ -7,6 +7,18 @@
 		"nodejs_compat",
 		"global_fetch_strictly_public"
 	],
+	"workers_dev": false,
+	"preview_urls": false,
+	"routes": [
+		{
+			"pattern": "ninety-nine-vintage.store",
+			"custom_domain": true
+		},
+		{
+			"pattern": "www.ninety-nine-vintage.store/*",
+			"zone_name": "ninety-nine-vintage.store"
+		}
+	],
 	"assets": {
 		"directory": ".open-next/assets",
 		"binding": "ASSETS",

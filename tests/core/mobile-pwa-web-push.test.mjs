@@ -26,13 +26,18 @@ test("the install control is mobile-device gated and the manifest opens the mobi
 });
 
 test("service worker keeps cache consent separate from install and handles push clicks", async () => {
-  const [worker, consent] = await Promise.all([
+  const [worker, consent, cacheConsent] = await Promise.all([
     source("public/sw.js"),
     source("src/components/layout/CacheConsentBanner.tsx"),
+    source("src/lib/cacheConsent.ts"),
   ]);
 
   assert.match(worker, /ENABLE_PUBLIC_CACHE/);
   assert.match(worker, /CACHE_CONSENT_NAME/);
+  assert.match(cacheConsent, /CACHE_CONSENT_COOKIE/);
+  assert.match(cacheConsent, /writeCookieConsent\(value\)/);
+  assert.match(consent, /setConsent\("accepted"\)/);
+  assert.match(consent, /setConsent\("declined"\)/);
   assert.match(worker, /addEventListener\("push"/);
   assert.match(worker, /showNotification/);
   assert.match(worker, /addEventListener\("notificationclick"/);

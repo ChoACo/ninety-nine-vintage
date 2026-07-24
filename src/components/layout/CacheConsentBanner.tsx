@@ -52,8 +52,16 @@ export function CacheConsentBanner({ surface = "mobile" }: { surface?: "desktop"
 
   if (pathname === "/" || consent !== "unknown") return null;
   const detailHasFixedMobileAction = /^\/auction\/[^/]+$/.test(pathname);
-  const accept = () => { writeCacheConsent("accepted"); void registerPublicCache().catch(() => undefined); };
-  const decline = () => { writeCacheConsent("declined"); void clearPublicCache().catch(() => undefined); };
+  const accept = () => {
+    setConsent("accepted");
+    writeCacheConsent("accepted");
+    void registerPublicCache().catch(() => undefined);
+  };
+  const decline = () => {
+    setConsent("declined");
+    writeCacheConsent("declined");
+    void clearPublicCache().catch(() => undefined);
+  };
   const mobileBottom = detailHasFixedMobileAction
     ? "bottom-[calc(9rem+env(safe-area-inset-bottom))]"
     : "bottom-[calc(5rem+env(safe-area-inset-bottom))]";

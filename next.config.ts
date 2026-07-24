@@ -9,6 +9,9 @@ const supabaseImageHostname = (() => {
 })();
 
 const nextConfig: NextConfig = {
+  // Allow a phone on this local network to receive Turbopack updates while
+  // testing the mobile site through the development server.
+  allowedDevOrigins: ["192.168.45.119"],
   // Keep the App Router in its default SSR mode. Product images use next/image;
   // the allow-list below limits remote optimization to Supabase Storage while
   // AVIF/WebP variants and device-specific srcsets reduce storefront payloads.

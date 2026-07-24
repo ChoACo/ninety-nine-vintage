@@ -24,6 +24,9 @@ test("Owner dashboard removes shop status cards and links center(store) manageme
   assert.match(consoleSource, /센터와 매장은 같은 업무 단위입니다/);
   assert.match(consoleSource, /센터\(매장\) 추가/);
   assert.match(consoleSource, /담당 운영자/);
+  assert.match(consoleSource, /운영자 배정 적용/);
+  assert.match(consoleSource, /선택한 운영자는 아직 배정되지 않았습니다/);
+  assert.match(consoleSource, /applyOperatorAssignment/);
   assert.match(consoleSource, /직원 배치/);
   assert.match(consoleSource, /수정 저장/);
   assert.match(consoleSource, /삭제된 센터\(매장\)/);

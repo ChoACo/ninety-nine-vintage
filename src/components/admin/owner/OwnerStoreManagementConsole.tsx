@@ -246,6 +246,24 @@ export function OwnerStoreManagementConsole() {
     );
   };
 
+  const applyOperatorAssignment = async (store: ManagedStore) => {
+    const operatorId = (drafts[store.id] ?? storeDraft(store)).operatorId;
+    if (!operatorId || operatorId === store.operatorId) return;
+    await mutate(
+      `operator:${store.id}:${store.version}:${operatorId}`,
+      {
+        action: "update",
+        storeId: store.id,
+        expectedVersion: store.version,
+        slug: store.slug,
+        name: store.name,
+        description: store.description,
+        operatorId,
+      },
+      "새 담당 운영자를 매장에 배정했습니다.",
+    );
+  };
+
   const archiveStore = async (store: ManagedStore) => {
     if (
       !window.confirm(
@@ -553,30 +571,55 @@ export function OwnerStoreManagementConsole() {
                       </label>
                       <label className="text-xs font-bold sm:col-span-2">
                         담당 운영자
-                        <select
-                          className="mt-2 w-full border border-line bg-paper px-3 py-3 text-sm"
-                          onChange={(event) =>
-                            setDrafts((current) => ({
-                              ...current,
-                              [store.id]: {
-                                ...draft,
-                                operatorId: event.target.value,
-                              },
-                            }))
-                          }
-                          value={draft.operatorId}
-                        >
-                          {directory.operators.map((operator) => (
-                            <option
-                              disabled={!operator.assignable}
-                              key={operator.id}
-                              value={operator.id}
-                            >
-                              {operator.displayName}
-                              {!operator.assignable ? " (기존 관리자 담당)" : ""}
-                            </option>
-                          ))}
-                        </select>
+                        <span className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                          <select
+                            className="w-full border border-line bg-paper px-3 py-3 text-sm"
+                            onChange={(event) =>
+                              setDrafts((current) => ({
+                                ...current,
+                                [store.id]: {
+                                  ...draft,
+                                  operatorId: event.target.value,
+                                },
+                              }))
+                            }
+                            value={draft.operatorId}
+                          >
+                            {directory.operators.map((operator) => (
+                              <option
+                                disabled={!operator.assignable}
+                                key={operator.id}
+                                value={operator.id}
+                              >
+                                {operator.displayName}
+                                {!operator.assignable
+                                  ? " (기존 관리자 담당)"
+                                  : ""}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            className="inline-flex items-center justify-center gap-2 border border-ink px-4 py-3 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40"
+                            disabled={
+                              busyKey !== null ||
+                              !draft.operatorId ||
+                              draft.operatorId === store.operatorId
+                            }
+                            onClick={() =>
+                              void applyOperatorAssignment(store)
+                            }
+                            type="button"
+                          >
+                            <UserPlus size={14} />
+                            운영자 배정 적용
+                          </button>
+                        </span>
+                        {draft.operatorId !== store.operatorId && (
+                          <span className="mt-2 block text-[11px] font-normal text-amber-700">
+                            선택한 운영자는 아직 배정되지 않았습니다. 적용
+                            버튼을 눌러 주세요.
+                          </span>
+                        )}
                       </label>
                       <label className="text-xs font-bold sm:col-span-2">
                         설명

@@ -107,3 +107,34 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
     /grant select on table public\.customer_inventory_items to service_role/i,
   );
 });
+
+test("direct-store cutover projects paid items without reactivating the retired center workflow", async () => {
+  const repair = await source(
+    "supabase/migrations/20260724185954_repair_direct_store_inventory_projection.sql",
+  );
+
+  assert.match(
+    repair,
+    /create or replace function app_private\.create_customer_inventory_entitlement/,
+  );
+  assert.match(repair, /routes\.status = 'active'/);
+  assert.match(repair, /centers\.business_id = v_business/);
+  assert.doesNotMatch(
+    repair,
+    /centers\.status = 'active'/,
+  );
+  assert.match(repair, /'direct_store_entitlement'/);
+  assert.match(
+    repair,
+    /create_customer_inventory_entitlement\(\s*'auction'/i,
+  );
+  assert.match(
+    repair,
+    /current_stage = 'reconciliation_required'[\s\S]*current_stage = 'preparing'/,
+  );
+  assert.match(
+    repair,
+    /unified_inventory_reads_enabled = true[\s\S]*item_selected_shipments_enabled = true/,
+  );
+  assert.doesNotMatch(repair, /update public\.fulfillment_centers[\s\S]*status/);
+});

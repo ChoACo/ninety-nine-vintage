@@ -7,6 +7,7 @@ import {
   normalizeProductLimit,
   normalizeProductOffset,
 } from "@/lib/catalog/query";
+import { formatProductDisplayNumber } from "@/lib/productDisplayNumber";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 
@@ -45,6 +46,7 @@ export interface PublishedProduct {
   category: string;
   brand: string;
   brandSlug: string;
+  gender: "" | "남성" | "여성" | "공용";
   publishAt: string;
   closesAt: string;
   status: ProductRow["status"];
@@ -66,7 +68,7 @@ export interface PublishedProduct {
   storeId: string | null;
   storageClass: "small" | "large";
   sizeLabel: string;
-  conditionGrade: "S" | "A+" | "A" | "B";
+  conditionGrade: "" | "S" | "A+" | "A" | "B";
   measurements: Json;
   inspectionNotes: string[];
 }
@@ -79,11 +81,15 @@ export interface SoldFeedProduct extends PublishedProduct {
 export function mapPublishedProduct(row: ProductRow): PublishedProduct {
   return {
     id: row.id,
-    title: row.title,
+    title: row.title || formatProductDisplayNumber(row.id),
     description: row.description,
     category: row.category,
     brand: row.brand,
     brandSlug: row.brand_slug,
+    gender:
+      row.gender === "남성" || row.gender === "여성" || row.gender === "공용"
+        ? row.gender
+        : "",
     publishAt: row.publish_at,
     closesAt: row.closes_at,
     status: row.status,
@@ -105,7 +111,7 @@ export function mapPublishedProduct(row: ProductRow): PublishedProduct {
     storeId: row.store_id,
     storageClass: row.storage_class === "large" ? "large" : "small",
     sizeLabel: resolveSizeLabel(row.title, row.size_label),
-    conditionGrade: ["S", "A+", "A", "B"].includes(row.condition_grade) ? row.condition_grade as "S" | "A+" | "A" | "B" : "A",
+    conditionGrade: ["S", "A+", "A", "B"].includes(row.condition_grade) ? row.condition_grade as "S" | "A+" | "A" | "B" : "",
     measurements: row.measurements,
     inspectionNotes: row.inspection_notes,
   };
@@ -181,9 +187,10 @@ export async function fetchSoldFeedProducts(input: {
     bidLockedAt: row.bid_locked_at,
     brand: row.brand,
     brandSlug: row.brand_slug,
+    gender: "",
     category: row.category,
     closesAt: row.closes_at,
-    conditionGrade: "A",
+    conditionGrade: "",
     currentPrice: row.current_price,
     description: row.description,
     finalBidAmount: row.final_bid_amount,

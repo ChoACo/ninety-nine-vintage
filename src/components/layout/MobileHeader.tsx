@@ -9,14 +9,7 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
-
-const publicNavigation = [
-  { label: "홈", href: "/home" },
-  ...(LIVE_AUCTION_ENABLED ? [{ label: "입찰 중인 상품", href: "/bidding" }] : []),
-  ...(LIVE_AUCTION_ENABLED ? [{ label: "실시간 경매", href: "/feed" }] : []),
-  { label: "즉시 구매", href: "/shop" },
-  { label: "내 정보", href: "/account" },
-];
+import { useActiveBidNavigation } from "@/components/features/auction/ActiveBidNavigationProvider";
 
 export function MobileHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -24,6 +17,14 @@ export function MobileHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolea
   const pathname = usePathname();
   const router = useRouter();
   const access = useAdminNavigationAccess();
+  const { hasActiveBid } = useActiveBidNavigation();
+  const publicNavigation = [
+    { label: "홈", href: "/home" },
+    ...(LIVE_AUCTION_ENABLED && hasActiveBid ? [{ label: "입찰 중인 상품", href: "/bidding" }] : []),
+    ...(LIVE_AUCTION_ENABLED ? [{ label: "실시간 경매", href: "/feed" }] : []),
+    { label: "즉시 구매", href: "/shop" },
+    { label: "내 정보", href: "/account" },
+  ];
 
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 768px)");

@@ -1,6 +1,6 @@
 import type { Bid, Item } from "@/types/auction";
 
-export type ConditionGrade = "S" | "A+" | "A" | "B";
+export type ConditionGrade = "" | "S" | "A+" | "A" | "B";
 
 export interface ItemMeasurements {
   shoulder: number;

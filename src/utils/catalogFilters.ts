@@ -68,6 +68,9 @@ function catalogText(post: AuctionPost): string {
 }
 
 export function getCatalogGender(post: AuctionPost): Exclude<CatalogGender, "all"> {
+  if (post.gender === "남성" || post.gender === "여성" || post.gender === "공용") {
+    return post.gender;
+  }
   const text = catalogText(post);
   if (/(여성|여자|woman|women|ladies|걸즈)/i.test(text)) return "여성";
   if (/(남성|남자|man|men|보이즈)/i.test(text)) return "남성";

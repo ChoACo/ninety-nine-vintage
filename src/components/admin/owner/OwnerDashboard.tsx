@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Database, Settings, ShieldCheck, Store, UsersRound } from "lucide-react";
+import { Building2, Clock3, Database, Settings, ShieldCheck, Store, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -8,6 +8,7 @@ import { OwnerManualTransferAccountPanel } from "@/components/admin/owner/OwnerM
 import { OwnerSiteStatusPanel } from "@/components/admin/owner/OwnerSiteStatusPanel";
 import { LocalTestMemberSwitcher } from "@/components/admin/LocalTestMemberSwitcher";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useOwnerMemberMode } from "@/components/features/auth/OwnerMemberModeProvider";
 
 interface StoreRow {
   id: string;
@@ -28,6 +29,7 @@ export function OwnerDashboard({
 }: Readonly<{ enableLocalTestMembers?: boolean }>) {
   const [data, setData] = useState<Overview | null>(null);
   const [notice, setNotice] = useState("");
+  const memberMode = useOwnerMemberMode();
 
   useEffect(() => {
     void (async () => {
@@ -68,6 +70,33 @@ export function OwnerDashboard({
       </div>
       {notice && <div className="border border-dashed border-line bg-surface p-6 text-sm">{notice}</div>}
       {enableLocalTestMembers && <LocalTestMemberSwitcher />}
+      {memberMode.eligible && (
+        <section className="border border-amber-300 bg-amber-50 p-5">
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+            <div>
+              <p className="inline-flex items-center gap-2 text-xs font-black text-amber-950">
+                <Clock3 size={15} /> 회원 화면 임시 확인
+              </p>
+              <p className="mt-2 text-xs leading-5 text-amber-900">
+                저장된 소유자 권한은 변경하지 않고 3분 동안 회원과 같은 권한으로 사이트를 확인합니다.
+              </p>
+            </div>
+            <button
+              className="h-11 shrink-0 bg-amber-950 px-5 text-xs font-bold text-white disabled:opacity-40"
+              disabled={memberMode.busy}
+              onClick={() => {
+                void memberMode.run("activate").then((activated) => {
+                  if (activated) window.location.assign("/home");
+                  else setNotice("임시 회원 권한을 활성화하지 못했습니다.");
+                });
+              }}
+              type="button"
+            >
+              3분간 회원 권한 활성화
+            </button>
+          </div>
+        </section>
+      )}
       <div className="grid grid-cols-1 gap-px border border-line bg-line sm:grid-cols-3">
         <div className="bg-paper p-6"><Store size={17} /><p className="mt-8 text-xs text-muted">운영 중인 센터(매장)</p><p className="mt-2 font-mono text-3xl font-bold">{stores.filter((store) => store.is_active).length}</p></div>
         <div className="bg-paper p-6"><Database size={17} /><p className="mt-8 text-xs text-muted">결제 완료 거래</p><p className="mt-2 font-mono text-3xl font-bold">{paidTotal.toLocaleString("ko-KR")}원</p></div>

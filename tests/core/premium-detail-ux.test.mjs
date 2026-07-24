@@ -97,7 +97,7 @@ test("premium detail actions stay in layered rounded dialogs before server mutat
   assert.match(condition, /PremiumDialog/);
   assert.match(condition, /상품 상태 상세 보기/);
   assert.match(condition, /상품 상태 정보/);
-  assert.match(condition, /상태 등급 \{item\.conditionGrade\}/);
+  assert.match(condition, /상태 등급 \{item\.conditionGrade \|\| "미입력"\}/);
   assert.doesNotMatch(condition, /전문가 검수 완료|정품·상태 확인|검수 보고서|상세 보고서|BadgeCheck/);
   assert.match(cart, /PremiumDialog/);
   assert.match(cart, /간편 장바구니/);

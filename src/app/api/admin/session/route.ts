@@ -1,4 +1,5 @@
 import { authenticateCommerceRequest, commerceJson } from "@/lib/commerce/server";
+import { getOwnerMemberModeState } from "@/lib/ownerMemberMode.server";
 
 export async function GET(request: Request) {
   const auth = await authenticateCommerceRequest(request);
@@ -8,7 +9,15 @@ export async function GET(request: Request) {
     auth.admin.from("account_access_roles").select("role_code, grade_level, reports_to_operator_id").eq("user_id", auth.userId).maybeSingle(),
   ]);
   if (profileError || roleError) return commerceJson({ error: "session_unavailable" }, 503);
-  const roleCode = role?.role_code ?? "member";
+  let memberModeActive = false;
+  try {
+    memberModeActive = (
+      await getOwnerMemberModeState(auth.admin, auth.userId)
+    ).active;
+  } catch {
+    return commerceJson({ error: "session_unavailable" }, 503);
+  }
+  const roleCode = memberModeActive ? "member" : role?.role_code ?? "member";
   const isOwner = roleCode === "owner";
   const isStaff = isOwner || roleCode === "operator" || roleCode === "employee";
   const canAccessOperator = isOwner || roleCode === "operator";
@@ -24,6 +33,7 @@ export async function GET(request: Request) {
       canAccessOperator,
       canAccessEmployee,
       canAccessOwner: isOwner,
+      memberModeActive,
     },
   });
 }

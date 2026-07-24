@@ -40,6 +40,7 @@ export interface ProductPayload {
   category: string;
   brand: string;
   brandSlug: string;
+  gender?: "" | "남성" | "여성" | "공용";
   publishAt: string;
   closesAt: string;
   status: "pending" | "active" | "closed";
@@ -95,7 +96,6 @@ interface ProductCatalogResponse {
 }
 
 async function fetchCompleteProductCatalog(input: {
-  query: string;
   saleType: ProductSaleType;
   signal: AbortSignal;
   soldOnly: boolean;
@@ -112,10 +112,6 @@ async function fetchCompleteProductCatalog(input: {
       sort: "latest",
     });
     if (input.soldOnly) params.set("view", "sold");
-    if (input.query.trim() && !input.soldOnly) {
-      params.set("q", input.query.trim());
-    }
-
     const response = await fetch(`/api/products?${params.toString()}`, {
       cache: "no-store",
       signal: input.signal,
@@ -201,7 +197,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
   });
   const [refreshNonce, setRefreshNonce] = useState(0);
   const catalogRequestKey =
-    `${saleType}:${showSoldOnly ? "sold" : "active"}:${query}:${refreshNonce}`;
+    `${saleType}:${showSoldOnly ? "sold" : "active"}:${refreshNonce}`;
   const [settledCatalogKey, setSettledCatalogKey] = useState(
     () => initialProducts !== undefined && !showSoldOnly ? catalogRequestKey : "",
   );
@@ -259,7 +255,6 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
   useEffect(() => {
     const controller = new AbortController();
     fetchCompleteProductCatalog({
-      query,
       saleType,
       signal: controller.signal,
       soldOnly: showSoldOnly,
@@ -282,7 +277,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
         }
       });
     return () => controller.abort();
-  }, [catalogRequestKey, query, saleType, showSoldOnly]);
+  }, [catalogRequestKey, saleType, showSoldOnly]);
 
   useEffect(() => {
     if (!LIVE_AUCTION_ENABLED || saleType !== "auction" || showSoldOnly) return;
@@ -354,6 +349,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
       description: product.description,
       brand: product.brand,
       brandSlug: product.brandSlug,
+      gender: product.gender,
       category: product.category,
       createdAt: product.publishAt,
       publish_at: product.publishAt,

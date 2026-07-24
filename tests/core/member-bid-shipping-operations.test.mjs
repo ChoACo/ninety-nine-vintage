@@ -24,10 +24,11 @@ test("delivery work is member-grouped and transitions into a 30-day minimal arch
   assert.match(consoleSource, /완료 후 30일 보관/);
 });
 
-test("active bidding page is placed between home and live auction and supports realtime quick bidding", async () => {
-  const [component, desktopHeader, mobileHeader, desktopPage, mobilePage] =
+test("active bidding navigation appears only with active bid history and supports realtime quick bidding", async () => {
+  const [component, visibilityProvider, desktopHeader, mobileHeader, desktopPage, mobilePage] =
     await Promise.all([
       source("src/components/features/auction/ActiveBidProducts.tsx"),
+      source("src/components/features/auction/ActiveBidNavigationProvider.tsx"),
       source("src/components/layout/PcHeader.tsx"),
       source("src/components/mobile/MobileSiteHeader.tsx"),
       source("src/app/(shop)/bidding/page.tsx"),
@@ -36,6 +37,9 @@ test("active bidding page is placed between home and live auction and supports r
 
   assert.match(desktopHeader, /홈[\s\S]*입찰 중인 상품[\s\S]*실시간 경매/);
   assert.match(mobileHeader, /홈[\s\S]*입찰 중인 상품[\s\S]*실시간 경매/);
+  assert.match(desktopHeader, /LIVE_AUCTION_ENABLED && hasActiveBid/);
+  assert.match(mobileHeader, /hasActiveBid/);
+  assert.match(visibilityProvider, /item\.productStatus === "active"/);
   assert.match(component, /productStatus === "active"/);
   assert.match(component, /postgres_changes/);
   assert.match(component, /다른 회원이 더 높은 가격으로 입찰했습니다/);

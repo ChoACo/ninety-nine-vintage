@@ -3280,6 +3280,38 @@ export type Database = {
           },
         ]
       }
+      owner_member_mode_sessions: {
+        Row: {
+          activated_at: string
+          ended_at: string | null
+          expires_at: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string
+          ended_at?: string | null
+          expires_at: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string
+          ended_at?: string | null
+          expires_at?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_member_mode_sessions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       owner_hidden_test_member_audit: {
         Row: {
           action: string
@@ -3698,6 +3730,7 @@ export type Database = {
           final_bid_amount: number | null
           final_bid_id: string | null
           fixed_price: number | null
+          gender: string
           id: string
           image_urls: string[]
           inquiry_operator_id: string | null
@@ -3741,6 +3774,7 @@ export type Database = {
           final_bid_amount?: number | null
           final_bid_id?: string | null
           fixed_price?: number | null
+          gender?: string
           id?: string
           image_urls: string[]
           inquiry_operator_id?: string | null
@@ -3784,6 +3818,7 @@ export type Database = {
           final_bid_amount?: number | null
           final_bid_id?: string | null
           fixed_price?: number | null
+          gender?: string
           id?: string
           image_urls?: string[]
           inquiry_operator_id?: string | null
@@ -5598,6 +5633,10 @@ export type Database = {
     }
     Functions: {
       access_role_for_user: { Args: { p_user_id: string }; Returns: string }
+      owner_member_mode_is_active: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       add_member_warning: {
         Args: { p_category: string; p_member_id: string; p_reason: string }
         Returns: {

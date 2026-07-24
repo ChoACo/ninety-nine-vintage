@@ -80,7 +80,7 @@ async function workbookFile({
   });
 }
 
-test("operator XLSX UI parses in the browser, highlights Korean row errors, and requires explicit confirmation", async () => {
+test("operator XLSX UI validates products, supports per-product deletion, and requires explicit confirmation", async () => {
   const [modal, consoleSource, dashboard, parser, bulkRoute, categoryIds] = await Promise.all([
     source("src/components/admin/operator/OperatorXlsxImportModal.tsx"),
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
@@ -92,7 +92,10 @@ test("operator XLSX UI parses in the browser, highlights Korean row errors, and 
 
   assert.match(parser, /await import\("exceljs"\)/);
   assert.match(modal, /parseAuctionWorkbook\(file\)/);
-  assert.match(modal, /상품 행별 검증 미리보기/);
+  assert.match(modal, /상품별 검증 미리보기/);
+  assert.match(modal, /상품 순번/);
+  assert.match(modal, /상품 삭제/);
+  assert.match(modal, /excludedRowNumbers/);
   assert.match(modal, /aria-invalid=\{hasRowError\}/);
   assert.match(modal, /검증 결과와 저장 대상을 확인했다는 항목에 체크해 주세요/);
   assert.match(modal, /disabled=\{!confirmed \|\| !preview\?\.canSubmit/);
@@ -108,7 +111,11 @@ test("operator XLSX UI parses in the browser, highlights Korean row errors, and 
   assert.match(modal, /stores\.map\(\(store\)/);
   assert.match(modal, /기존 고정 양식만 사용합니다/);
   assert.match(modal, /A열 상품명[\s\S]*D열 여성·남성 의류[\s\S]*E열 여성·남성 하의[\s\S]*F열 스포츠·등산복 사이즈[\s\S]*W열 상태점수[\s\S]*X열 원문[\s\S]*Y열 시작가[\s\S]*AH열 이미지명/);
-  assert.doesNotMatch(modal, /setSaleType|즉시 구매/);
+  assert.match(modal, /setSaleType/);
+  assert.match(modal, /실시간 경매/);
+  assert.match(modal, /즉시 구매/);
+  assert.match(modal, /다음 날 오전 10시 등록 \(기본\)/);
+  assert.match(modal, /즉시 등록/);
 
   assert.match(consoleSource, /uploadProductImages\(/);
   assert.match(consoleSource, /crypto\.randomUUID\(\)/);
@@ -158,6 +165,22 @@ test("golden XLSX parser accepts a valid row and reports Korean validation failu
   assert.equal(preview.drafts[0].saleType, "auction");
   assert.equal(preview.drafts[0].fixedPrice, null);
   assert.equal(preview.drafts[0].status, "pending");
+
+  const fixedPreview = buildBatchAuctionPreview(parsed, [imageFile("boss.jpg")], {
+    publishAt: "2030-01-01T01:00:00.000Z",
+    bidIncrement: 1_000,
+    saleType: "fixed",
+  });
+  assert.equal(fixedPreview.drafts[0].saleType, "fixed");
+  assert.equal(fixedPreview.drafts[0].fixedPrice, 25_000);
+
+  const deletedPreview = buildBatchAuctionPreview(parsed, [imageFile("boss.jpg")], {
+    publishAt: "2030-01-01T01:00:00.000Z",
+    bidIncrement: 1_000,
+    excludedRowNumbers: [6],
+  });
+  assert.equal(deletedPreview.rows.length, 0);
+  assert.equal(deletedPreview.canSubmit, false);
 
   const invalidParsed = await parseAuctionWorkbook(await workbookFile({
     condition: 9,

@@ -35,7 +35,7 @@ export function ConditionReport({ item, surface = "desktop" }: ConditionReportPr
             <h2 className="text-lg font-black leading-snug tracking-tight">빈티지 상품 상태 안내</h2>
           </div>
           <span className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[11px] font-bold text-zinc-700 shadow-sm">
-            상태 등급 {item.conditionGrade}
+            상태 등급 {item.conditionGrade || "미입력"}
           </span>
         </div>
         <p className="mt-4 line-clamp-2 text-xs leading-relaxed text-zinc-600">{notes.join(" · ")}</p>
@@ -47,7 +47,7 @@ export function ConditionReport({ item, surface = "desktop" }: ConditionReportPr
       <PremiumDialog labelledBy="condition-report-title" onClose={() => setOpen(false)} open={open} panelClassName="max-w-2xl overflow-y-auto">
         <header className="flex items-start justify-between gap-6 border-b border-line px-6 py-5">
           <div>
-            <p className="text-[10px] font-bold tracking-[0.14em] text-muted">상품 상태 · 등급 {item.conditionGrade}</p>
+            <p className="text-[10px] font-bold tracking-[0.14em] text-muted">상품 상태 · 등급 {item.conditionGrade || "미입력"}</p>
             <h2 className="mt-2 text-xl font-black leading-snug tracking-tight" id="condition-report-title">빈티지 상품 상태 상세</h2>
             <p className="mt-2 text-xs leading-relaxed text-muted">사진 확대와 함께 아래 기록을 구매 전 확인해 주세요.</p>
           </div>

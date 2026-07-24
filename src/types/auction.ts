@@ -69,6 +69,7 @@ export interface AuctionPost {
   description: string;
   brand?: string;
   brandSlug?: string;
+  gender?: "" | "남성" | "여성" | "공용";
   category: string;
   createdAt: ISODateString;
   /** 예약 공개 시각. 기존 데이터는 createdAt을 공개 시각으로 사용합니다. */

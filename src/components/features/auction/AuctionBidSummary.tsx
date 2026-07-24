@@ -11,6 +11,7 @@ export interface AccountAuctionBidItem {
   amount: number;
   currentPrice: number;
   productId: string;
+  productStatus: string;
   state: AccountAuctionBidState;
 }
 

@@ -8,6 +8,8 @@ import {
 } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import { TEMPORARY_MEMBER_OWNER_ID } from "@/lib/ownerMemberMode";
+import { getOwnerMemberModeState } from "@/lib/ownerMemberMode.server";
 
 export function commerceJson(body: unknown, status = 200) {
   const normalizedBody = body && typeof body === "object" && !Array.isArray(body)
@@ -58,6 +60,34 @@ export async function authenticateCommerceRequest(
 export async function authenticateMemberCommerceRequest(request: Request, mutation = false) {
   const auth = await authenticateCommerceRequest(request, mutation);
   if (!auth.ok) return auth;
+  if (auth.userId === TEMPORARY_MEMBER_OWNER_ID) {
+    try {
+      const memberMode = await getOwnerMemberModeState(auth.admin, auth.userId);
+      if (!memberMode.active) {
+        return {
+          ok: false as const,
+          response: commerceJson(
+            {
+              error: "member_required",
+              message: "소유자 센터에서 임시 회원 권한을 활성화해 주세요.",
+            },
+            403,
+          ),
+        };
+      }
+    } catch {
+      return {
+        ok: false as const,
+        response: commerceJson(
+          {
+            error: "member_unavailable",
+            message: "회원 권한 상태를 확인하지 못했습니다.",
+          },
+          503,
+        ),
+      };
+    }
+  }
   const { data: account, error } = await auth.admin
     .from("member_accounts")
     .select("member_id, account_status")
@@ -82,6 +112,35 @@ export async function authenticateMemberRlsRequest(request: Request, mutation = 
       return { ok: false as const, response: commerceJson({ error: "unauthorized", message: "로그인이 필요합니다." }, 401) };
     }
     const user = createSupabaseUserClient(token);
+    if (data.user.id === TEMPORARY_MEMBER_OWNER_ID) {
+      const { admin } = createSupabaseServerClients();
+      try {
+        const memberMode = await getOwnerMemberModeState(admin, data.user.id);
+        if (!memberMode.active) {
+          return {
+            ok: false as const,
+            response: commerceJson(
+              {
+                error: "member_required",
+                message: "소유자 센터에서 임시 회원 권한을 활성화해 주세요.",
+              },
+              403,
+            ),
+          };
+        }
+      } catch {
+        return {
+          ok: false as const,
+          response: commerceJson(
+            {
+              error: "member_unavailable",
+              message: "회원 권한 상태를 확인하지 못했습니다.",
+            },
+            503,
+          ),
+        };
+      }
+    }
     const { data: account, error: accountError } = await user
       .from("member_accounts")
       .select("member_id, account_status")
@@ -108,6 +167,34 @@ export function normalizeIds(value: unknown): string[] {
 export async function authenticateStaffRequest(request: Request, mutation = false) {
   const auth = await authenticateCommerceRequest(request, mutation);
   if (!auth.ok) return auth;
+  if (auth.userId === TEMPORARY_MEMBER_OWNER_ID) {
+    try {
+      const memberMode = await getOwnerMemberModeState(auth.admin, auth.userId);
+      if (memberMode.active) {
+        return {
+          ok: false as const,
+          response: commerceJson(
+            {
+              error: "member_mode_active",
+              message: "임시 회원 권한을 종료한 뒤 운영 기능을 이용해 주세요.",
+            },
+            403,
+          ),
+        };
+      }
+    } catch {
+      return {
+        ok: false as const,
+        response: commerceJson(
+          {
+            error: "role_unavailable",
+            message: "운영 권한을 확인하지 못했습니다.",
+          },
+          503,
+        ),
+      };
+    }
+  }
   const { data: role, error } = await auth.admin
     .from("account_access_roles")
     .select("role_code, grade_level, reports_to_operator_id")

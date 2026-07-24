@@ -6,10 +6,12 @@ import { usePathname } from "next/navigation";
 import { useCommerceStore } from "@/store/useCommerceStore";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
+import { useActiveBidNavigation } from "@/components/features/auction/ActiveBidNavigationProvider";
 
 export function MobileBottomNav() {
   const pathname = usePathname();
   const access = useAdminNavigationAccess();
+  const { hasActiveBid } = useActiveBidNavigation();
   const likedCount = useCommerceStore((state) => state.likedIds.length);
   const cartCount = useCommerceStore((state) => state.cartIds.length);
   const staffTab =
@@ -22,7 +24,7 @@ export function MobileBottomNav() {
           : null;
   const tabs = [
     ["홈", "/home", Home],
-    ...(LIVE_AUCTION_ENABLED ? [["입찰 중", "/bidding", TrendingUp] as const] : []),
+    ...(LIVE_AUCTION_ENABLED && hasActiveBid ? [["입찰 중", "/bidding", TrendingUp] as const] : []),
     ...(LIVE_AUCTION_ENABLED ? [["실시간 경매", "/feed", Gavel] as const] : []),
     ["즉시 구매", "/shop", ShoppingBag] as const,
     ["내 정보", "/account", UserRound] as const,

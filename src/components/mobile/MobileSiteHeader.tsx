@@ -8,20 +8,21 @@ import { AuthStatus } from "@/components/layout/AuthStatus";
 import { ChatNotificationLink } from "@/components/features/chat/ChatNotificationProvider";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
-
-const links = [
-  ["홈", "/m/home"],
-  ["입찰 중인 상품", "/m/bidding"],
-  ["실시간 경매", "/m/feed"],
-  ["즉시 구매", "/m/shop"],
-  ["상담·채팅", "/m/chat"],
-] as const;
+import { useActiveBidNavigation } from "@/components/features/auction/ActiveBidNavigationProvider";
 
 export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const { hasActiveBid } = useActiveBidNavigation();
+  const links = [
+    ["홈", "/m/home"],
+    ...(hasActiveBid ? [["입찰 중인 상품", "/m/bidding"] as const] : []),
+    ["실시간 경매", "/m/feed"],
+    ["즉시 구매", "/m/shop"],
+    ["상담·채팅", "/m/chat"],
+  ] as const;
 
   const submitSearch = () => {
     const value = query.trim();

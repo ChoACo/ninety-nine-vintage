@@ -65,6 +65,8 @@ export interface ParsedAuctionWorkbook {
 export interface BatchAuctionDraftOptions {
   publishAt: string;
   bidIncrement: number;
+  excludedRowNumbers?: readonly number[];
+  saleType?: "auction" | "fixed";
 }
 
 export type ImageMatchStrategy = "relative-path" | "basename" | "unique-stem";
@@ -896,7 +898,10 @@ export function buildBatchAuctionPreview(
     });
   }
 
-  const rows: BatchAuctionPreviewRow[] = workbook.rows.map((row) => {
+  const excludedRowNumbers = new Set(options.excludedRowNumbers ?? []);
+  const rows: BatchAuctionPreviewRow[] = workbook.rows
+    .filter((row) => !excludedRowNumbers.has(row.rowNumber))
+    .map((row) => {
     const issues: BatchAuctionIssue[] = [];
     const detected = workbook.detectedHeaders;
     const descriptionCell = cellAsText(valueAt(row, detected.description));
@@ -1041,12 +1046,15 @@ export function buildBatchAuctionPreview(
   }
 
   const fileUsage = new Map<string, BatchAuctionPreviewRow>();
-  rows.forEach((row) => {
+  rows.forEach((row, rowIndex) => {
     row.imageMatches.forEach((match) => {
       const identity = fileIdentity(match.file);
       const previousRow = fileUsage.get(identity);
       if (previousRow && previousRow.rowNumber !== row.rowNumber) {
-        const message = `같은 사진이 ${previousRow.rowNumber}행과 ${row.rowNumber}행에 중복 매칭되었습니다: ${fileRelativePath(match.file)}`;
+        const previousProductNumber = rows.findIndex(
+          (candidate) => candidate.rowNumber === previousRow.rowNumber,
+        ) + 1;
+        const message = `같은 사진이 ${previousProductNumber}번째 상품과 ${rowIndex + 1}번째 상품에 중복 매칭되었습니다: ${fileRelativePath(match.file)}`;
         if (!previousRow.issues.some((issue) => issue.message === message)) {
           previousRow.issues.push({
             code: "image_reused_across_products",
@@ -1081,8 +1089,8 @@ export function buildBatchAuctionPreview(
     row.draft = {
       title: row.title,
       description: row.description,
-      saleType: "auction",
-      fixedPrice: null,
+      saleType: options.saleType === "fixed" ? "fixed" : "auction",
+      fixedPrice: options.saleType === "fixed" ? row.startingPrice : null,
       startingPrice: row.startingPrice,
       bidIncrement: options.bidIncrement,
       imageFiles: row.imageMatches.map((match) => match.file),

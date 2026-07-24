@@ -1,6 +1,6 @@
 "use client";
 
-import { FileSpreadsheet, X } from "lucide-react";
+import { FileSpreadsheet, Trash2, X } from "lucide-react";
 import {
   useId,
   useCallback,
@@ -49,8 +49,14 @@ export interface OperatorXlsxImportModalProps {
   onSubmit: (
     preview: BatchAuctionPreview,
     storeId: string,
+    options: XlsxRegistrationOptions,
     onProgress: BatchAuctionProgressReporter,
   ) => Promise<number>;
+}
+
+export interface XlsxRegistrationOptions {
+  publicationMode: "now" | "next-day-10";
+  saleType: "auction" | "fixed";
 }
 
 const PREVIEW_PUBLISH_AT = "2030-01-01T01:00:00.000Z";
@@ -88,6 +94,13 @@ export function OperatorXlsxImportModal({
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [storeId, setStoreId] = useState("");
   const [bidIncrement, setBidIncrement] = useState("1000");
+  const [publicationMode, setPublicationMode] =
+    useState<XlsxRegistrationOptions["publicationMode"]>("next-day-10");
+  const [saleType, setSaleType] =
+    useState<XlsxRegistrationOptions["saleType"]>("auction");
+  const [excludedRowNumbers, setExcludedRowNumbers] = useState<Set<number>>(
+    new Set(),
+  );
   const [confirmed, setConfirmed] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -107,8 +120,10 @@ export function OperatorXlsxImportModal({
     return buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
       publishAt: PREVIEW_PUBLISH_AT,
       bidIncrement: Number(bidIncrement),
+      excludedRowNumbers: [...excludedRowNumbers],
+      saleType,
     });
-  }, [bidIncrement, imageFiles, parsedWorkbook]);
+  }, [bidIncrement, excludedRowNumbers, imageFiles, parsedWorkbook, saleType]);
   const selectedStoreId = stores.some((store) => store.id === storeId)
     ? storeId
     : stores[0]?.id ?? "";
@@ -127,6 +142,9 @@ export function OperatorXlsxImportModal({
     setImageFiles([]);
     setStoreId(stores[0]?.id ?? "");
     setBidIncrement("1000");
+    setPublicationMode("next-day-10");
+    setSaleType("auction");
+    setExcludedRowNumbers(new Set());
     setConfirmed(false);
     setIsParsing(false);
     setIsSubmitting(false);
@@ -148,6 +166,7 @@ export function OperatorXlsxImportModal({
     const file = event.currentTarget.files?.[0];
     const requestId = ++parseRequestRef.current;
     setParsedWorkbook(null);
+    setExcludedRowNumbers(new Set());
     setWorkbookFileName(file?.name ?? "");
     resetResult();
     if (!file) {
@@ -194,12 +213,17 @@ export function OperatorXlsxImportModal({
     }
 
     const finalPreview = buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
-      publishAt: getNextAuctionPublishAt(new Date()).toISOString(),
+      publishAt:
+        publicationMode === "now"
+          ? new Date().toISOString()
+          : getNextAuctionPublishAt(new Date()).toISOString(),
       bidIncrement: Number(bidIncrement),
+      excludedRowNumbers: [...excludedRowNumbers],
+      saleType,
     });
     if (!finalPreview.canSubmit || finalPreview.drafts.length === 0) {
       setConfirmed(false);
-      setError("오류가 있는 행과 이미지 연결을 모두 확인해 주세요.");
+      setError("오류가 있는 상품과 이미지 연결을 모두 확인해 주세요.");
       return;
     }
 
@@ -215,6 +239,7 @@ export function OperatorXlsxImportModal({
       const count = await onSubmit(
         finalPreview,
         selectedStoreId,
+        { publicationMode, saleType },
         (completed, total, phase) => {
           setProgress({
             completed: Math.min(Math.max(0, completed), Math.max(1, total)),
@@ -341,7 +366,7 @@ export function OperatorXlsxImportModal({
                 </select>
               </label>
               <label className="text-xs font-bold">
-                전체 입찰 단위
+                {saleType === "auction" ? "전체 입찰 단위" : "가격 단위"}
                 <input
                   className="mt-2 block w-full border border-line bg-paper px-3 py-3 text-xs disabled:opacity-40"
                   disabled={isSubmitting || completed}
@@ -353,10 +378,49 @@ export function OperatorXlsxImportModal({
                   value={bidIncrement}
                 />
               </label>
+              <label className="text-xs font-bold">
+                판매 방식
+                <select
+                  className="mt-2 block w-full border border-line bg-paper px-3 py-3 text-xs"
+                  disabled={isSubmitting || completed}
+                  onChange={(event) => {
+                    setSaleType(
+                      event.target.value as XlsxRegistrationOptions["saleType"],
+                    );
+                    resetResult();
+                  }}
+                  value={saleType}
+                >
+                  <option value="auction">실시간 경매</option>
+                  <option value="fixed">즉시 구매</option>
+                </select>
+              </label>
+              <label className="text-xs font-bold">
+                등록 시각
+                <select
+                  className="mt-2 block w-full border border-line bg-paper px-3 py-3 text-xs"
+                  disabled={isSubmitting || completed}
+                  onChange={(event) => {
+                    setPublicationMode(
+                      event.target
+                        .value as XlsxRegistrationOptions["publicationMode"],
+                    );
+                    resetResult();
+                  }}
+                  value={publicationMode}
+                >
+                  <option value="next-day-10">
+                    다음 날 오전 10시 등록 (기본)
+                  </option>
+                  <option value="now">즉시 등록</option>
+                </select>
+              </label>
             </div>
             <p className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-900">
               {selectedStoreCanPublish
-                ? "등록이 끝난 상품은 즉시 공개됩니다."
+                ? publicationMode === "now"
+                  ? "등록이 끝난 상품은 즉시 공개됩니다."
+                  : "상품은 다음 날 오전 10시 공개로 예약됩니다."
                 : "공개 권한이 없으면 상품은 초안으로 저장됩니다."} 숍 선택지는 현재 계정의 서버 검증 권한 범위만 표시됩니다.
             </p>
           </section>
@@ -371,12 +435,12 @@ export function OperatorXlsxImportModal({
           )}
 
           {preview && (
-            <section aria-label="상품 행별 검증 미리보기">
+            <section aria-label="상품별 검증 미리보기">
               <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
                 <div>
-                  <h3 className="text-sm font-bold">4. 행별 검증 미리보기</h3>
+                  <h3 className="text-sm font-bold">4. 상품별 검증 미리보기</h3>
                   <p className="mt-1 text-xs text-muted">
-                    총 {preview.rows.length.toLocaleString("ko-KR")}행 · 오류 {rowErrorCount.toLocaleString("ko-KR")}행 · 미사용 사진 {preview.unusedImageFiles.length.toLocaleString("ko-KR")}개
+                    총 {preview.rows.length.toLocaleString("ko-KR")}개 상품 · 오류 {rowErrorCount.toLocaleString("ko-KR")}개 상품 · 미사용 사진 {preview.unusedImageFiles.length.toLocaleString("ko-KR")}개
                   </p>
                 </div>
                 <span className={`border px-3 py-2 text-xs font-bold ${preview.canSubmit ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-red-300 bg-red-50 text-red-800"}`}>
@@ -398,21 +462,22 @@ export function OperatorXlsxImportModal({
                 <table className="w-full min-w-[900px] border-collapse text-left text-xs">
                   <thead className="sticky top-0 z-10 border-b border-line bg-surface">
                     <tr>
-                      <th className="px-3 py-3">행</th>
+                      <th className="px-3 py-3">상품 순번</th>
                       <th className="px-3 py-3">상품</th>
                       <th className="px-3 py-3">확인 브랜드</th>
                       <th className="px-3 py-3">카테고리 ID</th>
                       <th className="px-3 py-3">시작가</th>
                       <th className="px-3 py-3">연결 사진</th>
                       <th className="px-3 py-3">검증 결과</th>
+                      <th className="px-3 py-3">관리</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
-                    {preview.rows.map((row) => {
+                    {preview.rows.map((row, productIndex) => {
                       const hasRowError = row.issues.some((issue) => issue.severity === "error");
                       return (
                         <tr aria-invalid={hasRowError} className={hasRowError ? "bg-red-50" : "bg-paper"} key={row.rowNumber}>
-                          <td className="px-3 py-3 align-top font-bold">{row.rowNumber}</td>
+                          <td className="px-3 py-3 align-top font-bold">{productIndex + 1}번째</td>
                           <td className="max-w-[320px] px-3 py-3 align-top">
                             <p className="font-bold">{row.title || "상품명 없음"}</p>
                             <p className="mt-1 whitespace-pre-line leading-5 text-muted">{row.description || "설명 없음"}</p>
@@ -441,6 +506,24 @@ export function OperatorXlsxImportModal({
                                 ))}
                               </ul>
                             )}
+                          </td>
+                          <td className="px-3 py-3 align-top">
+                            <button
+                              aria-label={`${productIndex + 1}번째 상품 삭제`}
+                              className="inline-flex items-center gap-1 whitespace-nowrap border border-red-200 px-3 py-2 font-bold text-red-700"
+                              disabled={isSubmitting || completed}
+                              onClick={() => {
+                                setExcludedRowNumbers((current) => {
+                                  const next = new Set(current);
+                                  next.add(row.rowNumber);
+                                  return next;
+                                });
+                                resetResult();
+                              }}
+                              type="button"
+                            >
+                              <Trash2 size={13} /> 상품 삭제
+                            </button>
                           </td>
                         </tr>
                       );
@@ -473,7 +556,7 @@ export function OperatorXlsxImportModal({
                 onChange={(event) => { setConfirmed(event.target.checked); setError(""); }}
                 type="checkbox"
               />
-              검증 결과, 자동 추출 브랜드, 저장할 숍과 {preview?.rows.length ?? 0}개 경매 상품을 모두 확인했습니다. 이제 데이터베이스 저장을 허용합니다.
+              검증 결과, 자동 추출 브랜드, 저장할 숍과 {preview?.rows.length ?? 0}개 {saleType === "auction" ? "경매" : "즉시 구매"} 상품을 모두 확인했습니다. 이제 데이터베이스 저장을 허용합니다.
             </label>
           )}
 

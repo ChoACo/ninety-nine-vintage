@@ -20,7 +20,10 @@ import { Button } from "@/components/ui/Button";
 import { SelectInput, TextArea, TextInput } from "@/components/ui/FormControls";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { StatusNotice } from "@/components/ui/StatusNotice";
-import { OperatorXlsxImportModal } from "@/components/admin/operator/OperatorXlsxImportModal";
+import {
+  OperatorXlsxImportModal,
+  type XlsxRegistrationOptions,
+} from "@/components/admin/operator/OperatorXlsxImportModal";
 import { getNextAuctionDeadline } from "@/utils/formatters";
 
 interface Store { id: string; name: string; canPublish: boolean; }
@@ -41,6 +44,7 @@ interface Product {
   store_id: string | null;
   size_label: string;
   condition_grade: string;
+  gender: string;
   storage_class: string;
   publish_at: string;
   closes_at: string;
@@ -59,6 +63,7 @@ type FormState = {
   imageUrls: string;
   sizeLabel: string;
   conditionGrade: string;
+  gender: "" | "남성" | "여성" | "공용";
   storageClass: "small" | "large";
   status: "pending" | "active";
   bidIncrement: string;
@@ -77,7 +82,7 @@ interface SingleImage {
 
 const emptyForm: FormState = {
   title: "", description: "", brand: "", category: "기타", storeId: "", saleType: "fixed", price: "", imageUrls: "",
-  sizeLabel: "", conditionGrade: "A", storageClass: "small", status: "active", bidIncrement: "1000", publishAt: "", closesAt: "",
+  sizeLabel: "", conditionGrade: "", gender: "", storageClass: "small", status: "active", bidIncrement: "1000", publishAt: "", closesAt: "",
   inspectionNotes: "",
 };
 
@@ -392,6 +397,10 @@ export function OperatorProductsConsole() {
         body = {
           id: productId,
           registrationMode: "single",
+          title: form.title,
+          brand: form.brand,
+          gender: form.gender,
+          conditionGrade: form.conditionGrade,
           description: form.description,
           storeId: form.storeId,
           saleType: form.saleType,
@@ -468,6 +477,12 @@ export function OperatorProductsConsole() {
       imageUrls: product.image_urls?.join("\n") ?? "",
       sizeLabel: product.size_label ?? "",
       conditionGrade: product.condition_grade ?? "A",
+      gender:
+        product.gender === "남성" ||
+        product.gender === "여성" ||
+        product.gender === "공용"
+          ? product.gender
+          : "",
       storageClass: product.storage_class === "large" ? "large" : "small",
       status: product.status === "active" ? "active" : "pending",
       bidIncrement: String(product.bid_increment ?? 1000),
@@ -675,6 +690,7 @@ export function OperatorProductsConsole() {
   const importXlsx = async (
     preview: BatchAuctionPreview,
     scopedStoreId: string,
+    options: XlsxRegistrationOptions,
     onProgress: BatchAuctionProgressReporter,
   ) => {
     if (!token || busy || !permissions.canCreate) {
@@ -700,8 +716,8 @@ export function OperatorProductsConsole() {
     setNotice("");
     try {
       onProgress(0, totalImages, "uploading");
-      for (const row of preview.rows) {
-        if (!row.draft) throw new Error(`${row.rowNumber}행의 검증 결과가 유효하지 않습니다.`);
+      for (const [productIndex, row] of preview.rows.entries()) {
+        if (!row.draft) throw new Error(`${productIndex + 1}번째 상품의 검증 결과가 유효하지 않습니다.`);
         const draft = row.draft;
         const productId = crypto.randomUUID();
         const uploaded = await uploadProductImages(
@@ -753,7 +769,7 @@ export function OperatorProductsConsole() {
       const canPublish = stores.find((store) => store.id === scopedStoreId)?.canPublish === true;
       const insertedIds = (payload?.products ?? []).map((product) => product.id);
       let published = 0;
-      if (canPublish) {
+      if (canPublish && options.publicationMode === "now") {
         for (const productId of insertedIds) {
           try {
             await publishProductNow(token, productId);
@@ -763,8 +779,10 @@ export function OperatorProductsConsole() {
           }
         }
       }
-      setNotice(canPublish
+      setNotice(canPublish && options.publicationMode === "now"
         ? `${published}개 엑셀 상품을 즉시 공개했습니다.${published < count ? ` ${count - published}개는 초안으로 남았습니다.` : ""}`
+        : canPublish
+          ? `${count}개 엑셀 상품을 다음 날 오전 10시 공개로 예약했습니다.`
         : `${count}개 엑셀 상품을 초안으로 저장했습니다.`);
       try {
         await load(token);
@@ -790,17 +808,35 @@ export function OperatorProductsConsole() {
         <div className="flex items-center justify-between sm:col-span-2">
           <div>
             <p className="text-sm font-bold">{editingId ? "상품 수정" : "단품 간편 등록"}</p>
-            {!editingId && <p className="mt-1 text-[11px] text-muted">상품명과 분류 정보는 자동으로 생성됩니다.</p>}
+            {!editingId && <p className="mt-1 text-[11px] text-muted">상품명·브랜드·성별·상태등급은 선택 사항이며, 미입력하면 공란으로 저장됩니다.</p>}
           </div>
           <Button size="compact" variant="ghost" onClick={resetForm} type="button">
             <X size={13} /> {editingId ? "수정 취소" : "닫기"}
           </Button>
         </div>
 
-        {editingId && (
+        {editingId ? (
           <>
             <TextInput aria-label="상품명" disabled={!productFieldsEditable} onChange={(event) => update("title", event.target.value)} placeholder="상품명" required value={form.title} />
             <TextInput aria-label="브랜드" disabled={!productFieldsEditable} onChange={(event) => update("brand", event.target.value)} placeholder="브랜드" required value={form.brand} />
+          </>
+        ) : (
+          <>
+            <TextInput aria-label="상품명" onChange={(event) => update("title", event.target.value)} placeholder="상품명 (선택)" value={form.title} />
+            <TextInput aria-label="브랜드명" onChange={(event) => update("brand", event.target.value)} placeholder="브랜드명 (선택)" value={form.brand} />
+            <SelectInput aria-label="성별" onChange={(event) => update("gender", event.target.value)} value={form.gender}>
+              <option value="">성별 미입력</option>
+              <option value="여성">여성</option>
+              <option value="남성">남성</option>
+              <option value="공용">공용</option>
+            </SelectInput>
+            <SelectInput aria-label="상태등급" onChange={(event) => update("conditionGrade", event.target.value)} value={form.conditionGrade}>
+              <option value="">상태등급 미입력</option>
+              <option value="S">S</option>
+              <option value="A+">A+</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+            </SelectInput>
           </>
         )}
 

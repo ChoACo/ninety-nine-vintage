@@ -543,7 +543,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
           </div>
           <div className="bg-white px-3 py-3">
             <dt className="text-zinc-500">상태</dt>
-            <dd className="mt-1 truncate font-bold">{item.conditionGrade}</dd>
+            <dd className="mt-1 truncate font-bold">{item.conditionGrade || "미입력"}</dd>
           </div>
         </dl>
         <p className="mt-5 whitespace-pre-line text-xs leading-relaxed text-zinc-600">

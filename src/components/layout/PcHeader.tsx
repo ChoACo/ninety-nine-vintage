@@ -9,19 +9,20 @@ import { ChatNotificationLink } from "@/components/features/chat/ChatNotificatio
 import { AuthStatus } from "@/components/layout/AuthStatus";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
-
-const navigation = [
-  { label: "홈", href: "/home" },
-  ...(LIVE_AUCTION_ENABLED ? [{ label: "입찰 중인 상품", href: "/bidding" }] : []),
-  ...(LIVE_AUCTION_ENABLED ? [{ label: "실시간 경매", href: "/feed" }] : []),
-  { label: "즉시 구매", href: "/shop" },
-];
+import { useActiveBidNavigation } from "@/components/features/auction/ActiveBidNavigationProvider";
 
 export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean }) {
   const [query, setQuery] = useState("");
   const pathname = usePathname();
   const router = useRouter();
   const authenticating = pathname === "/auth/callback";
+  const { hasActiveBid } = useActiveBidNavigation();
+  const navigation = [
+    { label: "홈", href: "/home" },
+    ...(LIVE_AUCTION_ENABLED && hasActiveBid ? [{ label: "입찰 중인 상품", href: "/bidding" }] : []),
+    ...(LIVE_AUCTION_ENABLED ? [{ label: "실시간 경매", href: "/feed" }] : []),
+    { label: "즉시 구매", href: "/shop" },
+  ];
   return (
     <header className={`sticky ${hasLiveTicker ? "top-9" : "top-0"} z-[60] block border-b border-line bg-paper/95 text-ink backdrop-blur-md`}>
       <div className="mx-auto flex h-20 w-[1200px] items-center gap-5">

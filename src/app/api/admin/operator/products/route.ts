@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
 import { normalizeProductBrand } from "@/lib/catalog/brand";
-import { formatProductDisplayNumber } from "@/lib/productDisplayNumber";
 import {
   getNextAuctionDeadline,
   getRelativeKoreanDateTime,
@@ -118,16 +117,20 @@ export async function POST(request: Request) {
   const productId = singleRegistration && UUID_PATTERN.test(requestedId)
     ? requestedId
     : crypto.randomUUID();
-  const title = singleRegistration
-    ? formatProductDisplayNumber(productId)
-    : text(body?.title);
+  const title = text(body?.title);
   const description = text(body?.description);
   const category = singleRegistration
     ? "기타"
     : text(body?.category, "기타");
-  const normalizedBrand = normalizeProductBrand(
-    singleRegistration ? "기타" : body?.brand,
-  );
+  const enteredBrand = text(body?.brand);
+  const normalizedBrand = enteredBrand
+    ? normalizeProductBrand(enteredBrand)
+    : singleRegistration
+      ? { brand: "", brandSlug: "" }
+      : null;
+  const gender = ["남성", "여성", "공용"].includes(text(body?.gender))
+    ? text(body?.gender)
+    : "";
   const storeId = text(body?.storeId);
   const saleType = body?.saleType === "fixed" ? "fixed" : "auction";
   const imageUrls = images(body?.imageUrls);
@@ -151,7 +154,7 @@ export async function POST(request: Request) {
       ? FIXED_PRODUCT_OPEN_UNTIL
       : getNextAuctionDeadline(publishAt).toISOString()
     : text(body?.closesAt, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
-  if (!title || !description || !normalizedBrand || !storeId || imageUrls.length === 0 || thumbnailUrls.length !== imageUrls.length || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
+  if (title.length > 160 || !description || !normalizedBrand || !storeId || imageUrls.length === 0 || thumbnailUrls.length !== imageUrls.length || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
     return commerceJson({ error: "상품 입력값을 확인해 주세요." }, 400);
   }
   const { data: canManageStore, error: permissionError } = await auth.user.rpc(
@@ -185,6 +188,7 @@ export async function POST(request: Request) {
     title,
     description,
     category,
+    gender,
     brand: normalizedBrand.brand,
     brand_slug: normalizedBrand.brandSlug,
     brand_source: "explicit",
@@ -203,7 +207,9 @@ export async function POST(request: Request) {
     updated_by: auth.userId,
     size_label: singleRegistration ? "" : text(body?.sizeLabel),
     condition_grade: singleRegistration
-      ? "A"
+      ? ["S", "A+", "A", "B"].includes(text(body?.conditionGrade))
+        ? text(body?.conditionGrade)
+        : ""
       : ["S", "A+", "A", "B"].includes(text(body?.conditionGrade))
         ? text(body?.conditionGrade)
         : "A",

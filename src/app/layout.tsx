@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ChatNotificationProvider } from "@/components/features/chat/ChatNotificationProvider";
+import { OwnerMemberModeProvider } from "@/components/features/auth/OwnerMemberModeProvider";
 import "./globals.css";
 
 const geist = Geist({
@@ -40,7 +41,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} />
       </head>
       <body className="font-sans antialiased">
-        <ChatNotificationProvider>{children}</ChatNotificationProvider>
+        <OwnerMemberModeProvider>
+          <ChatNotificationProvider>{children}</ChatNotificationProvider>
+        </OwnerMemberModeProvider>
       </body>
     </html>
   );

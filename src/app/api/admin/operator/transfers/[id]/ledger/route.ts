@@ -100,6 +100,20 @@ function asManualTransferReversalResult(
   };
 }
 
+function normalizeShippingCreditReversalResult(value: unknown) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    !Object.hasOwn(value, "shipping_credit_quantity")
+  ) {
+    return value;
+  }
+  const normalized = { ...(value as Record<string, unknown>) };
+  delete normalized.shipping_credit_quantity;
+  return normalized;
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await authenticateStaffRequest(request, true);
   if (!auth.ok) return auth.response;
@@ -217,7 +231,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       p_idempotency_key: idempotencyKey,
       p_reason: reason,
     };
-    const { data, error, status } = kind === "shipping"
+    const { data: rawData, error, status } = kind === "shipping"
       ? await auth.user.rpc("reverse_shipping_fee_payment", rpcArgs)
       : await auth.user.rpc("reverse_manual_transfer_payment", rpcArgs);
     if (error) {
@@ -227,6 +241,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         outcome === "rejected" ? 409 : 503,
       );
     }
+    const data = kind === "shipping"
+      ? normalizeShippingCreditReversalResult(rawData)
+      : rawData;
     const result = asManualTransferReversalResult(data, kind, targetId, ledgerId);
     if (!result) {
       return commerceJson(

@@ -99,16 +99,13 @@ test("owner member management actions use confirmed reasons and separate seven-d
   assert.doesNotMatch(archiveConsole, /member\.email|member\.phone|legal_name/);
 });
 
-test("center assignments derive capabilities from operator and employee roles and can be edited or deleted", async () => {
-  const [migration, route, consoleSource, centerRoute, centerConsole] =
+test("center assignment capabilities are revoked after direct-store cutover", async () => {
+  const [migration, route, centerRoute, cutover] =
     await Promise.all([
       source(migrationPath),
       source("src/app/api/admin/owner/fulfillment/route.ts"),
-      source(
-        "src/app/(admin)/admin/owner/fulfillment/OwnerFulfillmentConsole.tsx",
-      ),
       source("src/app/api/admin/centers/route.ts"),
-      source("src/components/admin/center/StaffCenterManagementConsole.tsx"),
+      source("supabase/migrations/20260724063531_simplify_direct_store_fulfillment.sql"),
     ]);
 
   assert.match(
@@ -124,15 +121,11 @@ test("center assignments derive capabilities from operator and employee roles an
     migration,
     /delete from public\.fulfillment_center_staff_assignments as assignments[\s\S]*where not exists[\s\S]*roles\.role_code in \('operator', 'employee'\)/i,
   );
-  assert.match(route, /action === "delete_assignment"/);
-  assert.match(route, /p_receive_at_center:\s*true/);
-  assert.match(route, /p_create_shipments:\s*true/);
-  assert.match(consoleSource, /역할에서 자동 결정/);
-  assert.match(consoleSource, /센터 배정을 삭제/);
-  assert.doesNotMatch(consoleSource, /assignmentReceive|assignmentShip/);
-  assert.match(centerRoute, /body\.action === "configure_store_route"/);
-  assert.match(centerRoute, /"configure_store_fulfillment_route"/);
-  assert.match(centerConsole, /각 매장별 센터 연결/);
+  assert.match(route, /center_topology_removed/);
+  assert.match(centerRoute, /center_management_removed/);
+  assert.match(cutover, /revoke all on function public\.configure_fulfillment_center_staff_assignment/);
+  assert.match(cutover, /revoke all on function public\.delete_fulfillment_center_staff_assignment/);
+  assert.match(cutover, /revoke all on function public\.configure_store_fulfillment_route/);
 });
 
 test("every operator can confirm shared payments while owner retains site and refund authority", async () => {
@@ -148,7 +141,7 @@ test("every operator can confirm shared payments while owner retains site and re
   );
   assert.match(ownerLayout, /사이트·로그/);
   assert.match(ownerLayout, /회원·권한/);
-  assert.match(ownerLayout, /센터·매장 구조/);
+  assert.doesNotMatch(ownerLayout, /센터·매장 구조/);
   assert.match(ownerLayout, /환불 승인/);
   assert.doesNotMatch(ownerLayout, /배송·결제/);
   assert.match(operatorLayout, /주문·입금 확인/);

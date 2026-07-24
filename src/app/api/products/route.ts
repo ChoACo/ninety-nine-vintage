@@ -1,4 +1,7 @@
-import { fetchPublishedProducts } from "@/services/products";
+import {
+  fetchPublishedProducts,
+  fetchSoldFeedProducts,
+} from "@/services/products";
 import { getCatalogImageUrl } from "@/lib/images";
 import { normalizeProductLimit, normalizeProductOffset } from "@/lib/catalog/query";
 
@@ -7,17 +10,20 @@ export async function GET(request: Request) {
   const limit = normalizeProductLimit(searchParams.get("limit") ?? "24");
   const offset = normalizeProductOffset(searchParams.get("offset") ?? "0");
   const saleType = searchParams.get("saleType") === "fixed" ? "fixed" : "auction";
+  const soldOnly = searchParams.get("view") === "sold";
   const sort = ["latest", "ending", "price_asc", "price_desc"].includes(searchParams.get("sort") ?? "")
     ? (searchParams.get("sort") as "latest" | "ending" | "price_asc" | "price_desc")
     : "latest";
   try {
-    const products = await fetchPublishedProducts({
-      limit,
-      offset,
-      saleType,
-      sort,
-      search: searchParams.get("q") ?? "",
-    });
+    const products = soldOnly
+      ? await fetchSoldFeedProducts({ limit, offset, saleType })
+      : await fetchPublishedProducts({
+        limit,
+        offset,
+        saleType,
+        sort,
+        search: searchParams.get("q") ?? "",
+      });
     const hasMore = products.length === limit;
     return Response.json({
       products: products.map((product) => ({

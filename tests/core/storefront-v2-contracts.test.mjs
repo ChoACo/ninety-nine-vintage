@@ -18,7 +18,8 @@ test("the storefront renders separate mobile and fixed desktop presentation tree
 
   assert.match(home, /function DesktopHome\(/);
   assert.doesNotMatch(home, /MobileHome|md:hidden|data-home-presentation="mobile"/);
-  assert.match(home, /<DesktopHome auctions=\{auctions\}/);
+  assert.match(home, /<DesktopHome auctions=\{auctions\.slice\(0, 6\)\}/);
+  assert.match(home, /<HomeFeaturedAuction products=\{featuredAuctions\} \/>/);
   assert.match(mobileHome, /data-mobile-home/);
   assert.match(mobileHome, /basePath="\/m"/);
   assert.match(layout, /<PcHeader hasLiveTicker=\{LIVE_AUCTION_ENABLED\} \/>/);
@@ -101,7 +102,7 @@ test("product, login, and bid navigation support intercepted modals and direct f
   assert.match(stickyBidPanel, /surface === "desktop"[\s\S]*sticky col-span-5/);
   assert.match(stickyBidPanel, /compact \? "top-6" : "top-\[100px\]"/);
   assert.match(directProduct, /<AuctionDetailView id=\{id\} \/>/);
-  assert.match(interceptedLogin, /<ModalShell label="로그인"><LoginPrompt returnTo=\{safeReturnTo\(query\.next\)\} \/><\/ModalShell>/);
+  assert.match(interceptedLogin, /<ModalShell label="로그인"><LoginPrompt dismissToPrevious returnTo=\{safeReturnTo\(query\.next\)\} \/><\/ModalShell>/);
   assert.match(directLogin, /<LoginPrompt returnTo=\{safeReturnTo\(query\.next\)\} \/>/);
   for (const login of [interceptedLogin, directLogin]) {
     assert.match(login, /!candidate\.startsWith\("\/\/"\)/);
@@ -120,11 +121,11 @@ test("product, login, and bid navigation support intercepted modals and direct f
 });
 
 test("gallery, Next Image, and supplied hero banners keep the V2 media contract", async () => {
-  const [nextConfig, catalogImage, gallery, home, mobileBanner, wideBanner] = await Promise.all([
+  const [nextConfig, catalogImage, gallery, featuredAuction, mobileBanner, wideBanner] = await Promise.all([
     source("next.config.ts"),
     source("src/components/ui/CatalogImage.tsx"),
     source("src/components/features/auction/AuctionGalleryModal.tsx"),
-    source("src/app/(shop)/home/page.tsx"),
+    source("src/components/features/home/HomeFeaturedAuction.tsx"),
     stat(new URL("public/banners/brand-banner-mobile.jpg", rootUrl)),
     stat(new URL("public/banners/brand-banner-wide.png", rootUrl)),
   ]);
@@ -145,8 +146,10 @@ test("gallery, Next Image, and supplied hero banners keep the V2 media contract"
   assert.match(gallery, /surface === "desktop" && <nav aria-label="상품 사진 선택"/);
 
   const mobileHome = await source("src/app/(mobile)/m/home/page.tsx");
-  assert.match(mobileHome, /src="\/banners\/brand-banner-mobile\.jpg"/);
-  assert.match(home, /src="\/banners\/brand-banner-wide\.png"/);
+  assert.match(mobileHome, /<HomeFeaturedAuction/);
+  assert.match(mobileHome, /surface="mobile"/);
+  assert.match(featuredAuction, /\/banners\/brand-banner-mobile\.jpg/);
+  assert.match(featuredAuction, /\/banners\/brand-banner-wide\.png/);
   assert.ok(mobileBanner.isFile() && mobileBanner.size > 0);
   assert.ok(wideBanner.isFile() && wideBanner.size > 0);
 });

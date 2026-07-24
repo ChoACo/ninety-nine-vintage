@@ -8,6 +8,8 @@ const migrationPath =
   "supabase/migrations/20260722084550_add_unified_inventory_fulfillment_v2.sql";
 const advancedLedgerMigrationPath =
   "supabase/migrations/20260722120747_add_v2_shipping_fee_advanced_ledger.sql";
+const combinedAuctionPaymentMigrationPath =
+  "supabase/migrations/20260724042550_combine_auction_payments_and_fix_confirmation.sql";
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -703,13 +705,32 @@ test("operator payment API is shared, nested, strict, and confirms only the obse
   assert.match(consoleSource, /observedLedgerEntryCount:\s*payment\.ledgerEntryCount/);
   assert.match(consoleSource, /expectedVersion:\s*payment\.version/);
   assert.match(consoleSource, /sessionStorage\.getItem\(key\)\s*\?\?\s*crypto\.randomUUID\(\)/);
-  assert.match(consoleSource, /잔액 전액 입금 확인 완료/);
-  assert.match(consoleSource, /원장 금액 결제 확정/);
+  assert.match(consoleSource, /입금 확인 완료/);
+  assert.match(consoleSource, /상세보기/);
   assert.match(consoleSource, /구매자별 주문 상품/);
-  assert.match(consoleSource, /const buyerGroups = useMemo/);
+  assert.match(consoleSource, /productSummary/);
   assert.match(consoleSource, /payment\.products\.map/);
   assert.match(consoleSource, /response\.status\s*===\s*409/);
   assert.match(layout, /href:\s*"\/admin\/operator\/payments"/);
+});
+
+test("auction wins begin and confirm as one member-scoped payment", async () => {
+  const migration = await source(combinedAuctionPaymentMigrationPath);
+  const begin = sqlFunction(migration, "begin_my_combined_auction_payment");
+  const confirm = sqlFunction(migration, "confirm_combined_auction_payment");
+  const router = sqlFunction(migration, "confirm_unified_manual_payment_v2");
+
+  assert.match(migration, /last_depositor_name\s+text/i);
+  assert.match(begin, /public\.get_my_won_products\(\)/i);
+  assert.match(begin, /public\.begin_manual_transfer\(v_win\.product_id\)/i);
+  assert.match(begin, /update\s+public\.member_accounts[\s\S]*last_depositor_name\s*=\s*v_name/i);
+  assert.match(confirm, /orders\.buyer_id\s*=\s*p_member_id/i);
+  assert.match(confirm, /order\s+by\s+orders\.id[\s\S]*for update/i);
+  assert.match(confirm, /v_offer\.offered_amount\s*<>\s*v_order\.expected_amount/i);
+  assert.doesNotMatch(confirm, /v_offer\.amount/);
+  assert.match(confirm, /insert\s+into\s+public\.manual_transfer_payment_ledger/i);
+  assert.match(confirm, /update\s+public\.manual_transfer_orders[\s\S]*status\s*=\s*'confirmed'/i);
+  assert.match(router, /public\.confirm_combined_auction_payment/i);
 });
 
 test("advanced V2 shipping-fee receipts remain unconfirmed until the shared CAS finalisation", async () => {
@@ -735,9 +756,10 @@ test("advanced V2 shipping-fee receipts remain unconfirmed until the shared CAS 
 });
 
 test("buyer purchase surfaces use manual transfer and keep PortOne as legacy history only", async () => {
-  const [cart, settlement, history] = await Promise.all([
+  const [cart, settlement, combinedPayment, history] = await Promise.all([
     source("src/components/features/commerce/CartView.tsx"),
     source("src/components/features/auction/detail/SettlementActions.tsx"),
+    source("src/components/features/account/CombinedAuctionPayment.tsx"),
     source("src/components/features/account/OrderHistory.tsx"),
   ]);
 
@@ -746,9 +768,12 @@ test("buyer purchase surfaces use manual transfer and keep PortOne as legacy his
   assert.match(cart, /입금 대기 중/);
   assert.match(cart, /bank_name_snapshot/);
   assert.match(cart, /account_number_snapshot/);
-  assert.match(settlement, /\/api\/payments\/manual-transfer/);
-  assert.match(settlement, /transfer\.bankName[\s\S]{0,80}transfer\.accountNumber/);
-  assert.match(settlement, /입금 대기 중/);
+  assert.match(settlement, /href=\{`\$\{basePath\}\/account#auction-payments`\}/);
+  assert.match(settlement, /개별 결제하지 않습니다/);
+  assert.match(combinedPayment, /\/api\/payments\/manual-transfer/);
+  assert.match(combinedPayment, /transfer\.bankName[\s\S]{0,100}transfer\.accountNumber/);
+  assert.match(combinedPayment, /총액을 한 번만 입금/);
+  assert.match(combinedPayment, /입금자명/);
   assert.doesNotMatch(settlement, /PG 카드 결제는[\s\S]{0,80}운영자가 활성화한 이후 제공됩니다/);
   assert.match(history, /과거 PortOne 테스트 기록/);
   assert.match(history, /결제 재개는 중단/);
@@ -778,6 +803,9 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
   assert.match(storageRoute, /itemSelectedShipmentsEnabled/);
   assert.match(storageRoute, /"get_my_won_products"/);
   assert.match(storageRoute, /legacyAuctionWins/);
+  assert.match(storageRoute, /display_due_at,\s*due_at/);
+  assert.match(storageRoute, /win\.payment_due_at/);
+  assert.match(storageRoute, /deadlineEnforcementExempt:\s*role\?\.role_code === "band_member"/);
   assert.doesNotMatch(storageRoute, /internalNote|evidencePaths|account_ciphertext/);
   assert.match(shipmentRoute, /"get_my_inventory_shipments"/);
   assert.match(shipmentRoute, /"sourceKind"/);
@@ -789,7 +817,9 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
   assert.match(shippingRoute, /p_inventory_item_ids:\s*\[\.\.\.inventoryItemIds\]\.sort\(\)/);
   assert.match(shippingRoute, /hasExactKeys\(body,\s*LEGACY_BODY_KEYS\)/);
   assert.match(shippingRoute, /hasExactKeys\(body,\s*V2_BODY_KEYS\)/);
-  assert.match(shippingRoute, /"get_legacy_commerce_shipment_quote"/);
+  assert.match(shippingRoute, /\.from\("member_accounts"\)/);
+  assert.match(shippingRoute, /shipping_credit_required/);
+  assert.match(shippingRoute, /const settlement = "shipping_credit"/);
   assert.match(shippingRoute, /"request_commerce_order_shipment"/);
   assert.match(refundRoute, /"get_my_manual_refunds"/);
   assert.match(refundRoute, /shippingFeeRefunds/);
@@ -816,14 +846,27 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
   assert.match(dashboard, /itemSelectedCommerceOrderItemIds/);
   assert.match(dashboard, /v2Storage/);
   assert.match(dashboard, /legacyAuctionWins/);
+  assert.match(dashboard, /pendingAuctionWins/);
+  assert.match(dashboard, /settledLegacyAuctionWins/);
+  assert.match(dashboard, /낙찰품은 보관 상품이 되기 전에 결제를 진행해야 합니다/);
+  assert.match(dashboard, /<CombinedAuctionPayment/);
+  assert.match(dashboard, /dueAt:\s*win\.payment_due_at/);
+  assert.match(dashboard, /rememberedDepositorName=\{rememberedDepositorName\}/);
+  assert.match(dashboard, /serverTime=\{paymentServerTime\}/);
+  assert.match(dashboard, /기존 결제 완료 낙찰품/);
+  assert.doesNotMatch(dashboard, /기존 낙찰 보관 현황/);
   assert.match(dashboard, /fetch\("\/api\/orders"/);
   assert.match(dashboard, /orderId:\s*selectedLegacyOrder\?\.id/);
-  assert.match(dashboard, /exceptionPublicReason/);
+  assert.doesNotMatch(dashboard, /physicalStatus|locationKind|exceptionPublicReason|lineStatus/);
+  assert.match(dashboard, /서로 다른 매장 상품도 한 번에 신청/);
+  assert.match(dashboard, /상품 상세보기/);
   assert.match(dashboard, /환불 진행 상황/);
   assert.match(dashboard, /환불 계좌 등록/);
   assert.match(dashboard, /shipping_fee/);
   assert.match(dashboard, /shipment\.trackingNumber\s*&&\s*shipment\.courier/);
-  assert.match(dashboard, /shipment\.trackingUrl/);
+  assert.match(dashboard, /setTrackingShipment\(shipment\)/);
+  assert.match(dashboard, /trackingShipment\?\.trackingUrl/);
+  assert.match(dashboard, /<PremiumDialog/);
 });
 
 test("operator exceptions use private signed evidence while Owner alone reveals and completes refunds", async () => {

@@ -1,18 +1,19 @@
 "use client";
 
-import { Menu, Search, ShoppingBag, X } from "lucide-react";
+import { Headphones, Menu, Search, ShoppingBag, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthStatus } from "@/components/layout/AuthStatus";
+import { ChatNotificationLink } from "@/components/features/chat/ChatNotificationProvider";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
 
 const links = [
   ["홈", "/m/home"],
+  ["입찰 중인 상품", "/m/bidding"],
   ["실시간 경매", "/m/feed"],
   ["즉시 구매", "/m/shop"],
-  ["판매 완료", "/m/sold"],
   ["상담·채팅", "/m/chat"],
 ] as const;
 
@@ -35,6 +36,7 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
           <button aria-expanded={menuOpen} aria-label="전체 메뉴 열기" className="grid size-11 place-items-center" onClick={() => setMenuOpen(true)} type="button"><Menu size={21} /></button>
           <Link className="text-sm font-black tracking-[-0.05em]" href="/m/home">NINETY-NINE</Link>
           <div className="flex items-center">
+            <ChatNotificationLink ariaLabel="상담·채팅" basePath="/m" className="grid size-11 place-items-center" fallbackHref="/m/chat"><Headphones size={19} /></ChatNotificationLink>
             <button aria-expanded={searchOpen} aria-label="상품 검색 열기" className="grid size-11 place-items-center" onClick={() => setSearchOpen((value) => !value)} type="button"><Search size={19} /></button>
             <Link aria-label="장바구니" className="grid size-11 place-items-center" href="/m/cart"><ShoppingBag size={19} /></Link>
           </div>

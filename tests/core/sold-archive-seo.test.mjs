@@ -19,15 +19,15 @@ test("legacy title inference removes the size prefix and falls back safely", () 
   assert.deepEqual(inferBrandFromTitle("[S] !!!"), { brand: "기타", brandSlug: "etc" });
 });
 
-test("single and bulk product writes require and explicitly persist brand", async () => {
-  const routes = await Promise.all([
+test("single writes use the internal brand default while bulk writes require an explicit brand", async () => {
+  const [singleRoute, bulkRoute] = await Promise.all([
     source("src/app/api/admin/operator/products/route.ts"),
     source("src/app/api/admin/operator/products/bulk/route.ts"),
   ]);
-  for (const route of routes) {
-    assert.match(route, /normalizeProductBrand\(body\??\.brand\)/);
-    assert.match(route, /brand_source:\s*"explicit"/);
-  }
+  assert.match(singleRoute, /singleRegistration \? "기타" : body\?\.brand/);
+  assert.match(singleRoute, /brand_source:\s*"explicit"/);
+  assert.match(bulkRoute, /normalizeProductBrand\(body\.brand\)/);
+  assert.match(bulkRoute, /brand_source:\s*"explicit"/);
   const [operatorUpdate, ownerUpdate, operatorMutation] = await Promise.all([
     source("src/app/api/admin/operator/products/[id]/route.ts"),
     source("src/app/api/admin/owner/products/[id]/route.ts"),
@@ -73,6 +73,37 @@ test("sold routes own their canonical, structured data and safe 404 boundary", a
   assert.match(robots, /sitemap\.xml/);
 });
 
+test("sold archive stays addressable but main navigation exposes it only through feed toggles", async () => {
+  const [pcHeader, mobileHeader, mobileSiteHeader, footer, grid] = await Promise.all([
+    source("src/components/layout/PcHeader.tsx"),
+    source("src/components/layout/MobileHeader.tsx"),
+    source("src/components/mobile/MobileSiteHeader.tsx"),
+    source("src/components/layout/PcFooter.tsx"),
+    source("src/components/features/auction/AuctionFeedGrid.tsx"),
+  ]);
+  for (const navigation of [pcHeader, mobileHeader, mobileSiteHeader, footer]) {
+    assert.doesNotMatch(navigation, /판매 완료/);
+    assert.doesNotMatch(navigation, /\/sold/);
+  }
+  assert.match(grid, /판매 완료 상품만 보기/);
+  assert.match(grid, /판매 중 상품 보기/);
+});
+
+test("sold feed RPC supports both sale types without exposing buyer identity", async () => {
+  const [migration, service, route] = await Promise.all([
+    source("supabase/migrations/20260724055250_add_sold_product_feed_filter.sql"),
+    source("src/services/products.ts"),
+    source("src/app/api/products/route.ts"),
+  ]);
+  assert.match(migration, /get_public_sold_feed_products/);
+  assert.match(migration, /products\.sale_type = p_sale_type/);
+  assert.match(migration, /commerce_order_items/);
+  assert.match(migration, /to anon, authenticated/);
+  assert.doesNotMatch(migration, /member_id|bidder_id|winner_display_name/);
+  assert.match(service, /fetchSoldFeedProducts/);
+  assert.match(route, /searchParams\.get\("view"\) === "sold"/);
+});
+
 test("auction settlement copy and optional measurement rendering match policy", async () => {
   const [panel, bidRoutePanel, report] = await Promise.all([
     source("src/components/features/auction/detail/StickyBidPanel.tsx"),
@@ -85,7 +116,7 @@ test("auction settlement copy and optional measurement rendering match policy", 
   assert.match(panel, /aria-describedby="auction-settlement-summary"/);
   assert.match(
     panel,
-    /낙찰 후 다음 날 11:59까지 결제 · 미결제 시 낙찰 취소·경고 및\s*차순위 전환/,
+    /낙찰 후 서버가 확정한 결제 마감까지 입금 · 미결제 시 낙찰\s*취소·경고 및 차순위 전환/,
   );
   assert.match(
     bidRoutePanel,

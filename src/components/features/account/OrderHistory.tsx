@@ -283,7 +283,7 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
                   {order.transfer.expected_amount.toLocaleString("ko-KR")}원 ·{" "}
                   {order.transfer.bank_name_snapshot}{" "}
                   {order.transfer.account_number_snapshot}로 입금해 주세요. 입금
-                  확인 후 상품이 보관함으로 이동하며, 보관 기간은 중앙센터의 실물 보관 완료 시 시작됩니다.
+                  확인 후 상품이 보관함으로 이동하며, 보관 기간은 매장 보관 시작일부터 계산됩니다.
                 </p>
               )}
               {order.status === "awaiting_payment" && virtualAccount && (
@@ -291,7 +291,7 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
                   가상계좌 · {virtualAccount.bank ? `${virtualAccount.bank} ` : ""}
                   {virtualAccount.accountNumber}로 입금해 주세요.
                   {dueAt ? ` 입금 기한은 ${dueAt}입니다.` : ""} 입금 확인 후
-                  상품이 보관함으로 이동하며, 보관 기간은 중앙센터의 실물 보관 완료 시 시작됩니다.
+                  상품이 보관함으로 이동하며, 보관 기간은 매장 보관 시작일부터 계산됩니다.
                 </p>
               )}
               {order.portonePayment?.canResume && (

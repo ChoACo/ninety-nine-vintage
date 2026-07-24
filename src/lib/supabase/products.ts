@@ -123,7 +123,7 @@ export function mapProductRowToAuctionPost(row: ProductRow): AuctionPost {
     description: row.description,
     brand: row.brand,
     brandSlug: row.brand_slug,
-    category: row.category || "구제 의류",
+    category: row.category || "기타",
     createdAt: row.created_at,
     publish_at: row.publish_at,
     closesAt: row.closes_at,
@@ -447,7 +447,7 @@ function createProductInsert(
     id,
     title: draft.title,
     description: draft.description,
-    category: "구제 의류",
+    category: "기타",
     publish_at: publishAt.toISOString(),
     closes_at:
       draft.saleType === "fixed"
@@ -738,9 +738,12 @@ export async function fetchPublishedProductsPage({
   const { data, error, count } = await client
     .from("products")
     .select(PRODUCT_COLUMNS, { count: "exact" })
-    .eq("status", "active")
     .eq("sale_type", "auction")
     .lte("publish_at", nowIso)
+    .or(
+      `and(status.eq.active,auction_feed_expires_at.gt.${nowIso},final_bid_id.is.null),` +
+      "and(status.eq.closed,final_bid_id.not.is.null,final_bid_amount.not.is.null,sale_completed_at.is.null)",
+    )
     .order("publish_at", { ascending: false })
     .order("id", { ascending: false })
     .range(rangeStart, rangeEnd);
@@ -756,7 +759,7 @@ export async function fetchPublishedProductsPage({
     .map(mapProductRowToAuctionPost)
     .filter(
       (post) =>
-        post.status === "active" &&
+        (post.status === "active" || post.status === "closed") &&
         Date.parse(post.publish_at ?? post.createdAt) <= now.getTime(),
     );
 
@@ -786,8 +789,12 @@ export async function fetchPublishedProductById(
     .from("products")
     .select(PRODUCT_COLUMNS)
     .eq("id", normalizedId)
-    .eq("status", "active")
     .lte("publish_at", now.toISOString())
+    .or(
+      "and(status.eq.active,sale_type.eq.fixed)," +
+      `and(status.eq.active,sale_type.eq.auction,auction_feed_expires_at.gt.${now.toISOString()},final_bid_id.is.null),` +
+      "and(status.eq.closed,sale_type.eq.auction,final_bid_id.not.is.null,final_bid_amount.not.is.null,sale_completed_at.is.null)",
+    )
     .maybeSingle();
 
   if (error) {
@@ -799,7 +806,7 @@ export async function fetchPublishedProductById(
   if (!data) return null;
 
   const post = mapProductRowToAuctionPost(data as unknown as ProductRow);
-  return post.status === "active" &&
+  return (post.status === "active" || post.status === "closed") &&
     Date.parse(post.publish_at ?? post.createdAt) <= now.getTime()
     ? post
     : null;

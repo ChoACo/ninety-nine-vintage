@@ -34,6 +34,17 @@ interface QueuePayment {
   lastDepositorName: string | null;
 }
 
+interface LedgerRow {
+  id: string;
+  transfer_kind: string;
+  manual_transfer_order_id: string | null;
+  commerce_order_transfer_id: string | null;
+  shipping_fee_payment_id: string | null;
+  entry_type: string;
+  reversal_of: string | null;
+  created_at: string;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -175,10 +186,29 @@ export async function GET(request: Request) {
   const auctionIds = data.payments
     .filter((payment) => payment.paymentKind === "auction")
     .map((payment) => payment.paymentId);
+  const auctionBatchMemberIds = data.payments
+    .filter(
+      (payment) =>
+        payment.paymentKind === "auction" &&
+        payment.paymentId === payment.memberId &&
+        payment.status === "awaiting_manual_transfer",
+    )
+    .map((payment) => payment.memberId);
   const commerceIds = data.payments
     .filter((payment) => payment.paymentKind === "commerce")
     .map((payment) => payment.paymentId);
-  const [profileResult, auctionResult, commerceTransferResult] =
+  const shippingIds = data.payments
+    .filter((payment) => payment.paymentKind === "shipping_fee")
+    .map((payment) => payment.paymentId);
+  const [
+    profileResult,
+    auctionResult,
+    auctionBatchResult,
+    commerceTransferResult,
+    commerceLedgerResult,
+    auctionLedgerResult,
+    shippingLedgerResult,
+  ] =
     await Promise.all([
       memberIds.length === 0
         ? Promise.resolve({ data: [], error: null })
@@ -190,19 +220,48 @@ export async function GET(request: Request) {
         ? Promise.resolve({ data: [], error: null })
         : auth.admin
             .from("manual_transfer_orders")
-            .select("id, product_id")
+            .select("id, buyer_id, product_id")
             .in("id", auctionIds),
+      auctionBatchMemberIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : auth.admin
+            .from("manual_transfer_orders")
+            .select("id, buyer_id, product_id")
+            .in("buyer_id", auctionBatchMemberIds)
+            .eq("status", "awaiting_manual_transfer"),
       commerceIds.length === 0
         ? Promise.resolve({ data: [], error: null })
         : auth.admin
             .from("commerce_order_transfers")
             .select("id, order_id")
             .in("id", commerceIds),
+      commerceIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : auth.admin
+            .from("manual_transfer_payment_ledger")
+            .select("id, transfer_kind, manual_transfer_order_id, commerce_order_transfer_id, shipping_fee_payment_id, entry_type, reversal_of, created_at")
+            .in("commerce_order_transfer_id", commerceIds),
+      auctionIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : auth.admin
+            .from("manual_transfer_payment_ledger")
+            .select("id, transfer_kind, manual_transfer_order_id, commerce_order_transfer_id, shipping_fee_payment_id, entry_type, reversal_of, created_at")
+            .in("manual_transfer_order_id", auctionIds),
+      shippingIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : auth.admin
+            .from("manual_transfer_payment_ledger")
+            .select("id, transfer_kind, manual_transfer_order_id, commerce_order_transfer_id, shipping_fee_payment_id, entry_type, reversal_of, created_at")
+            .in("shipping_fee_payment_id", shippingIds),
     ]);
   if (
     profileResult.error ||
     auctionResult.error ||
-    commerceTransferResult.error
+    auctionBatchResult.error ||
+    commerceTransferResult.error ||
+    commerceLedgerResult.error ||
+    auctionLedgerResult.error ||
+    shippingLedgerResult.error
   ) {
     return commerceJson(
       { error: "payment_queue_unavailable", message: "구매자와 상품 정보를 불러오지 못했습니다." },
@@ -229,6 +288,7 @@ export async function GET(request: Request) {
 
   const productIds = [
     ...(auctionResult.data ?? []).map((order) => order.product_id),
+    ...(auctionBatchResult.data ?? []).map((order) => order.product_id),
     ...(commerceItemResult.data ?? []).map((item) => item.product_id),
   ];
   const uniqueProductIds = [...new Set(productIds)];
@@ -263,9 +323,21 @@ export async function GET(request: Request) {
       },
     ]),
   );
-  const auctionProduct = new Map(
-    (auctionResult.data ?? []).map((order) => [order.id, order.product_id]),
-  );
+  const auctionProducts = new Map<string, string[]>();
+  for (const order of auctionResult.data ?? []) {
+    auctionProducts.set(order.id, [
+      ...(auctionProducts.get(order.id) ?? []),
+      order.product_id,
+    ]);
+  }
+  for (const order of auctionBatchResult.data ?? []) {
+    if (order.buyer_id) {
+      auctionProducts.set(order.buyer_id, [
+        ...(auctionProducts.get(order.buyer_id) ?? []),
+        order.product_id,
+      ]);
+    }
+  }
   const orderByCommercePayment = new Map(
     (commerceTransferResult.data ?? []).map((transfer) => [
       transfer.id,
@@ -280,14 +352,47 @@ export async function GET(request: Request) {
     ]);
   }
 
+  const ledgerRows = [
+    ...(commerceLedgerResult.data ?? []),
+    ...(auctionLedgerResult.data ?? []),
+    ...(shippingLedgerResult.data ?? []),
+  ] as LedgerRow[];
+  const reversedReceiptIds = new Set(
+    ledgerRows.flatMap((entry) =>
+      entry.entry_type === "reversal" && entry.reversal_of
+        ? [entry.reversal_of]
+        : []
+    ),
+  );
+  const reversibleByPayment = new Map<string, string>();
+  for (const entry of ledgerRows
+    .filter((candidate) =>
+      candidate.entry_type === "receipt" && !reversedReceiptIds.has(candidate.id)
+    )
+    .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at))) {
+    const paymentId = entry.commerce_order_transfer_id ??
+      entry.manual_transfer_order_id ??
+      entry.shipping_fee_payment_id;
+    if (paymentId && !reversibleByPayment.has(paymentId)) {
+      reversibleByPayment.set(paymentId, entry.id);
+    }
+  }
+
+  const historyCutoff = Date.parse(data.serverTime) - 7 * 24 * 60 * 60 * 1_000;
+  const visiblePayments = data.payments.filter((payment) => {
+    if (!page.includeHistory) return payment.remainingAmount > 0;
+    if (payment.remainingAmount > 0) return true;
+    return payment.confirmedAt !== null &&
+      Number.isFinite(Date.parse(payment.confirmedAt)) &&
+      Date.parse(payment.confirmedAt) >= historyCutoff;
+  });
+
   return commerceJson({
     serverTime: data.serverTime,
-    payments: data.payments.map((payment) => {
+    payments: visiblePayments.map((payment) => {
       const linkedProductIds =
         payment.paymentKind === "auction"
-          ? [auctionProduct.get(payment.paymentId)].filter(
-              (id): id is string => Boolean(id),
-            )
+          ? [...new Set(auctionProducts.get(payment.paymentId) ?? [])]
           : payment.paymentKind === "commerce"
             ? commerceProductIds.get(
                 orderByCommercePayment.get(payment.paymentId) ?? "",
@@ -296,6 +401,7 @@ export async function GET(request: Request) {
       return {
         ...payment,
         buyerName: buyerNames.get(payment.memberId) ?? "이름 미확인 구매자",
+        reversibleLedgerId: reversibleByPayment.get(payment.paymentId) ?? null,
         products: linkedProductIds.flatMap((id) => {
           const product = productById.get(id);
           return product ? [product] : [];

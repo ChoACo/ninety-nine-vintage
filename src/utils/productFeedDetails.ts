@@ -45,7 +45,7 @@ export function getProductFeedDetails(
     name:
       (isCanonical ? labeledName : firstLine) ||
       title ||
-      "구제 의류 상품",
+      "빈티지 상품",
     size: isCanonical ? labeledSize : undefined,
     condition: isCanonical ? labeledCondition : undefined,
     legacyDescription,

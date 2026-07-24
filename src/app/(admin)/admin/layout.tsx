@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminAccessBoundary } from "@/components/admin/AdminAccessBoundary";
+import { ChatNotificationLink } from "@/components/features/chat/ChatNotificationProvider";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { MessageCircle } from "lucide-react";
 
 export const metadata: Metadata = {
   robots: {
@@ -25,6 +27,7 @@ export default function AdminLayout({
             NINETY-NINE 운영 센터
           </Link>
           <div className="flex items-center gap-2">
+            <ChatNotificationLink ariaLabel="운영 채팅" className="grid size-10 place-items-center border border-line" fallbackHref="/admin/operator/chat"><MessageCircle size={16} /></ChatNotificationLink>
             <ThemeToggle className="size-10 px-0 sm:w-auto sm:px-3" />
             <Link className="text-xs font-bold underline" href="/">
               쇼핑 화면으로 이동

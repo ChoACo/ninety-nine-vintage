@@ -62,7 +62,7 @@ function normalizeProduct(body: Record<string, unknown>, userId: string): Produc
     ...(productId ? { id: productId } : {}),
     title,
     description,
-    category: text(body.category, "구제 의류"),
+    category: text(body.category, "기타"),
     brand: normalizedBrand.brand,
     brand_slug: normalizedBrand.brandSlug,
     brand_source: "explicit",

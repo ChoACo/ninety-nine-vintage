@@ -204,10 +204,11 @@ test("a server-recorded anti-sniping overtime stays closing-soon during the dail
 });
 
 test("restored feed UI uses separated desktop and mobile routes with authoritative account and product APIs", async () => {
-  const [feedPage, mobileFeedPage, grid, card, summary, bidRoutePanel, interceptedBid, history, gallery, detailPanel, bidApi, productApi, productService, detailView] = await Promise.all([
+  const [feedPage, mobileFeedPage, grid, sidebar, card, summary, bidRoutePanel, interceptedBid, history, gallery, detailPanel, bidApi, productApi, productService, detailView] = await Promise.all([
     source("src/app/(shop)/feed/page.tsx"),
     source("src/app/(mobile)/m/feed/page.tsx"),
     source("src/components/features/auction/AuctionFeedGrid.tsx"),
+    source("src/components/features/auction/AuctionFilterSidebar.tsx"),
     source("src/components/features/auction/AuctionFeedCard.tsx"),
     source("src/components/features/auction/AuctionBidSummary.tsx"),
     source("src/components/features/auction/detail/AuctionBidRoutePanel.tsx"),
@@ -225,9 +226,20 @@ test("restored feed UI uses separated desktop and mobile routes with authoritati
   assert.match(mobileFeedPage, /basePath="\/m"/);
   assert.match(mobileFeedPage, /surface="mobile"/);
   assert.match(grid, /paginateAuctionFeed\(visibleCards, page\)/);
-  assert.match(grid, />브랜드<select/);
-  assert.match(grid, />카테고리<select/);
-  assert.match(grid, />성별<select/);
+  assert.match(sidebar, /상품명·설명 검색/);
+  assert.match(sidebar, /브랜드 카테고리/);
+  assert.match(sidebar, /성별 카테고리/);
+  assert.match(sidebar, /상품 등록일/);
+  assert.match(sidebar, /saleType === "auction"/);
+  assert.match(grid, /catalog-filter-options/);
+  assert.match(grid, /판매 완료 상품만 보기/);
+  assert.match(grid, /showSoldOnly\s*\?\s*<SoldFeedCard/);
+  assert.match(grid, /dates:\s*saleType === "auction"/);
+  assert.doesNotMatch(grid, /마감 임박순/);
+  assert.doesNotMatch(sidebar, /현재 입찰가 높은순|현재 입찰가 낮은순|경매 상태|구제 의류/);
+  assert.doesNotMatch(sidebar, /가격 높은순|가격 낮은순|사이즈/);
+  assert.doesNotMatch(grid, /상품 등록 날짜 선택/);
+  assert.doesNotMatch(grid, /<AuctionBidSummary snapshot=/);
   assert.match(summary, /fetch\("\/api\/account\/bids"/);
   assert.doesNotMatch(card, /fetch\("\/api\/auction\/bids"/);
   assert.match(card, /AuctionBidHistoryModal/);

@@ -67,6 +67,7 @@ export function AuctionBidRoutePanel({ basePath = "", bidIncrement, currentPrice
       setAgreed(false);
       setConfirmOpen(false);
       setMessage({ kind: "success", text: payload.bid.isFinal ? "첫 입찰이 즉시 낙찰로 확정되었습니다." : "입찰이 완료되었습니다. 현재가가 실시간으로 갱신됩니다." });
+      window.dispatchEvent(new Event("ninety-nine:close-route-modal"));
     } catch (error) {
       setConfirmOpen(false);
       setMessage({ kind: "error", text: error instanceof Error ? error.message : "입찰을 저장하지 못했습니다." });

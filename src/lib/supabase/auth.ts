@@ -84,10 +84,12 @@ export function getUserRole(user: User | null | undefined): AppRole {
     provider === "kakao" ||
     (Array.isArray(providers) && providers.includes("kakao"));
 
-  // Every account, including the private service owner, authenticates through
-  // Kakao. A legacy email/password JWT must never become authorized merely
-  // because it still carries an old role claim.
-  if (!hasKakaoProvider) return "unauthorized";
+  // Production access remains Kakao-only. Local test users are server-created
+  // with immutable app metadata and are accepted only by a development build.
+  const isLocalTestAccount =
+    process.env.NODE_ENV === "development" &&
+    user?.app_metadata?.local_test_account === true;
+  if (!hasKakaoProvider && !isLocalTestAccount) return "unauthorized";
 
   if (
     explicitRole === "admin" ||

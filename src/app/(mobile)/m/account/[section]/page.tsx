@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AccountDashboard } from "@/components/features/account/AccountDashboard";
 import { BidHistory } from "@/components/features/account/BidHistory";
+import { MemberAccountBoundary } from "@/components/features/account/MemberAccountBoundary";
 import { OrderHistory } from "@/components/features/account/OrderHistory";
 
 const sectionLabels = {
@@ -24,7 +25,8 @@ export async function generateMetadata({ params }: { params: Promise<{ section: 
 export default async function MobileAccountSectionPage({ params }: { params: Promise<{ section: string }> }) {
   const { section } = await params;
   if (!(section in sectionLabels)) notFound();
-  if (section === "orders") return <OrderHistory basePath="/m" />;
-  if (section === "bids") return <BidHistory basePath="/m" />;
-  return <div data-account-task={section}><div className="mb-6 border-b border-ink pb-4"><p className="eyebrow text-muted">내 정보 / {sectionLabels[section as AccountSection]}</p><h1 className="mt-3 text-3xl font-black tracking-[-.08em]">{sectionLabels[section as AccountSection]}</h1></div><AccountDashboard basePath="/m" /></div>;
+  const returnTo = `/m/account/${section}`;
+  if (section === "orders") return <MemberAccountBoundary basePath="/m" returnTo={returnTo}><OrderHistory basePath="/m" /></MemberAccountBoundary>;
+  if (section === "bids") return <MemberAccountBoundary basePath="/m" returnTo={returnTo}><BidHistory basePath="/m" /></MemberAccountBoundary>;
+  return <MemberAccountBoundary basePath="/m" returnTo={returnTo}><div data-account-task={section}><div className="mb-6 border-b border-ink pb-4"><p className="eyebrow text-muted">내 정보 / {sectionLabels[section as AccountSection]}</p><h1 className="mt-3 text-3xl font-black tracking-[-.08em]">{sectionLabels[section as AccountSection]}</h1></div><AccountDashboard basePath="/m" /></div></MemberAccountBoundary>;
 }

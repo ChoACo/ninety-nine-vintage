@@ -73,7 +73,8 @@ test("operator product console publishes directly and manages active listings fr
   assert.match(products, /> 점검<\/button>/);
   assert.match(products, /사이트에서 즉시 사라집니다/);
   assert.match(products, /status:\s*"pending" \| "active";/);
-  assert.match(products, /stores\.find\(\(store\) => store\.id === form\.storeId\)\?\.canPublish === true && form\.status === "active"/);
+  assert.match(products, /const canPublishStore\s*=[\s\S]*stores\.find\(\(store\) => store\.id === form\.storeId\)\?\.canPublish === true/);
+  assert.match(products, /canPublishStore && publicationMode === "now"/);
   assert.match(products, /form\.status === "active" \|\| stores\.find/);
   assert.match(products, /disabled=\{busy \|\| !canPublishStore \|\| product\.status !== "pending"\}/);
   assert.match(products, /\/products\/\$\{product\.id\}\/pause/);
@@ -86,8 +87,7 @@ test("operator product console publishes directly and manages active listings fr
   assert.match(productRoute, /products:\s*products \?\? \[\]/);
   assert.match(productRoute, /auth\.user\.from\("products"\)\.insert/);
   assert.match(productRoute, /from\("store_memberships"\)/);
-  assert.match(productRoute, /from\("fulfillment_center_staff_assignments"\)/);
-  assert.match(productRoute, /home_fulfillment_center_id/);
+  assert.doesNotMatch(productRoute, /fulfillment_center_staff_assignments|home_fulfillment_center_id/);
   assert.match(productRoute, /p_permission:\s*"manage_products"/);
   assert.match(productRoute, /const canMutate = stores\.length > 0/);
   assert.match(productRoute, /canCreate:\s*stores\.length > 0/);

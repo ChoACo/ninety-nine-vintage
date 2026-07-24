@@ -4,6 +4,7 @@ const CUSTOMER_ROOT_SEGMENTS = new Set([
   "account",
   "auction",
   "auth",
+  "bidding",
   "cart",
   "chat",
   "checkout",

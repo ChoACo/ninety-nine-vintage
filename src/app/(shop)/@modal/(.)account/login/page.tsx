@@ -8,5 +8,5 @@ function safeReturnTo(value: string | string[] | undefined) {
 
 export default async function InterceptedLoginPage({ searchParams }: { searchParams: Promise<{ next?: string | string[] }> }) {
   const query = await searchParams;
-  return <ModalShell label="로그인"><LoginPrompt returnTo={safeReturnTo(query.next)} /></ModalShell>;
+  return <ModalShell label="로그인"><LoginPrompt dismissToPrevious returnTo={safeReturnTo(query.next)} /></ModalShell>;
 }

@@ -115,6 +115,19 @@ test("premium detail actions stay in layered rounded dialogs before server mutat
   assert.match(confirmationRequest, /setConfirmOpen\(true\)/);
   assert.match(confirmedSubmission, /fetch\("\/api\/auction\/bids"/);
   assert.match(confirmedSubmission, /!agreed \|\| !session\?\.access_token/);
+  const successfulBidClose = confirmedSubmission.slice(
+    confirmedSubmission.indexOf("if (!response.ok"),
+    confirmedSubmission.indexOf("} catch"),
+  );
+  assert.match(
+    successfulBidClose,
+    /setConfirmOpen\(false\);[\s\S]*window\.dispatchEvent\(new Event\("ninety-nine:close-route-modal"\)\)/,
+  );
+  assert.match(
+    routeModal,
+    /window\.addEventListener\("ninety-nine:close-route-modal", onRequestedClose\)/,
+  );
+  assert.match(routeModal, /const onRequestedClose = \(\) => close\(\)/);
   assert.match(gallery, /touch-none/);
   assert.match(gallery, /event\.pointerType === "mouse"/);
   assert.match(gallery, /event\.pointerType === "touch"/);
@@ -167,7 +180,7 @@ test("fixed navigation and operator dialogs share the accessible portaled lifecy
   assert.doesNotMatch(mobileHeader, /document\.body\.style\.overflow/);
 
   assert.match(mobileFilters, /<PremiumDialog/);
-  assert.match(mobileFilters, /aria-expanded=\{mobileOpen\} aria-haspopup="dialog"/);
+  assert.match(mobileFilters, /aria-expanded=\{mobileOpen\}[\s\S]*aria-haspopup="dialog"/);
   assert.match(mobileFilters, /placement="sheet-bottom"/);
   assert.doesNotMatch(mobileFilters, /mobileOpen &&\s*<PremiumDialog/);
 

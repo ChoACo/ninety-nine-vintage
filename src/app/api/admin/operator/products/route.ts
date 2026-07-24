@@ -2,13 +2,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
 import { normalizeProductBrand } from "@/lib/catalog/brand";
+import { formatProductDisplayNumber } from "@/lib/productDisplayNumber";
+import {
+  getNextAuctionDeadline,
+  getRelativeKoreanDateTime,
+} from "@/utils/formatters";
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const FIXED_PRODUCT_OPEN_UNTIL = "9999-12-31T23:59:59.000Z";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
 }
 
 function images(value: unknown) {
-  if (!Array.isArray(value) || value.length === 0 || value.length > 12) return [];
+  if (!Array.isArray(value) || value.length === 0 || value.length > 15) return [];
   const normalized = value.flatMap((candidate) => {
     if (typeof candidate !== "string") return [];
     const image = candidate.trim();
@@ -34,19 +43,12 @@ export async function GET(request: Request) {
   const admin = auth.admin as unknown as SupabaseClient;
   const membershipPermissions = new Map<string, { canManage: boolean; canPublish: boolean }>();
   if (auth.roleCode !== "owner") {
-    const [membershipResult, assignmentResult] = await Promise.all([
-      admin
-        .from("store_memberships")
-        .select("store_id, manage_products, publish_products")
-        .eq("user_id", auth.userId)
-        .eq("status", "active"),
-      admin
-        .from("fulfillment_center_staff_assignments")
-        .select("fulfillment_center_id")
-        .eq("user_id", auth.userId)
-        .eq("status", "active"),
-    ]);
-    if (membershipResult.error || assignmentResult.error) {
+    const membershipResult = await admin
+      .from("store_memberships")
+      .select("store_id, manage_products, publish_products")
+      .eq("user_id", auth.userId)
+      .eq("status", "active");
+    if (membershipResult.error) {
       return commerceJson({ error: "operator_products_unavailable" }, 503);
     }
     const memberships = membershipResult.data;
@@ -55,25 +57,6 @@ export async function GET(request: Request) {
         canManage: membership.manage_products,
         canPublish: membership.publish_products,
       });
-    }
-    const centerIds = (assignmentResult.data ?? []).map(
-      (assignment) => assignment.fulfillment_center_id,
-    );
-    if (centerIds.length > 0) {
-      const { data: centerStores, error: centerStoreError } = await admin
-        .from("stores")
-        .select("id")
-        .eq("is_active", true)
-        .in("home_fulfillment_center_id", centerIds);
-      if (centerStoreError) {
-        return commerceJson({ error: "operator_products_unavailable" }, 503);
-      }
-      for (const store of centerStores ?? []) {
-        membershipPermissions.set(store.id, {
-          canManage: true,
-          canPublish: true,
-        });
-      }
     }
   }
 
@@ -86,7 +69,16 @@ export async function GET(request: Request) {
     .eq("is_active", true);
   if (auth.roleCode !== "owner") {
     if (manageableStoreIds.length === 0) {
-      return commerceJson({ stores: [], products: [], permissions: { canCreate: false, canMutate: false, canPublish: false } });
+      return commerceJson({
+        stores: [],
+        products: [],
+        permissions: {
+          canCloseAuctions: false,
+          canCreate: false,
+          canMutate: false,
+          canPublish: false,
+        },
+      });
     }
     storeQuery = storeQuery.in("id", manageableStoreIds);
   }
@@ -106,6 +98,7 @@ export async function GET(request: Request) {
     stores: stores ?? [],
     products: products ?? [],
     permissions: {
+      canCloseAuctions: auth.roleCode === "owner",
       canCreate: stores.length > 0,
       canMutate,
       canPublish: stores.some((store) => store.canPublish),
@@ -120,10 +113,21 @@ export async function POST(request: Request) {
     return commerceJson({ error: "operator_products_forbidden" }, 403);
   }
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
-  const title = text(body?.title);
+  const singleRegistration = body?.registrationMode === "single";
+  const requestedId = text(body?.id);
+  const productId = singleRegistration && UUID_PATTERN.test(requestedId)
+    ? requestedId
+    : crypto.randomUUID();
+  const title = singleRegistration
+    ? formatProductDisplayNumber(productId)
+    : text(body?.title);
   const description = text(body?.description);
-  const category = text(body?.category, "구제 의류");
-  const normalizedBrand = normalizeProductBrand(body?.brand);
+  const category = singleRegistration
+    ? "기타"
+    : text(body?.category, "기타");
+  const normalizedBrand = normalizeProductBrand(
+    singleRegistration ? "기타" : body?.brand,
+  );
   const storeId = text(body?.storeId);
   const saleType = body?.saleType === "fixed" ? "fixed" : "auction";
   const imageUrls = images(body?.imageUrls);
@@ -132,8 +136,21 @@ export async function POST(request: Request) {
     : images(body.thumbnailUrls);
   const startingPrice = Number(body?.startingPrice);
   const fixedPrice = saleType === "fixed" ? Number(body?.fixedPrice ?? body?.startingPrice) : null;
-  const publishAt = text(body?.publishAt, new Date().toISOString());
-  const closesAt = text(body?.closesAt, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+  const publicationMode = body?.publicationMode === "now"
+    ? "now"
+    : "next-day-10";
+  const publishAt = singleRegistration
+    ? publicationMode === "now"
+      ? new Date().toISOString()
+      : new Date(
+          getRelativeKoreanDateTime(1, "10:00:00", new Date()),
+        ).toISOString()
+    : text(body?.publishAt, new Date().toISOString());
+  const closesAt = singleRegistration
+    ? saleType === "fixed"
+      ? FIXED_PRODUCT_OPEN_UNTIL
+      : getNextAuctionDeadline(publishAt).toISOString()
+    : text(body?.closesAt, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
   if (!title || !description || !normalizedBrand || !storeId || imageUrls.length === 0 || thumbnailUrls.length !== imageUrls.length || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
     return commerceJson({ error: "상품 입력값을 확인해 주세요." }, 400);
   }
@@ -143,8 +160,28 @@ export async function POST(request: Request) {
   );
   if (permissionError) return commerceJson({ error: "store_unavailable" }, 503);
   if (canManageStore !== true) return commerceJson({ error: "forbidden" }, 403);
+  if (singleRegistration) {
+    const { data: canPublishStore, error: publishPermissionError } =
+      await auth.user.rpc("has_store_permission", {
+        p_store_id: storeId,
+        p_permission: "publish_products",
+      });
+    if (publishPermissionError) {
+      return commerceJson({ error: "store_unavailable" }, 503);
+    }
+    if (canPublishStore !== true) {
+      return commerceJson(
+        {
+          error: "publish_permission_required",
+          message: "단품의 공개 시각을 예약하려면 상품 공개 권한이 필요합니다.",
+        },
+        403,
+      );
+    }
+  }
   const price = saleType === "fixed" ? fixedPrice as number : startingPrice;
   const { data: product, error } = await auth.user.from("products").insert({
+    id: productId,
     title,
     description,
     category,
@@ -164,10 +201,20 @@ export async function POST(request: Request) {
     status: "pending",
     created_by: auth.userId,
     updated_by: auth.userId,
-    size_label: text(body?.sizeLabel),
-    condition_grade: ["S", "A+", "A", "B"].includes(text(body?.conditionGrade)) ? text(body?.conditionGrade) : "A",
+    size_label: singleRegistration ? "" : text(body?.sizeLabel),
+    condition_grade: singleRegistration
+      ? "A"
+      : ["S", "A+", "A", "B"].includes(text(body?.conditionGrade))
+        ? text(body?.conditionGrade)
+        : "A",
     storage_class: text(body?.storageClass) === "large" ? "large" : "small",
-    inspection_notes: Array.isArray(body?.inspectionNotes) ? body.inspectionNotes.filter((value): value is string => typeof value === "string") : [],
+    inspection_notes: singleRegistration
+      ? []
+      : Array.isArray(body?.inspectionNotes)
+        ? body.inspectionNotes.filter(
+            (value): value is string => typeof value === "string",
+          )
+        : [],
   }).select("*").single();
   if (error) return commerceJson({ error: error.message || "상품을 등록하지 못했습니다." }, 409);
   return commerceJson({ product }, 201);

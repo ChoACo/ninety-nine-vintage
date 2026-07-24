@@ -282,7 +282,9 @@ export function OperatorXlsxImportModal({
               />
               <p className="mt-3 text-[11px] leading-5 text-muted">
                 기존 고정 양식만 사용합니다. 1~5행은 안내로 제외하고 6행부터 A열 상품명,
-                D열 사이즈, W열 상태점수, X열 원문, Y열 시작가, AH열 이미지명을 읽습니다.
+                D열 여성·남성 의류, E열 여성·남성 하의, F열 스포츠·등산복 사이즈,
+                W열 상태점수, X열 원문, Y열 시작가, AH열 이미지명을 읽습니다. 행 안의
+                등록된 여성·남성 의류 카테고리 ID는 성별·대분류·세부 품목으로 자동 변환합니다.
               </p>
               {isParsing && <p className="mt-3 text-xs font-bold" role="status">엑셀 파일을 분석하는 중…</p>}
               {workbookFileName && !isParsing && <p className="mt-3 truncate bg-paper px-3 py-2 text-xs font-bold">{workbookFileName}</p>}
@@ -399,6 +401,7 @@ export function OperatorXlsxImportModal({
                       <th className="px-3 py-3">행</th>
                       <th className="px-3 py-3">상품</th>
                       <th className="px-3 py-3">확인 브랜드</th>
+                      <th className="px-3 py-3">카테고리 ID</th>
                       <th className="px-3 py-3">시작가</th>
                       <th className="px-3 py-3">연결 사진</th>
                       <th className="px-3 py-3">검증 결과</th>
@@ -415,6 +418,10 @@ export function OperatorXlsxImportModal({
                             <p className="mt-1 whitespace-pre-line leading-5 text-muted">{row.description || "설명 없음"}</p>
                           </td>
                           <td className="px-3 py-3 align-top font-bold">{inferBrandFromTitle(row.title).brand}</td>
+                          <td className="whitespace-nowrap px-3 py-3 align-top">
+                            <p className="font-mono font-bold">{row.category?.id ?? "미인식"}</p>
+                            <p className="mt-1 text-[10px] text-muted">{row.category?.label ?? "기타"}</p>
+                          </td>
                           <td className="whitespace-nowrap px-3 py-3 align-top font-mono font-bold">
                             {row.startingPrice === null ? "확인 필요" : formatKRW(row.startingPrice)}
                           </td>

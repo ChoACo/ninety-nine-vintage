@@ -71,6 +71,11 @@ export interface PublishedProduct {
   inspectionNotes: string[];
 }
 
+export interface SoldFeedProduct extends PublishedProduct {
+  soldAt: string;
+  soldPrice: number;
+}
+
 export function mapPublishedProduct(row: ProductRow): PublishedProduct {
   return {
     id: row.id,
@@ -128,13 +133,16 @@ export async function fetchPublishedProducts(input: {
   let query = verifier
     .from("products")
     .select("*")
-    .eq("status", "active")
     .eq("sale_type", saleType)
     .lte("publish_at", now);
   if (saleType === "auction") {
     query = query
-      .gt("auction_feed_expires_at", now)
-      .is("final_bid_id", null);
+      .or(
+        `and(status.eq.active,auction_feed_expires_at.gt.${now},final_bid_id.is.null),` +
+        "and(status.eq.closed,final_bid_id.not.is.null,final_bid_amount.not.is.null,sale_completed_at.is.null)",
+      );
+  } else {
+    query = query.eq("status", "active");
   }
   if (safeSearch) query = query.or(`title.ilike.%${safeSearch}%,description.ilike.%${safeSearch}%`);
   if (sort === "ending") query = query.order("closes_at", { ascending: true });
@@ -147,6 +155,59 @@ export async function fetchPublishedProducts(input: {
   return (data ?? []).map(mapPublishedProduct);
 }
 
+export async function fetchSoldFeedProducts(input: {
+  limit?: number;
+  offset?: number;
+  saleType: ProductRow["sale_type"];
+}): Promise<SoldFeedProduct[]> {
+  const safeLimit = normalizeProductLimit(input.limit ?? 100);
+  const safeOffset = normalizeProductOffset(input.offset ?? 0);
+  const { data, error } = await createSupabasePublicClient().rpc(
+    "get_public_sold_feed_products",
+    {
+      p_limit: safeLimit,
+      p_offset: safeOffset,
+      p_sale_type: input.saleType,
+    },
+  );
+  if (error) throw new Error("판매 완료 상품을 불러오지 못했습니다.");
+
+  return (data ?? []).map((row) => ({
+    antiSnipingBaseClosesAt: row.anti_sniping_base_closes_at,
+    antiSnipingExtendedAt: row.anti_sniping_extended_at,
+    antiSnipingExtensionCount: row.anti_sniping_extension_count,
+    bidHistory: row.bid_history,
+    bidIncrement: row.bid_increment,
+    bidLockedAt: row.bid_locked_at,
+    brand: row.brand,
+    brandSlug: row.brand_slug,
+    category: row.category,
+    closesAt: row.closes_at,
+    conditionGrade: "A",
+    currentPrice: row.current_price,
+    description: row.description,
+    finalBidAmount: row.final_bid_amount,
+    fixedPrice: row.fixed_price,
+    id: row.id,
+    imageUrls: row.image_urls,
+    inspectionNotes: [],
+    measurements: {},
+    participantCount: row.participant_count,
+    publishAt: row.publish_at,
+    saleType: row.sale_type === "fixed" ? "fixed" : "auction",
+    sizeLabel: row.size_label,
+    soldAt: row.sold_at,
+    soldPrice: row.sold_price,
+    startingPrice: row.starting_price,
+    status: "closed",
+    storageClass: "small",
+    storeId: null,
+    thumbnailUrls: row.thumbnail_urls,
+    title: row.title,
+    updatedAt: row.sold_at,
+  }));
+}
+
 export async function fetchPublishedProduct(productId: string): Promise<PublishedProduct | null> {
   const verifier = createSupabasePublicClient();
   const now = new Date().toISOString();
@@ -154,11 +215,14 @@ export async function fetchPublishedProduct(productId: string): Promise<Publishe
     .from("products")
     .select("*")
     .eq("id", productId)
-    .eq("status", "active")
     .lte("publish_at", now)
+    .or(
+      "and(status.eq.active,sale_type.eq.fixed)," +
+      `and(status.eq.active,sale_type.eq.auction,auction_feed_expires_at.gt.${now},final_bid_id.is.null),` +
+      "and(status.eq.closed,sale_type.eq.auction,final_bid_id.not.is.null,final_bid_amount.not.is.null,sale_completed_at.is.null)",
+    )
     .maybeSingle();
   if (error) throw new Error("상품을 불러오지 못했습니다.");
-  if (data?.sale_type === "auction" && (data.auction_feed_expires_at === null || data.auction_feed_expires_at <= now)) return null;
   return data ? mapPublishedProduct(data) : null;
 }
 

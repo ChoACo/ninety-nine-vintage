@@ -1,7 +1,9 @@
 import { hasTrustedRequestOrigin } from "@/lib/kakao/oidc";
-import { createSupabaseServerClients } from "@/lib/supabase/server";
+import {
+  createSupabaseServerClients,
+  createSupabaseUserClient,
+} from "@/lib/supabase/server";
 import { getManualTransferAccount } from "@/lib/manualTransferConfig";
-import { beginManualBankTransfer } from "@/services/manualPayments";
 
 function json(body: Record<string, unknown>, status = 200) {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
@@ -20,40 +22,54 @@ export async function POST(request: Request) {
   try {
     const { verifier, admin } = createSupabaseServerClients();
     await getManualTransferAccount(admin);
-    if (body?.action === "begin" && typeof body.productId === "string") {
+    if (
+      body?.action === "begin" &&
+      typeof body.depositorName === "string" &&
+      (body.includeShippingFee === undefined ||
+        typeof body.includeShippingFee === "boolean")
+    ) {
       const { data: authData, error: authError } = await verifier.auth.getUser(token);
       if (authError || !authData.user) return json({ error: "unauthorized" }, 401);
-      const transfer = await beginManualBankTransfer(token, body.productId);
-      const [deadlineResult, roleResult] = await Promise.all([
-        admin
-          .from("manual_transfer_orders")
-          .select("display_due_at, due_at")
-          .eq("id", transfer.orderId)
-          .maybeSingle(),
-        admin
-          .from("account_access_roles")
-          .select("role_code")
-          .eq("user_id", authData.user.id)
-          .maybeSingle(),
-      ]);
-      if (deadlineResult.error || roleResult.error) {
+      const depositorName = body.depositorName.trim();
+      if (depositorName.length < 1 || depositorName.length > 80) {
+        return json({ error: "invalid_depositor_name" }, 422);
+      }
+      const { data, error } = await createSupabaseUserClient(token).rpc(
+        "begin_my_combined_auction_payment",
+        {
+          p_depositor_name: depositorName,
+          p_include_shipping_fee: body.includeShippingFee !== false,
+        },
+      );
+      if (error) {
+        const status = error.code === "42501"
+          ? 403
+          : error.code === "P0002"
+            ? 404
+            : error.code === "22023"
+              ? 422
+              : 409;
+        return json(
+          {
+            error: "manual_transfer_failed",
+            message: error.message || "일괄 결제를 시작하지 못했습니다.",
+          },
+          status,
+        );
+      }
+      const roleResult = await admin
+        .from("account_access_roles")
+        .select("role_code")
+        .eq("user_id", authData.user.id)
+        .maybeSingle();
+      if (roleResult.error) {
         return json({ error: "manual_transfer_deadline_unavailable" }, 503);
       }
-      const deadline = deadlineResult.data as unknown as {
-        display_due_at: string | null;
-        due_at: string | null;
-      } | null;
-      const dueAt = deadline?.display_due_at ?? deadline?.due_at ?? null;
-      const deadlineEnforcementExempt =
-        roleResult.data?.role_code === "band_member";
       return json({
         transfer: {
-          ...transfer,
-          dueAt,
-          timedOut: Boolean(
-            dueAt && Date.parse(dueAt) <= Date.now() && transfer.status !== "confirmed",
-          ),
-          deadlineEnforcementExempt,
+          ...(data as Record<string, unknown>),
+          deadlineEnforcementExempt:
+            roleResult.data?.role_code === "band_member",
         },
       });
     }

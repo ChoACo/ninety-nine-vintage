@@ -76,7 +76,7 @@ test("historical v1 canonical commands retain their complete-order safety contra
   }
 });
 
-test("buyer shipping API keeps exact legacy and v2 paths during staged rollout", async () => {
+test("buyer shipping API keeps exact legacy and v2 paths and requires a shipping credit", async () => {
   const [memberRoute, storageRoute, shipmentHistoryRoute, hiddenTestRoute] =
     await Promise.all([
       source("src/app/api/shipping/requests/route.ts"),
@@ -88,7 +88,9 @@ test("buyer shipping API keeps exact legacy and v2 paths during staged rollout",
   assert.match(memberRoute, /authenticateMemberCommerceRequest\(request,\s*true\)/);
   assert.match(memberRoute, /auth\.user as unknown as RpcClient/);
   assert.match(memberRoute, /"request_inventory_shipment"/);
-  assert.match(memberRoute, /"get_legacy_commerce_shipment_quote"/);
+  assert.match(memberRoute, /\.from\("member_accounts"\)/);
+  assert.match(memberRoute, /shipping_credit_required/);
+  assert.match(memberRoute, /const settlement = "shipping_credit"/);
   assert.match(memberRoute, /"request_commerce_order_shipment"/);
   assert.match(memberRoute, /p_member_id:\s*auth\.userId/);
   assert.match(memberRoute, /p_order_id:\s*body\.orderId/);
@@ -151,7 +153,7 @@ test("current operator shipping uses v2 CAS packing and exact unfulfilled-item g
   assert.match(operator, /expectedVersion:\s*shipment\.version/);
   assert.match(operator, /idempotencyKey/);
   assert.match(operator, /item\.lineStatus\s*===\s*"ready"/);
-  assert.match(operator, /item\.physicalStatus\s*===\s*"center_stored"/);
+  assert.match(operator, /item\.released/);
   assert.match(operator, /work\.status\s*===\s*"outbound_complete"/);
   assert.match(operator, /"미 출고된 상품이 존재합니다"/);
   assert.match(operator, /shipment\.addressSnapshot\.recipientName/);
@@ -178,7 +180,7 @@ test("customer UI supports mixed per-business rollout while keeping each request
   assert.match(account, /body:\s*JSON\.stringify\(useV2/);
   assert.match(account, /requestEligibleItems\.map\(\(item\)\s*=>\s*item\.id\)/);
   assert.match(account, /disabled=\{disabled\}/);
-  assert.match(account, /전환이 완료된 매장의 상품은 필요한 상품만 골라 함께 신청할 수 있습니다/);
+  assert.match(account, /결제 완료 상품은 매장 출고 전에도 선택할 수 있으며, 서로 다른 매장 상품도 한 번에 신청할 수 있습니다/);
   assert.match(account, /전환 전 매장의 결제 완료 상품은 주문 한 건 전체를 선택합니다/);
   assert.match(account, /setSelectedOrderId\(""\)/);
   assert.match(account, /setSelectedInventoryItemIds\(\[\]\)/);

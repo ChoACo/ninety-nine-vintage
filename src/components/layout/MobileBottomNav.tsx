@@ -1,6 +1,6 @@
 "use client";
 
-import { Gavel, Home, ShieldCheck, ShoppingBag, UserRound } from "lucide-react";
+import { Gavel, Home, ShieldCheck, ShoppingBag, TrendingUp, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCommerceStore } from "@/store/useCommerceStore";
@@ -14,7 +14,7 @@ export function MobileBottomNav() {
   const cartCount = useCommerceStore((state) => state.cartIds.length);
   const staffTab =
     access.roleCode === "operator"
-      ? (["센터 관리", "/admin/operator/center", ShieldCheck] as const)
+      ? (["출고·보관", "/admin/operator/fulfillment", ShieldCheck] as const)
       : access.roleCode === "employee"
         ? (["직원센터", "/admin/employee", ShieldCheck] as const)
         : access.roleCode === "owner"
@@ -22,6 +22,7 @@ export function MobileBottomNav() {
           : null;
   const tabs = [
     ["홈", "/home", Home],
+    ...(LIVE_AUCTION_ENABLED ? [["입찰 중", "/bidding", TrendingUp] as const] : []),
     ...(LIVE_AUCTION_ENABLED ? [["실시간 경매", "/feed", Gavel] as const] : []),
     ["즉시 구매", "/shop", ShoppingBag] as const,
     ["내 정보", "/account", UserRound] as const,

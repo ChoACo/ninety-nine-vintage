@@ -9,6 +9,14 @@ const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 async function loadBatchAuctionModule() {
   const originalSource = await source("src/lib/import/batchAuction.ts");
+  const categorySource = await source("src/lib/import/categoryIds.ts");
+  const categoryModule = ts.transpileModule(categorySource, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.ES2022,
+    },
+  }).outputText;
+  const categoryModuleUrl = `data:text/javascript;base64,${Buffer.from(categoryModule).toString("base64")}`;
   const importableSource = originalSource
     .replace(
       'import { isSupportedProductImageMimeType } from "@/src/lib/supabase/productImagePolicy";',
@@ -22,7 +30,10 @@ async function loadBatchAuctionModule() {
       target: ts.ScriptTarget.ES2022,
       module: ts.ModuleKind.ES2022,
     },
-  }).outputText;
+  }).outputText.replace(
+    '"@/lib/import/categoryIds"',
+    JSON.stringify(categoryModuleUrl),
+  );
   return import(`data:text/javascript;base64,${Buffer.from(transpiled).toString("base64")}#${Date.now()}`);
 }
 
@@ -33,17 +44,32 @@ function imageFile(name) {
   });
 }
 
-async function workbookFile({ condition = 2, price = 25_000, imageName = "boss.jpg" } = {}) {
+async function workbookFile({
+  categoryId = 310260400,
+  clothingSize = "100 / 추천 M",
+  bottomSize = "",
+  condition = 2,
+  imageName = "boss.jpg",
+  price = 25_000,
+  sportsSize = "",
+  title = "[M] BOSS 빈티지 셔츠",
+} = {}) {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("상품 등록");
   worksheet.getCell("A1").value = "상품명";
+  worksheet.getCell("B1").value = "카테고리 ID";
   worksheet.getCell("D1").value = "사이즈 및 추천 사이즈";
+  worksheet.getCell("E1").value = "여성/남성 하의 사이즈";
+  worksheet.getCell("F1").value = "스포츠/등산복 사이즈";
   worksheet.getCell("W1").value = "상태점수";
   worksheet.getCell("X1").value = "상품 설명";
   worksheet.getCell("Y1").value = "시작가";
   worksheet.getCell("AH1").value = "이미지명";
-  worksheet.getCell("A6").value = "[M] BOSS 빈티지 셔츠";
-  worksheet.getCell("D6").value = "100 / 추천 M";
+  worksheet.getCell("A6").value = title;
+  worksheet.getCell("B6").value = categoryId;
+  worksheet.getCell("D6").value = clothingSize;
+  worksheet.getCell("E6").value = bottomSize;
+  worksheet.getCell("F6").value = sportsSize;
   worksheet.getCell("W6").value = condition;
   worksheet.getCell("X6").value = "기존 엑셀 원문";
   worksheet.getCell("Y6").value = price;
@@ -55,12 +81,13 @@ async function workbookFile({ condition = 2, price = 25_000, imageName = "boss.j
 }
 
 test("operator XLSX UI parses in the browser, highlights Korean row errors, and requires explicit confirmation", async () => {
-  const [modal, consoleSource, dashboard, parser, bulkRoute] = await Promise.all([
+  const [modal, consoleSource, dashboard, parser, bulkRoute, categoryIds] = await Promise.all([
     source("src/components/admin/operator/OperatorXlsxImportModal.tsx"),
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
     source("src/components/admin/operator/OperatorConsole.tsx"),
     source("src/lib/import/batchAuction.ts"),
     source("src/app/api/admin/operator/products/bulk/route.ts"),
+    source("src/lib/import/categoryIds.ts"),
   ]);
 
   assert.match(parser, /await import\("exceljs"\)/);
@@ -76,10 +103,11 @@ test("operator XLSX UI parses in the browser, highlights Korean row errors, and 
   assert.match(modal, /panelViewportClassName="max-h-\[calc\(100dvh-2rem\)\]"/);
   assert.match(modal, /className="grid grid-cols-1 gap-4 lg:grid-cols-2"/);
   assert.match(modal, /확인 브랜드/);
+  assert.match(modal, /카테고리 ID/);
   assert.match(modal, /inferBrandFromTitle\(row\.title\)\.brand/);
   assert.match(modal, /stores\.map\(\(store\)/);
   assert.match(modal, /기존 고정 양식만 사용합니다/);
-  assert.match(modal, /A열 상품명[\s\S]*D열 사이즈[\s\S]*W열 상태점수[\s\S]*X열 원문[\s\S]*Y열 시작가[\s\S]*AH열 이미지명/);
+  assert.match(modal, /A열 상품명[\s\S]*D열 여성·남성 의류[\s\S]*E열 여성·남성 하의[\s\S]*F열 스포츠·등산복 사이즈[\s\S]*W열 상태점수[\s\S]*X열 원문[\s\S]*Y열 시작가[\s\S]*AH열 이미지명/);
   assert.doesNotMatch(modal, /setSaleType|즉시 구매/);
 
   assert.match(consoleSource, /uploadProductImages\(/);
@@ -88,6 +116,7 @@ test("operator XLSX UI parses in the browser, highlights Korean row errors, and 
   assert.match(consoleSource, /discardUnpersistedProductImages\(uploadedPaths\)/);
   assert.match(consoleSource, /stores\.some\(\(store\) => store\.id === scopedStoreId\)/);
   assert.match(consoleSource, /get\("import"\) === "xlsx"/);
+  assert.match(consoleSource, /category: row\.category\?\.label \?\? "기타"/);
   assert.match(dashboard, /href="\/admin\/operator\/products\?import=xlsx"/);
   assert.match(dashboard, /엑셀 일괄 등록/);
 
@@ -99,6 +128,15 @@ test("operator XLSX UI parses in the browser, highlights Korean row errors, and 
   assert.match(bulkRoute, /const normalizedBrand = normalizeProductBrand\(body\.brand\)/);
   assert.match(bulkRoute, /brand_source: "explicit"/);
   assert.match(bulkRoute, /thumbnail_urls: thumbnailUrls/);
+  assert.match(categoryIds, /310300200/);
+  assert.match(categoryIds, /310400999/);
+  assert.match(categoryIds, /320300300/);
+  assert.match(categoryIds, /320500999/);
+  assert.equal(
+    categoryIds.match(/\["(?:여성|남성)",\s*"[^"]+",\s*"[^"]+",\s*"\d+"\],/gu)?.length,
+    54,
+  );
+  assert.doesNotMatch(categoryIds, /구제 의류/);
 });
 
 test("golden XLSX parser accepts a valid row and reports Korean validation failures before save", async () => {
@@ -112,6 +150,9 @@ test("golden XLSX parser accepts a valid row and reports Korean validation failu
   assert.equal(preview.canSubmit, true);
   assert.equal(preview.rows[0].rowNumber, 6);
   assert.equal(preview.rows[0].title, "BOSS 빈티지 셔츠");
+  assert.equal(preview.rows[0].category.id, "310260400");
+  assert.equal(preview.rows[0].category.label, "여성 · 상의 · 셔츠");
+  assert.equal(preview.rows[0].size, "100 / 추천 M");
   assert.equal(preview.rows[0].condition, "상태 좋음");
   assert.equal(preview.rows[0].sourceDescription, "기존 엑셀 원문");
   assert.equal(preview.drafts[0].saleType, "auction");
@@ -135,6 +176,66 @@ test("golden XLSX parser accepts a valid row and reports Korean validation failu
   assert.match(messages, /사진을 찾지 못했습니다/);
 });
 
+test("fixed XLSX rows select D clothing, E bottoms, and F sports sizes by product classification", async () => {
+  const { buildBatchAuctionPreview, parseAuctionWorkbook } =
+    await loadBatchAuctionModule();
+  const options = {
+    publishAt: "2030-01-01T01:00:00.000Z",
+    bidIncrement: 1_000,
+  };
+
+  const bottom = buildBatchAuctionPreview(
+    await parseAuctionWorkbook(
+      await workbookFile({
+        title: "빈티지 데님 팬츠",
+        categoryId: 310150080,
+        clothingSize: "",
+        bottomSize: "허리 30",
+        imageName: "bottom.jpg",
+      }),
+    ),
+    [imageFile("bottom.jpg")],
+    options,
+  );
+  assert.equal(bottom.canSubmit, true);
+  assert.equal(bottom.rows[0].size, "허리 30");
+  assert.equal(bottom.rows[0].category.gender, "여성");
+  assert.equal(bottom.rows[0].category.group, "바지");
+
+  const sports = buildBatchAuctionPreview(
+    await parseAuctionWorkbook(
+      await workbookFile({
+        title: "등산 아웃도어 바람막이",
+        categoryId: "",
+        clothingSize: "",
+        sportsSize: "국내 100",
+        imageName: "sports.jpg",
+      }),
+    ),
+    [imageFile("sports.jpg")],
+    options,
+  );
+  assert.equal(sports.canSubmit, true);
+  assert.equal(sports.rows[0].size, "국내 100");
+
+  const classifiedWhenAllExist = buildBatchAuctionPreview(
+    await parseAuctionWorkbook(
+      await workbookFile({
+        title: "테니스 스포츠 저지",
+        categoryId: 320120600,
+        clothingSize: "M",
+        bottomSize: "30",
+        sportsSize: "L(100)",
+        imageName: "classified.jpg",
+      }),
+    ),
+    [imageFile("classified.jpg")],
+    options,
+  );
+  assert.equal(classifiedWhenAllExist.rows[0].size, "30");
+  assert.equal(classifiedWhenAllExist.rows[0].category.label, "남성 · 바지 · 데님/청바지");
+});
+
 test("parser rejects a rewritten generic spreadsheet instead of changing the existing fixed-column contract", async () => {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("새 양식");
@@ -148,7 +249,7 @@ test("parser rejects a rewritten generic spreadsheet instead of changing the exi
 
   await assert.rejects(
     () => parseAuctionWorkbook(file),
-    /기존 Excel 고정 양식\(A\/D\/W\/X\/Y\/AH 열, 6행 시작\)/,
+    /기존 Excel 고정 양식\(A\/D·E·F\/W\/X\/Y\/AH 열, 6행 시작\)/,
   );
 });
 

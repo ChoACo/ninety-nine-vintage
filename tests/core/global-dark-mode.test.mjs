@@ -82,7 +82,7 @@ test("legacy fixed light surfaces and status notices have dark palette coverage"
     assert.match(css, new RegExp(`--${variable}:`));
   }
   assert.doesNotMatch(home, /\["#c7b9a5", "#9fa9a2", "#b8a7a1"\]/);
-  assert.match(home, /var\(--store-card-/);
+  assert.doesNotMatch(home, /var\(--store-card-/);
   assert.match(storePage, /bg-\[var\(--store-card-1\)\]/);
   assert.match(gallery, /theme-invariant-dark/);
   assert.match(ticker, /theme-invariant-dark/);

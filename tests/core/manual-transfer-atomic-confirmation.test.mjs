@@ -1072,7 +1072,7 @@ test("generated database types include receipt keys and exact deadline holds", a
   const shippingReceipt = section(
     databaseTypes,
     "record_shipping_fee_payment:",
-    "reopen_my_support_conversation:",
+    "reopen_support_conversation:",
     "shipping receipt RPC type",
   );
 

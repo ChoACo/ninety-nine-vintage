@@ -1,64 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import Link from "next/link";
 
 interface SettlementActionsProps {
+  basePath?: "" | "/m";
+  deadlineAt?: string | null;
+  deadlineEnforcementExempt?: boolean;
+  initialStatus?: string | null;
   productId: string;
-}
-interface ManualTransfer {
-  orderName: string;
-  expectedAmount: number;
-  bankName: string;
-  accountNumber: string;
-  status: string;
-  dueAt: string | null;
-  timedOut: boolean;
-  deadlineEnforcementExempt: boolean;
+  serverTime?: string | null;
 }
 
-export function SettlementActions({ productId }: SettlementActionsProps) {
-  const [busy, setBusy] = useState<"manual" | null>(null);
-  const [message, setMessage] = useState("");
-  const [transfer, setTransfer] = useState<ManualTransfer | null>(null);
-
-  const getToken = async () => {
-    const { data } = await getSupabaseBrowserClient().auth.getSession();
-    const token = data.session?.access_token;
-    if (!token) throw new Error("로그인 후 결제할 수 있습니다.");
-    return token;
-  };
-
-  const startManualTransfer = async () => {
-    setBusy("manual");
-    setMessage("");
-    try {
-      const token = await getToken();
-      const response = await fetch("/api/payments/manual-transfer", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ action: "begin", productId }),
-      });
-      const payload = (await response.json()) as {
-        transfer?: ManualTransfer;
-        error?: string;
-      };
-      if (!response.ok || !payload.transfer)
-        throw new Error(payload.error || "계좌이체를 시작하지 못했습니다.");
-      setTransfer(payload.transfer);
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "계좌이체를 시작하지 못했습니다.",
-      );
-    } finally {
-      setBusy(null);
-    }
-  };
+export function SettlementActions({
+  basePath = "",
+  deadlineAt = null,
+  deadlineEnforcementExempt = false,
+}: SettlementActionsProps) {
+  const deadline = deadlineAt && Number.isFinite(Date.parse(deadlineAt))
+    ? new Intl.DateTimeFormat("ko-KR", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "Asia/Seoul",
+      }).format(new Date(deadlineAt))
+    : null;
 
   return (
     <div className="mt-6 border-t border-zinc-200 pt-5">
@@ -66,45 +30,21 @@ export function SettlementActions({ productId }: SettlementActionsProps) {
         낙찰 결제
       </p>
       <p className="mb-3 text-[11px] leading-5 text-zinc-500">
-        현재 신규 결제는 수동 계좌이체로만 진행됩니다. 계좌를 확인해 입금한 뒤
-        운영자의 입금 확인을 기다려 주세요.
+        낙찰품은 개별 결제하지 않습니다. 계정의 모든 미결제 낙찰품을 한 번에
+        확인하고 총액을 한 번만 입금해 주세요.
       </p>
-      <button
-        className="h-10 w-full border border-zinc-950 text-xs font-bold transition-colors hover:bg-zinc-950 hover:text-white disabled:opacity-50"
-        disabled={busy !== null}
-        onClick={startManualTransfer}
-        type="button"
+      <Link
+        className="flex h-10 w-full items-center justify-center border border-zinc-950 text-xs font-bold transition-colors hover:bg-zinc-950 hover:text-white"
+        href={`${basePath}/account#auction-payments`}
       >
-        {busy === "manual" ? "계좌 확인 중..." : "계좌이체 안내"}
-      </button>
-      {transfer && (
-        <div className="mt-3 border border-zinc-200 bg-zinc-50 p-3 text-xs leading-5">
-          <p className="font-bold">{transfer.orderName}</p>
-          <p>
-            {transfer.bankName} {transfer.accountNumber}
-          </p>
-          <p>
-            {transfer.expectedAmount.toLocaleString("ko-KR")}원 ·{" "}
-            {transfer.status === "confirmed" ? "입금 확인 완료" : "입금 대기 중"}
-          </p>
-          {transfer.dueAt && (
-            <p>
-              입금 마감{" "}
-              {new Intl.DateTimeFormat("ko-KR", {
-                dateStyle: "medium",
-                timeStyle: "short",
-                timeZone: "Asia/Seoul",
-              }).format(new Date(transfer.dueAt))}
-            </p>
-          )}
-          {transfer.timedOut && transfer.deadlineEnforcementExempt && (
-            <p className="mt-1 font-bold text-red-700">
-              입금 시간이 초과되었습니다. 밴드 회원은 지금도 결제할 수 있습니다.
-            </p>
-          )}
-        </div>
+        낙찰품 전체 결제하기
+      </Link>
+      {deadline && (
+        <p className="mt-3 text-[11px] font-bold text-zinc-600">
+          결제 마감 {deadline}
+          {deadlineEnforcementExempt ? " · 마감 예외 회원" : ""}
+        </p>
       )}
-      {message && <p className="mt-3 text-xs text-zinc-500">{message}</p>}
     </div>
   );
 }

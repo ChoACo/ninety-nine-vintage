@@ -190,7 +190,7 @@ export function OwnerRefundConsole() {
         <div>
           <p className="eyebrow text-muted">Owner / 수동 환불</p>
           <h1 className="mt-3 text-3xl font-black tracking-[-0.07em]">환불 승인·송금 확인</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">매장과 센터가 보고한 상품 문제를 검토하고, 실제 계좌 송금 뒤 참조번호를 남깁니다.</p>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">매장에서 보고한 상품 문제를 검토하고, 실제 계좌 송금 뒤 참조번호를 남깁니다.</p>
         </div>
         <button className="flex items-center justify-center gap-2 border border-line px-4 py-3 text-xs font-bold disabled:opacity-40" disabled={loading} onClick={() => void load()} type="button">
           <RefreshCw size={14} /> 새로고침

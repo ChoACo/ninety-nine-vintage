@@ -82,39 +82,69 @@ function isAddressSnapshot(value: unknown): value is Record<string, unknown> {
 function isShipmentItem(value: unknown): value is Record<string, unknown> {
   if (!isRecord(value)) return false;
   const fields = [
-    "inventoryItemId", "productId", "title", "imageUrl", "lineStatus", "physicalStatus",
-    "originStoreName", "isBlocked",
+    "inventoryItemId", "productId", "title", "imageUrl", "lineStatus", "released",
+    "originStoreId", "originStoreName", "isBlocked",
   ];
   return Object.keys(value).length === fields.length && fields.every((field) => Object.hasOwn(value, field)) &&
     isUuid(value.inventoryItemId) && isUuid(value.productId) && typeof value.title === "string" &&
     isNullableText(value.imageUrl) && typeof value.lineStatus === "string" &&
-    typeof value.physicalStatus === "string" && typeof value.originStoreName === "string" &&
+    typeof value.released === "boolean" && isUuid(value.originStoreId) &&
+    typeof value.originStoreName === "string" &&
     typeof value.isBlocked === "boolean";
 }
 
 function isShipment(value: unknown): value is Record<string, unknown> {
   if (!isRecord(value)) return false;
   const fields = [
-    "id", "memberId", "businessId", "centerId", "status", "version", "settlementMethod",
+    "id", "memberId", "memberName", "businessId", "status", "version", "settlementMethod",
     "shippingFeeStatus", "requestedAt", "packedAt", "shippedAt", "courier", "trackingNumber",
-    "addressSnapshot", "itemCount", "activeItemCount", "storedItemCount", "heldItemCount", "storeWorks", "items",
+    "addressSnapshot", "itemCount", "activeItemCount", "releasedItemCount", "unreleasedItemCount",
+    "heldItemCount", "storeWorks", "items",
   ];
   return Object.keys(value).length === fields.length && fields.every((field) => Object.hasOwn(value, field)) &&
-    isUuid(value.id) && isUuid(value.memberId) && isUuid(value.businessId) && isUuid(value.centerId) &&
+    isUuid(value.id) && isUuid(value.memberId) && typeof value.memberName === "string" && isUuid(value.businessId) &&
     typeof value.status === "string" && isNonNegativeInteger(value.version) &&
     typeof value.settlementMethod === "string" && typeof value.shippingFeeStatus === "string" &&
     typeof value.requestedAt === "string" && isNullableText(value.packedAt) && isNullableText(value.shippedAt) &&
     isNullableText(value.courier) && isNullableText(value.trackingNumber) &&
     isAddressSnapshot(value.addressSnapshot) &&
     isNonNegativeInteger(value.itemCount) && isNonNegativeInteger(value.activeItemCount) &&
-    isNonNegativeInteger(value.storedItemCount) && isNonNegativeInteger(value.heldItemCount) &&
+    isNonNegativeInteger(value.releasedItemCount) && isNonNegativeInteger(value.unreleasedItemCount) &&
+    isNonNegativeInteger(value.heldItemCount) &&
     Array.isArray(value.storeWorks) && value.storeWorks.every(isStoreWork) &&
     Array.isArray(value.items) && value.items.every(isShipmentItem);
 }
 
-function isQueue(value: unknown): value is { shipments: Record<string, unknown>[] } {
-  return isRecord(value) && Object.keys(value).length === 1 &&
-    Array.isArray(value.shipments) && value.shipments.every(isShipment);
+function isCompletedProduct(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && Object.keys(value).length === 3 &&
+    isUuid(value.productId) && typeof value.title === "string" &&
+    typeof value.imageUrl === "string";
+}
+
+function isCompletedDelivery(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value)) return false;
+  const fields = [
+    "shipmentId", "memberId", "memberName", "courier", "trackingNumber",
+    "itemCount", "products", "shippedAt", "completedAt", "purgeAfter",
+  ];
+  return Object.keys(value).length === fields.length &&
+    fields.every((field) => Object.hasOwn(value, field)) &&
+    isUuid(value.shipmentId) && isUuid(value.memberId) &&
+    typeof value.memberName === "string" && typeof value.courier === "string" &&
+    typeof value.trackingNumber === "string" && isNonNegativeInteger(value.itemCount) &&
+    Array.isArray(value.products) && value.products.every(isCompletedProduct) &&
+    typeof value.shippedAt === "string" && typeof value.completedAt === "string" &&
+    typeof value.purgeAfter === "string";
+}
+
+function isQueue(value: unknown): value is {
+  completedDeliveries: Record<string, unknown>[];
+  shipments: Record<string, unknown>[];
+} {
+  return isRecord(value) && Object.keys(value).length === 2 &&
+    Array.isArray(value.shipments) && value.shipments.every(isShipment) &&
+    Array.isArray(value.completedDeliveries) &&
+    value.completedDeliveries.every(isCompletedDelivery);
 }
 
 function isShipmentResult(value: unknown): value is Record<string, unknown> {
@@ -193,8 +223,10 @@ export async function POST(request: Request) {
   const action = typeof body.action === "string" ? body.action : "";
   const allowed = action === "pack"
     ? ["shipmentId", "expectedVersion", "action", "idempotencyKey", "note"]
-    : action === "ship"
+    : action === "ship" || action === "tracking_update"
       ? ["shipmentId", "expectedVersion", "action", "courier", "trackingNumber", "idempotencyKey", "note"]
+      : action === "tracking_delete"
+        ? ["shipmentId", "expectedVersion", "action", "idempotencyKey", "note"]
       : [];
   const courier = optionalText(body.courier, 80);
   const trackingNumber = optionalText(body.trackingNumber, 120);
@@ -203,27 +235,37 @@ export async function POST(request: Request) {
     allowed.length === 0 || !hasOnlyKeys(body, allowed) ||
     !isUuid(body.shipmentId) || !isNonNegativeInteger(body.expectedVersion) ||
     !isUuid(body.idempotencyKey) || courier === undefined || trackingNumber === undefined || note === undefined ||
-    (action === "pack" && (courier !== null || trackingNumber !== null)) ||
-    (action === "ship" && (!courier || !trackingNumber))
+    ((action === "pack" || action === "tracking_delete") && (courier !== null || trackingNumber !== null)) ||
+    ((action === "ship" || action === "tracking_update") && (!courier || !trackingNumber))
   ) {
     return commerceJson({ error: "invalid_shipment_request", message: "배송 작업 내용을 확인해 주세요." }, 422);
   }
 
   const result = action === "pack"
     ? await (auth.user as unknown as RpcClient).rpc("pack_inventory_shipment", {
-      p_shipment_id: body.shipmentId,
-      p_expected_version: body.expectedVersion,
-      p_idempotency_key: body.idempotencyKey,
-      p_note: note,
-    })
-    : await (auth.user as unknown as RpcClient).rpc("ship_inventory_shipment", {
-      p_shipment_id: body.shipmentId,
-      p_expected_version: body.expectedVersion,
-      p_courier: courier,
-      p_tracking_number: trackingNumber,
-      p_idempotency_key: body.idempotencyKey,
-      p_note: note,
-    });
+        p_shipment_id: body.shipmentId,
+        p_expected_version: body.expectedVersion,
+        p_idempotency_key: body.idempotencyKey,
+        p_note: note,
+      })
+    : action === "ship"
+      ? await (auth.user as unknown as RpcClient).rpc("ship_inventory_shipment", {
+          p_shipment_id: body.shipmentId,
+          p_expected_version: body.expectedVersion,
+          p_courier: courier,
+          p_tracking_number: trackingNumber,
+          p_idempotency_key: body.idempotencyKey,
+          p_note: note,
+        })
+      : await (auth.user as unknown as RpcClient).rpc("revise_inventory_shipment_tracking", {
+          p_shipment_id: body.shipmentId,
+          p_expected_version: body.expectedVersion,
+          p_action: action === "tracking_update" ? "update" : "delete",
+          p_courier: action === "tracking_update" ? courier : null,
+          p_tracking_number: action === "tracking_update" ? trackingNumber : null,
+          p_idempotency_key: body.idempotencyKey,
+          p_note: note,
+        });
   if (result.error) return rpcFailure(result.error);
   if (!isShipmentResult(result.data)) return commerceJson({ error: "shipment_unavailable", message: "배송 처리 결과를 검증하지 못했습니다." }, 503);
   return commerceJson({ shipment: result.data });

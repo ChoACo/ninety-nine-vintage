@@ -59,19 +59,6 @@ function isShipmentPayment(value: unknown): value is Record<string, unknown> {
     value.account_number_snapshot.trim().length > 0;
 }
 
-function isLegacyShipmentQuote(value: unknown): value is Record<string, unknown> {
-  return isRecord(value) && hasExactKeys(value, [
-    "expected_amount",
-    "bank_name_snapshot",
-    "account_number_snapshot",
-  ]) &&
-    isPositiveMoney(value.expected_amount) &&
-    typeof value.bank_name_snapshot === "string" &&
-    value.bank_name_snapshot.trim().length > 0 &&
-    typeof value.account_number_snapshot === "string" &&
-    value.account_number_snapshot.trim().length > 0;
-}
-
 function isLegacyShipmentResult(value: unknown): value is Record<string, unknown> {
   if (!isRecord(value) || !hasExactKeys(value, [
     "shipment_id",
@@ -189,30 +176,42 @@ export async function POST(request: Request) {
     );
   }
 
-  const settlement = body.applyShippingCredit ? "shipping_credit" : "manual_transfer";
+  if (!body.applyShippingCredit) {
+    return commerceJson(
+      {
+        error: "shipping_credit_required",
+        message: "배송 크레딧이 있어야 배송을 신청할 수 있습니다.",
+      },
+      403,
+    );
+  }
+  const { data: account, error: accountError } = await auth.admin
+    .from("member_accounts")
+    .select("shipping_credit_count")
+    .eq("member_id", auth.userId)
+    .maybeSingle();
+  if (
+    accountError ||
+    !account ||
+    !Number.isSafeInteger(account.shipping_credit_count) ||
+    account.shipping_credit_count < 1
+  ) {
+    return commerceJson(
+      {
+        error: "shipping_credit_required",
+        message: "배송 크레딧이 없어 배송을 신청할 수 없습니다. 먼저 배송 크레딧을 결제해 주세요.",
+      },
+      403,
+    );
+  }
+
+  const settlement = "shipping_credit";
   if (legacyMode) {
     if (!isUuid(body.orderId)) {
       return commerceJson(
         { error: "invalid_shipping_request", message: "배송 요청할 주문을 확인해 주세요." },
         422,
       );
-    }
-
-    let shippingFeeAmount: number | null = null;
-    let bankNameSnapshot: string | null = null;
-    let accountNumberSnapshot: string | null = null;
-    if (settlement === "manual_transfer") {
-      const { data: quote, error: quoteError } = await (auth.admin as unknown as RpcClient).rpc(
-        "get_legacy_commerce_shipment_quote",
-        { p_member_id: auth.userId, p_order_id: body.orderId },
-      );
-      if (quoteError) return rpcFailure(quoteError, "legacy");
-      if (!isLegacyShipmentQuote(quote)) {
-        return commerceJson({ error: "shipping_request_unavailable" }, 503);
-      }
-      shippingFeeAmount = quote.expected_amount as number;
-      bankNameSnapshot = quote.bank_name_snapshot as string;
-      accountNumberSnapshot = quote.account_number_snapshot as string;
     }
 
     const { data, error } = await (auth.admin as unknown as RpcClient).rpc(
@@ -222,9 +221,9 @@ export async function POST(request: Request) {
         p_order_id: body.orderId,
         p_address_id: body.addressId,
         p_settlement_method: settlement,
-        p_shipping_fee_amount: shippingFeeAmount,
-        p_bank_name_snapshot: bankNameSnapshot,
-        p_account_number_snapshot: accountNumberSnapshot,
+        p_shipping_fee_amount: null,
+        p_bank_name_snapshot: null,
+        p_account_number_snapshot: null,
         p_idempotency_key: body.idempotencyKey,
       },
     );

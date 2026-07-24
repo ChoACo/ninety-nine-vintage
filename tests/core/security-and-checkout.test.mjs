@@ -149,7 +149,7 @@ test("the former entry gate is absent while live auctions keep their authoritati
   for (const source of [header, mobileNavigation]) {
     assert.match(source, /"\/feed"/);
   }
-  assert.match(mobileNavigation, /"\/admin\/operator\/center"/);
+  assert.match(mobileNavigation, /"\/admin\/operator\/fulfillment"/);
   assert.match(mobileNavigation, /"\/admin\/employee"/);
 });
 
@@ -293,7 +293,7 @@ test("public shop surfaces expose shopper controls while admin links remain sess
 
   assert.match(authStatus, /useSupabaseSession\(\)/);
   assert.match(authStatus, /label: "내 정보"/);
-  assert.match(authStatus, /label: "센터 관리"/);
+  assert.match(authStatus, /label: "출고·보관"/);
   assert.match(authStatus, /label: "직원센터"/);
   assert.match(authStatus, /aria-label="로그아웃"/);
   for (const source of [authStatus, accountPage]) {
@@ -303,7 +303,7 @@ test("public shop surfaces expose shopper controls while admin links remain sess
     assert.doesNotMatch(source, /href="\/(?:owner|operator)"/);
     assert.doesNotMatch(source, /AccountSessionPanel/);
   }
-  assert.match(mobileHeader, /access\.roleCode === "operator"[\s\S]*?href="\/admin\/operator\/center"/);
+  assert.match(mobileHeader, /access\.roleCode === "operator"[\s\S]*?href="\/admin\/operator\/fulfillment"/);
   assert.match(mobileHeader, /access\.roleCode === "employee"[\s\S]*?href="\/admin\/employee"/);
   assert.match(mobileHeader, /access\.canAccessOwner[\s\S]*?href="\/admin\/owner"/);
   assert.match(mobileNavigation, /access\.roleCode === "operator"/);
@@ -319,7 +319,8 @@ test("public shop surfaces expose shopper controls while admin links remain sess
   for (const source of [homePage, storePage, storeService]) {
     assert.doesNotMatch(source, /operatorId|operator_id/);
   }
-  assert.match(homePage, /String\(index \+ 1\)\.padStart\(2, "0"\)/);
+  assert.doesNotMatch(homePage, /String\(index \+ 1\)\.padStart\(2, "0"\)/);
+  assert.doesNotMatch(homePage, /엄선된 숍|전체 숍 보기/);
   assert.match(storePage, /엄선된 숍 · 숍 소개/);
 });
 

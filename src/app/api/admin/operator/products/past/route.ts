@@ -16,39 +16,19 @@ export async function GET(request: Request) {
   const admin = auth.admin as unknown as SupabaseClient;
   let allowedStoreIds: string[] | null = null;
   if (auth.roleCode === "operator") {
-    const [membershipResult, assignmentResult] = await Promise.all([
-      admin
-        .from("store_memberships")
-        .select("store_id")
-        .eq("user_id", auth.userId)
-        .eq("status", "active")
-        .eq("manage_products", true),
-      admin
-        .from("fulfillment_center_staff_assignments")
-        .select("fulfillment_center_id")
-        .eq("user_id", auth.userId)
-        .eq("status", "active"),
-    ]);
-    if (membershipResult.error || assignmentResult.error) {
+    const membershipResult = await admin
+      .from("store_memberships")
+      .select("store_id")
+      .eq("user_id", auth.userId)
+      .eq("status", "active")
+      .eq("manage_products", true);
+    if (membershipResult.error) {
       return commerceJson({ error: "past_products_unavailable" }, 503);
     }
     const membershipStoreIds = (membershipResult.data ?? []).map(
       (membership) => membership.store_id,
     );
-    const centerIds = (assignmentResult.data ?? []).map(
-      (assignment) => assignment.fulfillment_center_id,
-    );
-    let centerStoreIds: string[] = [];
-    if (centerIds.length > 0) {
-      const { data, error } = await admin
-        .from("stores")
-        .select("id")
-        .eq("is_active", true)
-        .in("home_fulfillment_center_id", centerIds);
-      if (error) return commerceJson({ error: "past_products_unavailable" }, 503);
-      centerStoreIds = (data ?? []).map((store) => store.id);
-    }
-    allowedStoreIds = [...new Set([...membershipStoreIds, ...centerStoreIds])];
+    allowedStoreIds = [...new Set(membershipStoreIds)];
   }
   let storeQuery = admin
     .from("stores")

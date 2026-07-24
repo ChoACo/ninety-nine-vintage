@@ -42,11 +42,11 @@ test("first-login nickname setup is limited to Kakao account hubs and every late
   );
 });
 
-test("band members retain a visible deadline but automatic expiry enforcement is disabled", async () => {
-  const [migration, route, settlement] = await Promise.all([
+test("band members retain a visible deadline while combined payment keeps the exemption", async () => {
+  const [migration, route, combinedPayment] = await Promise.all([
     source("supabase/migrations/20260723043642_member_center_admin_workflows.sql"),
     source("src/app/api/payments/manual-transfer/route.ts"),
-    source("src/components/features/auction/detail/SettlementActions.tsx"),
+    source("src/components/features/account/CombinedAuctionPayment.tsx"),
   ]);
 
   assert.match(migration, /display_payment_due_at\s+timestamptz/i);
@@ -60,18 +60,21 @@ test("band members retain a visible deadline but automatic expiry enforcement is
     /if v_target_role = 'member' and mod\(v_warning_count,\s*3\) = 0/i,
   );
   assert.match(route, /role_code === "band_member"/);
-  assert.match(route, /timedOut:/);
-  assert.match(settlement, /입금 시간이 초과되었습니다/);
-  assert.match(settlement, /지금도 결제할 수 있습니다/);
+  assert.match(route, /begin_my_combined_auction_payment/);
+  assert.match(combinedPayment, /paymentBlocked/);
+  assert.match(combinedPayment, /deadlineEnforcementExempt/);
+  assert.match(combinedPayment, /가장 빠른 결제 마감/);
+  assert.match(combinedPayment, /낙찰품 전체 결제하기/);
 });
 
-test("employee center and operator center have separate routes and navigation", async () => {
+test("employee and operator navigation use direct-store fulfillment without center management", async () => {
   await Promise.all([
     access(new URL("src/app/(admin)/admin/employee/inquiries/page.tsx", rootUrl)),
     access(new URL("src/app/(admin)/admin/employee/fulfillment/page.tsx", rootUrl)),
     access(new URL("src/app/(admin)/admin/employee/parcels/page.tsx", rootUrl)),
     access(new URL("src/app/(admin)/admin/employee/center/page.tsx", rootUrl)),
     access(new URL("src/app/(admin)/admin/operator/center/page.tsx", rootUrl)),
+    access(new URL("src/app/(admin)/admin/operator/chat/page.tsx", rootUrl)),
   ]);
   const [session, boundary, employeeLayout, operatorLayout, header] =
     await Promise.all([
@@ -86,34 +89,33 @@ test("employee center and operator center have separate routes and navigation", 
   assert.match(session, /canAccessEmployee = isOwner \|\| roleCode === "employee"/);
   assert.match(boundary, /pathname\.startsWith\("\/admin\/employee\/"\)/);
   assert.match(employeeLayout, /직원센터 메뉴/);
-  for (const route of ["inquiries", "fulfillment", "parcels", "center"]) {
+  for (const route of ["inquiries", "fulfillment", "parcels"]) {
     assert.match(employeeLayout, new RegExp(`/admin/employee/${route}`));
   }
-  assert.match(operatorLayout, /\/admin\/operator\/center/);
+  assert.doesNotMatch(employeeLayout, /\/admin\/employee\/center/);
+  assert.doesNotMatch(operatorLayout, /\/admin\/operator\/center/);
+  assert.match(operatorLayout, /출고·보관/);
   assert.match(operatorLayout, /\/admin\/operator\/payments/);
   assert.doesNotMatch(operatorLayout, /\/admin\/operator\/members/);
-  assert.doesNotMatch(operatorLayout, /\/admin\/operator\/chat/);
-  assert.match(header, /label: "센터 관리"/);
+  assert.match(operatorLayout, /\/admin\/operator\/chat/);
+  assert.match(operatorLayout, /회원 채팅/);
+  assert.match(header, /label: "출고·보관"/);
   assert.match(header, /label: "직원센터"/);
 });
 
-test("assigned center management and center-wide product control use guarded RPCs", async () => {
-  const [centerRoute, centerConsole, productRoute, pauseRoute, migration] =
+test("retired center management is gone and product control uses explicit store membership", async () => {
+  const [centerRoute, productRoute, pauseRoute, migration] =
     await Promise.all([
       source("src/app/api/admin/centers/route.ts"),
-      source("src/components/admin/center/StaffCenterManagementConsole.tsx"),
       source("src/app/api/admin/operator/products/route.ts"),
       source("src/app/api/admin/operator/products/[id]/pause/route.ts"),
       source("supabase/migrations/20260723043642_member_center_admin_workflows.sql"),
     ]);
 
-  assert.match(centerRoute, /"get_my_center_management"/);
-  assert.match(centerRoute, /"configure_assigned_fulfillment_center"/);
-  assert.match(centerConsole, /action:\s*"create"\s*\|\s*"update"\s*\|\s*"archive"/);
-  assert.match(centerConsole, /센터 추가/);
-  assert.match(centerConsole, /센터 정보를 저장했습니다/);
-  assert.match(productRoute, /fulfillment_center_staff_assignments/);
-  assert.match(productRoute, /home_fulfillment_center_id/);
+  assert.match(centerRoute, /center_management_removed/);
+  assert.match(centerRoute, /410/);
+  assert.match(productRoute, /from\("store_memberships"\)/);
+  assert.doesNotMatch(productRoute, /fulfillment_center_staff_assignments|home_fulfillment_center_id/);
   assert.match(pauseRoute, /"pause_managed_product"/);
   assert.match(
     migration,
@@ -123,7 +125,7 @@ test("assigned center management and center-wide product control use guarded RPC
   assert.match(migration, /v_product\.status <> 'active'/i);
 });
 
-test("orders and payment confirmation are buyer-grouped with linked products", async () => {
+test("orders and payment confirmation use compact rows with linked product details", async () => {
   const [layout, route, consoleSource, redirectPage] = await Promise.all([
     source("src/app/(admin)/admin/operator/layout.tsx"),
     source("src/app/api/admin/operator/payments/route.ts"),
@@ -138,13 +140,14 @@ test("orders and payment confirmation are buyer-grouped with linked products", a
   assert.match(route, /from\("manual_transfer_orders"\)/);
   assert.match(route, /buyerName:/);
   assert.match(route, /products:/);
-  assert.match(consoleSource, /const buyerGroups = useMemo/);
-  assert.match(consoleSource, /group\.buyerName/);
+  assert.match(consoleSource, /payment\.buyerName/);
+  assert.match(consoleSource, /productSummary/);
+  assert.match(consoleSource, /상세보기/);
   assert.match(consoleSource, /payment\.products\.map/);
   assert.match(consoleSource, /void confirm\(payment\)/);
 });
 
-test("owner save paths use user-scoped persistence RPCs", async () => {
+test("owner save paths use user-scoped persistence while center topology is retired", async () => {
   const [siteRoute, memberRoute, ownerCenterRoute, migration] =
     await Promise.all([
       source("src/app/api/admin/owner/site-status/route.ts"),
@@ -159,8 +162,8 @@ test("owner save paths use user-scoped persistence RPCs", async () => {
   assert.match(memberRoute, /p_reports_to_operator_id:\s*reportsToOperatorId/);
   assert.doesNotMatch(memberRoute, /p_display_name:\s*body/);
   assert.match(migration, /v_role not in \('operator', 'employee', 'band_member', 'member'\)/);
-  assert.match(ownerCenterRoute, /"configure_managed_fulfillment_center"/);
-  assert.match(ownerCenterRoute, /"configure_fulfillment_center_staff_assignment"/);
+  assert.match(ownerCenterRoute, /center_topology_removed/);
+  assert.match(ownerCenterRoute, /410/);
   assert.match(migration, /function public\.set_site_status/i);
   assert.match(migration, /function public\.set_managed_staff_role/i);
 });

@@ -663,8 +663,8 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
               className="mt-3 text-[11px] leading-5 text-zinc-500"
               id="auction-settlement-summary"
             >
-              낙찰 후 다음 날 11:59까지 결제 · 미결제 시 낙찰 취소·경고 및
-              차순위 전환
+              낙찰 후 서버가 확정한 결제 마감까지 입금 · 미결제 시 낙찰
+              취소·경고 및 차순위 전환
             </p>
             {phase === "CLOSING_SOON" && (
               <p className="mt-2 text-[11px] font-bold leading-5 text-amber-700">
@@ -733,7 +733,10 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
       {LIVE_AUCTION_ENABLED &&
         item.saleType === "auction" &&
         participationState === "final" && (
-          <SettlementActions productId={item.id} />
+          <SettlementActions
+            basePath={surface === "mobile" ? "/m" : ""}
+            productId={item.id}
+          />
         )}
       {LIVE_AUCTION_ENABLED && item.saleType === "auction" && (
         <AuctionBidHistoryModal

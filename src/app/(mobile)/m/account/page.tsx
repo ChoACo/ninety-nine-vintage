@@ -3,6 +3,7 @@ import { Gavel, Heart, MapPin, PackageCheck, ReceiptText, RotateCcw, Settings, T
 import Link from "next/link";
 
 import { NicknameGate } from "@/components/account/NicknameGate";
+import { MemberAccountBoundary } from "@/components/features/account/MemberAccountBoundary";
 
 export const metadata: Metadata = { title: "내 정보", robots: { follow: false, index: false } };
 
@@ -19,6 +20,7 @@ const tasks = [
 
 export default function MobileAccountPage() {
   return (
+    <MemberAccountBoundary basePath="/m" returnTo="/m/account">
     <div>
       <NicknameGate />
       <header className="border-b border-ink pb-6">
@@ -49,5 +51,6 @@ export default function MobileAccountPage() {
         ))}
       </nav>
     </div>
+    </MemberAccountBoundary>
   );
 }

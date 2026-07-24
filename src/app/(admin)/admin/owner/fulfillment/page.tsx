@@ -1,7 +1,5 @@
-import { OwnerFulfillmentConsole } from "./OwnerFulfillmentConsole";
-
-export const dynamic = "force-dynamic";
+import { redirect } from "next/navigation";
 
 export default function OwnerFulfillmentPage() {
-  return <OwnerFulfillmentConsole />;
+  redirect("/admin/owner");
 }

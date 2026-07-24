@@ -50,7 +50,7 @@ function isConfirmationResult(
     "version",
     "idempotent_replay",
   ];
-  return isRecord(value) && hasExactKeys(value, fields) &&
+  return isRecord(value) && fields.every((field) => Object.hasOwn(value, field)) &&
     value.payment_kind === paymentKind &&
     value.payment_id === paymentId &&
     typeof value.status === "string" &&

@@ -28,7 +28,7 @@ function isTrackingUrl(value: unknown): value is string | null {
   if (typeof value !== "string") return false;
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.hostname === "trace.cjlogistics.com";
+    return url.protocol === "https:" && url.hostname === "www.hanjin.com";
   } catch {
     return false;
   }
@@ -36,27 +36,26 @@ function isTrackingUrl(value: unknown): value is string | null {
 
 function isShipmentItem(value: unknown): value is Record<string, unknown> {
   return isRecord(value) && hasExactKeys(value, [
-    "inventoryItemId", "productId", "title", "imageUrl", "lineStatus", "physicalStatus",
+    "inventoryItemId", "productId", "title", "imageUrl",
   ]) && (value.inventoryItemId === null || isUuid(value.inventoryItemId)) && isUuid(value.productId) &&
-    typeof value.title === "string" && typeof value.imageUrl === "string" &&
-    typeof value.lineStatus === "string" && typeof value.physicalStatus === "string";
+    typeof value.title === "string" && typeof value.imageUrl === "string";
 }
 
 function isShipment(value: unknown): value is Record<string, unknown> {
   return isRecord(value) && hasExactKeys(value, [
-    "id", "sourceKind", "sourceId", "status", "settlementMethod", "shippingFeeStatus",
-    "itemCount", "activeItemCount", "courier", "trackingNumber", "trackingUrl",
-    "requestedAt", "packedAt", "shippedAt", "addressSnapshot", "items",
-  ]) && isUuid(value.id) && typeof value.status === "string" &&
+    "id", "sourceKind", "sourceId", "settlementMethod", "shippingFeeStatus",
+    "publicStatus", "itemCount", "activeItemCount", "courier", "trackingNumber", "trackingUrl",
+    "requestedAt", "addressSnapshot", "items",
+  ]) && isUuid(value.id) &&
     (value.sourceKind === "inventory_v2" || value.sourceKind === "canonical_commerce") &&
     isUuid(value.sourceId) &&
     typeof value.settlementMethod === "string" && typeof value.shippingFeeStatus === "string" &&
+    (value.publicStatus === "preparing" || value.publicStatus === "shipped") &&
     Number.isSafeInteger(value.itemCount) && Number(value.itemCount) >= 0 &&
     Number.isSafeInteger(value.activeItemCount) && Number(value.activeItemCount) >= 0 &&
     (value.courier === null || typeof value.courier === "string") &&
     (value.trackingNumber === null || typeof value.trackingNumber === "string") &&
-    isTrackingUrl(value.trackingUrl) &&
-    isTimestamp(value.requestedAt) && isTimestamp(value.packedAt) && isTimestamp(value.shippedAt) &&
+    isTrackingUrl(value.trackingUrl) && isTimestamp(value.requestedAt) &&
     (value.addressSnapshot === null || isRecord(value.addressSnapshot)) &&
     Array.isArray(value.items) && value.items.every(isShipmentItem);
 }

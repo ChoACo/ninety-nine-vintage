@@ -479,6 +479,7 @@ export type Database = {
           bank_name_snapshot: string
           confirmed_at: string | null
           confirmed_by: string | null
+          credit_quantity: number
           expected_amount: number
           id: string
           member_id: string
@@ -2770,6 +2771,7 @@ export type Database = {
         Row: {
           account_status: string
           created_at: string
+          last_depositor_name: string | null
           member_id: string
           phone: string | null
           shipping_credit_count: number
@@ -2781,6 +2783,7 @@ export type Database = {
         Insert: {
           account_status?: string
           created_at?: string
+          last_depositor_name?: string | null
           member_id: string
           phone?: string | null
           shipping_credit_count?: number
@@ -2792,6 +2795,7 @@ export type Database = {
         Update: {
           account_status?: string
           created_at?: string
+          last_depositor_name?: string | null
           member_id?: string
           phone?: string | null
           shipping_credit_count?: number
@@ -3704,6 +3708,7 @@ export type Database = {
           past_at: string | null
           past_expires_at: string | null
           publish_at: string
+          sale_completed_at: string | null
           sale_type: string
           size_label: string
           starting_price: number
@@ -3746,6 +3751,7 @@ export type Database = {
           past_at?: string | null
           past_expires_at?: string | null
           publish_at: string
+          sale_completed_at?: string | null
           sale_type?: string
           size_label?: string
           starting_price: number
@@ -3788,6 +3794,7 @@ export type Database = {
           past_at?: string | null
           past_expires_at?: string | null
           publish_at?: string
+          sale_completed_at?: string | null
           sale_type?: string
           size_label?: string
           starting_price?: number
@@ -4354,6 +4361,7 @@ export type Database = {
           idempotency_key: string | null
           inventory_shipment_id: string | null
           member_id: string
+          payment_context: string
           requested_at: string
           shipping_request_id: string | null
           status: string
@@ -4365,11 +4373,13 @@ export type Database = {
           business_id?: string | null
           confirmed_at?: string | null
           confirmed_by?: string | null
+          credit_quantity?: number
           expected_amount: number
           id?: string
           idempotency_key?: string | null
           inventory_shipment_id?: string | null
           member_id: string
+          payment_context?: string
           requested_at?: string
           shipping_request_id?: string | null
           status?: string
@@ -4381,11 +4391,13 @@ export type Database = {
           business_id?: string | null
           confirmed_at?: string | null
           confirmed_by?: string | null
+          credit_quantity?: number
           expected_amount?: number
           id?: string
           idempotency_key?: string | null
           inventory_shipment_id?: string | null
           member_id?: string
+          payment_context?: string
           requested_at?: string
           shipping_request_id?: string | null
           status?: string
@@ -5379,6 +5391,7 @@ export type Database = {
           product_id: string | null
           product_image_url_snapshot: string | null
           product_title_snapshot: string | null
+          store_id: string | null
           status: string
           subject: string | null
           updated_at: string
@@ -5395,6 +5408,7 @@ export type Database = {
           product_id?: string | null
           product_image_url_snapshot?: string | null
           product_title_snapshot?: string | null
+          store_id?: string | null
           status?: string
           subject?: string | null
           updated_at?: string
@@ -5411,6 +5425,7 @@ export type Database = {
           product_id?: string | null
           product_image_url_snapshot?: string | null
           product_title_snapshot?: string | null
+          store_id?: string | null
           status?: string
           subject?: string | null
           updated_at?: string
@@ -5444,6 +5459,13 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "support_conversations_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
         ]
       }
       support_messages: {
@@ -5453,6 +5475,9 @@ export type Database = {
           conversation_id: string
           created_at: string
           id: string
+          product_id: string | null
+          product_image_url_snapshot: string | null
+          product_title_snapshot: string | null
           sender_id: string | null
         }
         Insert: {
@@ -5461,6 +5486,9 @@ export type Database = {
           conversation_id: string
           created_at?: string
           id?: string
+          product_id?: string | null
+          product_image_url_snapshot?: string | null
+          product_title_snapshot?: string | null
           sender_id?: string | null
         }
         Update: {
@@ -5469,6 +5497,9 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           id?: string
+          product_id?: string | null
+          product_image_url_snapshot?: string | null
+          product_title_snapshot?: string | null
           sender_id?: string | null
         }
         Relationships: [
@@ -5484,6 +5515,13 @@ export type Database = {
             columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_messages_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -5774,6 +5812,17 @@ export type Database = {
           updated_at: string
         }[]
       }
+      confirm_combined_auction_payment: {
+        Args: {
+          p_depositor_name: string
+          p_expected_version: number
+          p_idempotency_key: string
+          p_member_id: string
+          p_observed_ledger_entry_count: number
+          p_observed_received_amount: number
+        }
+        Returns: Json
+      }
       confirm_unified_manual_payment: {
         Args: {
           p_depositor_name: string
@@ -6040,6 +6089,13 @@ export type Database = {
           warning_count: number
         }[]
       }
+      begin_my_combined_auction_payment: {
+        Args: {
+          p_depositor_name: string
+          p_include_shipping_fee?: boolean
+        }
+        Returns: Json
+      }
       get_owner_withdrawn_member_retention: {
         Args: { p_limit?: number; p_offset?: number }
         Returns: {
@@ -6224,33 +6280,8 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      get_or_create_product_inquiry_conversation: {
-        Args: { p_product_id: string }
-        Returns: {
-          assigned_staff_id: string | null
-          conversation_type: string
-          created_at: string
-          id: string
-          last_message_at: string | null
-          last_message_preview: string | null
-          last_sender_id: string | null
-          member_id: string
-          product_id: string | null
-          product_image_url_snapshot: string | null
-          product_title_snapshot: string | null
-          status: string
-          subject: string | null
-          updated_at: string
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "support_conversations"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
       get_or_create_support_conversation: {
-        Args: never
+        Args: { p_store_id: string }
         Returns: {
           assigned_staff_id: string | null
           conversation_type: string
@@ -6263,6 +6294,7 @@ export type Database = {
           product_id: string | null
           product_image_url_snapshot: string | null
           product_title_snapshot: string | null
+          store_id: string | null
           status: string
           subject: string | null
           updated_at: string
@@ -6467,6 +6499,67 @@ export type Database = {
           sold_count: number
         }[]
       }
+      get_or_create_operator_store_conversation: {
+        Args: { p_member_id: string; p_store_id: string }
+        Returns: {
+          assigned_staff_id: string | null
+          conversation_type: string
+          created_at: string
+          id: string
+          last_message_at: string | null
+          last_message_preview: string | null
+          last_sender_id: string | null
+          member_id: string
+          product_id: string | null
+          product_image_url_snapshot: string | null
+          product_title_snapshot: string | null
+          status: string
+          store_id: string | null
+          subject: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "support_conversations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      get_public_sold_feed_products: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_sale_type: string
+        }
+        Returns: {
+          anti_sniping_base_closes_at: string | null
+          anti_sniping_extended_at: string | null
+          anti_sniping_extension_count: number
+          bid_history: Json
+          bid_increment: number
+          bid_locked_at: string | null
+          brand: string
+          brand_slug: string
+          category: string
+          closes_at: string
+          current_price: number
+          description: string
+          final_bid_amount: number | null
+          fixed_price: number | null
+          id: string
+          image_urls: string[]
+          participant_count: number
+          publish_at: string
+          sale_type: string
+          size_label: string
+          sold_at: string
+          sold_price: number
+          starting_price: number
+          status: string
+          thumbnail_urls: string[]
+          title: string
+        }[]
+      }
       get_public_sold_product: {
         Args: { p_product_id: string }
         Returns: {
@@ -6480,6 +6573,7 @@ export type Database = {
           measurements: Json
           participant_count: number
           product_id: string
+          sale_type: string
           size_label: string
           sold_at: string
           status: string
@@ -7078,7 +7172,7 @@ export type Database = {
       owner_upsert_hidden_test_shipping_address: {
         Args: {
           p_address: string
-          p_id: string
+          p_id: string | null
           p_is_default?: boolean
           p_label: string
           p_phone: string
@@ -7404,31 +7498,6 @@ export type Database = {
           p_note?: string
         }
         Returns: Json
-      }
-      reopen_my_support_conversation: {
-        Args: never
-        Returns: {
-          assigned_staff_id: string | null
-          conversation_type: string
-          created_at: string
-          id: string
-          last_message_at: string | null
-          last_message_preview: string | null
-          last_sender_id: string | null
-          member_id: string
-          product_id: string | null
-          product_image_url_snapshot: string | null
-          product_title_snapshot: string | null
-          status: string
-          subject: string | null
-          updated_at: string
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "support_conversations"
-          isOneToOne: false
-          isSetofReturn: true
-        }
       }
       reopen_support_conversation: {
         Args: { p_conversation_id: string }
@@ -7915,11 +7984,11 @@ export type Database = {
       upsert_my_shipping_address: {
         Args: {
           p_address: string
-          p_id: string
+          p_id: string | null
           p_is_default?: boolean
           p_label: string
           p_phone: string
-          p_postal_code?: string
+          p_postal_code?: string | null
           p_recipient_name: string
         }
         Returns: {

@@ -1,5 +1,9 @@
 import type { NewAuctionDraft } from "@/src/core/contracts/productDraft";
 import { isSupportedProductImageMimeType } from "@/src/lib/supabase/productImagePolicy";
+import {
+  findBatchClothingCategory,
+  type BatchClothingCategory,
+} from "@/lib/import/categoryIds";
 
 export type BatchAuctionCanonicalField =
   | "description"
@@ -74,6 +78,7 @@ export interface BatchAuctionImageMatch {
 export interface BatchAuctionPreviewRow {
   rowNumber: number;
   title: string;
+  category: BatchClothingCategory | null;
   size: string;
   condition: BatchAuctionCondition | null;
   /** 기존 X열 원문입니다. 공개 본문에는 넣지 않고 진단/호환용으로만 보존합니다. */
@@ -105,12 +110,77 @@ const MAX_PRODUCT_IMAGES = 12;
 export const FIRST_PRODUCT_ROW = 6;
 const FIXED_TEMPLATE_COLUMNS = {
   title: 1,
-  size: 4,
+  clothingSize: 4,
+  bottomSize: 5,
+  sportsSize: 6,
   conditionScore: 23,
   description: 24,
   startingPrice: 25,
   imageNames: 34,
 } as const;
+
+const BOTTOM_TITLE_PATTERN =
+  /(팬츠|바지|데님|진|청바지|슬랙스|스커트|치마|쇼츠|반바지|레깅스|조거)/iu;
+const SPORTS_TITLE_PATTERN =
+  /(스포츠|등산|아웃도어|골프|축구|야구|농구|테니스|트레이닝|유니폼|저지|져지|바람막이|윈드브레이커)/iu;
+
+interface FixedTemplateSize {
+  column: "D" | "E" | "F" | null;
+  size: string;
+}
+
+function fixedTemplateCategory(
+  row: ParsedAuctionWorkbookRow,
+): BatchClothingCategory | null {
+  // W열 이후에는 상태·가격·이미지 번호가 있어 숫자 ID와 우연히
+  // 충돌할 수 있으므로 분류 영역(A~V) 안에서만 카테고리 ID를 찾습니다.
+  return findBatchClothingCategory(
+    row.cells.slice(0, FIXED_TEMPLATE_COLUMNS.conditionScore - 1),
+  );
+}
+
+function resolveFixedTemplateSize(
+  row: ParsedAuctionWorkbookRow,
+  title: string,
+): FixedTemplateSize {
+  const candidates = [
+    {
+      column: "D" as const,
+      size: normalizeBatchAuctionSize(
+        row.cells[FIXED_TEMPLATE_COLUMNS.clothingSize - 1],
+      ),
+    },
+    {
+      column: "E" as const,
+      size: normalizeBatchAuctionSize(
+        row.cells[FIXED_TEMPLATE_COLUMNS.bottomSize - 1],
+      ),
+    },
+    {
+      column: "F" as const,
+      size: normalizeBatchAuctionSize(
+        row.cells[FIXED_TEMPLATE_COLUMNS.sportsSize - 1],
+      ),
+    },
+  ].filter((candidate) => candidate.size);
+
+  if (candidates.length === 0) return { column: null, size: "" };
+  if (candidates.length === 1) return candidates[0];
+
+  const category = fixedTemplateCategory(row);
+  const preferredColumn = category?.group === "바지" ||
+      category?.group === "치마"
+    ? "E"
+    : SPORTS_TITLE_PATTERN.test(title)
+      ? "F"
+      : BOTTOM_TITLE_PATTERN.test(title)
+        ? "E"
+        : "D";
+  return (
+    candidates.find((candidate) => candidate.column === preferredColumn) ??
+    candidates[0]
+  );
+}
 
 export function normalizeWorkbookCellValue(
   value: unknown,
@@ -191,11 +261,8 @@ function detectFixedTemplateForSheet(
     const hasTitle = Boolean(
       cellAsText(row.cells[FIXED_TEMPLATE_COLUMNS.title - 1]),
     );
-    const hasSize = Boolean(
-      normalizeBatchAuctionSize(
-        row.cells[FIXED_TEMPLATE_COLUMNS.size - 1],
-      ),
-    );
+    const title = cellAsText(row.cells[FIXED_TEMPLATE_COLUMNS.title - 1]);
+    const hasSize = Boolean(resolveFixedTemplateSize(row, title).size);
     const hasValidConditionScore =
       parseBatchAuctionConditionScore(
         row.cells[FIXED_TEMPLATE_COLUMNS.conditionScore - 1],
@@ -281,8 +348,8 @@ function detectFixedTemplateForSheet(
         ),
         size: fixedTemplateColumn(
           headerRow,
-          FIXED_TEMPLATE_COLUMNS.size,
-          "D열 사이즈",
+          FIXED_TEMPLATE_COLUMNS.clothingSize,
+          "D열 여성/남성 의류 사이즈",
         ),
         conditionScore: fixedTemplateColumn(
           headerRow,
@@ -440,7 +507,7 @@ export async function parseAuctionWorkbook(
 
   const selectedSheet = fixedTemplateBest;
   if (!selectedSheet) {
-    throw new Error("기존 Excel 고정 양식(A/D/W/X/Y/AH 열, 6행 시작)을 확인하지 못했습니다.");
+    throw new Error("기존 Excel 고정 양식(A/D·E·F/W/X/Y/AH 열, 6행 시작)을 확인하지 못했습니다.");
   }
 
   const dataRows = selectedSheet.rows
@@ -688,7 +755,7 @@ export function normalizeBatchAuctionProductName(value: string): string {
     .trim();
 }
 
-/** D열의 줄바꿈과 연속 공백만 접어 추천 사이즈 문구 전체를 한 줄로 보존합니다. */
+/** D/E/F열의 줄바꿈과 연속 공백만 접어 사이즈 문구 전체를 한 줄로 보존합니다. */
 export function normalizeBatchAuctionSize(
   value: ParsedWorkbookCell | undefined,
 ): string {
@@ -836,7 +903,7 @@ export function buildBatchAuctionPreview(
     const titleCell = cellAsText(valueAt(row, detected.title));
     const isFixedTemplate = Boolean(
       detected.title?.columnNumber === FIXED_TEMPLATE_COLUMNS.title &&
-        detected.size?.columnNumber === FIXED_TEMPLATE_COLUMNS.size &&
+        detected.size?.columnNumber === FIXED_TEMPLATE_COLUMNS.clothingSize &&
         detected.conditionScore?.columnNumber ===
           FIXED_TEMPLATE_COLUMNS.conditionScore,
     );
@@ -851,8 +918,11 @@ export function buildBatchAuctionPreview(
     const title = isFixedTemplate
       ? normalizeBatchAuctionProductName(rawTitle)
       : rawTitle;
+    const category = isFixedTemplate
+      ? fixedTemplateCategory(row)
+      : null;
     const size = isFixedTemplate
-      ? normalizeBatchAuctionSize(valueAt(row, detected.size))
+      ? resolveFixedTemplateSize(row, rawTitle).size
       : "";
     const conditionScore = isFixedTemplate
       ? parseBatchAuctionConditionScore(valueAt(row, detected.conditionScore))
@@ -886,8 +956,16 @@ export function buildBatchAuctionPreview(
     if (isFixedTemplate && !size) {
       issues.push({
         code: "missing_size",
-        message: "D열 사이즈 및 추천 사이즈가 비어 있습니다.",
+        message: "D열 의류, E열 하의, F열 스포츠·등산복 사이즈가 모두 비어 있습니다.",
         severity: "error",
+      });
+    }
+    if (isFixedTemplate && !category) {
+      issues.push({
+        code: "category_id_unrecognized",
+        message:
+          "행에서 등록된 여성·남성 의류 카테고리 ID를 찾지 못해 카테고리를 기타로 저장합니다.",
+        severity: "warning",
       });
     }
     if (isFixedTemplate && conditionScore === null) {
@@ -941,6 +1019,7 @@ export function buildBatchAuctionPreview(
     return {
       rowNumber: row.rowNumber,
       title,
+      category,
       size,
       condition,
       sourceDescription: descriptionCell,

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Clock3, Landmark, RefreshCw } from "lucide-react";
+import { CheckCircle2, Clock3, Pencil, RefreshCw, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -26,6 +26,7 @@ interface PaymentRow {
   confirmedBy: string | null;
   lastDepositorName: string | null;
   buyerName: string;
+  reversibleLedgerId: string | null;
   products: PaymentProduct[];
 }
 
@@ -75,6 +76,7 @@ function kindLabel(kind: PaymentKind) {
 function statusLabel(status: string) {
   return {
     awaiting_transfer: "입금 대기 중",
+    awaiting_manual_transfer: "입금 대기 중",
     partially_paid: "부분 입금",
     confirmed: "입금 확인 완료",
     paid: "결제 완료",
@@ -118,7 +120,8 @@ function isPaymentRow(value: unknown): value is PaymentRow {
     "paymentKind", "paymentId", "businessId", "memberId", "reference",
     "expectedAmount", "receivedAmount", "remainingAmount", "ledgerEntryCount",
     "version", "status", "bankNameSnapshot", "accountNumberSnapshot", "requestedAt",
-    "confirmedAt", "confirmedBy", "lastDepositorName", "buyerName", "products",
+    "confirmedAt", "confirmedBy", "lastDepositorName", "buyerName",
+    "reversibleLedgerId", "products",
   ];
   return Object.keys(value).length === fields.length &&
     fields.every((field) => Object.hasOwn(value, field)) &&
@@ -140,6 +143,7 @@ function isPaymentRow(value: unknown): value is PaymentRow {
     isTextOrNull(value.confirmedBy) &&
     isTextOrNull(value.lastDepositorName) &&
     typeof value.buyerName === "string" &&
+    isTextOrNull(value.reversibleLedgerId) &&
     Array.isArray(value.products) &&
     value.products.every(isPaymentProduct);
 }
@@ -160,8 +164,7 @@ function isConfirmationResult(
     "payment_kind", "payment_id", "status", "received_amount", "remaining_amount",
     "ledger_entry_count", "version", "idempotent_replay",
   ];
-  return Object.keys(value).length === fields.length &&
-    fields.every((field) => Object.hasOwn(value, field)) &&
+  return fields.every((field) => Object.hasOwn(value, field)) &&
     value.payment_kind === expectedKind && value.payment_id === expectedId &&
     typeof value.status === "string" &&
     isInteger(value.received_amount) && isInteger(value.remaining_amount) &&
@@ -177,10 +180,12 @@ export function OperatorPaymentsConsole() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [serverTime, setServerTime] = useState<string | null>(null);
-  const [includeHistory, setIncludeHistory] = useState(false);
+  const [includeHistory] = useState(true);
   const [offset, setOffset] = useState(0);
   const [depositorNames, setDepositorNames] = useState<Record<string, string>>({});
+  const [confirmationAmounts, setConfirmationAmounts] = useState<Record<string, string>>({});
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
 
   const load = useCallback(async (
@@ -215,20 +220,12 @@ export function OperatorPaymentsConsole() {
         const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
         const token = session?.access_token ?? null;
         setAccessToken(token);
-        if (token) await load(token, false, 0);
+        if (token) await load(token, true, 0);
       } catch (error) {
         setNotice(error instanceof Error ? error.message : "입금 대기열을 불러오지 못했습니다.");
       }
     })();
   }, [load]);
-
-  const changeHistory = (next: boolean) => {
-    setIncludeHistory(next);
-    setOffset(0);
-    void load(accessToken, next, 0).catch((error) => {
-      setNotice(error instanceof Error ? error.message : "입금 대기열을 불러오지 못했습니다.");
-    });
-  };
 
   const refresh = () => {
     void load(accessToken, includeHistory, offset).catch((error) => {
@@ -247,15 +244,71 @@ export function OperatorPaymentsConsole() {
     if (!accessToken || busyKey || payment.remainingAmount < 1) return;
     const key = sessionKey(payment);
     const depositorName = (depositorNames[key] ?? payment.lastDepositorName ?? "").trim();
+    const confirmationAmount = Number(
+      (confirmationAmounts[key] ?? String(payment.remainingAmount)).replaceAll(",", ""),
+    );
+    if (
+      !Number.isSafeInteger(confirmationAmount) ||
+      confirmationAmount < 1 ||
+      confirmationAmount > payment.remainingAmount
+    ) {
+      setExpandedKey(key);
+      setNotice(`확인 금액은 1원부터 ${formatWon(payment.remainingAmount)}까지 입력해 주세요.`);
+      return;
+    }
     if (!depositorName) {
+      setExpandedKey(key);
       setNotice("입금자명을 입력해 주세요.");
       return;
     }
-    const idempotencyKey = sessionStorage.getItem(key) ?? crypto.randomUUID();
-    sessionStorage.setItem(key, idempotencyKey);
+    const idempotencyStorageKey = `${key}:amount:${confirmationAmount}`;
+    const idempotencyKey = sessionStorage.getItem(idempotencyStorageKey) ?? crypto.randomUUID();
+    sessionStorage.setItem(idempotencyStorageKey, idempotencyKey);
     setBusyKey(key);
     setNotice("");
     try {
+      if (confirmationAmount !== payment.remainingAmount) {
+        if (
+          payment.paymentKind === "auction" &&
+          payment.paymentId === payment.memberId
+        ) {
+          throw new Error("낙찰품 일괄 결제는 나누지 않고 표시된 전체 금액만 확인할 수 있습니다.");
+        }
+        const response = await fetch(
+          `/api/admin/operator/transfers/${payment.paymentId}/ledger`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              action: "record",
+              kind: payment.paymentKind === "shipping_fee"
+                ? "shipping"
+                : payment.paymentKind,
+              amount: confirmationAmount,
+              depositorName,
+              expectedReceivedAmount: payment.receivedAmount,
+              expectedLedgerEntryCount: payment.ledgerEntryCount,
+              idempotencyKey,
+              memo: "입금 확인 목록에서 금액 변경",
+            }),
+          },
+        );
+        const payload = await response.json().catch(() => null) as unknown;
+        if (!response.ok || !isRecord(payload) || !isRecord(payload.result)) {
+          throw new Error(
+            isRecord(payload) && typeof payload.error === "string"
+              ? payload.error
+              : "변경한 입금 금액을 기록하지 못했습니다.",
+          );
+        }
+        sessionStorage.removeItem(idempotencyStorageKey);
+        setNotice(`${formatWon(confirmationAmount)} 입금을 확인했습니다.`);
+        await load(accessToken, includeHistory, offset);
+        return;
+      }
       const response = await fetch(
         `/api/admin/operator/payments/${payment.paymentKind}/${payment.paymentId}/confirm`,
         {
@@ -287,7 +340,7 @@ export function OperatorPaymentsConsole() {
           : "입금 확인 결과를 검증하지 못했습니다.";
         throw new Error(message);
       }
-      sessionStorage.removeItem(key);
+      sessionStorage.removeItem(idempotencyStorageKey);
       setNotice(payload.payment.idempotent_replay
         ? "기존 입금 확인 결과를 다시 확인했습니다."
         : "잔액 전액을 입금 확인 처리했습니다.");
@@ -299,29 +352,64 @@ export function OperatorPaymentsConsole() {
     }
   };
 
+  const reverse = async (payment: PaymentRow) => {
+    if (!accessToken || busyKey || !payment.reversibleLedgerId) return;
+    const reason = window.prompt("입금 확인 취소 사유를 입력해 주세요.");
+    if (!reason?.trim()) return;
+    const key = `reverse:${payment.paymentKind}:${payment.paymentId}:${payment.reversibleLedgerId}`;
+    const idempotencyKey = sessionStorage.getItem(key) ?? crypto.randomUUID();
+    sessionStorage.setItem(key, idempotencyKey);
+    setBusyKey(key);
+    setNotice("");
+    try {
+      const response = await fetch(
+        `/api/admin/operator/transfers/${payment.paymentId}/ledger`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            action: "reverse",
+            kind: payment.paymentKind === "shipping_fee"
+              ? "shipping"
+              : payment.paymentKind,
+            ledgerId: payment.reversibleLedgerId,
+            reason: reason.trim(),
+            expectedReceivedAmount: payment.receivedAmount,
+            expectedLedgerEntryCount: payment.ledgerEntryCount,
+            idempotencyKey,
+          }),
+        },
+      );
+      const payload = await response.json().catch(() => null) as unknown;
+      if (!response.ok || !isRecord(payload) || !isRecord(payload.result)) {
+        throw new Error(
+          isRecord(payload) && typeof payload.error === "string"
+            ? payload.error
+            : "입금 확인을 취소하지 못했습니다.",
+        );
+      }
+      sessionStorage.removeItem(key);
+      setNotice("입금 확인을 취소하고 이전 단계로 되돌렸습니다.");
+      await load(accessToken, includeHistory, offset);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "입금 확인을 취소하지 못했습니다.");
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
   const summary = useMemo(() => ({
     pending: payments.filter((payment) => payment.remainingAmount > 0).length,
     confirmed: payments.filter((payment) => payment.remainingAmount === 0).length,
   }), [payments]);
-  const buyerGroups = useMemo(() => {
-    const grouped = new Map<
-      string,
-      { memberId: string; buyerName: string; payments: PaymentRow[] }
-    >();
-    for (const payment of payments) {
-      const current = grouped.get(payment.memberId);
-      if (current) {
-        current.payments.push(payment);
-      } else {
-        grouped.set(payment.memberId, {
-          memberId: payment.memberId,
-          buyerName: payment.buyerName,
-          payments: [payment],
-        });
-      }
-    }
-    return [...grouped.values()];
-  }, [payments]);
+  const orderedPayments = useMemo(() => [
+    ...payments.filter((payment) => payment.remainingAmount > 0),
+    ...payments.filter((payment) => payment.remainingAmount === 0),
+  ], [payments]);
+  const pendingCount = summary.pending;
 
   return (
     <div className="space-y-8">
@@ -344,25 +432,22 @@ export function OperatorPaymentsConsole() {
       </div>
 
       <div className="flex flex-col gap-4 border-b border-line pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <label className="flex items-center gap-2 text-xs font-bold"><input checked={includeHistory} onChange={(event) => changeHistory(event.target.checked)} type="checkbox" /> 확인 완료 내역 포함</label>
+        <p className="text-xs font-bold">입금 확인 완료 내역은 처리 시각부터 최대 7일간 표시됩니다.</p>
         <p className="text-[11px] text-muted">서버 기준 {formatAt(serverTime)}</p>
       </div>
 
-      <div className="space-y-5">
-        {buyerGroups.map((group) => (
-          <section className="border border-line" key={group.memberId}>
-            <header className="flex items-end justify-between gap-4 border-b border-ink bg-surface px-5 py-4">
-              <div>
-                <p className="text-base font-black">{group.buyerName}</p>
-                <p className="mt-1 break-all font-mono text-[10px] text-muted">
-                  {group.memberId}
-                </p>
-              </div>
-              <p className="text-xs font-bold">
-                주문·입금 {group.payments.length}건
-              </p>
-            </header>
-            {group.payments.map((payment) => {
+      <div className="overflow-hidden border border-line">
+        <div className="hidden grid-cols-[minmax(120px,1fr)_minmax(180px,2fr)_120px_110px_150px] gap-4 border-b border-ink bg-surface px-4 py-3 text-[11px] font-bold text-muted md:grid">
+          <span>회원</span>
+          <span>상품</span>
+          <span className="text-right">금액</span>
+          <span className="text-center">상태</span>
+          <span className="text-center">처리</span>
+        </div>
+        <div className="border-b border-ink bg-paper px-4 py-3 text-xs font-black">
+          입금 확인 하기 · {summary.pending}건
+        </div>
+        {orderedPayments.map((payment, index) => {
           const key = sessionKey(payment);
           const pending = payment.remainingAmount > 0;
           const confirmable = payment.receivedAmount >= 0 && (
@@ -374,66 +459,141 @@ export function OperatorPaymentsConsole() {
           );
           const needsLedgerAdjustment = payment.receivedAmount < 0 || payment.remainingAmount < 0;
           const account = [payment.bankNameSnapshot, payment.accountNumberSnapshot].filter(Boolean).join(" · ") || "계좌 정보 없음";
+          const firstProduct = payment.products[0];
+          const productSummary = firstProduct
+            ? `${firstProduct.title}${payment.products.length > 1 ? ` 외 ${payment.products.length - 1}개` : ""}`
+            : payment.reference;
+          const expanded = expandedKey === key;
           return (
-            <article className="border-b border-line px-4 py-5 last:border-b-0 sm:px-5" key={`${payment.paymentKind}:${payment.paymentId}`}>
-              <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:gap-6">
+            <div key={`${payment.paymentKind}:${payment.paymentId}`}>
+              {index === pendingCount && (
+                <div className="border-y border-ink bg-ink px-4 py-3 text-xs font-black text-paper">
+                  입금 확인 완료 · 최근 7일 · {summary.confirmed}건
+                </div>
+              )}
+            <article className="border-b border-line last:border-b-0">
+              <div className="grid gap-3 px-4 py-4 md:grid-cols-[minmax(120px,1fr)_minmax(180px,2fr)_120px_110px_150px] md:items-center md:gap-4">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2"><span className="border border-line px-2 py-1 text-[10px] font-bold">{kindLabel(payment.paymentKind)}</span><span className="border border-line px-2 py-1 text-[10px] font-bold">{statusLabel(payment.status)}</span></div>
-                  <p className="mt-3 break-words text-sm font-bold">{payment.reference}</p>
-                  <p className="mt-1 break-all font-mono text-[10px] text-muted">{payment.paymentId}</p>
-                  {payment.products.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {payment.products.map((product) => (
-                        <div
-                          className="flex max-w-xs items-center gap-2 border border-line bg-paper p-2"
-                          key={product.id}
-                        >
-                          <CatalogImage
-                            alt=""
-                            className="size-10 object-cover"
-                            src={product.imageUrl ?? ""}
-                          />
-                          <span className="line-clamp-2 text-[11px] font-bold">
-                            {product.title}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                  <p className="truncate text-xs font-black">{payment.buyerName}</p>
+                  <p className="mt-1 text-[10px] text-muted">{kindLabel(payment.paymentKind)}</p>
+                </div>
+                <button
+                  className="min-w-0 text-left"
+                  onClick={() => setExpandedKey(expanded ? null : key)}
+                  type="button"
+                >
+                  <p className="truncate text-xs font-bold">{productSummary}</p>
+                  <p className="mt-1 text-[10px] font-bold underline">
+                    {expanded ? "상세 닫기" : "상세보기"}
+                  </p>
+                </button>
+                <p className="font-mono text-sm font-black md:text-right">
+                  {formatWon(payment.remainingAmount)}
+                  {pending && (
+                    <button
+                      className="mt-1 flex items-center gap-1 text-[10px] font-bold underline md:ml-auto"
+                      onClick={() => setExpandedKey(expanded ? null : key)}
+                      type="button"
+                    >
+                      <Pencil size={10} /> 금액 변경하기
+                    </button>
                   )}
-                </div>
-                <div className="w-full max-w-sm border border-line p-3 text-xs sm:w-80">
-                  <p className="flex items-center gap-2 font-bold"><Landmark size={13} /> 입금 계좌</p>
-                  <p className="mt-2 break-all text-muted">{account}</p>
-                </div>
+                </p>
+                <p className="text-xs font-bold md:text-center">
+                  {statusLabel(payment.status)}
+                </p>
+                {confirmable ? (
+                  <button
+                    className="h-10 bg-ink px-3 text-xs font-bold text-paper disabled:opacity-40"
+                    disabled={busyKey !== null}
+                    onClick={() => void confirm(payment)}
+                    type="button"
+                  >
+                    {busyKey === key ? "처리 중..." : "입금 확인 완료"}
+                  </button>
+                ) : (
+                  <button
+                    className="inline-flex h-10 items-center justify-center gap-1 border border-line px-3 text-xs font-bold disabled:opacity-40"
+                    disabled={busyKey !== null || !payment.reversibleLedgerId}
+                    onClick={() => void reverse(payment)}
+                    type="button"
+                  >
+                    <RotateCcw size={12} /> 입금 확인 취소하기
+                  </button>
+                )}
               </div>
 
-              <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-line pt-4 text-xs sm:grid-cols-4">
-                <div><dt className="text-muted">예상 금액</dt><dd className="mt-1 font-bold">{formatWon(payment.expectedAmount)}</dd></div>
-                <div><dt className="text-muted">누적 입금</dt><dd className="mt-1 font-bold">{formatWon(payment.receivedAmount)}</dd></div>
-                <div><dt className="text-muted">잔액</dt><dd className="mt-1 font-bold">{formatWon(payment.remainingAmount)}</dd></div>
-                <div><dt className="text-muted">원장 행</dt><dd className="mt-1 font-mono font-bold">{payment.ledgerEntryCount}</dd></div>
-                <div><dt className="text-muted">입금자</dt><dd className="mt-1 break-words">{payment.lastDepositorName ?? "-"}</dd></div>
-                <div><dt className="text-muted">요청 시각</dt><dd className="mt-1">{formatAt(payment.requestedAt)}</dd></div>
-                <div><dt className="text-muted">확인자</dt><dd className="mt-1 break-all">{payment.confirmedBy ?? "-"}</dd></div>
-                <div><dt className="text-muted">확인 시각</dt><dd className="mt-1">{formatAt(payment.confirmedAt)}</dd></div>
-              </dl>
-
-              {confirmable && (
-                <div className="mt-5 grid grid-cols-1 gap-2 border-t border-line pt-4 sm:grid-cols-[minmax(0,240px)_auto]">
-                  <input aria-label={`${payment.reference} 입금자명`} className="h-10 border border-line px-3 text-xs" maxLength={80} onChange={(event) => setDepositorNames((current) => ({ ...current, [key]: event.target.value }))} placeholder="입금자명" value={depositorNames[key] ?? payment.lastDepositorName ?? ""} />
-                  <button className="h-10 bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40" disabled={busyKey !== null} onClick={() => void confirm(payment)} type="button">{payment.remainingAmount === 0 ? "원장 금액 결제 확정" : "잔액 전액 입금 확인 완료"}</button>
+              {expanded && (
+                <div className="border-t border-line bg-surface px-4 py-4">
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(240px,.7fr)]">
+                    <div>
+                      <p className="text-xs font-black">
+                        상품 {payment.products.length}개
+                      </p>
+                      <div className="mt-3 divide-y divide-line border-y border-line bg-paper">
+                        {payment.products.map((product) => (
+                          <div className="flex items-center gap-3 py-2" key={product.id}>
+                            <CatalogImage
+                              alt=""
+                              className="size-10 shrink-0 object-cover"
+                              src={product.imageUrl ?? ""}
+                            />
+                            <span className="min-w-0 truncate text-xs font-bold">
+                              {product.title}
+                            </span>
+                          </div>
+                        ))}
+                        {payment.products.length === 0 && (
+                          <p className="py-4 text-xs text-muted">{payment.reference}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-xs">
+                      <p><span className="text-muted">입금 계좌</span><br />{account}</p>
+                      <p className="mt-3"><span className="text-muted">요청 시각</span><br />{formatAt(payment.requestedAt)}</p>
+                      <label className="mt-4 block font-bold" htmlFor={`depositor-${key}`}>
+                        입금자명
+                      </label>
+                      <input
+                        className="mt-2 h-10 w-full border border-line bg-paper px-3 text-xs"
+                        id={`depositor-${key}`}
+                        maxLength={80}
+                        onChange={(event) => setDepositorNames((current) => ({ ...current, [key]: event.target.value }))}
+                        placeholder="입금자명"
+                        value={depositorNames[key] ?? payment.lastDepositorName ?? ""}
+                      />
+                      {pending && (
+                        <>
+                          <label className="mt-4 block font-bold" htmlFor={`amount-${key}`}>
+                            이번 확인 금액
+                          </label>
+                          <input
+                            className="mt-2 h-10 w-full border border-line bg-paper px-3 font-mono text-xs"
+                            id={`amount-${key}`}
+                            inputMode="numeric"
+                            max={payment.remainingAmount}
+                            min={1}
+                            onChange={(event) => setConfirmationAmounts((current) => ({
+                              ...current,
+                              [key]: event.target.value.replace(/[^0-9]/gu, ""),
+                            }))}
+                            value={confirmationAmounts[key] ?? String(payment.remainingAmount)}
+                          />
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
               {needsLedgerAdjustment && (
-                <p className="mt-5 border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900">
+                <p className="border-t border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900">
                   부분·초과 입금 또는 역분개 상태입니다. 이 단순 확인 화면에서는 처리하지 않고 고급 원장 조정을 사용해 주세요.
                 </p>
               )}
             </article>
+            </div>
           );
-            })}
-          </section>
-        ))}
+        })}
         {payments.length === 0 && <p className="py-16 text-center text-sm text-muted">표시할 입금 요청이 없습니다.</p>}
       </div>
 

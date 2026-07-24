@@ -25,6 +25,8 @@
     "verify:queue-snapshot-db": "node scripts/verify-local-queue-snapshot-postgres.mjs",
     "verify:reversal-target-db": "node scripts/verify-local-reversal-target-postgres.mjs",
     "verify:reversal-target-db:docker": "node scripts/verify-docker-reversal-target-postgres.mjs",
+    "db:reset-local": "node scripts/local-test-supabase.mjs reset",
+    "dev:local-test": "node scripts/start-local-test-app.mjs",
     "lint": "eslint .",
     "db:generate": "drizzle-kit generate",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",

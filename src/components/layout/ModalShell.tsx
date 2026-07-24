@@ -67,9 +67,12 @@ export function ModalShell({
         }
       }
     };
+    const onRequestedClose = () => close();
     document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("ninety-nine:close-route-modal", onRequestedClose);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("ninety-nine:close-route-modal", onRequestedClose);
       if (closeTimerRef.current !== null) {
         window.clearTimeout(closeTimerRef.current);
       }

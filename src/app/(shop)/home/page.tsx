@@ -1,12 +1,17 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowDownRight, ArrowUpRight, Clock3 } from "lucide-react";
+import { ArrowUpRight, Clock3 } from "lucide-react";
 import { ProductRail } from "@/components/features/catalog/ProductRail";
-import { CatalogImage } from "@/components/ui/CatalogImage";
-import { SectionHeading } from "@/components/ui/SectionHeading";
+import {
+  HomeFeaturedAuction,
+  type HomeFeaturedAuctionItem,
+} from "@/components/features/home/HomeFeaturedAuction";
+import {
+  selectFeaturedAuctionCandidates,
+  shuffleFeaturedAuctionCandidates,
+} from "@/components/features/home/featuredAuction";
 import { StatusNotice } from "@/components/ui/StatusNotice";
 import { fetchPublishedProducts } from "@/services/products";
-import { fetchActiveStores } from "@/services/stores";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 
 export const dynamic = "force-dynamic";
@@ -17,33 +22,28 @@ export const metadata: Metadata = {
 };
 
 async function loadHomeData() {
-  const [auctionResult, fixedResult, storesResult] = await Promise.allSettled([
+  const [auctionResult, fixedResult] = await Promise.allSettled([
     LIVE_AUCTION_ENABLED
-      ? fetchPublishedProducts({ limit: 6, saleType: "auction", sort: "ending" })
+      ? fetchPublishedProducts({ limit: 100, saleType: "auction", sort: "latest" })
       : Promise.resolve([]),
     fetchPublishedProducts({ limit: 6, saleType: "fixed", sort: "latest" }),
-    fetchActiveStores(),
   ]);
   return {
     auctions: auctionResult.status === "fulfilled" ? auctionResult.value : [],
     fixed: fixedResult.status === "fulfilled" ? fixedResult.value : [],
-    stores: storesResult.status === "fulfilled" ? storesResult.value : [],
     catalogUnavailable: fixedResult.status === "rejected",
-    storesUnavailable: storesResult.status === "rejected",
   };
 }
 
 type HomeProducts = Awaited<ReturnType<typeof fetchPublishedProducts>>;
-type HomeStores = Awaited<ReturnType<typeof fetchActiveStores>>;
 
 interface HomePresentationProps {
   auctions: HomeProducts;
-  feature: HomeProducts[number] | null;
   fixed: HomeProducts;
-  stores: HomeStores;
+  featuredAuctions: HomeFeaturedAuctionItem[];
 }
 
-function DesktopHome({ auctions, feature, fixed, stores }: HomePresentationProps) {
+function DesktopHome({ auctions, featuredAuctions, fixed }: HomePresentationProps) {
   return (
     <div className="space-y-16" data-home-presentation="desktop">
       <section className="theme-invariant-dark grid min-h-[560px] grid-cols-[1.05fr_.95fr] overflow-hidden bg-ink text-paper">
@@ -57,30 +57,15 @@ function DesktopHome({ auctions, feature, fixed, stores }: HomePresentationProps
             <Link className="flex items-center gap-2 border-b border-paper pb-2 text-xs font-bold" href="/shop">즉시 구매 <ArrowUpRight size={14} /></Link>
           </div>
         </div>
-        <Link className="group relative min-h-[560px] overflow-hidden bg-black" href={feature ? `/auction/${feature.id}` : "/shop"}>
-          <CatalogImage alt="나인티 나인 빈티지 배너" className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.02]" loading="lazy" maxDimension={1600} sizes="570px" src="/banners/brand-banner-wide.png" />
-          <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 bg-gradient-to-t from-black/90 to-transparent p-8 pt-28">
-            <div className="min-w-0"><p className="text-[10px] font-bold tracking-[0.14em] text-zinc-400">{feature ? "오늘의 대표 상품" : "새 상품 준비 중"}</p><p className="mt-2 truncate text-sm font-bold">{feature?.title ?? "새로운 상품을 준비 중입니다"}</p></div>
-            <span className="grid size-12 shrink-0 place-items-center rounded-full border border-white"><ArrowDownRight size={18} /></span>
-          </div>
-        </Link>
+        <HomeFeaturedAuction products={featuredAuctions} />
       </section>
 
-      <section className="grid grid-cols-3 gap-8 border-y border-line py-5">
+      <section className="grid grid-cols-2 gap-8 border-y border-line py-5">
         <div className="flex items-center gap-3"><Clock3 size={16} /><div><p className="text-[10px] font-bold tracking-[0.14em] text-muted">즉시 구매</p><p className="mt-1 text-sm font-bold">상시 바로 구매</p></div></div>
         <div><p className="text-[10px] font-bold tracking-[0.14em] text-muted">보관·묶음 배송</p><p className="mt-1 text-sm font-bold">소형 14일 · 대형 7일</p></div>
-        <div><p className="text-[10px] font-bold tracking-[0.14em] text-muted">엄선된 숍</p><p className="mt-1 text-sm font-bold">{stores.length}개의 숍, 하나의 아카이브</p></div>
       </section>
 
       {LIVE_AUCTION_ENABLED && <ProductRail compact eyebrow="실시간 경매" title="오늘 밤의 경매" products={auctions} />}
-
-      <section>
-        <SectionHeading action={<Link className="shrink-0 text-xs font-bold underline" href="/shop">전체 숍 보기</Link>} className="mb-6 gap-4" eyebrow="엄선된 숍" title="각자의 시선, 하나의 아카이브" titleClassName="mt-2 text-2xl font-black tracking-[-0.06em]" />
-        <div className="grid grid-cols-3 gap-3">
-          {stores.map((store, index) => <Link className="min-h-52 p-6 transition-transform hover:-translate-y-1" href={`/stores/${store.slug}`} key={store.id} style={{ backgroundColor: `var(--store-card-${(index % 3) + 1})` }}><p className="text-[10px] font-bold tracking-[0.14em]">엄선된 숍 {String(index + 1).padStart(2, "0")}</p><h3 className="mt-14 text-2xl font-black tracking-[-.06em]">{store.name}</h3><p className="mt-2 max-w-[18rem] text-xs leading-5">{store.description}</p></Link>)}
-          {stores.length === 0 && <div className="col-span-full border border-dashed border-line py-12 text-center text-sm text-muted">공개된 숍이 없습니다.</div>}
-        </div>
-      </section>
 
       <ProductRail compact eyebrow="즉시 구매" title="바로 구매 가능한 상품" products={fixed} href="/shop" />
 
@@ -93,13 +78,21 @@ function DesktopHome({ auctions, feature, fixed, stores }: HomePresentationProps
 }
 
 export default async function HomePage() {
-  const { auctions, fixed, stores, catalogUnavailable, storesUnavailable } = await loadHomeData();
-  const feature = fixed[0] ?? auctions[0] ?? null;
+  const { auctions, fixed, catalogUnavailable } = await loadHomeData();
+  const featuredAuctions = shuffleFeaturedAuctionCandidates(
+    selectFeaturedAuctionCandidates(auctions),
+  ).map((product) => ({
+    brand: product.brand,
+    currentPrice: product.currentPrice,
+    id: product.id,
+    imageUrl: product.imageUrls[0] ?? "",
+    title: product.title,
+  }));
 
   return (
     <div>
-      {(catalogUnavailable || storesUnavailable) && <StatusNotice className="mb-6 px-5 py-4 leading-5" variant="warning">{catalogUnavailable ? "상품 정보를 일시적으로 불러오지 못했습니다. 잠시 후 새로고침해 주세요." : "숍 정보를 일시적으로 불러오지 못했습니다. 즉시 구매 상품은 계속 확인할 수 있습니다."}</StatusNotice>}
-      <DesktopHome auctions={auctions} feature={feature} fixed={fixed} stores={stores} />
+      {catalogUnavailable && <StatusNotice className="mb-6 px-5 py-4 leading-5" variant="warning">상품 정보를 일시적으로 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</StatusNotice>}
+      <DesktopHome auctions={auctions.slice(0, 6)} featuredAuctions={featuredAuctions} fixed={fixed} />
     </div>
   );
 }

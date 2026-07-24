@@ -1,5 +1,5 @@
-import { StaffCenterManagementConsole } from "@/components/admin/center/StaffCenterManagementConsole";
+import { redirect } from "next/navigation";
 
 export default function EmployeeCenterPage() {
-  return <StaffCenterManagementConsole />;
+  redirect("/admin/employee/fulfillment");
 }

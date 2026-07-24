@@ -26,6 +26,7 @@ export interface SupportConversation {
   assignedStaffId: string | null;
   conversationType: SupportConversationType;
   productId: string | null;
+  storeId: string | null;
   subject: string | null;
   productTitleSnapshot: string | null;
   productImageUrlSnapshot: string | null;
@@ -43,6 +44,9 @@ export interface SupportMessage {
   senderId: string;
   body: string;
   clientNonce: string;
+  productId: string | null;
+  productTitleSnapshot: string | null;
+  productImageUrlSnapshot: string | null;
   createdAt: string;
 }
 
@@ -100,6 +104,7 @@ interface ConversationRow {
   assigned_staff_id: string | null;
   conversation_type: SupportConversationType;
   product_id: string | null;
+  store_id: string | null;
   subject: string | null;
   product_title_snapshot: string | null;
   product_image_url_snapshot: string | null;
@@ -117,6 +122,9 @@ interface MessageRow {
   sender_id: string;
   body: string;
   client_nonce: string;
+  product_id: string | null;
+  product_title_snapshot: string | null;
+  product_image_url_snapshot: string | null;
   created_at: string;
 }
 
@@ -154,6 +162,7 @@ export type SupportChatDatabase = {
           assigned_staff_id?: string | null;
           conversation_type?: SupportConversationType;
           product_id?: string | null;
+          store_id?: string | null;
           subject?: string | null;
           product_title_snapshot?: string | null;
           product_image_url_snapshot?: string | null;
@@ -178,6 +187,9 @@ export type SupportChatDatabase = {
           sender_id: string;
           body: string;
           client_nonce?: string;
+          product_id?: string | null;
+          product_title_snapshot?: string | null;
+          product_image_url_snapshot?: string | null;
           created_at?: string;
         };
         Update: Record<string, never>;
@@ -197,7 +209,11 @@ export type SupportChatDatabase = {
     Views: { [_ in never]: never };
     Functions: {
       get_or_create_support_conversation: {
-        Args: Record<PropertyKey, never>;
+        Args: { p_store_id: string };
+        Returns: ConversationRow[];
+      };
+      get_or_create_operator_store_conversation: {
+        Args: { p_member_id: string; p_store_id: string };
         Returns: ConversationRow[];
       };
       start_product_inquiry: {
@@ -215,10 +231,6 @@ export type SupportChatDatabase = {
       mark_support_conversation_read: {
         Args: { p_conversation_id: string };
         Returns: ReadRow[];
-      };
-      reopen_my_support_conversation: {
-        Args: Record<PropertyKey, never>;
-        Returns: ConversationRow[];
       };
       reopen_support_conversation: {
         Args: { p_conversation_id: string };
@@ -258,6 +270,7 @@ function toConversation(row: ConversationRow): SupportConversation {
     assignedStaffId: row.assigned_staff_id,
     conversationType: row.conversation_type,
     productId: row.product_id,
+    storeId: row.store_id,
     subject: row.subject,
     productTitleSnapshot: row.product_title_snapshot,
     productImageUrlSnapshot: row.product_image_url_snapshot,
@@ -277,6 +290,9 @@ function toMessage(row: MessageRow): SupportMessage {
     senderId: row.sender_id,
     body: row.body,
     clientNonce: row.client_nonce,
+    productId: row.product_id,
+    productTitleSnapshot: row.product_title_snapshot,
+    productImageUrlSnapshot: row.product_image_url_snapshot,
     createdAt: row.created_at,
   };
 }
@@ -336,9 +352,12 @@ export function isSupportStaffRole(
   return role === "admin" || role === "operator";
 }
 
-export async function getOrCreateMemberSupportConversation(): Promise<SupportConversation> {
+export async function getOrCreateMemberSupportConversation(
+  storeId: string,
+): Promise<SupportConversation> {
   const { data, error } = await getSupportClient().rpc(
     "get_or_create_support_conversation",
+    { p_store_id: storeId },
   );
   throwQueryError(error, "상담 대화를 준비하지 못했어요. 잠시 후 다시 시도해 주세요.");
 
@@ -419,22 +438,6 @@ export async function fetchEmployeeSupportConversation(
   throwQueryError(error, "내부 운영 대화를 불러오지 못했어요.");
 
   return data ? toConversation(data) : null;
-}
-
-export async function reopenMemberSupportConversation(): Promise<SupportConversation> {
-  const { data, error } = await getSupportClient().rpc(
-    "reopen_my_support_conversation",
-  );
-  throwQueryError(error, "상담을 다시 열지 못했어요. 잠시 후 다시 시도해 주세요.");
-
-  const row = data?.[0];
-  if (!row) {
-    throw new SupportChatError("다시 열 상담을 찾지 못했어요.", {
-      code: "conversation_not_found",
-    });
-  }
-
-  return toConversation(row);
 }
 
 export async function reopenSupportConversation(

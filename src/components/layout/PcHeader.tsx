@@ -5,15 +5,16 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { CommerceToolbar } from "@/components/features/commerce/CommerceToolbar";
+import { ChatNotificationLink } from "@/components/features/chat/ChatNotificationProvider";
 import { AuthStatus } from "@/components/layout/AuthStatus";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 
 const navigation = [
   { label: "홈", href: "/home" },
+  ...(LIVE_AUCTION_ENABLED ? [{ label: "입찰 중인 상품", href: "/bidding" }] : []),
   ...(LIVE_AUCTION_ENABLED ? [{ label: "실시간 경매", href: "/feed" }] : []),
   { label: "즉시 구매", href: "/shop" },
-  { label: "판매 완료", href: "/sold" },
 ];
 
 export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean }) {
@@ -30,7 +31,7 @@ export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean })
         </nav>
         <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
           <ThemeToggle className="size-10 px-0" />
-          <Link aria-label="상담" className="grid size-10 shrink-0 place-items-center border border-line" href="/chat"><Headphones size={17} /></Link>
+          <ChatNotificationLink ariaLabel="상담" className="grid size-10 shrink-0 place-items-center border border-line" fallbackHref="/chat"><Headphones size={17} /></ChatNotificationLink>
           {authenticating ? <span aria-label="로그인 상태 확인 중" className="inline-flex h-10 w-[193px] shrink-0 border border-line bg-surface" role="status" /> : <><span className="inline-flex"><AuthStatus /></span><CommerceToolbar /></>}
           <form className="flex h-10 w-40 shrink-0 items-center gap-2 border border-line bg-surface px-3 text-muted" onSubmit={(event) => { event.preventDefault(); const value = query.trim(); router.push(value ? `/shop?q=${encodeURIComponent(value)}` : "/shop"); }}><Search size={16} /><input aria-label="상품 검색" className="min-w-0 flex-1 bg-transparent text-xs text-ink outline-none placeholder:text-muted" onChange={(event) => setQuery(event.target.value)} placeholder="검색 후 Enter" value={query} /></form>
         </div>

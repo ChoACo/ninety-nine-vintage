@@ -13,6 +13,7 @@ import {
 import { useEffect, useState } from "react";
 import { OperatorSecondChanceButton } from "@/components/admin/operator/OperatorSecondChanceButton";
 import { OwnerNicknameReviewPanel } from "@/components/admin/owner/OwnerNicknameReviewPanel";
+import { LocalTestMemberSwitcher } from "@/components/admin/LocalTestMemberSwitcher";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -42,7 +43,9 @@ function productStatusLabel(status: string) {
   return status;
 }
 
-export function OperatorConsole() {
+export function OperatorConsole({
+  enableLocalTestMembers = false,
+}: Readonly<{ enableLocalTestMembers?: boolean }>) {
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState(0);
   const [shipping, setShipping] = useState(0);
@@ -156,21 +159,21 @@ export function OperatorConsole() {
             운영자 센터
           </h1>
           <p className="mt-3 text-sm text-muted">
-            소속 센터의 상품 등록, 입금 확인, 출고와 택배 업무를 확인합니다.
+            소속 매장의 상품 등록, 입금 확인, 출고와 택배 업무를 확인합니다.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex">
           <Link
-            className="flex items-center justify-center gap-2 border border-ink px-3 py-3 text-xs font-bold sm:px-5"
+            className="flex items-center justify-center gap-2 bg-ink px-3 py-3 text-xs font-bold text-paper sm:px-5"
             href="/admin/operator/products?import=xlsx"
           >
             <FileSpreadsheet size={15} /> 엑셀 일괄 등록
           </Link>
           <Link
-            className="flex items-center justify-center gap-2 bg-ink px-3 py-3 text-xs font-bold text-paper sm:px-5"
-            href="/admin/operator/products"
+            className="flex items-center justify-center gap-2 border border-ink px-3 py-3 text-xs font-bold sm:px-5"
+            href="/admin/operator/products?create=single"
           >
-            <Plus size={15} /> 상품 등록
+            <Plus size={15} /> 단품 등록
           </Link>
         </div>
       </div>
@@ -183,6 +186,7 @@ export function OperatorConsole() {
           {notice}
         </div>
       )}
+      {enableLocalTestMembers && <LocalTestMemberSwitcher />}
 
       <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-4">
         {stats.map(([label, value, Icon]) => (
@@ -265,12 +269,6 @@ export function OperatorConsole() {
             </Link>
             <Link
               className="flex gap-3 underline"
-              href="/admin/operator/center"
-            >
-              소속 센터 정보 관리 <ArrowUpRight size={14} />
-            </Link>
-            <Link
-              className="flex gap-3 underline"
               href="/admin/operator/payments"
             >
               주문·입금 확인 업무 열기 <ArrowUpRight size={14} />
@@ -291,7 +289,7 @@ export function OperatorConsole() {
               className="flex gap-3 underline"
               href="/admin/operator/fulfillment"
             >
-              입고·보관·출고 업무 열기 <ArrowUpRight size={14} />
+              출고·보관 업무 열기 <ArrowUpRight size={14} />
             </Link>
           </div>
         </section>

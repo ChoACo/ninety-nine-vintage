@@ -57,12 +57,15 @@ test("push subscription endpoints are authenticated and rebound to the current u
 });
 
 test("database events target members, operators, and employees through a retryable outbox", async () => {
-  const [migration, coalescingMigration] = await Promise.all([
+  const [migration, coalescingMigration, vaultMigration] = await Promise.all([
     source(
       "supabase/migrations/20260724134857_mobile_pwa_web_push_notifications.sql",
     ),
     source(
       "supabase/migrations/20260724141416_coalesce_auction_payment_push_notifications.sql",
+    ),
+    source(
+      "supabase/migrations/20260724141701_store_web_push_runtime_secrets_in_vault.sql",
     ),
   ]);
 
@@ -92,6 +95,12 @@ test("database events target members, operators, and employees through a retryab
   assert.match(
     coalescingMigration,
     /if new\.payment_context = 'auction_bundle' then/i,
+  );
+  assert.match(vaultMigration, /vault\.decrypted_secrets/i);
+  assert.match(vaultMigration, /to service_role/i);
+  assert.doesNotMatch(
+    vaultMigration,
+    /grant execute[^;]*to (anon|authenticated)/i,
   );
   assert.doesNotMatch(
     migration,

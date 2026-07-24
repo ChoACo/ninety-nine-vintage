@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     if (error) throw error;
     return commerceJson({
       enabled: (count ?? 0) > 0,
-      publicKey: readWebPushPublicKey(),
+      publicKey: await readWebPushPublicKey(auth.admin),
     });
   } catch {
     return commerceJson(

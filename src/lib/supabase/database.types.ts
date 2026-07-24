@@ -5762,6 +5762,12 @@ export type Database = {
           url: string
         }[]
       }
+      get_web_push_delivery_config: { Args: never; Returns: Json }
+      get_web_push_public_key: { Args: never; Returns: string }
+      verify_web_push_dispatch_secret: {
+        Args: { p_secret: string }
+        Returns: boolean
+      }
       owner_member_mode_is_active: {
         Args: { p_user_id: string }
         Returns: boolean

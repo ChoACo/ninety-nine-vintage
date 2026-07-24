@@ -1,7 +1,9 @@
 import "server-only";
 
 import webPush from "web-push";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClients } from "@/lib/supabase/server";
+import type { Database } from "@/lib/supabase/database.types";
 
 interface ClaimedPushNotification {
   attempts: number;
@@ -14,13 +16,20 @@ interface ClaimedPushNotification {
   url: string;
 }
 
-function getWebPushConfiguration() {
-  const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY?.trim();
-  const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY?.trim();
-  const subject =
-    process.env.WEB_PUSH_VAPID_SUBJECT?.trim() ||
-    "mailto:privacy@ninety-nine-vintage.store";
-  if (!publicKey || !privateKey) {
+async function getWebPushConfiguration(admin: SupabaseClient<Database>) {
+  const { data, error } = await admin.rpc("get_web_push_delivery_config");
+  if (error) throw error;
+  const config = data as {
+    privateKey?: unknown;
+    publicKey?: unknown;
+    subject?: unknown;
+  } | null;
+  const publicKey =
+    typeof config?.publicKey === "string" ? config.publicKey.trim() : "";
+  const privateKey =
+    typeof config?.privateKey === "string" ? config.privateKey.trim() : "";
+  const subject = typeof config?.subject === "string" ? config.subject.trim() : "";
+  if (!publicKey || !privateKey || !subject) {
     throw new Error("web_push_not_configured");
   }
   return { publicKey, privateKey, subject };
@@ -37,8 +46,8 @@ function compactError(error: unknown) {
 }
 
 export async function dispatchPendingWebPushNotifications(limit = 50) {
-  const config = getWebPushConfiguration();
   const { admin } = createSupabaseServerClients();
+  const config = await getWebPushConfiguration(admin);
   const { data, error } = await admin.rpc("claim_web_push_notifications", {
     p_limit: limit,
   });
@@ -176,6 +185,10 @@ export async function dispatchPendingWebPushNotifications(limit = 50) {
   return { claimed: claimed.length, delivered, deferred };
 }
 
-export function readWebPushPublicKey() {
-  return getWebPushConfiguration().publicKey;
+export async function readWebPushPublicKey(admin: SupabaseClient<Database>) {
+  const { data, error } = await admin.rpc("get_web_push_public_key");
+  if (error || typeof data !== "string" || !data.trim()) {
+    throw error ?? new Error("web_push_not_configured");
+  }
+  return data.trim();
 }

@@ -53,14 +53,21 @@ self.addEventListener("push", (event) => {
     }
   })();
   const title = payload.title || "NINETY-NINE VINTAGE";
-  event.waitUntil(self.registration.showNotification(title, {
-    body: payload.body || "새로운 소식이 있습니다.",
-    icon: "/pwa-icon-192.png",
-    badge: "/pwa-icon-192.png",
-    tag: payload.tag || "ninety-nine-notification",
-    renotify: true,
-    data: { url: payload.url || "/m/home" },
-  }));
+  event.waitUntil((async () => {
+    const clients = await self.clients.matchAll({
+      type: "window",
+      includeUncontrolled: true,
+    });
+    if (clients.some((client) => client.visibilityState === "visible")) return;
+    await self.registration.showNotification(title, {
+      body: payload.body || "새로운 소식이 있습니다.",
+      icon: "/pwa-icon-192.png",
+      badge: "/pwa-icon-192.png",
+      tag: payload.tag || "ninety-nine-notification",
+      renotify: true,
+      data: { url: payload.url || "/m/home" },
+    });
+  })());
 });
 
 self.addEventListener("notificationclick", (event) => {

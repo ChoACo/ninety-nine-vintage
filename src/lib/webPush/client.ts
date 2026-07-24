@@ -61,7 +61,9 @@ export async function registerMobileServiceWorker() {
 }
 
 export async function enableWebPush(accessToken: string) {
-  const registration = await registerMobileServiceWorker();
+  if (!isActualMobileDevice() || !isInstalledWebApp()) {
+    throw new Error("백그라운드 알림은 설치한 모바일 웹앱에서만 사용할 수 있습니다.");
+  }
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
     throw new Error(
@@ -70,6 +72,7 @@ export async function enableWebPush(accessToken: string) {
         : "알림 권한을 허용해야 새 소식을 받을 수 있습니다.",
     );
   }
+  const registration = await registerMobileServiceWorker();
 
   const keyResponse = await fetch("/api/push/subscription", {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -93,7 +96,10 @@ export async function enableWebPush(accessToken: string) {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(subscription.toJSON()),
+    body: JSON.stringify({
+      ...subscription.toJSON(),
+      clientMode: "standalone",
+    }),
   });
   if (!response.ok) throw new Error(await readApiError(response));
   return subscription;
@@ -101,6 +107,8 @@ export async function enableWebPush(accessToken: string) {
 
 export async function syncExistingWebPush(accessToken: string) {
   if (
+    !isActualMobileDevice() ||
+    !isInstalledWebApp() ||
     !("serviceWorker" in navigator) ||
     !("Notification" in window) ||
     Notification.permission !== "granted"
@@ -116,7 +124,10 @@ export async function syncExistingWebPush(accessToken: string) {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(subscription.toJSON()),
+    body: JSON.stringify({
+      ...subscription.toJSON(),
+      clientMode: "standalone",
+    }),
   });
   return response.ok;
 }

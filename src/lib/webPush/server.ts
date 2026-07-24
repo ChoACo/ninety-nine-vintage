@@ -4,6 +4,10 @@ import webPush from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClients } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
+import {
+  isNotificationCategoryEnabled,
+  type NotificationPreferences,
+} from "@/lib/notifications/preferences";
 
 interface ClaimedPushNotification {
   attempts: number;
@@ -14,6 +18,38 @@ interface ClaimedPushNotification {
   title: string;
   topic: string;
   url: string;
+}
+
+interface DeliveryPreferenceRow {
+  auction_enabled: boolean;
+  background_push_enabled: boolean;
+  chat_enabled: boolean;
+  consent_state: string;
+  foreground_enabled: boolean;
+  payment_verification_enabled: boolean;
+  shipment_enabled: boolean;
+  shipping_request_enabled: boolean;
+  system_enabled: boolean;
+  user_id: string;
+}
+
+function mapDeliveryPreferences(
+  row: DeliveryPreferenceRow,
+): NotificationPreferences {
+  return {
+    auctionEnabled: row.auction_enabled,
+    backgroundPushEnabled: row.background_push_enabled,
+    chatEnabled: row.chat_enabled,
+    consentState:
+      row.consent_state === "granted" || row.consent_state === "declined"
+        ? row.consent_state
+        : "pending",
+    foregroundEnabled: row.foreground_enabled,
+    paymentVerificationEnabled: row.payment_verification_enabled,
+    shipmentEnabled: row.shipment_enabled,
+    shippingRequestEnabled: row.shipping_request_enabled,
+    systemEnabled: row.system_enabled,
+  };
 }
 
 async function getWebPushConfiguration(admin: SupabaseClient<Database>) {
@@ -58,12 +94,29 @@ export async function dispatchPendingWebPushNotifications(limit = 50) {
   const recipients = [
     ...new Set(claimed.map((notification) => notification.recipient_user_id)),
   ];
-  const { data: subscriptions, error: subscriptionError } = await admin
-    .from("web_push_subscriptions")
-    .select("id, user_id, endpoint, p256dh, auth_secret")
-    .in("user_id", recipients)
-    .is("disabled_at", null);
-  if (subscriptionError) throw subscriptionError;
+  const [subscriptionResult, preferenceResult] = await Promise.all([
+    admin
+      .from("web_push_subscriptions")
+      .select("id, user_id, endpoint, p256dh, auth_secret")
+      .in("user_id", recipients)
+      .eq("delivery_mode", "standalone")
+      .is("disabled_at", null),
+    admin
+      .from("notification_preferences")
+      .select(
+        "user_id, consent_state, foreground_enabled, background_push_enabled, auction_enabled, chat_enabled, shipment_enabled, payment_verification_enabled, shipping_request_enabled, system_enabled",
+      )
+      .in("user_id", recipients),
+  ]);
+  if (subscriptionResult.error) throw subscriptionResult.error;
+  if (preferenceResult.error) throw preferenceResult.error;
+  const subscriptions = subscriptionResult.data;
+  const preferencesByUser = new Map(
+    ((preferenceResult.data ?? []) as DeliveryPreferenceRow[]).map((row) => [
+      row.user_id,
+      mapDeliveryPreferences(row),
+    ]),
+  );
 
   const subscriptionsByUser = new Map<
     string,
@@ -78,6 +131,23 @@ export async function dispatchPendingWebPushNotifications(limit = 50) {
   let delivered = 0;
   let deferred = 0;
   for (const notification of claimed) {
+    const preferences = preferencesByUser.get(notification.recipient_user_id);
+    if (
+      !preferences ||
+      preferences.consentState !== "granted" ||
+      !preferences.backgroundPushEnabled ||
+      !isNotificationCategoryEnabled(preferences, notification.topic)
+    ) {
+      await admin
+        .from("web_push_notification_outbox")
+        .update({
+          delivered_at: new Date().toISOString(),
+          last_error: "preference_disabled",
+          locked_at: null,
+        })
+        .eq("id", notification.id);
+      continue;
+    }
     const targets = subscriptionsByUser.get(notification.recipient_user_id) ?? [];
     if (targets.length === 0) {
       deferred += 1;

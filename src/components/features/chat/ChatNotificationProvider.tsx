@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle, X } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -18,11 +18,6 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 interface ChatNotificationState {
   href: string | null;
   unreadCount: number;
-}
-
-interface ChatToast {
-  href: string;
-  messageId: string;
 }
 
 interface ChatNotificationLinkProps {
@@ -48,7 +43,6 @@ export function ChatNotificationProvider({
 }: {
   children: ReactNode;
 }) {
-  const pathname = usePathname();
   const { session } = useSupabaseSession();
   const accessToken = session?.access_token;
   const sessionUserId = session?.user.id;
@@ -56,7 +50,6 @@ export function ChatNotificationProvider({
     href: null,
     unreadCount: 0,
   });
-  const [toast, setToast] = useState<ChatToast | null>(null);
 
   const loadSummary = useCallback(async () => {
     if (!accessToken) {
@@ -110,10 +103,7 @@ export function ChatNotificationProvider({
             sender_id?: string | null;
           };
           if (!message.id || message.sender_id === sessionUserId) return;
-          void loadSummary().then((summary) => {
-            const href = summary?.href;
-            if (!href) return;
-            setToast({ href, messageId: message.id as string });
+          void loadSummary().then(() => {
             window.dispatchEvent(new Event("ninety-nine:chat-message"));
           });
         },
@@ -125,54 +115,11 @@ export function ChatNotificationProvider({
     };
   }, [loadSummary, sessionUserId]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 5_000);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
-
   const value = useMemo(() => state, [state]);
-  const toastHref = toast
-    ? withMobileBase(toast.href, pathname, pathname.startsWith("/m") ? "/m" : "")
-    : null;
 
   return (
     <ChatNotificationContext.Provider value={value}>
       {children}
-      {toast && toastHref && (
-        <aside
-          aria-live="polite"
-          className="fixed right-4 top-4 z-[140] w-[min(22rem,calc(100vw-2rem))] border border-ink bg-paper p-4 text-ink shadow-2xl"
-          role="status"
-        >
-          <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-ink text-paper">
-              <MessageCircle size={17} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-black">새로운 채팅이 있습니다</p>
-              <p className="mt-1 text-[11px] text-muted">
-                확인하지 않은 매장 상담 메시지가 도착했습니다.
-              </p>
-              <Link
-                className="mt-3 inline-flex h-9 items-center bg-ink px-4 text-[11px] font-bold text-paper"
-                href={toastHref}
-                onClick={() => setToast(null)}
-              >
-                채팅으로 이동하기
-              </Link>
-            </div>
-            <button
-              aria-label="새 채팅 알림 닫기"
-              className="grid size-9 shrink-0 place-items-center"
-              onClick={() => setToast(null)}
-              type="button"
-            >
-              <X size={17} />
-            </button>
-          </div>
-        </aside>
-      )}
     </ChatNotificationContext.Provider>
   );
 }

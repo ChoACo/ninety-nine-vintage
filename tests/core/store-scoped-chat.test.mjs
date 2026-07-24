@@ -77,10 +77,20 @@ test("member and operator surfaces expose store selection and direct member chat
 });
 
 test("realtime chat events render an unread badge and dismissible five-second toast", async () => {
-  const [provider, rootLayout, desktopHeader, mobileHeader, adminLayout] =
+  const [
+    chatProvider,
+    notificationProvider,
+    rootLayout,
+    desktopHeader,
+    mobileHeader,
+    adminLayout,
+  ] =
     await Promise.all([
       source(
         "src/components/features/chat/ChatNotificationProvider.tsx",
+      ),
+      source(
+        "src/components/features/notifications/NotificationExperienceProvider.tsx",
       ),
       source("src/app/layout.tsx"),
       source("src/components/layout/PcHeader.tsx"),
@@ -88,13 +98,14 @@ test("realtime chat events render an unread badge and dismissible five-second to
       source("src/app/(admin)/admin/layout.tsx"),
     ]);
 
-  assert.match(provider, /postgres_changes/);
-  assert.match(provider, /table: "support_messages"/);
-  assert.match(provider, /새로운 채팅이 있습니다/);
-  assert.match(provider, /5_000/);
-  assert.match(provider, /새 채팅 알림 닫기/);
-  assert.match(provider, /채팅으로 이동하기/);
-  assert.match(provider, /unreadCount/);
+  assert.match(chatProvider, /postgres_changes/);
+  assert.match(chatProvider, /table: "support_messages"/);
+  assert.match(chatProvider, /unreadCount/);
+  assert.match(notificationProvider, /table: "notifications"/);
+  assert.match(notificationProvider, /5_000/);
+  assert.match(notificationProvider, /알림 닫기/);
+  assert.match(notificationProvider, /관련 화면으로 이동/);
+  assert.match(rootLayout, /NotificationExperienceProvider/);
   assert.match(rootLayout, /ChatNotificationProvider/);
   assert.match(desktopHeader, /ChatNotificationLink/);
   assert.match(mobileHeader, /ChatNotificationLink/);

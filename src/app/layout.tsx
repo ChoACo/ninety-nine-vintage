@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ChatNotificationProvider } from "@/components/features/chat/ChatNotificationProvider";
+import { NotificationExperienceProvider } from "@/components/features/notifications/NotificationExperienceProvider";
 import { OwnerMemberModeProvider } from "@/components/features/auth/OwnerMemberModeProvider";
 import "./globals.css";
 
@@ -55,7 +56,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className="font-sans antialiased">
         <OwnerMemberModeProvider>
-          <ChatNotificationProvider>{children}</ChatNotificationProvider>
+          <NotificationExperienceProvider>
+            <ChatNotificationProvider>{children}</ChatNotificationProvider>
+          </NotificationExperienceProvider>
         </OwnerMemberModeProvider>
       </body>
     </html>

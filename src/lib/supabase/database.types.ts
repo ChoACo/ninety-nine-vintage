@@ -3055,6 +3055,62 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          auction_enabled: boolean
+          background_push_enabled: boolean
+          chat_enabled: boolean
+          consent_state: string
+          consented_at: string | null
+          created_at: string
+          foreground_enabled: boolean
+          payment_verification_enabled: boolean
+          shipment_enabled: boolean
+          shipping_request_enabled: boolean
+          system_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auction_enabled?: boolean
+          background_push_enabled?: boolean
+          chat_enabled?: boolean
+          consent_state?: string
+          consented_at?: string | null
+          created_at?: string
+          foreground_enabled?: boolean
+          payment_verification_enabled?: boolean
+          shipment_enabled?: boolean
+          shipping_request_enabled?: boolean
+          system_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auction_enabled?: boolean
+          background_push_enabled?: boolean
+          chat_enabled?: boolean
+          consent_state?: string
+          consented_at?: string | null
+          created_at?: string
+          foreground_enabled?: boolean
+          payment_verification_enabled?: boolean
+          shipment_enabled?: boolean
+          shipping_request_enabled?: boolean
+          system_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           audience_role: string
@@ -5664,6 +5720,7 @@ export type Database = {
         Row: {
           auth_secret: string
           created_at: string
+          delivery_mode: string
           disabled_at: string | null
           endpoint: string
           failure_count: number
@@ -5677,6 +5734,7 @@ export type Database = {
         Insert: {
           auth_secret: string
           created_at?: string
+          delivery_mode?: string
           disabled_at?: string | null
           endpoint: string
           failure_count?: number
@@ -5690,6 +5748,7 @@ export type Database = {
         Update: {
           auth_secret?: string
           created_at?: string
+          delivery_mode?: string
           disabled_at?: string | null
           endpoint?: string
           failure_count?: number

@@ -22,10 +22,14 @@ test("the install control is mobile-device gated and the manifest opens the mobi
   assert.match(controls, /if \(!state\?\.isMobile\) return null/);
   assert.match(controls, /앱 설치하기/);
   assert.match(provider, /beforeinstallprompt/);
+  assert.match(provider, /foreground_only/);
+  assert.match(provider, /!standalone/);
+  assert.match(controls, /사이트 접속 중 알림만 사용/);
+  assert.match(controls, /NOTIFICATION_CATEGORY_OPTIONS/);
   assert.match(mobileLayout, /MobilePwaProvider/);
 });
 
-test("service worker keeps cache consent separate from install and handles push clicks", async () => {
+test("service worker suppresses OS push in the foreground and handles background push clicks", async () => {
   const [worker, consent, cacheConsent] = await Promise.all([
     source("public/sw.js"),
     source("src/components/layout/CacheConsentBanner.tsx"),
@@ -39,6 +43,8 @@ test("service worker keeps cache consent separate from install and handles push 
   assert.match(consent, /setConsent\("accepted"\)/);
   assert.match(consent, /setConsent\("declined"\)/);
   assert.match(worker, /addEventListener\("push"/);
+  assert.match(worker, /clients\.matchAll/);
+  assert.match(worker, /visibilityState === "visible"/);
   assert.match(worker, /showNotification/);
   assert.match(worker, /addEventListener\("notificationclick"/);
   assert.match(worker, /clients\.openWindow/);
@@ -56,9 +62,68 @@ test("push subscription endpoints are authenticated and rebound to the current u
   assert.match(route, /\.upsert\(/);
   assert.match(route, /onConflict:\s*"endpoint"/);
   assert.match(route, /\.eq\("user_id",\s*auth\.userId\)/);
+  assert.match(route, /clientMode === "standalone"/);
+  assert.match(route, /delivery_mode:\s*subscription\.clientMode/);
+  assert.match(client, /isActualMobileDevice\(\) \|\| !isInstalledWebApp\(\)/);
+  assert.match(client, /clientMode:\s*"standalone"/);
   assert.match(client, /disableWebPush/);
   assert.match(client, /subscription\.unsubscribe/);
   assert.match(authStatus, /await disableWebPush\(session\.access_token\)/);
+});
+
+test("notification consent is stored per user and all categories default enabled", async () => {
+  const [migration, preferences, route, provider, rootLayout] =
+    await Promise.all([
+      source(
+        "supabase/migrations/20260724231529_notification_delivery_preferences.sql",
+      ),
+      source("src/lib/notifications/preferences.ts"),
+      source("src/app/api/notifications/preferences/route.ts"),
+      source(
+        "src/components/features/notifications/NotificationExperienceProvider.tsx",
+      ),
+      source("src/app/layout.tsx"),
+    ]);
+
+  assert.match(migration, /create table public\.notification_preferences/i);
+  assert.match(migration, /consent_state text not null default 'pending'/i);
+  assert.match(migration, /auction_enabled boolean not null default true/i);
+  assert.match(migration, /chat_enabled boolean not null default true/i);
+  assert.match(migration, /shipment_enabled boolean not null default true/i);
+  assert.match(
+    migration,
+    /payment_verification_enabled boolean not null default true/i,
+  );
+  assert.match(
+    migration,
+    /shipping_request_enabled boolean not null default true/i,
+  );
+  assert.match(migration, /force row level security/i);
+  assert.match(
+    migration,
+    /where disabled_at is null and delivery_mode = 'standalone'/i,
+  );
+  assert.match(
+    migration,
+    /update public\.web_push_subscriptions[\s\S]*where disabled_at is null/i,
+  );
+  assert.match(
+    migration,
+    /update public\.web_push_notification_outbox[\s\S]*notification_preferences_migration/i,
+  );
+  assert.match(migration, /alter publication supabase_realtime add table public\.notifications/i);
+  assert.doesNotMatch(
+    migration,
+    /grant (select|insert|update|delete|all)[^;]*to anon/i,
+  );
+  assert.match(preferences, /DEFAULT_NOTIFICATION_PREFERENCES/);
+  assert.match(preferences, /auctionEnabled:\s*true/);
+  assert.match(preferences, /chatEnabled:\s*true/);
+  assert.match(route, /authenticateCommerceRequest\(request,\s*true\)/);
+  assert.match(provider, /첫 가입 \/ 알림 설정/);
+  assert.match(provider, /PC와 모바일 웹에서는 사이트를 보고 있을 때만/);
+  assert.match(provider, /isActualMobileDevice\(\) && isInstalledWebApp\(\)/);
+  assert.match(rootLayout, /NotificationExperienceProvider/);
 });
 
 test("database events target members, operators, and employees through a retryable outbox", async () => {

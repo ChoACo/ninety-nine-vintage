@@ -2,6 +2,7 @@ import { authenticateCommerceRequest, commerceJson } from "@/lib/commerce/server
 import { readWebPushPublicKey } from "@/lib/webPush/server";
 
 interface SubscriptionPayload {
+  clientMode?: unknown;
   endpoint?: unknown;
   keys?: {
     auth?: unknown;
@@ -10,11 +11,14 @@ interface SubscriptionPayload {
 }
 
 function normalizeSubscription(body: SubscriptionPayload) {
+  const clientMode =
+    body.clientMode === "standalone" ? body.clientMode : null;
   const endpoint = typeof body.endpoint === "string" ? body.endpoint.trim() : "";
   const p256dh = typeof body.keys?.p256dh === "string" ? body.keys.p256dh.trim() : "";
   const authSecret =
     typeof body.keys?.auth === "string" ? body.keys.auth.trim() : "";
   if (
+    !clientMode ||
     !endpoint.startsWith("https://") ||
     endpoint.length > 4096 ||
     p256dh.length < 32 ||
@@ -24,7 +28,7 @@ function normalizeSubscription(body: SubscriptionPayload) {
   ) {
     return null;
   }
-  return { endpoint, p256dh, authSecret };
+  return { endpoint, p256dh, authSecret, clientMode };
 }
 
 export async function GET(request: Request) {
@@ -35,6 +39,7 @@ export async function GET(request: Request) {
       .from("web_push_subscriptions")
       .select("id", { count: "exact", head: true })
       .eq("user_id", auth.userId)
+      .eq("delivery_mode", "standalone")
       .is("disabled_at", null);
     if (error) throw error;
     return commerceJson({
@@ -67,6 +72,7 @@ export async function POST(request: Request) {
       endpoint: subscription.endpoint,
       p256dh: subscription.p256dh,
       auth_secret: subscription.authSecret,
+      delivery_mode: subscription.clientMode,
       user_agent: (request.headers.get("user-agent") ?? "").slice(0, 1024),
       failure_count: 0,
       disabled_at: null,

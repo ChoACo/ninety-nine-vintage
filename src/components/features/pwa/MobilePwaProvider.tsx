@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useNotificationExperience } from "@/components/features/notifications/NotificationExperienceProvider";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import {
   type BeforeInstallPromptEvent,
@@ -28,6 +29,7 @@ type PushState =
   | "denied"
   | "enabled"
   | "disabled"
+  | "foreground_only"
   | "busy"
   | "error";
 
@@ -36,6 +38,7 @@ export interface MobilePwaState {
   installHelp: string | null;
   installed: boolean;
   isMobile: boolean;
+  standalone: boolean;
   pushError: string | null;
   pushState: PushState;
   togglePush(): Promise<void>;
@@ -45,8 +48,10 @@ const MobilePwaContext = createContext<MobilePwaState | null>(null);
 
 export function MobilePwaProvider({ children }: { children: ReactNode }) {
   const { session } = useSupabaseSession();
+  const notificationExperience = useNotificationExperience();
   const [isMobile, setIsMobile] = useState(false);
   const [installed, setInstalled] = useState(false);
+  const [standalone, setStandalone] = useState(false);
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [installHelp, setInstallHelp] = useState<string | null>(null);
@@ -59,7 +64,9 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
     queueMicrotask(() => {
       if (!active) return;
       setIsMobile(mobile);
-      setInstalled(isInstalledWebApp());
+      const runningStandalone = isInstalledWebApp();
+      setInstalled(runningStandalone);
+      setStandalone(runningStandalone);
     });
     if (!mobile) {
       return () => {
@@ -99,8 +106,23 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
         active = false;
       };
     }
+    if (!standalone) {
+      publish("foreground_only");
+      return () => {
+        active = false;
+      };
+    }
     if (!session) {
       publish("signed_out");
+      return () => {
+        active = false;
+      };
+    }
+    if (
+      notificationExperience?.preferences?.consentState !== "granted" ||
+      !notificationExperience.preferences.backgroundPushEnabled
+    ) {
+      publish("disabled");
       return () => {
         active = false;
       };
@@ -128,7 +150,12 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [isMobile, session]);
+  }, [
+    isMobile,
+    notificationExperience?.preferences,
+    session,
+    standalone,
+  ]);
 
   const install = useCallback(async () => {
     setInstallHelp(null);
@@ -146,15 +173,32 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
   }, [installPrompt]);
 
   const togglePush = useCallback(async () => {
-    if (!session || pushState === "busy") return;
+    if (
+      !session ||
+      !notificationExperience?.preferences ||
+      !standalone ||
+      pushState === "busy"
+    ) {
+      return;
+    }
     setPushState("busy");
     setPushError(null);
     try {
       if (Notification.permission === "granted" && pushState === "enabled") {
         await disableWebPush(session.access_token);
+        await notificationExperience.savePreferences({
+          ...notificationExperience.preferences,
+          backgroundPushEnabled: false,
+          consentState: "granted",
+        });
         setPushState("disabled");
       } else {
         await enableWebPush(session.access_token);
+        await notificationExperience.savePreferences({
+          ...notificationExperience.preferences,
+          backgroundPushEnabled: true,
+          consentState: "granted",
+        });
         setPushState("enabled");
       }
     } catch (error) {
@@ -169,7 +213,7 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
           : "알림 설정을 완료하지 못했습니다.",
       );
     }
-  }, [pushState, session]);
+  }, [notificationExperience, pushState, session, standalone]);
 
   const value = useMemo(
     () => ({
@@ -177,6 +221,7 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
       installHelp,
       installed,
       isMobile,
+      standalone,
       pushError,
       pushState,
       togglePush,
@@ -186,6 +231,7 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
       installHelp,
       installed,
       isMobile,
+      standalone,
       pushError,
       pushState,
       togglePush,

@@ -86,7 +86,12 @@ test("operator product console publishes directly and manages active listings fr
   assert.doesNotMatch(productRoute, /getCatalogImageUrl/);
   assert.match(productRoute, /products:\s*products \?\? \[\]/);
   assert.match(productRoute, /auth\.user\.from\("products"\)\.insert/);
-  assert.match(productRoute, /from\("store_memberships"\)/);
+  assert.match(productRoute, /const user = auth\.user/);
+  assert.match(productRoute, /user[\s\S]*\.from\("store_memberships"\)/);
+  assert.match(productRoute, /let storeQuery = user[\s\S]*\.from\("stores"\)/);
+  assert.match(productRoute, /user\.from\("products"\)[\s\S]*\.in\("store_id", storeIds\)/);
+  assert.doesNotMatch(productRoute, /auth\.admin[\s\S]*\.from\("store_memberships"\)/);
+  assert.doesNotMatch(productRoute, /auth\.admin[\s\S]*\.from\("products"\)/);
   assert.doesNotMatch(productRoute, /fulfillment_center_staff_assignments|home_fulfillment_center_id/);
   assert.match(productRoute, /p_permission:\s*"manage_products"/);
   assert.match(productRoute, /const canMutate = stores\.length > 0/);

@@ -1,5 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
 import { normalizeProductBrand } from "@/lib/catalog/brand";
 import {
@@ -39,10 +37,10 @@ export async function GET(request: Request) {
   if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
     return commerceJson({ error: "operator_products_forbidden" }, 403);
   }
-  const admin = auth.admin as unknown as SupabaseClient;
+  const user = auth.user;
   const membershipPermissions = new Map<string, { canManage: boolean; canPublish: boolean }>();
   if (auth.roleCode !== "owner") {
-    const membershipResult = await admin
+    const membershipResult = await user
       .from("store_memberships")
       .select("store_id, manage_products, publish_products")
       .eq("user_id", auth.userId)
@@ -62,7 +60,7 @@ export async function GET(request: Request) {
   const manageableStoreIds = [...membershipPermissions]
     .filter(([, permission]) => permission.canManage)
     .map(([storeId]) => storeId);
-  let storeQuery = admin
+  let storeQuery = user
     .from("stores")
     .select("id, name, slug, operator_id, is_active")
     .eq("is_active", true);
@@ -90,7 +88,7 @@ export async function GET(request: Request) {
   const storeIds = (stores ?? []).map((store) => store.id);
   const { data: products, error: productError } = storeIds.length === 0
     ? { data: [], error: null }
-    : await admin.from("products").select("*, stores(id, name, slug)").in("store_id", storeIds).order("created_at", { ascending: false });
+    : await user.from("products").select("*, stores(id, name, slug)").in("store_id", storeIds).order("created_at", { ascending: false });
   if (productError) return commerceJson({ error: "operator_products_unavailable" }, 503);
   const canMutate = stores.length > 0;
   return commerceJson({

@@ -2,6 +2,10 @@ import "server-only";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
+function isExplicitlyEnabled() {
+  return process.env.LOCAL_TEST_ACCOUNTS_ENABLED?.trim().toLowerCase() === "true";
+}
+
 function configuredSupabaseUrl() {
   return (
     process.env.SUPABASE_URL?.trim() ||
@@ -11,6 +15,7 @@ function configuredSupabaseUrl() {
 }
 
 export function isLocalTestAccountEnvironment() {
+  if (!isExplicitlyEnabled()) return false;
   if (process.env.NODE_ENV !== "development") return false;
 
   try {

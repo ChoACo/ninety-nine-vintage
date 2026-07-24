@@ -5,20 +5,26 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("local test accounts are development and localhost-only, with one member, two operators, one owner, and cleanup paths", async () => {
-  const [config, route, actions, switcher, localDatabase, auth, login] = await Promise.all([
+test("local test accounts stay dormant unless the isolated local-test launcher explicitly enables them", async () => {
+  const [config, route, actions, switcher, localDatabase, launcher, envExample, auth, login] = await Promise.all([
     source("src/lib/localTestAccounts/config.ts"),
     source("src/app/api/local-test-accounts/route.ts"),
     source("src/components/features/account/LocalTestAccountActions.tsx"),
     source("src/components/admin/LocalTestMemberSwitcher.tsx"),
     source("scripts/local-test-supabase.mjs"),
+    source("scripts/start-local-test-app.mjs"),
+    source(".env.example"),
     source("src/lib/supabase/auth.ts"),
     source("src/components/features/account/LoginPrompt.tsx"),
   ]);
 
+  assert.match(config, /LOCAL_TEST_ACCOUNTS_ENABLED/);
+  assert.match(config, /=== "true"/);
   assert.match(config, /process\.env\.NODE_ENV !== "development"/);
   assert.match(config, /LOCAL_HOSTS/);
   assert.match(config, /LOCAL_TEST_ACCOUNT_PASSWORD/);
+  assert.match(launcher, /LOCAL_TEST_ACCOUNTS_ENABLED: "true"/);
+  assert.match(envExample, /LOCAL_TEST_ACCOUNTS_ENABLED=false/);
   assert.match(route, /canUseLocalTestAccounts\(\)/);
   assert.match(route, /local_test_account: true/);
   assert.match(route, /account_access_roles/);

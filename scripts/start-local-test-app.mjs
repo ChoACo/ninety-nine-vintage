@@ -19,6 +19,7 @@ try {
       cwd: root,
       env: {
         ...process.env,
+        LOCAL_TEST_ACCOUNTS_ENABLED: "true",
         LOCAL_TEST_ACCOUNT_PASSWORD: "ninety-nine-local-test-password",
         NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey,
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: anonKey,

@@ -15,7 +15,7 @@ const client = createClient(
 );
 
 const archiveFields = new Set(["product_id", "title", "description", "brand", "brand_slug", "brand_source", "category", "status", "size_label", "condition_grade", "measurements", "inspection_notes", "image_urls", "thumbnail_urls", "sold_at", "winning_amount", "winner_display_name", "participant_count"]);
-const detailFields = new Set([...archiveFields].filter((field) => field !== "brand_source"));
+const detailFields = new Set([...archiveFields, "sale_type"].filter((field) => field !== "brand_source"));
 
 function assertFields(record, allowed, label) {
   const unexpected = Object.keys(record).filter((field) => !allowed.has(field));

@@ -753,3 +753,58 @@ test("catalog inputs are bounded before entering PostgREST filter syntax", () =>
   assert.equal(normalizeCatalogSearch("가죽   재킷"), "가죽 재킷");
   assert.ok(normalizeCatalogSearch("가".repeat(200)).length <= 80);
 });
+
+test("advisor remediation preserves public reads while tightening grants and RLS", async () => {
+  const migration = await readFile(
+    new URL(
+      "supabase/migrations/20260725103000_resolve_advisor_security_and_rls_warnings.sql",
+      rootUrl,
+    ),
+    "utf8",
+  );
+
+  assert.match(
+    migration,
+    /alter function public\.get_public_sold_feed_products[\s\S]*set schema app_private/i,
+  );
+  assert.match(
+    migration,
+    /create function public\.get_public_sold_feed_products[\s\S]*security invoker/i,
+  );
+  assert.match(
+    migration,
+    /alter function public\.get_auction_server_time\(\) security invoker/i,
+  );
+  assert.match(
+    migration,
+    /where namespaces\.nspname = 'public'[\s\S]*procedures\.prosecdef[\s\S]*revoke all on function %s from public, anon/i,
+  );
+  assert.match(
+    migration,
+    /alter default privileges for role postgres in schema public[\s\S]*revoke execute on functions from public/i,
+  );
+  assert.match(
+    migration,
+    /drop policy if exists "Public reads product images" on storage\.objects/i,
+  );
+  assert.match(
+    migration,
+    /create policy "Members read their commerce orders"[\s\S]*member_id = \(select auth\.uid\(\)\)/i,
+  );
+  assert.match(
+    migration,
+    /create policy "Members manage their wishlist"[\s\S]*with check \(member_id = \(select auth\.uid\(\)\)\)/i,
+  );
+  assert.match(
+    migration,
+    /create policy "Authenticated users read authorized products"/i,
+  );
+  assert.match(
+    migration,
+    /create policy "Members and staff read authorized shipping requests"/i,
+  );
+  assert.match(
+    migration,
+    /create policy "Members and staff read authorized shipping items"/i,
+  );
+});

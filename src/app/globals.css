@@ -220,6 +220,23 @@ html[data-theme="dark"] .theme-invariant-dark {
     overflow-wrap: normal;
   }
 
+  html[data-simple-mode="on"] {
+    font-size: 18px;
+  }
+
+  html[data-simple-mode="on"] body {
+    letter-spacing: -0.01em;
+  }
+
+  html[data-simple-mode="on"] :is(button, [role="button"], input, select, a) {
+    min-height: 48px;
+  }
+
+  html[data-simple-mode="on"] :focus-visible {
+    outline: 3px solid rgb(var(--theme-ink));
+    outline-offset: 3px;
+  }
+
   [data-ui-surface="desktop"] :is(nav a, button, [role="button"], dt, dd) {
     white-space: nowrap;
   }

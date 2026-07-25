@@ -25,13 +25,14 @@ test("mobile staff navigation replaces member account and routes chat to the ass
     /roleCode === "employee"[\s\S]*centerHref: "\/admin\/employee"[\s\S]*chatHref: "\/admin\/employee\/inquiries"/,
   );
   assert.match(bottomNav, /roleNavigation\.centerHref/);
+  assert.match(bottomNav, /simpleMode\.enabled && !roleNavigation\.isStaff/);
   assert.doesNotMatch(bottomNav, /\["내 정보", "\/m\/account"/);
   assert.match(header, /fallbackHref=\{roleNavigation\.chatHref\}/);
   assert.match(header, /allowedHrefPrefix=\{staffChatPrefix\}/);
   assert.match(header, /\["설정", "\/m\/account\/settings"\]/);
   assert.match(chatLink, /allowedHrefPrefix/);
   assert.doesNotMatch(account, /\["설정"/);
-  assert.match(settings, /더보기 \/ 설정/);
+  assert.match(settings, /내 정보 \/ 설정/);
 });
 
 test("successful bids close the mobile quick-bid sheet and immediately refresh active-bid navigation", async () => {

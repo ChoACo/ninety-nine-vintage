@@ -10,6 +10,8 @@ type NavigatorWithMobileHints = Navigator & {
   userAgentData?: { mobile?: boolean };
 };
 
+export type WebPushClientMode = "browser" | "standalone";
+
 export function isActualMobileDevice() {
   if (typeof navigator === "undefined") return false;
   const mobileNavigator = navigator as NavigatorWithMobileHints;
@@ -39,6 +41,20 @@ export function isIosMobile() {
   );
 }
 
+export function getWebPushClientMode(): WebPushClientMode | null {
+  if (
+    typeof window === "undefined" ||
+    !isActualMobileDevice() ||
+    !("Notification" in window) ||
+    !("serviceWorker" in navigator) ||
+    !("PushManager" in window)
+  ) {
+    return null;
+  }
+  if (isInstalledWebApp()) return "standalone";
+  return isIosMobile() ? null : "browser";
+}
+
 function urlBase64ToUint8Array(value: string) {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
   const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -61,8 +77,13 @@ export async function registerMobileServiceWorker() {
 }
 
 export async function enableWebPush(accessToken: string) {
-  if (!isActualMobileDevice() || !isInstalledWebApp()) {
-    throw new Error("백그라운드 알림은 설치한 모바일 웹앱에서만 사용할 수 있습니다.");
+  const clientMode = getWebPushClientMode();
+  if (!clientMode) {
+    throw new Error(
+      isIosMobile()
+        ? "iPhone·iPad에서는 Safari의 ‘홈 화면에 추가’ 후 설치한 앱에서 알림을 켜 주세요."
+        : "현재 모바일 브라우저는 시스템 알림을 지원하지 않습니다.",
+    );
   }
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
@@ -98,7 +119,7 @@ export async function enableWebPush(accessToken: string) {
     },
     body: JSON.stringify({
       ...subscription.toJSON(),
-      clientMode: "standalone",
+      clientMode,
     }),
   });
   if (!response.ok) throw new Error(await readApiError(response));
@@ -106,11 +127,9 @@ export async function enableWebPush(accessToken: string) {
 }
 
 export async function syncExistingWebPush(accessToken: string) {
+  const clientMode = getWebPushClientMode();
   if (
-    !isActualMobileDevice() ||
-    !isInstalledWebApp() ||
-    !("serviceWorker" in navigator) ||
-    !("Notification" in window) ||
+    !clientMode ||
     Notification.permission !== "granted"
   ) {
     return false;
@@ -126,7 +145,7 @@ export async function syncExistingWebPush(accessToken: string) {
     },
     body: JSON.stringify({
       ...subscription.toJSON(),
-      clientMode: "standalone",
+      clientMode,
     }),
   });
   return response.ok;
@@ -147,4 +166,25 @@ export async function disableWebPush(accessToken: string) {
     body: JSON.stringify({ endpoint: subscription.endpoint }),
   }).catch(() => undefined);
   await subscription.unsubscribe().catch(() => false);
+}
+
+export async function showTestWebPushNotification() {
+  const clientMode = getWebPushClientMode();
+  if (!clientMode || Notification.permission !== "granted") {
+    throw new Error("먼저 모바일 시스템 알림을 켜 주세요.");
+  }
+  const registration = await registerMobileServiceWorker();
+  const options: NotificationOptions & {
+    renotify?: boolean;
+    vibrate?: number[];
+  } = {
+    body: "상태창에 이 알림이 보이면 모바일 알림 설정이 정상입니다.",
+    icon: "/pwa-icon-192.png",
+    badge: "/pwa-icon-192.png",
+    tag: "ninety-nine-test",
+    renotify: true,
+    vibrate: [200, 100, 200],
+    data: { url: "/m/account/settings" },
+  };
+  await registration.showNotification("NINETY-NINE 시험 알림", options);
 }

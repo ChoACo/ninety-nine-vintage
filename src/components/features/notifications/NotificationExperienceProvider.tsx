@@ -21,8 +21,7 @@ import {
 } from "@/lib/notifications/preferences";
 import {
   enableWebPush,
-  isActualMobileDevice,
-  isInstalledWebApp,
+  getWebPushClientMode,
 } from "@/lib/webPush/client";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -181,6 +180,13 @@ export function NotificationExperienceProvider({
         },
         (payload) => {
           if (document.visibilityState !== "visible") return;
+          if (
+            getWebPushClientMode() &&
+            preferences.backgroundPushEnabled &&
+            Notification.permission === "granted"
+          ) {
+            return;
+          }
           const notification = payload.new as Partial<ForegroundNotification>;
           if (
             typeof notification.id !== "string" ||
@@ -227,7 +233,7 @@ export function NotificationExperienceProvider({
       consentState: "granted",
     };
     const pushAttempt =
-      isActualMobileDevice() && isInstalledWebApp()
+      getWebPushClientMode()
         ? enableWebPush(accessToken).then(
             () => true,
             () => false,
@@ -285,9 +291,9 @@ export function NotificationExperienceProvider({
               필요한 소식을 알려드릴까요?
             </h2>
             <p className="mt-3 text-sm leading-6 text-muted">
-              PC와 모바일 웹에서는 사이트를 보고 있을 때만 알림이
-              표시됩니다. 설치한 모바일 웹앱에서는 백그라운드 알림도 받을
-              수 있습니다.
+              Android Chrome은 모바일 상태창 알림을 받을 수 있습니다.
+              iPhone·iPad는 Safari에서 홈 화면에 추가한 뒤 설치한 앱에서
+              상태창 알림을 받을 수 있습니다.
             </p>
             <p className="mt-3 text-xs leading-5 text-muted">
               모든 알림이 기본으로 켜지며, 웹앱 설정에서 종류별로 언제든

@@ -22,18 +22,20 @@ test("the install control is mobile-device gated and the manifest opens the mobi
   assert.match(controls, /if \(!state\?\.isMobile\) return null/);
   assert.match(controls, /앱 설치하기/);
   assert.match(provider, /beforeinstallprompt/);
-  assert.match(provider, /foreground_only/);
-  assert.match(provider, /!standalone/);
-  assert.match(controls, /접속 중 알림 받는 중/);
+  assert.match(provider, /install_required/);
+  assert.match(provider, /getWebPushClientMode/);
+  assert.match(controls, /Android Chrome에서는 앱을 설치하지 않아도/);
+  assert.match(controls, /iPhone·iPad는 Safari 공유 메뉴/);
   assert.match(controls, /알림 받지 않는 중/);
   assert.match(controls, /알림 끄기/);
   assert.match(controls, /알림 켜기/);
+  assert.match(controls, /시험 알림 보내기/);
   assert.match(provider, /syncExistingWebPush[\s\S]*enableWebPush/);
   assert.match(controls, /NOTIFICATION_CATEGORY_OPTIONS/);
   assert.match(mobileLayout, /MobilePwaProvider/);
 });
 
-test("service worker suppresses OS push in the foreground and handles background push clicks", async () => {
+test("service worker always shows mobile OS push and handles notification clicks", async () => {
   const [worker, consent, cacheConsent] = await Promise.all([
     source("public/sw.js"),
     source("src/components/layout/CacheConsentBanner.tsx"),
@@ -50,9 +52,10 @@ test("service worker suppresses OS push in the foreground and handles background
   assert.match(consent, /setConsent\("accepted"\)/);
   assert.match(consent, /setConsent\("declined"\)/);
   assert.match(worker, /addEventListener\("push"/);
-  assert.match(worker, /clients\.matchAll/);
-  assert.match(worker, /visibilityState === "visible"/);
   assert.match(worker, /showNotification/);
+  assert.match(worker, /vibrate:\s*\[200,\s*100,\s*200\]/);
+  assert.match(worker, /timestamp:\s*Date\.now\(\)/);
+  assert.doesNotMatch(worker, /visibilityState === "visible"/);
   assert.match(worker, /addEventListener\("notificationclick"/);
   assert.match(worker, /clients\.openWindow/);
   assert.doesNotMatch(consent, /\.unregister\(\)/);
@@ -69,20 +72,25 @@ test("push subscription endpoints are authenticated and rebound to the current u
   assert.match(route, /\.upsert\(/);
   assert.match(route, /onConflict:\s*"endpoint"/);
   assert.match(route, /\.eq\("user_id",\s*auth\.userId\)/);
-  assert.match(route, /clientMode === "standalone"/);
+  assert.match(route, /clientMode === "standalone" \|\| body\.clientMode === "browser"/);
   assert.match(route, /delivery_mode:\s*subscription\.clientMode/);
-  assert.match(client, /isActualMobileDevice\(\) \|\| !isInstalledWebApp\(\)/);
-  assert.match(client, /clientMode:\s*"standalone"/);
+  assert.match(client, /getWebPushClientMode/);
+  assert.match(client, /return isIosMobile\(\) \? null : "browser"/);
+  assert.match(client, /clientMode,/);
+  assert.match(client, /showTestWebPushNotification/);
   assert.match(client, /disableWebPush/);
   assert.match(client, /subscription\.unsubscribe/);
   assert.match(authStatus, /await disableWebPush\(session\.access_token\)/);
 });
 
 test("notification consent is stored per user and all categories default enabled", async () => {
-  const [migration, preferences, route, provider, rootLayout] =
+  const [migration, deliveryMigration, preferences, route, provider, rootLayout] =
     await Promise.all([
       source(
         "supabase/migrations/20260724231529_notification_delivery_preferences.sql",
+      ),
+      source(
+        "supabase/migrations/20260725125706_member_experience_preferences.sql",
       ),
       source("src/lib/notifications/preferences.ts"),
       source("src/app/api/notifications/preferences/route.ts"),
@@ -107,9 +115,10 @@ test("notification consent is stored per user and all categories default enabled
   );
   assert.match(migration, /force row level security/i);
   assert.match(
-    migration,
-    /where disabled_at is null and delivery_mode = 'standalone'/i,
+    deliveryMigration,
+    /web_push_subscriptions_active_delivery_user_idx/i,
   );
+  assert.match(deliveryMigration, /\(user_id, delivery_mode, updated_at desc\)/i);
   assert.match(
     migration,
     /update public\.web_push_subscriptions[\s\S]*where disabled_at is null/i,
@@ -128,8 +137,8 @@ test("notification consent is stored per user and all categories default enabled
   assert.match(preferences, /chatEnabled:\s*true/);
   assert.match(route, /authenticateCommerceRequest\(request,\s*true\)/);
   assert.match(provider, /첫 가입 \/ 알림 설정/);
-  assert.match(provider, /PC와 모바일 웹에서는 사이트를 보고 있을 때만/);
-  assert.match(provider, /isActualMobileDevice\(\) && isInstalledWebApp\(\)/);
+  assert.match(provider, /Android Chrome은 모바일 상태창 알림/);
+  assert.match(provider, /getWebPushClientMode\(\)/);
   assert.match(rootLayout, /NotificationExperienceProvider/);
 });
 

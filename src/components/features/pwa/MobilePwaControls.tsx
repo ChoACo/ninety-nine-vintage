@@ -67,14 +67,11 @@ export function MobilePwaControls({
           label: "알림 받지 않는 중",
           receiving: false,
         };
-      case "foreground_only":
+      case "install_required":
         return {
-          description: "모바일 웹에서는 화면을 보고 있을 때만 알림을 받습니다.",
-          label: notificationExperience?.preferences?.foregroundEnabled
-            ? "접속 중 알림 받는 중"
-            : "알림 받지 않는 중",
-          receiving:
-            notificationExperience?.preferences?.foregroundEnabled === true,
+          description: "iPhone·iPad는 Safari에서 홈 화면에 추가한 뒤 시스템 알림을 켤 수 있습니다.",
+          label: "앱 설치 후 알림 가능",
+          receiving: false,
         };
       case "unsupported":
         return {
@@ -110,7 +107,7 @@ export function MobilePwaControls({
     state.pushState === "busy" ||
     state.pushState === "signed_out" ||
     state.pushState === "unsupported" ||
-    state.pushState === "foreground_only" ||
+    state.pushState === "install_required" ||
     state.pushState === "denied";
   const visibleCategoryOptions = NOTIFICATION_CATEGORY_OPTIONS.filter(
     (option) =>
@@ -144,7 +141,7 @@ export function MobilePwaControls({
           <Download size={16} /> 앱 설치하기
         </button>
       )}
-      {state.standalone ? (
+      {state.pushState !== "install_required" ? (
         <>
           <div
             className={`border-2 p-4 ${
@@ -181,6 +178,15 @@ export function MobilePwaControls({
                 ? "알림 끄기"
                 : "알림 켜기"}
           </button>
+          {state.pushState === "enabled" && (
+            <button
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 border border-ink px-4 text-xs font-black"
+              onClick={() => void state.testPush().catch(() => undefined)}
+              type="button"
+            >
+              <Bell size={16} /> 시험 알림 보내기
+            </button>
+          )}
         </>
       ) : (
         <div
@@ -204,8 +210,10 @@ export function MobilePwaControls({
           <p className="flex gap-2 text-[11px] leading-5 text-muted">
             <Smartphone className="mt-0.5 shrink-0" size={14} />
             {state.standalone
-              ? "설치된 웹앱이므로 화면을 닫아도 허용한 알림을 받을 수 있습니다."
-              : "모바일 웹에서는 화면을 보고 있을 때만 알림이 표시됩니다. 백그라운드 알림은 앱 설치 후 사용할 수 있습니다."}
+              ? "설치된 웹앱이므로 화면을 닫아도 허용한 알림을 모바일 상태창에서 받을 수 있습니다."
+              : state.pushState === "install_required"
+                ? "iPhone·iPad는 Safari 공유 메뉴의 ‘홈 화면에 추가’가 필요합니다."
+                : "Android Chrome에서는 앱을 설치하지 않아도 허용한 알림을 모바일 상태창에서 받을 수 있습니다."}
           </p>
           {preferences && (
             <div className="mt-3 divide-y divide-line border-y border-line">

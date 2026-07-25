@@ -15,11 +15,13 @@ import {
   type BeforeInstallPromptEvent,
   disableWebPush,
   enableWebPush,
+  getWebPushClientMode,
   isActualMobileDevice,
   isInstalledWebApp,
   isIosMobile,
   registerMobileServiceWorker,
   syncExistingWebPush,
+  showTestWebPushNotification,
 } from "@/lib/webPush/client";
 
 type PushState =
@@ -29,7 +31,7 @@ type PushState =
   | "denied"
   | "enabled"
   | "disabled"
-  | "foreground_only"
+  | "install_required"
   | "busy"
   | "error";
 
@@ -41,6 +43,7 @@ export interface MobilePwaState {
   standalone: boolean;
   pushError: string | null;
   pushState: PushState;
+  testPush(): Promise<void>;
   togglePush(): Promise<void>;
 }
 
@@ -106,8 +109,8 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
         active = false;
       };
     }
-    if (!standalone) {
-      publish("foreground_only");
+    if (!getWebPushClientMode()) {
+      publish(isIosMobile() && !standalone ? "install_required" : "unsupported");
       return () => {
         active = false;
       };
@@ -191,7 +194,7 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
     if (
       !session ||
       !notificationExperience?.preferences ||
-      !standalone ||
+      !getWebPushClientMode() ||
       pushState === "busy"
     ) {
       return;
@@ -228,7 +231,19 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
           : "알림 설정을 완료하지 못했습니다.",
       );
     }
-  }, [notificationExperience, pushState, session, standalone]);
+  }, [notificationExperience, pushState, session]);
+
+  const testPush = useCallback(async () => {
+    setPushError(null);
+    try {
+      await showTestWebPushNotification();
+    } catch (error) {
+      setPushError(
+        error instanceof Error ? error.message : "시험 알림을 표시하지 못했습니다.",
+      );
+      throw error;
+    }
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -239,6 +254,7 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
       standalone,
       pushError,
       pushState,
+      testPush,
       togglePush,
     }),
     [
@@ -249,6 +265,7 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
       standalone,
       pushError,
       pushState,
+      testPush,
       togglePush,
     ],
   );

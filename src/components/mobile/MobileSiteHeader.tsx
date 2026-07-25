@@ -11,6 +11,8 @@ import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { useActiveBidNavigation } from "@/components/features/auction/ActiveBidNavigationProvider";
 import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
 import { getMobileRoleNavigation } from "@/lib/admin/mobileNavigation";
+import { SimpleModeToggle } from "@/components/features/accessibility/SimpleModeToggle";
+import { useSimpleMode } from "@/components/features/accessibility/SimpleModeProvider";
 
 export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean }) {
   const router = useRouter();
@@ -19,12 +21,14 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
   const [query, setQuery] = useState("");
   const { hasActiveBid } = useActiveBidNavigation();
   const access = useAdminNavigationAccess();
+  const simpleMode = useSimpleMode();
   const roleNavigation = getMobileRoleNavigation(access.roleCode);
+  const consumerSimpleMode = simpleMode.enabled && !roleNavigation.isStaff;
   const staffChatPrefix = roleNavigation.isStaff &&
       (access.roleCode === "operator" || access.roleCode === "employee")
     ? roleNavigation.chatHref
     : undefined;
-  const links = [
+  const standardLinks = [
     ["홈", "/m/home"],
     ...(hasActiveBid ? [["입찰 중인 상품", "/m/bidding"] as const] : []),
     ["실시간 경매", "/m/feed"],
@@ -32,6 +36,16 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
     [roleNavigation.chatLabel, roleNavigation.chatHref],
     ["설정", "/m/account/settings"],
   ] as const;
+  const links = consumerSimpleMode
+    ? ([
+        ["홈", "/m/home"],
+        ["입찰", "/m/feed"],
+        ["구매", "/m/shop"],
+        ["결제", "/m/account/payments"],
+        ["배송 신청·현황", "/m/account/shipping"],
+        ["내 정보", "/m/account"],
+      ] as const)
+    : standardLinks;
 
   const submitSearch = () => {
     const value = query.trim();
@@ -46,6 +60,7 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
           <button aria-expanded={menuOpen} aria-label="전체 메뉴 열기" className="grid size-11 place-items-center" onClick={() => setMenuOpen(true)} type="button"><Menu size={21} /></button>
           <Link className="text-sm font-black tracking-[-0.05em]" href="/m/home" prefetch={false}>NINETY-NINE</Link>
           <div className="flex items-center">
+            {!consumerSimpleMode && <>
             <ChatNotificationLink
               allowedHrefPrefix={staffChatPrefix}
               ariaLabel={roleNavigation.chatLabel}
@@ -57,6 +72,7 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
             </ChatNotificationLink>
             <button aria-expanded={searchOpen} aria-label="상품 검색 열기" className="grid size-11 place-items-center" onClick={() => setSearchOpen((value) => !value)} type="button"><Search size={19} /></button>
             <Link aria-label="장바구니" className="grid size-11 place-items-center" href="/m/cart" prefetch={false}><ShoppingBag size={19} /></Link>
+            </>}
           </div>
         </div>
         {searchOpen && (
@@ -70,7 +86,8 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
         <div className="flex items-center justify-between border-b border-line pb-5"><span className="text-xs font-black tracking-[0.08em]">NINETY-NINE VINTAGE</span><button aria-label="전체 메뉴 닫기" className="grid size-11 place-items-center" onClick={() => setMenuOpen(false)} type="button"><X size={20} /></button></div>
         <nav aria-label="모바일 전체 메뉴" className="mt-4 grid">{links.map(([label, href]) => <Link className="border-b border-line py-4 text-base font-bold" href={href} key={href} onClick={() => setMenuOpen(false)} prefetch={false}>{label}</Link>)}</nav>
         <div className="mt-6 grid gap-3">
-          <ThemeToggle className="w-full" showLabel />
+          <SimpleModeToggle detailed />
+          {!consumerSimpleMode && <ThemeToggle className="w-full" showLabel />}
           <AuthStatus basePath="/m" />
         </div>
       </PremiumDialog>

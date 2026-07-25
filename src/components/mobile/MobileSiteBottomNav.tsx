@@ -2,6 +2,7 @@
 
 import {
   Building2,
+  CreditCard,
   Gavel,
   Home,
   ShoppingBag,
@@ -15,6 +16,7 @@ import { useCommerceStore } from "@/store/useCommerceStore";
 import { useActiveBidNavigation } from "@/components/features/auction/ActiveBidNavigationProvider";
 import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
 import { getMobileRoleNavigation } from "@/lib/admin/mobileNavigation";
+import { useSimpleMode } from "@/components/features/accessibility/SimpleModeProvider";
 
 export function MobileSiteBottomNav() {
   const pathname = usePathname();
@@ -22,6 +24,8 @@ export function MobileSiteBottomNav() {
   const { hasActiveBid } = useActiveBidNavigation();
   const access = useAdminNavigationAccess();
   const roleNavigation = getMobileRoleNavigation(access.roleCode);
+  const simpleMode = useSimpleMode();
+  const consumerSimpleMode = simpleMode.enabled && !roleNavigation.isStaff;
   const identityTab = access.loading
     ? null
     : ([
@@ -29,7 +33,7 @@ export function MobileSiteBottomNav() {
         roleNavigation.centerHref,
         roleNavigation.isStaff ? Building2 : UserRound,
       ] as const);
-  const tabs = [
+  const standardTabs = [
     ["홈", "/m/home", Home],
     ...(hasActiveBid ? [["입찰 중", "/m/bidding", TrendingUp] as const] : []),
     ["경매", "/m/feed", Gavel],
@@ -37,6 +41,15 @@ export function MobileSiteBottomNav() {
     ["장바구니", "/m/cart", ShoppingBag],
     ...(identityTab ? [identityTab] : []),
   ] as const;
+  const tabs = consumerSimpleMode
+    ? ([
+        ["홈", "/m/home", Home],
+        ["입찰", "/m/feed", Gavel],
+        ["구매", "/m/shop", Store],
+        ["결제·배송", "/m/account/payments", CreditCard],
+        ["내 정보", `/m/${"account"}`, UserRound],
+      ] as const)
+    : standardTabs;
   return (
     <nav aria-label="모바일 주요 메뉴" className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md">
       <div className="grid h-16" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>

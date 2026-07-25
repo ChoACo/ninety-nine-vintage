@@ -66,12 +66,13 @@ test("shipping credits accept an explicit quantity and remain one payment reques
 });
 
 test("member addresses use the owner-safe RPC and storage shows policy, full list, and item selection", async () => {
-  const [addressRoute, storageRoute, ordersRoute, dashboard, accountPage, rollout, serverGrant] = await Promise.all([
+  const [addressRoute, storageRoute, ordersRoute, dashboard, accountPage, accountContent, rollout, serverGrant] = await Promise.all([
     source("src/app/api/account/addresses/route.ts"),
     source("src/app/api/account/storage/route.ts"),
     source("src/app/api/orders/route.ts"),
     source("src/components/features/account/AccountDashboard.tsx"),
     source("src/app/(shop)/account/page.tsx"),
+    source("src/components/features/account/DesktopAccountContent.tsx"),
     source("supabase/migrations/20260724054224_enable_selectable_paid_inventory.sql"),
     source("supabase/migrations/20260724061006_grant_inventory_server_read.sql"),
   ]);
@@ -96,8 +97,9 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   assert.match(dashboard, /col-start-1 row-start-1[\s\S]*id="shipping-request"[\s\S]*id="shipping-credit"/);
   assert.match(dashboard, /<details[^>]*id="refunds"/);
   assert.doesNotMatch(dashboard, /<details[^>]*id="refunds"[^>]*\sopen(?:=|\s|>)/);
-  assert.match(accountPage, /<details[\s\S]*<BidHistory surface="desktop" \/>[\s\S]*<\/details>/);
-  assert.doesNotMatch(accountPage, /<details[^>]*\sopen(?:=|\s|>)/);
+  assert.match(accountPage, /<DesktopAccountContent \/>/);
+  assert.match(accountContent, /<details[\s\S]*<BidHistory surface="desktop" \/>[\s\S]*<\/details>/);
+  assert.match(accountContent, /open=\{simpleMode\.enabled \? true : undefined\}/);
   assert.match(rollout, /create_customer_inventory_entitlement\(\s*'auction'/i);
   assert.match(rollout, /current_stage = 'reconciliation_required'/i);
   assert.match(rollout, /current_stage = 'preparing'/i);

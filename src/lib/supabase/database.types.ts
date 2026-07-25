@@ -2904,6 +2904,35 @@ export type Database = {
           },
         ]
       }
+      member_experience_preferences: {
+        Row: {
+          created_at: string
+          simple_mode_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          simple_mode_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          simple_mode_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_experience_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_sanction_events: {
         Row: {
           actor_user_id: string | null

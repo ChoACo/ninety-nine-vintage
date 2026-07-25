@@ -99,7 +99,6 @@ export async function dispatchPendingWebPushNotifications(limit = 50) {
       .from("web_push_subscriptions")
       .select("id, user_id, endpoint, p256dh, auth_secret")
       .in("user_id", recipients)
-      .eq("delivery_mode", "standalone")
       .is("disabled_at", null),
     admin
       .from("notification_preferences")

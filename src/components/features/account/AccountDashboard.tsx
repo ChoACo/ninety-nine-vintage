@@ -188,6 +188,16 @@ interface ShippingCreditPayment {
   version: number;
 }
 
+export type AccountDashboardView =
+  | "full"
+  | "simple"
+  | "payments"
+  | "storage"
+  | "shipping"
+  | "addresses"
+  | "refunds"
+  | "saved";
+
 function shipmentIsLegacy(shipment: ShipmentResponse): shipment is ShipmentResponse & {
   shipping_request_id: string;
   order_id: string;
@@ -209,11 +219,13 @@ function AccountDashboardForSession({
   loading,
   session,
   surface,
+  view,
 }: {
   basePath: "" | "/m";
   loading: boolean;
   session: Session | null;
   surface: "desktop" | "mobile";
+  view: AccountDashboardView;
 }) {
   const token = session?.access_token ?? null;
   const userName =
@@ -258,6 +270,7 @@ function AccountDashboardForSession({
   const [creditCancelBusyId, setCreditCancelBusyId] = useState<string | null>(null);
   const [creditPurchaseBusy, setCreditPurchaseBusy] = useState(false);
   const [refundMessage, setRefundMessage] = useState("");
+  const refundDetailsRef = useRef<HTMLDetailsElement>(null);
   const [refundBusyId, setRefundBusyId] = useState<string | null>(null);
   const [refundDrafts, setRefundDrafts] = useState<Record<string, RefundAccountDraft>>({});
   const [applyShippingCredit, setApplyShippingCredit] = useState(true);
@@ -274,8 +287,8 @@ function AccountDashboardForSession({
       }
       setDataStatus("loading");
       setNotice("");
+      const headers = { Authorization: `Bearer ${token}` };
       try {
-        const headers = { Authorization: `Bearer ${token}` };
         const [
           storageResponse,
           shipmentResponse,
@@ -293,54 +306,48 @@ function AccountDashboardForSession({
           fetch("/api/account/addresses", { headers, cache: "no-store" }),
           fetch("/api/orders", { headers, cache: "no-store" }),
         ]);
-        if (
-          !storageResponse.ok ||
-          !shipmentResponse.ok ||
-          !refundResponse.ok ||
-          !creditResponse.ok ||
-          !wishlistResponse.ok ||
-          !addressResponse.ok
-        ) {
-          throw new Error("account_data_unavailable");
-        }
-        const storageData = (await storageResponse.json()) as StoragePayload;
-        if (!ordersResponse.ok) {
-          throw new Error("legacy_orders_unavailable");
-        }
-        const shipmentData = (await shipmentResponse.json()) as ShipmentsPayload;
-        const refundData = (await refundResponse.json()) as { refunds?: ManualRefund[] };
-        const creditData = (await creditResponse.json()) as {
+        const storageData = storageResponse.ok
+          ? await storageResponse.json() as StoragePayload
+          : {};
+        const shipmentData = shipmentResponse.ok
+          ? await shipmentResponse.json() as ShipmentsPayload
+          : {};
+        const refundData = refundResponse.ok
+          ? await refundResponse.json() as { refunds?: ManualRefund[] }
+          : {};
+        const creditData = creditResponse.ok
+          ? await creditResponse.json() as {
           credits?: number;
           payments?: ShippingCreditPayment[];
           rememberedDepositorName?: string | null;
-        };
-        const wishlistData = (await wishlistResponse.json()) as {
-          productIds?: string[];
-        };
-        const addressData = (await addressResponse.json()) as {
-          addresses?: Address[];
-        };
+        }
+          : {};
+        const wishlistData = wishlistResponse.ok
+          ? await wishlistResponse.json() as { productIds?: string[] }
+          : {};
+        const addressData = addressResponse.ok
+          ? await addressResponse.json() as { addresses?: Address[] }
+          : {};
         const ordersData = ordersResponse.ok
           ? await ordersResponse.json() as { orders?: LegacyCommerceOrder[] }
           : { orders: [] };
         const ids = wishlistData.productIds ?? [];
-        const [auctionResponse, fixedResponse] = await Promise.all([
-          fetch("/api/products?saleType=auction&limit=100", {
-            cache: "no-store",
-          }),
-          fetch("/api/products?saleType=fixed&limit=100", {
-            cache: "no-store",
-          }),
-        ]);
-        if (!auctionResponse.ok || !fixedResponse.ok) {
-          throw new Error("catalog_data_unavailable");
-        }
-        const auctionData = (await auctionResponse.json()) as {
-          products?: ProductSummary[];
-        };
-        const fixedData = (await fixedResponse.json()) as {
-          products?: ProductSummary[];
-        };
+        const [auctionResponse, fixedResponse] = ids.length > 0
+          ? await Promise.all([
+              fetch("/api/products?saleType=auction&limit=100", {
+                cache: "no-store",
+              }),
+              fetch("/api/products?saleType=fixed&limit=100", {
+                cache: "no-store",
+              }),
+            ])
+          : [null, null];
+        const auctionData = auctionResponse?.ok
+          ? await auctionResponse.json() as { products?: ProductSummary[] }
+          : {};
+        const fixedData = fixedResponse?.ok
+          ? await fixedResponse.json() as { products?: ProductSummary[] }
+          : {};
         const allProducts = [
           ...(auctionData.products ?? []),
           ...(fixedData.products ?? []),
@@ -380,6 +387,19 @@ function AccountDashboardForSession({
               addressData.addresses?.[0]?.id ??
               "",
           );
+          const unavailableCount = [
+            storageResponse,
+            shipmentResponse,
+            refundResponse,
+            creditResponse,
+            wishlistResponse,
+            addressResponse,
+            ordersResponse,
+          ].filter((response) => !response.ok).length +
+            [auctionResponse, fixedResponse].filter((response) => response && !response.ok).length;
+          if (unavailableCount > 0) {
+            setNotice("일부 계정 정보를 불러오지 못했습니다. 다른 메뉴는 계속 이용할 수 있습니다.");
+          }
           setDataStatus("ready");
         }
       } catch {
@@ -395,7 +415,7 @@ function AccountDashboardForSession({
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, view]);
 
   const itemSelectedCommerceOrderItemIds = useMemo(
     () => new Set(
@@ -479,6 +499,19 @@ function AccountDashboardForSession({
       Heart,
     ],
   ] as const;
+  const visibleCards = view === "simple" ? cards.slice(0, 3) : cards;
+  const showOverview = view === "full" || view === "simple";
+  const showPayments =
+    view === "full" || view === "simple" || view === "payments";
+  const showStorage =
+    view === "full" || view === "simple" || view === "storage" || view === "shipping";
+  const showShippingRequest =
+    view === "full" || view === "simple" || view === "shipping";
+  const showRefunds = view === "full" || view === "refunds";
+  const showShipments =
+    view === "full" || view === "simple" || view === "shipping";
+  const showLikes = view === "full" || view === "saved";
+  const showAddresses = view === "addresses";
   const requestEligibleItems = useMemo(
     () => v2Storage.filter((item) => item.requestEligible && !item.activeShipmentId),
     [v2Storage],
@@ -965,9 +998,14 @@ function AccountDashboardForSession({
       setRefundBusyId(null);
     }
   };
+  useEffect(() => {
+    if (view === "refunds" && refundDetailsRef.current) {
+      refundDetailsRef.current.open = true;
+    }
+  }, [view]);
   return (
-    <div className={surface === "desktop" ? "space-y-14" : "space-y-10"}>
-      <div className={`flex justify-between gap-5 border-b border-ink pb-8 ${surface === "desktop" ? "flex-row items-end" : "flex-col"}`}>
+    <div className={surface === "desktop" ? "space-y-14" : "space-y-10"} data-account-dashboard-view={view}>
+      <div hidden={!showOverview} className={`flex justify-between gap-5 border-b border-ink pb-8 ${surface === "desktop" ? "flex-row items-end" : "flex-col"}`}>
         <div className="min-w-0">
           <p className="eyebrow text-muted">내 계정 / 이용 현황</p>
           <h1 className={`mt-3 break-keep font-black tracking-[-0.08em] ${surface === "desktop" ? "text-4xl" : "text-3xl"}`}>
@@ -996,7 +1034,7 @@ function AccountDashboardForSession({
           </Link>
         )}
       </div>
-      {!loading && !token && (
+      {showOverview && !loading && !token && (
         <div className="border border-dashed border-line bg-surface p-6 text-sm">
           입찰, 장바구니, 보관 상품은 카카오 로그인 후 확인할 수 있습니다.
         </div>
@@ -1006,8 +1044,8 @@ function AccountDashboardForSession({
           {notice}
         </div>
       )}
-      <div className={`grid gap-px border border-line bg-line ${surface === "desktop" ? "grid-cols-4" : "grid-cols-2"}`}>
-        {cards.map(([label, value, description, href, Icon]) => (
+      <div hidden={!showOverview} className={`grid gap-px border border-line bg-line ${surface === "desktop" ? "grid-cols-4" : "grid-cols-2"}`}>
+        {visibleCards.map(([label, value, description, href, Icon]) => (
           <Link
             className={`group bg-paper transition-colors hover:bg-surface ${surface === "desktop" ? "p-5" : "p-4"}`}
             href={href}
@@ -1022,7 +1060,7 @@ function AccountDashboardForSession({
           </Link>
         ))}
       </div>
-      <section id="auction-payments">
+      <section hidden={!showPayments} id="auction-payments">
         <div className="mb-5 border-b border-ink pb-4">
           <p className="eyebrow text-muted">경매 낙찰 / 결제</p>
           <h2 className="mt-2 text-xl font-black tracking-[-0.05em]">
@@ -1078,10 +1116,11 @@ function AccountDashboardForSession({
           </div>
         )}
       </section>
-      <div className={`grid gap-10 ${surface === "desktop" ? "grid-cols-[1.4fr_.8fr]" : "grid-cols-1"}`}>
+      <div hidden={!showStorage && !showShippingRequest} className={`grid gap-10 ${surface === "desktop" ? "grid-cols-[1.4fr_.8fr]" : "grid-cols-1"}`}>
         <section className="contents">
           <div
             className={surface === "desktop" ? "col-start-2 row-start-1" : ""}
+            hidden={!showStorage}
             id="storage"
           >
           <div className={`mb-5 flex items-start gap-3 border-b border-ink pb-4 ${surface === "desktop" ? "flex-row items-end justify-between" : "flex-col"}`}>
@@ -1259,6 +1298,7 @@ function AccountDashboardForSession({
           </div>
           <div
             className={surface === "desktop" ? "col-start-1 row-start-1" : ""}
+            hidden={!showShippingRequest}
             id="shipping-request"
           >
           <div className="border border-line bg-surface p-4">
@@ -1471,7 +1511,7 @@ function AccountDashboardForSession({
           </div>
         </section>
       </div>
-      <details className="group border-y border-line py-1" id="refunds">
+      <details className="group border-y border-line py-1" hidden={!showRefunds} id="refunds" ref={refundDetailsRef}>
         <summary className="flex cursor-pointer list-none items-end justify-between gap-4 py-4">
           <div>
             <p className="eyebrow text-muted">상품 확인 / 수동 환불</p>
@@ -1526,7 +1566,7 @@ function AccountDashboardForSession({
           </div>
         </div>
       </details>
-      <section id="shipments">
+      <section hidden={!showShipments} id="shipments">
         <div className="mb-5 flex items-end justify-between border-b border-ink pb-4">
           <div>
             <p className="eyebrow text-muted">배송 내역 / 송장 조회</p>
@@ -1592,7 +1632,41 @@ function AccountDashboardForSession({
           ))}
         </div>
       </section>
-      <section id="likes">
+      <section hidden={!showAddresses} id="addresses">
+        <div className="mb-5 flex items-end justify-between border-b border-ink pb-4">
+          <div>
+            <p className="eyebrow text-muted">수령 정보 / 배송지</p>
+            <h2 className="mt-2 text-xl font-black tracking-[-0.05em]">배송지 관리</h2>
+          </div>
+          <span className="text-xs text-muted">{addresses.length}곳</span>
+        </div>
+        <div className="divide-y divide-line border-y border-line">
+          {addresses.map((address) => (
+            <article className="py-5" key={address.id}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-black">
+                    {address.label} · {address.recipient_name}
+                    {address.is_default && <span className="ml-2 border border-line px-2 py-0.5 text-[9px]">기본</span>}
+                  </p>
+                  <p className="mt-2 text-xs text-muted">{address.phone}</p>
+                  <p className="mt-1 text-xs leading-5 text-muted">
+                    {address.postal_code ? `[${address.postal_code}] ` : ""}{address.address}
+                  </p>
+                </div>
+                <button className="shrink-0 border border-line px-3 py-2 text-xs font-bold" onClick={() => openAddressEdit(address)} type="button">
+                  수정
+                </button>
+              </div>
+            </article>
+          ))}
+          {addresses.length === 0 && <p className="py-12 text-center text-sm text-muted">등록된 배송지가 없습니다.</p>}
+        </div>
+        <button className="mt-4 min-h-12 w-full bg-ink px-4 text-sm font-black text-paper" onClick={openAddressCreate} type="button">
+          새 배송지 추가
+        </button>
+      </section>
+      <section hidden={!showLikes} id="likes">
         <div className="mb-5 flex items-end justify-between border-b border-ink pb-4">
           <div>
             <p className="eyebrow text-muted">찜 목록</p>
@@ -1879,7 +1953,15 @@ function AccountDashboardForSession({
   );
 }
 
-export function AccountDashboard({ basePath = "", surface = "mobile" }: { basePath?: "" | "/m"; surface?: "desktop" | "mobile" }) {
+export function AccountDashboard({
+  basePath = "",
+  surface = "mobile",
+  view = "full",
+}: {
+  basePath?: "" | "/m";
+  surface?: "desktop" | "mobile";
+  view?: AccountDashboardView;
+}) {
   const { identityRevision, loading, session } = useSupabaseSession();
   const identityKey = loading
     ? "loading"
@@ -1891,6 +1973,7 @@ export function AccountDashboard({ basePath = "", surface = "mobile" }: { basePa
       loading={loading}
       session={session}
       surface={surface}
+      view={view}
     />
   );
 }

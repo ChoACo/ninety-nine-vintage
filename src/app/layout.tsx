@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import { ChatNotificationProvider } from "@/components/features/chat/ChatNotificationProvider";
 import { NotificationExperienceProvider } from "@/components/features/notifications/NotificationExperienceProvider";
 import { OwnerMemberModeProvider } from "@/components/features/auth/OwnerMemberModeProvider";
+import { SimpleModeProvider } from "@/components/features/accessibility/SimpleModeProvider";
 import "./globals.css";
 
 const geist = Geist({
@@ -13,6 +14,7 @@ const geist = Geist({
 const themeInitializationScript = `
 (() => {
   const storageKey = "ninety-nine:color-theme";
+  const simpleModeStorageKey = "ninety-nine:simple-mode";
   const root = document.documentElement;
   let theme = "light";
   try {
@@ -22,6 +24,13 @@ const themeInitializationScript = `
       : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   } catch {}
   root.dataset.theme = theme;
+  try {
+    root.dataset.simpleMode = localStorage.getItem(simpleModeStorageKey) === "on"
+      ? "on"
+      : "off";
+  } catch {
+    root.dataset.simpleMode = "off";
+  }
   root.style.colorScheme = theme;
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", theme === "dark" ? "#15181c" : "#fbfaf7");
@@ -56,9 +65,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className="font-sans antialiased">
         <OwnerMemberModeProvider>
-          <NotificationExperienceProvider>
-            <ChatNotificationProvider>{children}</ChatNotificationProvider>
-          </NotificationExperienceProvider>
+          <SimpleModeProvider>
+            <NotificationExperienceProvider>
+              <ChatNotificationProvider>{children}</ChatNotificationProvider>
+            </NotificationExperienceProvider>
+          </SimpleModeProvider>
         </OwnerMemberModeProvider>
       </body>
     </html>

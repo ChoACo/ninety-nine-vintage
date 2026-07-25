@@ -1,4 +1,4 @@
-const CACHE_NAME = "ninetynine-public-v3";
+const CACHE_NAME = "ninetynine-public-v4";
 const CACHE_PREFIX = "ninetynine-public-";
 const CACHE_CONSENT_NAME = "ninetynine-cache-consent-v1";
 const CACHE_CONSENT_KEY = "/__cache-consent__";
@@ -85,21 +85,19 @@ self.addEventListener("push", (event) => {
     }
   })();
   const title = payload.title || "NINETY-NINE VINTAGE";
-  event.waitUntil((async () => {
-    const clients = await self.clients.matchAll({
-      type: "window",
-      includeUncontrolled: true,
-    });
-    if (clients.some((client) => client.visibilityState === "visible")) return;
-    await self.registration.showNotification(title, {
+  event.waitUntil(
+    self.registration.showNotification(title, {
       body: payload.body || "새로운 소식이 있습니다.",
       icon: "/pwa-icon-192.png",
       badge: "/pwa-icon-192.png",
       tag: payload.tag || "ninety-nine-notification",
       renotify: true,
+      vibrate: [200, 100, 200],
+      lang: "ko",
+      timestamp: Date.now(),
       data: { url: payload.url || "/m/home" },
-    });
-  })());
+    }),
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {

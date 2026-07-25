@@ -1,22 +1,41 @@
 "use client";
 
-import { Gavel, Home, ShoppingBag, Store, TrendingUp, UserRound } from "lucide-react";
+import {
+  Building2,
+  Gavel,
+  Home,
+  ShoppingBag,
+  Store,
+  TrendingUp,
+  UserRound,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCommerceStore } from "@/store/useCommerceStore";
 import { useActiveBidNavigation } from "@/components/features/auction/ActiveBidNavigationProvider";
+import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
+import { getMobileRoleNavigation } from "@/lib/admin/mobileNavigation";
 
 export function MobileSiteBottomNav() {
   const pathname = usePathname();
   const cartCount = useCommerceStore((state) => state.cartIds.length);
   const { hasActiveBid } = useActiveBidNavigation();
+  const access = useAdminNavigationAccess();
+  const roleNavigation = getMobileRoleNavigation(access.roleCode);
+  const identityTab = access.loading
+    ? null
+    : ([
+        roleNavigation.centerLabel,
+        roleNavigation.centerHref,
+        roleNavigation.isStaff ? Building2 : UserRound,
+      ] as const);
   const tabs = [
     ["홈", "/m/home", Home],
     ...(hasActiveBid ? [["입찰 중", "/m/bidding", TrendingUp] as const] : []),
     ["경매", "/m/feed", Gavel],
     ["구매", "/m/shop", Store],
     ["장바구니", "/m/cart", ShoppingBag],
-    ["내 정보", "/m/account", UserRound],
+    ...(identityTab ? [identityTab] : []),
   ] as const;
   return (
     <nav aria-label="모바일 주요 메뉴" className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md">

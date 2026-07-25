@@ -7,6 +7,7 @@ import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { formatProductDisplayNumber } from "@/lib/productDisplayNumber";
 import { Button } from "@/components/ui/Button";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
+import { announceAuctionBidSucceeded } from "@/lib/auction/bidEvents";
 
 interface AuctionBidRoutePanelProps {
   basePath?: "" | "/m";
@@ -67,6 +68,7 @@ export function AuctionBidRoutePanel({ basePath = "", bidIncrement, currentPrice
       setAgreed(false);
       setConfirmOpen(false);
       setMessage({ kind: "success", text: payload.bid.isFinal ? "첫 입찰이 즉시 낙찰로 확정되었습니다." : "입찰이 완료되었습니다. 현재가가 실시간으로 갱신됩니다." });
+      announceAuctionBidSucceeded(productId);
       window.dispatchEvent(new Event("ninety-nine:close-route-modal"));
     } catch (error) {
       setConfirmOpen(false);

@@ -6,9 +6,10 @@ const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 test("intercepted login dismissal and guest browsing preserve the underlying page", async () => {
-  const [intercepted, prompt, guestAction, authStatus, modalShell] = await Promise.all([
+  const [intercepted, prompt, sessionBoundary, guestAction, authStatus, modalShell] = await Promise.all([
     source("src/app/(shop)/@modal/(.)account/login/page.tsx"),
     source("src/components/features/account/LoginPrompt.tsx"),
+    source("src/components/features/account/LoginSessionBoundary.tsx"),
     source("src/components/features/account/GuestBrowseAction.tsx"),
     source("src/components/layout/AuthStatus.tsx"),
     source("src/components/layout/ModalShell.tsx"),
@@ -16,6 +17,11 @@ test("intercepted login dismissal and guest browsing preserve the underlying pag
   assert.match(intercepted, /<LoginPrompt dismissToPrevious/);
   assert.match(prompt, /dismissToPrevious=\{dismissToPrevious\}/);
   assert.match(prompt, /basePath=\{surface === "mobile" \? "\/m" : ""\}/);
+  assert.match(prompt, /<LoginSessionBoundary returnTo=\{returnTo\}>/);
+  assert.match(sessionBoundary, /if \(loading \|\| session\)/);
+  assert.match(sessionBoundary, /getMyNicknameState\(\)/);
+  assert.match(sessionBoundary, /resolveKakaoPostLoginReturnTo/);
+  assert.match(sessionBoundary, /window\.location\.replace/);
   assert.match(guestAction, /onClick=\{\(\) => router\.back\(\)\}/);
   assert.match(guestAction, /href=\{`\$\{basePath\}\/home`\}/);
   assert.match(modalShell, /event\.target === event\.currentTarget && close\(\)/);

@@ -2,12 +2,36 @@
 
 import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, type ReactNode } from "react";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
+import {
+  AUCTION_BID_SUCCEEDED_EVENT,
+  type AuctionBidSucceededDetail,
+} from "@/lib/auction/bidEvents";
 
 export function MobileBidSheet({ children, productId }: { children: ReactNode; productId: string }) {
   const router = useRouter();
-  const close = () => router.replace(`/m/auction/${productId}`);
+  const close = useCallback(
+    () => router.replace(`/m/auction/${productId}`),
+    [productId, router],
+  );
+
+  useEffect(() => {
+    const closeAfterSuccessfulBid = (event: Event) => {
+      const detail = (event as CustomEvent<AuctionBidSucceededDetail>).detail;
+      if (detail?.productId === productId) close();
+    };
+    window.addEventListener(
+      AUCTION_BID_SUCCEEDED_EVENT,
+      closeAfterSuccessfulBid,
+    );
+    return () => {
+      window.removeEventListener(
+        AUCTION_BID_SUCCEEDED_EVENT,
+        closeAfterSuccessfulBid,
+      );
+    };
+  }, [close, productId]);
 
   return (
     <PremiumDialog labelledBy="mobile-quick-bid-title" onClose={close} open panelClassName="max-w-lg" placement="sheet-bottom">

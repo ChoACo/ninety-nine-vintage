@@ -117,9 +117,10 @@ interface CatalogImageProps
 }
 
 /**
- * Product imagery is capped by Supabase Image Transformations, then served
- * through Next Image so Cloudflare can negotiate AVIF/WebP and responsive
- * widths. Every catalog surface receives the same lightweight blur placeholder.
+ * Product imagery is capped by Supabase Image Transformations and rendered by
+ * Next Image for stable dimensions and loading behavior. The global image
+ * configuration serves these already-optimized sources directly because the
+ * deployed Worker's /_next/image route is unavailable.
  */
 export function CatalogImage({
   alt = "",

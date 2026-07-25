@@ -9,10 +9,27 @@ import {
 } from "lucide-react";
 import { useNotificationExperience } from "@/components/features/notifications/NotificationExperienceProvider";
 import { useMobilePwa } from "@/components/features/pwa/MobilePwaProvider";
+import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
 import {
   NOTIFICATION_CATEGORY_OPTIONS,
   type NotificationPreferenceToggleKey,
 } from "@/lib/notifications/preferences";
+
+const STAFF_NOTIFICATION_PREFERENCE_KEYS =
+  new Set<NotificationPreferenceToggleKey>([
+    "chatEnabled",
+    "paymentVerificationEnabled",
+    "shippingRequestEnabled",
+    "systemEnabled",
+  ]);
+
+const MEMBER_NOTIFICATION_PREFERENCE_KEYS =
+  new Set<NotificationPreferenceToggleKey>([
+    "auctionEnabled",
+    "chatEnabled",
+    "shipmentEnabled",
+    "systemEnabled",
+  ]);
 
 export function MobilePwaControls({
   detailed = false,
@@ -21,28 +38,66 @@ export function MobilePwaControls({
 }) {
   const state = useMobilePwa();
   const notificationExperience = useNotificationExperience();
+  const access = useAdminNavigationAccess();
   if (!state?.isMobile) return null;
 
-  const pushLabel = (() => {
+  const pushStatus = (() => {
     switch (state.pushState) {
       case "busy":
-        return "알림 설정 중";
+        return {
+          description: "웹앱 알림 상태를 변경하고 있습니다.",
+          label: "알림 설정 중",
+          receiving: false,
+        };
       case "enabled":
-        return "알림 받는 중";
+        return {
+          description: "웹앱을 닫아도 허용한 새 소식을 받습니다.",
+          label: "알림 받는 중",
+          receiving: true,
+        };
       case "denied":
-        return "알림 권한이 차단됨";
+        return {
+          description: "기기 설정에서 이 웹앱의 알림 권한을 허용해 주세요.",
+          label: "기기에서 알림 차단됨",
+          receiving: false,
+        };
       case "signed_out":
-        return "로그인 후 알림 받기";
+        return {
+          description: "로그인하면 계정에 맞는 알림을 설정할 수 있습니다.",
+          label: "알림 받지 않는 중",
+          receiving: false,
+        };
       case "foreground_only":
-        return "접속 중 알림만 사용";
+        return {
+          description: "모바일 웹에서는 화면을 보고 있을 때만 알림을 받습니다.",
+          label: notificationExperience?.preferences?.foregroundEnabled
+            ? "접속 중 알림 받는 중"
+            : "알림 받지 않는 중",
+          receiving:
+            notificationExperience?.preferences?.foregroundEnabled === true,
+        };
       case "unsupported":
-        return "알림을 지원하지 않음";
+        return {
+          description: "현재 브라우저에서는 알림 기능을 사용할 수 없습니다.",
+          label: "알림 지원 안 됨",
+          receiving: false,
+        };
+      case "error":
+        return {
+          description: "알림 연결을 복구하지 못했습니다. 다시 켜 주세요.",
+          label: "알림 연결 확인 필요",
+          receiving: false,
+        };
       default:
-        return "웹앱 백그라운드 알림 켜기";
+        return {
+          description: "알림을 켜면 웹앱을 닫아도 새 소식을 받을 수 있습니다.",
+          label: "알림 받지 않는 중",
+          receiving: false,
+        };
     }
   })();
   const PushIcon =
-    state.pushState === "enabled"
+    pushStatus.receiving
       ? Bell
       : state.pushState === "busy"
         ? LoaderCircle
@@ -57,6 +112,13 @@ export function MobilePwaControls({
     state.pushState === "unsupported" ||
     state.pushState === "foreground_only" ||
     state.pushState === "denied";
+  const visibleCategoryOptions = NOTIFICATION_CATEGORY_OPTIONS.filter(
+    (option) =>
+      access.roleCode === "owner" ||
+      (access.roleCode === "operator" || access.roleCode === "employee"
+        ? STAFF_NOTIFICATION_PREFERENCE_KEYS.has(option.key)
+        : MEMBER_NOTIFICATION_PREFERENCE_KEYS.has(option.key)),
+  );
 
   const togglePreference = async (
     key: NotificationPreferenceToggleKey | "foregroundEnabled",
@@ -83,21 +145,58 @@ export function MobilePwaControls({
         </button>
       )}
       {state.standalone ? (
-        <button
-          className="inline-flex min-h-11 w-full items-center justify-center gap-2 border border-line px-4 text-xs font-bold disabled:opacity-45"
-          disabled={pushDisabled}
-          onClick={() => void state.togglePush()}
-          type="button"
-        >
-          <PushIcon
-            className={state.pushState === "busy" ? "animate-spin" : undefined}
-            size={16}
-          />
-          {pushLabel}
-        </button>
+        <>
+          <div
+            className={`border-2 p-4 ${
+              pushStatus.receiving
+                ? "border-emerald-600 bg-emerald-50 text-emerald-950"
+                : "border-line bg-surface"
+            }`}
+          >
+            <p className="flex items-center gap-2 text-sm font-black">
+              <PushIcon
+                className={state.pushState === "busy" ? "animate-spin" : undefined}
+                size={17}
+              />
+              {pushStatus.label}
+            </p>
+            <p className="mt-2 text-[11px] leading-5 text-muted">
+              {pushStatus.description}
+            </p>
+          </div>
+          <button
+            className={`inline-flex min-h-11 w-full items-center justify-center gap-2 px-4 text-xs font-black disabled:opacity-45 ${
+              pushStatus.receiving
+                ? "border border-rose-300 bg-rose-50 text-rose-800"
+                : "bg-ink text-paper"
+            }`}
+            disabled={pushDisabled}
+            onClick={() => void state.togglePush()}
+            type="button"
+          >
+            {pushStatus.receiving ? <BellOff size={16} /> : <Bell size={16} />}
+            {state.pushState === "denied"
+              ? "기기 설정에서 알림 허용 필요"
+              : pushStatus.receiving
+                ? "알림 끄기"
+                : "알림 켜기"}
+          </button>
+        </>
       ) : (
-        <div className="flex min-h-11 items-center justify-center gap-2 border border-line px-4 text-center text-xs font-bold text-muted">
-          <Bell size={16} /> 사이트 접속 중 알림만 사용
+        <div
+          className={`border-2 p-4 ${
+            pushStatus.receiving
+              ? "border-emerald-600 bg-emerald-50 text-emerald-950"
+              : "border-line bg-surface"
+          }`}
+        >
+          <p className="flex items-center gap-2 text-sm font-black">
+            {pushStatus.receiving ? <Bell size={17} /> : <BellOff size={17} />}
+            {pushStatus.label}
+          </p>
+          <p className="mt-2 text-[11px] leading-5 text-muted">
+            {pushStatus.description}
+          </p>
         </div>
       )}
       {detailed && (
@@ -108,7 +207,7 @@ export function MobilePwaControls({
               ? "설치된 웹앱이므로 화면을 닫아도 허용한 알림을 받을 수 있습니다."
               : "모바일 웹에서는 화면을 보고 있을 때만 알림이 표시됩니다. 백그라운드 알림은 앱 설치 후 사용할 수 있습니다."}
           </p>
-          {state.standalone && preferences && (
+          {preferences && (
             <div className="mt-3 divide-y divide-line border-y border-line">
               <label className="flex min-h-14 items-center justify-between gap-4 py-3 text-xs font-bold">
                 <span>
@@ -117,15 +216,20 @@ export function MobilePwaControls({
                     웹앱을 보고 있을 때 알림 팝업 표시
                   </small>
                 </span>
-                <input
-                  checked={preferences.foregroundEnabled}
-                  className="size-5 accent-black"
-                  disabled={notificationExperience.busy}
-                  onChange={() => void togglePreference("foregroundEnabled")}
-                  type="checkbox"
-                />
+                <span className="flex items-center gap-2">
+                  <span className={preferences.foregroundEnabled ? "text-emerald-700" : "text-muted"}>
+                    {preferences.foregroundEnabled ? "켜짐" : "꺼짐"}
+                  </span>
+                  <input
+                    checked={preferences.foregroundEnabled}
+                    className="size-5 accent-black"
+                    disabled={notificationExperience.busy}
+                    onChange={() => void togglePreference("foregroundEnabled")}
+                    type="checkbox"
+                  />
+                </span>
               </label>
-              {NOTIFICATION_CATEGORY_OPTIONS.map((option) => (
+              {visibleCategoryOptions.map((option) => (
                 <label
                   className="flex min-h-14 items-center justify-between gap-4 py-3 text-xs font-bold"
                   key={option.key}
@@ -136,13 +240,18 @@ export function MobilePwaControls({
                       {option.description}
                     </small>
                   </span>
-                  <input
-                    checked={preferences[option.key]}
-                    className="size-5 accent-black"
-                    disabled={notificationExperience.busy}
-                    onChange={() => void togglePreference(option.key)}
-                    type="checkbox"
-                  />
+                  <span className="flex items-center gap-2">
+                    <span className={preferences[option.key] ? "text-emerald-700" : "text-muted"}>
+                      {preferences[option.key] ? "켜짐" : "꺼짐"}
+                    </span>
+                    <input
+                      checked={preferences[option.key]}
+                      className="size-5 accent-black"
+                      disabled={notificationExperience.busy}
+                      onChange={() => void togglePreference(option.key)}
+                      type="checkbox"
+                    />
+                  </span>
                 </label>
               ))}
             </div>

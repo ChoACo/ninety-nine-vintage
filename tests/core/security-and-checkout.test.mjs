@@ -3,7 +3,10 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 import { parseSupabaseMigrationList } from "../../scripts/migration-list-parser.mjs";
 
-import { safeSameOriginReturnTo } from "../../src/lib/kakao/returnTo.ts";
+import {
+  resolveKakaoPostLoginReturnTo,
+  safeSameOriginReturnTo,
+} from "../../src/lib/kakao/returnTo.ts";
 import { createPortOnePaymentId } from "../../src/lib/portone/paymentId.ts";
 import {
   invokePortOneProductPayment,
@@ -154,6 +157,9 @@ test("the former entry gate is absent while live auctions keep their authoritati
 
 test("Kakao returnTo accepts only same-origin application paths", () => {
   assert.equal(safeSameOriginReturnTo("/cart?from=login#checkout", origin), "/cart?from=login#checkout");
+  assert.equal(safeSameOriginReturnTo("/account/login?next=%2Fhome", origin), "/account");
+  assert.equal(safeSameOriginReturnTo("/auth/callback?flow=stale", origin), "/account");
+  assert.equal(safeSameOriginReturnTo("/m/account/login?next=%2Fm%2Fhome", origin, "/m/account"), "/m/account");
   assert.equal(safeSameOriginReturnTo("//evil.example", origin), "/account");
   assert.equal(safeSameOriginReturnTo("/\\evil.example", origin), "/account");
   assert.equal(safeSameOriginReturnTo("/%5C%5Cevil.example", origin), "/account");
@@ -161,6 +167,13 @@ test("Kakao returnTo accepts only same-origin application paths", () => {
   assert.equal(safeSameOriginReturnTo("/cart\nnext", origin), "/account");
   assert.equal(safeSameOriginReturnTo("/" + "a".repeat(201), origin), "/account");
   assert.equal(safeSameOriginReturnTo("/cart", "javascript:alert(1)"), "/account");
+});
+
+test("Kakao first login reaches the nickname gate before the requested page", () => {
+  assert.equal(resolveKakaoPostLoginReturnTo("/home", false), "/account");
+  assert.equal(resolveKakaoPostLoginReturnTo("/m/home", false), "/m/account");
+  assert.equal(resolveKakaoPostLoginReturnTo("/cart?from=login", true), "/cart?from=login");
+  assert.equal(resolveKakaoPostLoginReturnTo("/account/login?next=%2Fhome", true), "/account");
 });
 
 test("Kakao concurrent login flows use isolated scoped cookies", () => {
@@ -247,15 +260,20 @@ test("Kakao profile failures roll back only the session created by that callback
 });
 
 test("Kakao callback hides identity and commerce surfaces until profile validation finishes", async () => {
-  const headerSource = await readFile(
-    new URL("src/components/layout/PcHeader.tsx", rootUrl),
-    "utf8",
-  );
+  const [headerSource, callbackSource] = await Promise.all([
+    readFile(new URL("src/components/layout/PcHeader.tsx", rootUrl), "utf8"),
+    readFile(
+      new URL("src/app/(shop)/auth/callback/page.tsx", rootUrl),
+      "utf8",
+    ),
+  ]);
   assert.match(headerSource, /pathname\s*===\s*"\/auth\/callback"/);
   assert.match(
     headerSource,
     /authenticating\s*\?\s*<span[\s\S]*?로그인 상태 확인 중[\s\S]*?:\s*<>[\s\S]*?<AuthStatus\s*\/>[\s\S]*?<CommerceToolbar\s*\/>/,
   );
+  assert.match(callbackSource, /getMyNicknameState\(\)/);
+  assert.match(callbackSource, /resolveKakaoPostLoginReturnTo/);
 });
 
 test("public shop surfaces expose shopper controls while admin links remain session-role gated", async () => {

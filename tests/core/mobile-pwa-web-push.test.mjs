@@ -24,7 +24,11 @@ test("the install control is mobile-device gated and the manifest opens the mobi
   assert.match(provider, /beforeinstallprompt/);
   assert.match(provider, /foreground_only/);
   assert.match(provider, /!standalone/);
-  assert.match(controls, /사이트 접속 중 알림만 사용/);
+  assert.match(controls, /접속 중 알림 받는 중/);
+  assert.match(controls, /알림 받지 않는 중/);
+  assert.match(controls, /알림 끄기/);
+  assert.match(controls, /알림 켜기/);
+  assert.match(provider, /syncExistingWebPush[\s\S]*enableWebPush/);
   assert.match(controls, /NOTIFICATION_CATEGORY_OPTIONS/);
   assert.match(mobileLayout, /MobilePwaProvider/);
 });

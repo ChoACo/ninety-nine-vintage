@@ -173,12 +173,15 @@ test("uploads overlap both variants without adding device measurements to produc
 });
 
 test("zoom and fallback images keep fixed desktop sizing, responsive mobile sizing, blur, and the proxy boundary", async () => {
-  const [catalogImage, detailView, itemGallery] = await Promise.all([
+  const [nextConfig, catalogImage, detailView, itemGallery] = await Promise.all([
+    source("next.config.ts"),
     source("src/components/ui/CatalogImage.tsx"),
     source("src/components/features/auction/detail/AuctionDetailView.tsx"),
     source("src/components/features/auction/detail/ItemGallery.tsx"),
   ]);
 
+  assert.match(nextConfig, /unoptimized:\s*true/);
+  assert.match(nextConfig, /\/_next\/image route currently returns 404/);
   assert.match(catalogImage, /maxDimension <= CATALOG_TRANSFORM_MAX_DIMENSION/);
   assert.match(
     catalogImage,

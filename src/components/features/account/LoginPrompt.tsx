@@ -2,6 +2,7 @@ import { MessageCircleMore, ShieldCheck } from "lucide-react";
 import { canUseLocalTestAccounts } from "@/lib/localTestAccounts/config";
 import { GuestBrowseAction } from "./GuestBrowseAction";
 import { LocalTestAccountActions } from "./LocalTestAccountActions";
+import { LoginSessionBoundary } from "./LoginSessionBoundary";
 
 export function LoginPrompt({
   dismissToPrevious = false,
@@ -14,7 +15,7 @@ export function LoginPrompt({
 }) {
   const loginHref = `/api/auth/kakao/start?returnTo=${encodeURIComponent(returnTo)}`;
   const enableLocalTestAccounts = canUseLocalTestAccounts();
-  return (
+  return <LoginSessionBoundary returnTo={returnTo}>
     <section className={`mx-auto w-full max-w-lg rounded-3xl border border-white/10 bg-paper text-center shadow-xl shadow-black/5 ${surface === "desktop" ? "p-10" : "p-6"}`}>
       <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#FEE500] text-ink shadow-lg shadow-black/10"><MessageCircleMore size={25} /></div>
       <p className="mt-6 text-[10px] font-bold tracking-[0.14em] text-muted">안전한 회원 로그인</p>
@@ -28,5 +29,5 @@ export function LoginPrompt({
         dismissToPrevious={dismissToPrevious}
       />
     </section>
-  );
+  </LoginSessionBoundary>;
 }

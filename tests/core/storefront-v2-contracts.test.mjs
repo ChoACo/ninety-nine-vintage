@@ -130,8 +130,7 @@ test("gallery, Next Image, and supplied hero banners keep the V2 media contract"
     stat(new URL("public/banners/brand-banner-wide.png", rootUrl)),
   ]);
 
-  assert.match(nextConfig, /formats:\s*\["image\/avif", "image\/webp"\]/);
-  assert.match(nextConfig, /deviceSizes:\s*\[360, 480, 640, 768, 1024, 1280, 1536, 1920\]/);
+  assert.match(nextConfig, /unoptimized:\s*true/);
   assert.match(nextConfig, /pathname:\s*"\/storage\/v1\/\*\*"/);
   assert.match(catalogImage, /import Image, \{ type ImageProps \} from "next\/image"/);
   assert.match(catalogImage, /blurDataURL = CATALOG_BLUR_DATA_URL/);

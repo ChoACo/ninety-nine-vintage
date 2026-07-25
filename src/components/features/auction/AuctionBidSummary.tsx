@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import type { AccountAuctionBidState, AuctionBidCapability } from "@/components/features/auction/auctionFeedLogic";
+import { AUCTION_BID_SUCCEEDED_EVENT } from "@/lib/auction/bidEvents";
 
 export type { AccountAuctionBidState } from "@/components/features/auction/auctionFeedLogic";
 
@@ -49,6 +50,7 @@ export function useAccountAuctionBids(enabled = true): AccountAuctionBidSnapshot
     revision: number;
     userId: string;
   } | null>(null);
+  const refresh = useCallback(() => setRefreshNonce((value) => value + 1), []);
 
   useEffect(() => {
     if (!enabled || !session?.access_token) return;
@@ -81,7 +83,13 @@ export function useAccountAuctionBids(enabled = true): AccountAuctionBidSnapshot
     return () => controller.abort();
   }, [enabled, refreshNonce, revision, session]);
 
-  const refresh = useCallback(() => setRefreshNonce((value) => value + 1), []);
+  useEffect(() => {
+    window.addEventListener(AUCTION_BID_SUCCEEDED_EVENT, refresh);
+    return () => {
+      window.removeEventListener(AUCTION_BID_SUCCEEDED_EVENT, refresh);
+    };
+  }, [refresh]);
+
   const isCurrent = Boolean(
     result &&
     result.revision === revision &&

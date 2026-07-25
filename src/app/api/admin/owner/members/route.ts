@@ -113,6 +113,31 @@ export async function PATCH(request: Request) {
       if (error) return rpcError(error, "profile_update_failed");
       return ownerAccessJsonResponse({ memberId, updated: true });
     }
+    if (action === "nickname") {
+      const nickname = typeof body.nickname === "string"
+        ? body.nickname.trim()
+        : "";
+      const reason = normalizeManagementReason(body.reason);
+      if (!nickname || !reason) {
+        return ownerAccessJsonResponse(
+          {
+            error: "invalid_nickname_request",
+            message: "새 닉네임과 변경 사유를 확인해 주세요.",
+          },
+          400,
+        );
+      }
+      const { data, error } = await access.userClient.rpc(
+        "owner_set_account_nickname",
+        {
+          p_member_id: memberId,
+          p_nickname: nickname,
+          p_reason: reason,
+        },
+      );
+      if (error) return rpcError(error, "nickname_update_failed");
+      return ownerAccessJsonResponse({ member: data });
+    }
     if (action === "credits") {
       const delta = Number(body.delta);
       if (!Number.isSafeInteger(delta) || delta === 0 || Math.abs(delta) > 100) return ownerAccessJsonResponse({ error: "invalid_delta" }, 400);

@@ -7,6 +7,7 @@ import { CatalogImage } from "@/components/ui/CatalogImage";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { announceAuctionBidSucceeded } from "@/lib/auction/bidEvents";
 
 interface ActiveBidItem {
   amount: number;
@@ -152,6 +153,7 @@ export function ActiveBidProducts({
       }
       setConfirmItem(null);
       setNotice(`${amount.toLocaleString("ko-KR")}원으로 입찰했습니다.`);
+      announceAuctionBidSucceeded(confirmItem.productId);
       await load();
     } catch (error) {
       setNotice(

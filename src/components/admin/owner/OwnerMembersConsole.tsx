@@ -3,6 +3,7 @@
 import {
   Archive,
   Gavel,
+  Pencil,
   RefreshCw,
   Save,
   Trash2,
@@ -42,6 +43,7 @@ type ActionDialogState =
       member: ManagedMember;
       scope: "warnings" | "sanctions";
     }
+  | { kind: "nickname"; member: ManagedMember; nickname: string }
   | { kind: "delete"; member: ManagedMember };
 
 const segmentLabels: Record<MemberSegment, string> = {
@@ -140,6 +142,15 @@ function dialogCopy(dialog: ActionDialogState) {
       destructive: true,
     };
   }
+  if (dialog.kind === "nickname") {
+    return {
+      title: `${dialog.member.display_name} 닉네임 직접 변경`,
+      description:
+        `승인 절차 없이 닉네임을 ‘${dialog.nickname}’(으)로 즉시 변경하고 대기 중인 요청을 취소합니다.`,
+      submitLabel: "닉네임 변경",
+      destructive: false,
+    };
+  }
   return {
     title: `${dialog.member.display_name} 탈퇴 처리`,
     description:
@@ -159,6 +170,9 @@ export function OwnerMembersConsole() {
   const [pendingMemberIds, setPendingMemberIds] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
   const [phones, setPhones] = useState<Record<string, string>>({});
+  const [nicknameDrafts, setNicknameDrafts] = useState<Record<string, string>>(
+    {},
+  );
   const [roleDrafts, setRoleDrafts] = useState<Record<string, string>>({});
   const [operatorDrafts, setOperatorDrafts] = useState<Record<string, string>>(
     {},
@@ -307,7 +321,15 @@ export function OwnerMembersConsole() {
     let body: Record<string, unknown>;
     let success: string;
 
-    if (dialog.kind === "status") {
+    if (dialog.kind === "nickname") {
+      body = {
+        action: "nickname",
+        memberId: dialog.member.id,
+        nickname: dialog.nickname,
+        reason,
+      };
+      success = "승인 절차 없이 닉네임을 변경했습니다.";
+    } else if (dialog.kind === "status") {
       let suspendedUntil: string | null = null;
       if (dialog.status === "temporary_suspended") {
         const parsed = new Date(dialogUntil);
@@ -451,6 +473,8 @@ export function OwnerMembersConsole() {
         {visible.map((member) => {
           const owner = member.access_role === "owner";
           const phone = phones[member.id] ?? member.phone ?? "";
+          const nickname =
+            nicknameDrafts[member.id] ?? member.display_name ?? "";
           const roleDraft =
             roleDrafts[member.id] ?? member.access_role ?? "member";
           const operatorDraft =
@@ -563,6 +587,39 @@ export function OwnerMembersConsole() {
                   </div>
                 )}
               </div>
+
+              {!owner && (
+                <div className="mt-5 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                  <input
+                    aria-label={`${member.display_name} 새 닉네임`}
+                    className="border border-line bg-paper px-3 py-2 text-xs"
+                    maxLength={20}
+                    onChange={(event) =>
+                      setNicknameDrafts((current) => ({
+                        ...current,
+                        [member.id]: event.target.value,
+                      }))}
+                    value={nickname}
+                  />
+                  <button
+                    className="inline-flex items-center justify-center gap-1 border border-ink px-3 py-2 text-xs font-bold disabled:opacity-40"
+                    disabled={
+                      memberBusy ||
+                      nickname.trim().length < 2 ||
+                      nickname.trim() === member.display_name
+                    }
+                    onClick={() =>
+                      openDialog({
+                        kind: "nickname",
+                        member,
+                        nickname: nickname.trim(),
+                      })}
+                    type="button"
+                  >
+                    <Pencil size={12} /> 승인 없이 닉네임 변경
+                  </button>
+                </div>
+              )}
 
               <div className="mt-5 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
                 <input

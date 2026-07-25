@@ -140,12 +140,27 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
       };
     }
 
+    queueMicrotask(() => {
+      if (active) setPushError(null);
+    });
     void syncExistingWebPush(session.access_token)
-      .then((synced) => {
-        publish(synced ? "enabled" : "disabled");
+      .then(async (synced) => {
+        if (synced) return true;
+        await enableWebPush(session.access_token);
+        return true;
       })
-      .catch(() => {
+      .then((enabled) => {
+        publish(enabled ? "enabled" : "disabled");
+      })
+      .catch((syncError: unknown) => {
         publish("error");
+        if (active) {
+          setPushError(
+            syncError instanceof Error
+              ? syncError.message
+              : "웹앱 알림 구독을 복구하지 못했습니다.",
+          );
+        }
       });
     return () => {
       active = false;

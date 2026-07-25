@@ -1,5 +1,49 @@
 const RETURN_TO_MAX_LENGTH = 200;
 const UNSAFE_PATH_CHARACTERS = /[\\\u0000-\u001f\u007f]/;
+const AUTHENTICATION_PATHS = new Set([
+  "/account/login",
+  "/auth/callback",
+  "/m/account/login",
+  "/m/auth/callback",
+]);
+
+function isAuthenticationPath(pathname: string): boolean {
+  const normalized =
+    pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  return (
+    AUTHENTICATION_PATHS.has(normalized) ||
+    normalized.startsWith("/api/auth/kakao")
+  );
+}
+
+function applicationPathname(value: string): string | null {
+  try {
+    return new URL(value, "https://return-to.invalid").pathname;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveKakaoPostLoginReturnTo(
+  requestedReturnTo: string,
+  nicknameInitialized: boolean,
+): string {
+  const pathname = applicationPathname(requestedReturnTo);
+  const accountPath =
+    pathname === "/m" || pathname?.startsWith("/m/")
+      ? "/m/account"
+      : "/account";
+
+  if (
+    !pathname ||
+    isAuthenticationPath(pathname) ||
+    !nicknameInitialized
+  ) {
+    return accountPath;
+  }
+
+  return requestedReturnTo;
+}
 
 /**
  * Accept only an application-local path. Browsers normalize backslashes in
@@ -34,7 +78,8 @@ export function safeSameOriginReturnTo(
       !normalized.startsWith("/") ||
       normalized.startsWith("//") ||
       UNSAFE_PATH_CHARACTERS.test(normalized) ||
-      /%5c/i.test(normalized)
+      /%5c/i.test(normalized) ||
+      isAuthenticationPath(resolved.pathname)
     ) {
       return fallback;
     }

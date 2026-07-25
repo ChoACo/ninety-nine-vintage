@@ -5831,6 +5831,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: boolean
       }
+      owner_set_account_nickname: {
+        Args: { p_member_id: string; p_nickname: string; p_reason: string }
+        Returns: Json
+      }
       add_member_warning: {
         Args: { p_category: string; p_member_id: string; p_reason: string }
         Returns: {

@@ -46,14 +46,13 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
-  // Keep the App Router in its default SSR mode. Product images use next/image;
-  // the allow-list below limits remote optimization to Supabase Storage while
-  // AVIF/WebP variants and device-specific srcsets reduce storefront payloads.
+  // OpenNext's deployed /_next/image route currently returns 404 while the
+  // original Supabase object and transformed WebP URLs are healthy. Keep
+  // next/image's layout and loading behavior, but serve the already-bounded
+  // Supabase catalog sources directly instead of passing them through a broken
+  // second optimizer.
   images: {
-    deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920],
-    formats: ["image/avif", "image/webp"],
-    imageSizes: [48, 64, 96, 128, 256, 384],
-    minimumCacheTTL: 86400,
+    unoptimized: true,
     remotePatterns: supabaseImageHostname
       ? [
           {

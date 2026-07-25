@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Gavel, Heart, MapPin, PackageCheck, ReceiptText, RotateCcw, Settings, Truck } from "lucide-react";
+import { Gavel, Heart, MapPin, PackageCheck, ReceiptText, RotateCcw, Truck } from "lucide-react";
 import Link from "next/link";
 
 import { NicknameGate } from "@/components/account/NicknameGate";
@@ -15,7 +15,6 @@ const tasks = [
   ["배송지", "수령 주소 등록과 선택", "/m/account/addresses", MapPin],
   ["찜 목록", "저장한 상품 다시 보기", "/m/account/saved", Heart],
   ["환불", "환불 상태와 계좌 등록", "/m/account/refunds", RotateCcw],
-  ["설정", "화면·테마·계정 설정", "/m/account/settings", Settings],
 ] as const;
 
 export default function MobileAccountPage() {

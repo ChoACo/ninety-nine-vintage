@@ -22,6 +22,7 @@ interface ChatNotificationState {
 
 interface ChatNotificationLinkProps {
   ariaLabel: string;
+  allowedHrefPrefix?: string;
   basePath?: "" | "/m";
   className?: string;
   children?: ReactNode;
@@ -126,6 +127,7 @@ export function ChatNotificationProvider({
 
 export function ChatNotificationLink({
   ariaLabel,
+  allowedHrefPrefix,
   basePath = "",
   className,
   children,
@@ -133,8 +135,12 @@ export function ChatNotificationLink({
 }: ChatNotificationLinkProps) {
   const pathname = usePathname();
   const { href, unreadCount } = useContext(ChatNotificationContext);
+  const notificationHref =
+    href && (!allowedHrefPrefix || href.startsWith(allowedHrefPrefix))
+      ? href
+      : fallbackHref;
   const resolvedHref = withMobileBase(
-    href ?? fallbackHref,
+    notificationHref,
     pathname,
     basePath,
   );

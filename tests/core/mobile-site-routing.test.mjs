@@ -42,6 +42,7 @@ test("path conversion is reversible, loop-safe, and leaves excluded surfaces alo
   assert.equal(toDesktopPath("/m/checkout"), "/cart");
   assert.equal(toDesktopPath("/m/account/settings"), "/account");
   assert.equal(toDesktopPath("/m/account/orders"), "/account");
+  assert.equal(toDesktopPath("/m/account/payments"), "/account");
   assert.equal(toDesktopPath("/shop"), "/shop");
   assert.equal(isMobilePath("/m/auction/item"), true);
 

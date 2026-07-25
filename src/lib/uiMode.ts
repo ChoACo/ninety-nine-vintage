@@ -44,7 +44,7 @@ export function toDesktopPath(pathname: string): string {
   if (!pathname.startsWith("/m/")) return pathname;
   const desktopPath = pathname.slice(2);
   if (desktopPath === "/checkout") return "/cart";
-  if (/^\/account\/(?:orders|bids|storage|shipping|addresses|saved|refunds|settings)(?:\/|$)/.test(desktopPath)) {
+  if (/^\/account\/(?:orders|bids|payments|storage|shipping|addresses|saved|refunds|settings)(?:\/|$)/.test(desktopPath)) {
     return "/account";
   }
   return desktopPath || "/home";

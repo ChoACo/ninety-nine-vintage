@@ -63,4 +63,9 @@ test("mobile account tabs render dedicated views and tolerate partial API failur
   assert.match(dashboard, /새 배송지 추가/);
   assert.match(dashboard, /hidden=\{!showPayments\}/);
   assert.match(dashboard, /hidden=\{!showShipments\}/);
+  assert.match(
+    dashboard,
+    /<details[\s\S]*?id="refunds"[\s\S]*?open=\{view === "refunds" \? true : undefined\}/,
+  );
+  assert.doesNotMatch(dashboard, /refundDetailsRef/);
 });

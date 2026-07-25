@@ -270,7 +270,6 @@ function AccountDashboardForSession({
   const [creditCancelBusyId, setCreditCancelBusyId] = useState<string | null>(null);
   const [creditPurchaseBusy, setCreditPurchaseBusy] = useState(false);
   const [refundMessage, setRefundMessage] = useState("");
-  const refundDetailsRef = useRef<HTMLDetailsElement>(null);
   const [refundBusyId, setRefundBusyId] = useState<string | null>(null);
   const [refundDrafts, setRefundDrafts] = useState<Record<string, RefundAccountDraft>>({});
   const [applyShippingCredit, setApplyShippingCredit] = useState(true);
@@ -998,11 +997,6 @@ function AccountDashboardForSession({
       setRefundBusyId(null);
     }
   };
-  useEffect(() => {
-    if (view === "refunds" && refundDetailsRef.current) {
-      refundDetailsRef.current.open = true;
-    }
-  }, [view]);
   return (
     <div className={surface === "desktop" ? "space-y-14" : "space-y-10"} data-account-dashboard-view={view}>
       <div hidden={!showOverview} className={`flex justify-between gap-5 border-b border-ink pb-8 ${surface === "desktop" ? "flex-row items-end" : "flex-col"}`}>
@@ -1511,7 +1505,12 @@ function AccountDashboardForSession({
           </div>
         </section>
       </div>
-      <details className="group border-y border-line py-1" hidden={!showRefunds} id="refunds" ref={refundDetailsRef}>
+      <details
+        className="group border-y border-line py-1"
+        hidden={!showRefunds}
+        id="refunds"
+        open={view === "refunds" ? true : undefined}
+      >
         <summary className="flex cursor-pointer list-none items-end justify-between gap-4 py-4">
           <div>
             <p className="eyebrow text-muted">상품 확인 / 수동 환불</p>

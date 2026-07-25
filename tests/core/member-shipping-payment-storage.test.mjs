@@ -96,7 +96,11 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   assert.match(dashboard, /col-start-2 row-start-1[\s\S]*id="storage"/);
   assert.match(dashboard, /col-start-1 row-start-1[\s\S]*id="shipping-request"[\s\S]*id="shipping-credit"/);
   assert.match(dashboard, /<details[^>]*id="refunds"/);
-  assert.doesNotMatch(dashboard, /<details[^>]*id="refunds"[^>]*\sopen(?:=|\s|>)/);
+  assert.match(
+    dashboard,
+    /<details[^>]*id="refunds"[^>]*open=\{view === "refunds" \? true : undefined\}/,
+  );
+  assert.doesNotMatch(dashboard, /<details[^>]*id="refunds"[^>]*open=\{true\}/);
   assert.match(accountPage, /<DesktopAccountContent \/>/);
   assert.match(accountContent, /<details[\s\S]*<BidHistory surface="desktop" \/>[\s\S]*<\/details>/);
   assert.match(accountContent, /open=\{simpleMode\.enabled \? true : undefined\}/);

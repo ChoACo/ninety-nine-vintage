@@ -75,10 +75,12 @@ test("home hero rotates auction product main images every five seconds and keeps
   assert.match(hero, /Math\.random/);
   assert.match(hero, /transition-opacity duration-700/);
   assert.match(hero, /실시간 경매 하러 가기/);
-  assert.match(hero, /\/banners\/brand-banner-wide\.png/);
-  assert.match(hero, /\/banners\/brand-banner-mobile\.jpg/);
+  assert.match(hero, /\/banners\/v1\/brand-banner-wide-640\.webp 640w/);
+  assert.match(hero, /\/banners\/v1\/brand-banner-mobile-480\.webp 480w/);
   assert.match(hero, /object-contain object-center/);
-  assert.match(hero, /unoptimized/);
+  assert.match(hero, /fetchPriority="high"/);
+  assert.match(hero, /loading="eager"/);
+  assert.match(hero, /prefetch=\{false\}/);
   assert.match(hero, /href=\{`\$\{basePath\}\/feed`\}/);
   assert.match(hero, /href=\{`\$\{basePath\}\/auction\/\$\{product\.id\}`\}/);
   assert.match(mobileHome, /limit: 100, saleType: "auction"/);

@@ -42,7 +42,7 @@ export function MobileSiteBottomNav() {
       <div className="grid h-16" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
         {tabs.map(([label, href, Icon]) => {
           const active = pathname === href || (href !== "/m/home" && pathname.startsWith(`${href}/`));
-          return <Link aria-current={active ? "page" : undefined} className={`relative flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[9px] font-bold ${active ? "text-ink" : "text-muted"}`} href={href} key={href}><span className="relative grid size-7 place-items-center"><Icon size={18} strokeWidth={active ? 2.5 : 1.7} />{href === "/m/cart" && cartCount > 0 && <span className="absolute -right-2 -top-1 grid size-4 place-items-center rounded-full bg-ink text-[8px] text-paper">{Math.min(cartCount, 9)}</span>}</span><span className="truncate">{label}</span></Link>;
+          return <Link aria-current={active ? "page" : undefined} className={`relative flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[9px] font-bold ${active ? "text-ink" : "text-muted"}`} href={href} key={href} prefetch={false}><span className="relative grid size-7 place-items-center"><Icon size={18} strokeWidth={active ? 2.5 : 1.7} />{href === "/m/cart" && cartCount > 0 && <span className="absolute -right-2 -top-1 grid size-4 place-items-center rounded-full bg-ink text-[8px] text-paper">{Math.min(cartCount, 9)}</span>}</span><span className="truncate">{label}</span></Link>;
         })}
       </div>
     </nav>

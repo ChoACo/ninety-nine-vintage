@@ -121,13 +121,19 @@ test("product, login, and bid navigation support intercepted modals and direct f
 });
 
 test("gallery, Next Image, and supplied hero banners keep the V2 media contract", async () => {
-  const [nextConfig, catalogImage, gallery, featuredAuction, mobileBanner, wideBanner] = await Promise.all([
+  const [nextConfig, catalogImage, gallery, featuredAuction, ...optimizedBanners] = await Promise.all([
     source("next.config.ts"),
     source("src/components/ui/CatalogImage.tsx"),
     source("src/components/features/auction/AuctionGalleryModal.tsx"),
     source("src/components/features/home/HomeFeaturedAuction.tsx"),
-    stat(new URL("public/banners/brand-banner-mobile.jpg", rootUrl)),
-    stat(new URL("public/banners/brand-banner-wide.png", rootUrl)),
+    ...[
+      "brand-banner-mobile-480.webp",
+      "brand-banner-mobile-768.webp",
+      "brand-banner-mobile-1080.webp",
+      "brand-banner-wide-640.webp",
+      "brand-banner-wide-960.webp",
+      "brand-banner-wide-1440.webp",
+    ].map((name) => stat(new URL(`public/banners/v1/${name}`, rootUrl))),
   ]);
 
   assert.match(nextConfig, /unoptimized:\s*true/);
@@ -147,12 +153,13 @@ test("gallery, Next Image, and supplied hero banners keep the V2 media contract"
   const mobileHome = await source("src/app/(mobile)/m/home/page.tsx");
   assert.match(mobileHome, /<HomeFeaturedAuction/);
   assert.match(mobileHome, /surface="mobile"/);
-  assert.match(featuredAuction, /\/banners\/brand-banner-mobile\.jpg/);
-  assert.match(featuredAuction, /\/banners\/brand-banner-wide\.png/);
+  assert.match(featuredAuction, /\/banners\/v1\/brand-banner-mobile-1080\.webp/);
+  assert.match(featuredAuction, /\/banners\/v1\/brand-banner-wide-1440\.webp/);
   assert.match(featuredAuction, /object-contain object-center/);
-  assert.match(featuredAuction, /unoptimized/);
-  assert.ok(mobileBanner.isFile() && mobileBanner.size > 0);
-  assert.ok(wideBanner.isFile() && wideBanner.size > 0);
+  assert.match(featuredAuction, /fetchPriority="high"/);
+  assert.match(featuredAuction, /srcSet=\{fallbackBanner\.srcSet\}/);
+  assert.ok(optimizedBanners.every((banner) => banner.isFile() && banner.size > 0));
+  assert.ok(optimizedBanners.every((banner) => banner.size < 30_000));
 });
 
 test("the cache banner opts in only public assets and excludes private commerce documents", async () => {

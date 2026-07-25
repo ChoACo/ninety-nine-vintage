@@ -1,5 +1,6 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- Versioned local banner srcsets bypass the disabled deployment image optimizer. */
 import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -14,6 +15,25 @@ export interface HomeFeaturedAuctionItem {
   title: string;
 }
 
+const fallbackBanners = {
+  desktop: {
+    height: 1080,
+    sizes: "570px",
+    src: "/banners/v1/brand-banner-wide-1440.webp",
+    srcSet:
+      "/banners/v1/brand-banner-wide-640.webp 640w, /banners/v1/brand-banner-wide-960.webp 960w, /banners/v1/brand-banner-wide-1440.webp 1440w",
+    width: 1440,
+  },
+  mobile: {
+    height: 1136,
+    sizes: "100vw",
+    src: "/banners/v1/brand-banner-mobile-1080.webp",
+    srcSet:
+      "/banners/v1/brand-banner-mobile-480.webp 480w, /banners/v1/brand-banner-mobile-768.webp 768w, /banners/v1/brand-banner-mobile-1080.webp 1080w",
+    width: 1080,
+  },
+} as const;
+
 export function HomeFeaturedAuction({
   basePath = "",
   products,
@@ -25,6 +45,7 @@ export function HomeFeaturedAuction({
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const mobile = surface === "mobile";
+  const fallbackBanner = fallbackBanners[mobile ? "mobile" : "desktop"];
 
   useEffect(() => {
     if (products.length < 2) return;
@@ -45,18 +66,19 @@ export function HomeFeaturedAuction({
           mobile ? "block aspect-[4/5] min-h-[480px]" : "min-h-[560px]"
         }`}
         href={`${basePath}/feed`}
+        prefetch={false}
       >
-        <CatalogImage
+        <img
           alt="나인티 나인 빈티지 배너"
           className="h-full w-full object-contain object-center"
-          loading={mobile ? "eager" : "lazy"}
-          maxDimension={1600}
-          priority={mobile}
-          sizes={mobile ? "100vw" : "570px"}
-          src={mobile
-            ? "/banners/brand-banner-mobile.jpg"
-            : "/banners/brand-banner-wide.png"}
-          unoptimized
+          decoding="async"
+          fetchPriority="high"
+          height={fallbackBanner.height}
+          loading="eager"
+          sizes={fallbackBanner.sizes}
+          src={fallbackBanner.src}
+          srcSet={fallbackBanner.srcSet}
+          width={fallbackBanner.width}
         />
         <div
           className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent ${
@@ -106,8 +128,10 @@ export function HomeFeaturedAuction({
             <CatalogImage
               alt={active ? `${product.title} 대표 이미지` : ""}
               className="h-full w-full object-cover object-center"
+              fetchPriority={active ? "high" : "auto"}
               loading={active ? "eager" : "lazy"}
               maxDimension={1600}
+              priority={active}
               sizes={mobile ? "100vw" : "570px"}
               src={product.imageUrl}
             />

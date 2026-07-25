@@ -54,7 +54,7 @@ function DesktopHome({ auctions, featuredAuctions, fixed }: HomePresentationProp
           </div>
           <div className="mt-14 flex max-w-lg items-end justify-between gap-8">
             <p className="text-sm leading-6 text-zinc-400">선별된 빈티지 한 점을<br />기다림 없이 바로 만나보세요.</p>
-            <Link className="flex items-center gap-2 border-b border-paper pb-2 text-xs font-bold" href="/shop">즉시 구매 <ArrowUpRight size={14} /></Link>
+            <Link className="flex items-center gap-2 border-b border-paper pb-2 text-xs font-bold" href="/shop" prefetch={false}>즉시 구매 <ArrowUpRight size={14} /></Link>
           </div>
         </div>
         <HomeFeaturedAuction products={featuredAuctions} />

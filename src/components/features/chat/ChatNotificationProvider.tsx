@@ -152,6 +152,7 @@ export function ChatNotificationLink({
       }
       className={`relative ${className ?? ""}`}
       href={resolvedHref}
+      prefetch={false}
     >
       {children ?? <MessageCircle size={17} />}
       {unreadCount > 0 && (

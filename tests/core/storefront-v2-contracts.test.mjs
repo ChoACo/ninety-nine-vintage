@@ -121,11 +121,13 @@ test("product, login, and bid navigation support intercepted modals and direct f
 });
 
 test("gallery, Next Image, and supplied hero banners keep the V2 media contract", async () => {
-  const [nextConfig, catalogImage, gallery, featuredAuction, ...optimizedBanners] = await Promise.all([
+  const [nextConfig, catalogImage, gallery, featuredAuction, cloudflareWorker, wrangler, ...optimizedBanners] = await Promise.all([
     source("next.config.ts"),
     source("src/components/ui/CatalogImage.tsx"),
     source("src/components/features/auction/AuctionGalleryModal.tsx"),
     source("src/components/features/home/HomeFeaturedAuction.tsx"),
+    source("cloudflare-worker.mjs"),
+    source("wrangler.jsonc"),
     ...[
       "brand-banner-mobile-480.webp",
       "brand-banner-mobile-768.webp",
@@ -158,6 +160,10 @@ test("gallery, Next Image, and supplied hero banners keep the V2 media contract"
   assert.match(featuredAuction, /object-contain object-center/);
   assert.match(featuredAuction, /fetchPriority="high"/);
   assert.match(featuredAuction, /srcSet=\{fallbackBanner\.srcSet\}/);
+  assert.match(wrangler, /"main":\s*"cloudflare-worker\.mjs"/);
+  assert.match(cloudflareWorker, /VERSIONED_BANNER_PREFIX = "\/banners\/v1\/"/);
+  assert.match(cloudflareWorker, /max-age=31536000, immutable/);
+  assert.match(cloudflareWorker, /headers\.set\("Content-Type", "image\/webp"\)/);
   assert.ok(optimizedBanners.every((banner) => banner.isFile() && banner.size > 0));
   assert.ok(optimizedBanners.every((banner) => banner.size < 30_000));
 });

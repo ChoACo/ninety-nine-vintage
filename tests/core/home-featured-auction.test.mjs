@@ -77,6 +77,8 @@ test("home hero rotates auction product main images every five seconds and keeps
   assert.match(hero, /실시간 경매 하러 가기/);
   assert.match(hero, /\/banners\/brand-banner-wide\.png/);
   assert.match(hero, /\/banners\/brand-banner-mobile\.jpg/);
+  assert.match(hero, /object-contain object-center/);
+  assert.match(hero, /unoptimized/);
   assert.match(hero, /href=\{`\$\{basePath\}\/feed`\}/);
   assert.match(hero, /href=\{`\$\{basePath\}\/auction\/\$\{product\.id\}`\}/);
   assert.match(mobileHome, /limit: 100, saleType: "auction"/);

@@ -150,6 +150,8 @@ test("gallery, Next Image, and supplied hero banners keep the V2 media contract"
   assert.match(mobileHome, /surface="mobile"/);
   assert.match(featuredAuction, /\/banners\/brand-banner-mobile\.jpg/);
   assert.match(featuredAuction, /\/banners\/brand-banner-wide\.png/);
+  assert.match(featuredAuction, /object-contain object-center/);
+  assert.match(featuredAuction, /unoptimized/);
   assert.ok(mobileBanner.isFile() && mobileBanner.size > 0);
   assert.ok(wideBanner.isFile() && wideBanner.size > 0);
 });

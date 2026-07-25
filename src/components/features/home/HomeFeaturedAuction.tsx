@@ -48,7 +48,7 @@ export function HomeFeaturedAuction({
       >
         <CatalogImage
           alt="나인티 나인 빈티지 배너"
-          className="h-full w-full object-cover object-center"
+          className="h-full w-full object-contain object-center"
           loading={mobile ? "eager" : "lazy"}
           maxDimension={1600}
           priority={mobile}
@@ -56,6 +56,7 @@ export function HomeFeaturedAuction({
           src={mobile
             ? "/banners/brand-banner-mobile.jpg"
             : "/banners/brand-banner-wide.png"}
+          unoptimized
         />
         <div
           className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent ${

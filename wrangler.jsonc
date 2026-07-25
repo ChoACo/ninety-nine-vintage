@@ -2,13 +2,20 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"main": ".open-next/worker.js",
 	"name": "ninety-nine-homepage",
-	"compatibility_date": "2026-07-19",
+	"compatibility_date": "2026-07-25",
 	"compatibility_flags": [
 		"nodejs_compat",
 		"global_fetch_strictly_public"
 	],
 	"workers_dev": false,
 	"preview_urls": false,
+	"secrets": {
+		"required": [
+			"SUPABASE_SECRET_KEY",
+			"KAKAO_REST_API_KEY",
+			"KAKAO_CLIENT_SECRET"
+		]
+	},
 	"routes": [
 		{
 			"pattern": "ninety-nine-vintage.store",

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { CACHE_CONSENT_EVENT, clearCacheConsent, readCacheConsent, writeCacheConsent, type CacheConsent } from "@/lib/cacheConsent";
 
-const CACHE_NAME = "ninetynine-public-v2";
+const CACHE_PREFIX = "ninetynine-public-";
 const CACHE_CONSENT_NAME = "ninetynine-cache-consent-v1";
 const subscribeToConsent = (onStoreChange: () => void) => {
   window.addEventListener(CACHE_CONSENT_EVENT, onStoreChange);
@@ -30,7 +30,13 @@ async function clearPublicCache() {
     const worker = registration?.active || registration?.waiting || registration?.installing;
     worker?.postMessage({ type: "CLEAR_PUBLIC_CACHE" });
   }
-  await Promise.all([caches.delete(CACHE_NAME), caches.delete(CACHE_CONSENT_NAME)]);
+  const cacheNames = await caches.keys();
+  await Promise.all([
+    ...cacheNames
+      .filter((cacheName) => cacheName.startsWith(CACHE_PREFIX))
+      .map((cacheName) => caches.delete(cacheName)),
+    caches.delete(CACHE_CONSENT_NAME),
+  ]);
 }
 
 export function CacheConsentBanner({ surface = "mobile" }: { surface?: "desktop" | "mobile" }) {

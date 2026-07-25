@@ -76,6 +76,24 @@ test("historical v1 canonical commands retain their complete-order safety contra
   }
 });
 
+test("read RPC volatility matches volatile clocks and manifest validation", async () => {
+  const migration = await source(
+    "supabase/migrations/20260725070000_correct_read_rpc_volatility.sql",
+  );
+
+  for (const signature of [
+    "app_private\\.commerce_shipment_gate\\(uuid, text\\)",
+    "public\\.get_commerce_shipment_queue\\(boolean, integer, integer\\)",
+    "public\\.get_store_financial_report\\(date, date\\)",
+    "public\\.get_owner_withdrawn_member_retention\\(integer, integer\\)",
+  ]) {
+    assert.match(
+      migration,
+      new RegExp(`alter function ${signature} volatile`, "i"),
+    );
+  }
+});
+
 test("buyer shipping API keeps exact legacy and v2 paths and requires a shipping credit", async () => {
   const [memberRoute, storageRoute, shipmentHistoryRoute, hiddenTestRoute] =
     await Promise.all([

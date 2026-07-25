@@ -36,7 +36,6 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
   const initialProducts = toPayload(await fetchPublishedProducts({
     limit: 100,
     saleType: "fixed",
-    sort: "latest",
     search: typeof query === "string" ? query : "",
   }));
   return <div className="flex items-start gap-10"><AuctionFilterSidebar saleType="fixed" surface="desktop" /><Suspense fallback={<div className="min-w-0 flex-1" />}><AuctionFeedGrid className="min-w-0 flex-1" initialProducts={initialProducts} saleType="fixed" surface="desktop" title="상시 즉시 구매" /></Suspense></div>;

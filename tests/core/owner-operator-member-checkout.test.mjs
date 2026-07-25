@@ -100,11 +100,9 @@ test("owner member management actions use confirmed reasons and separate seven-d
 });
 
 test("center assignment capabilities are revoked after direct-store cutover", async () => {
-  const [migration, route, centerRoute, cutover] =
+  const [migration, cutover] =
     await Promise.all([
       source(migrationPath),
-      source("src/app/api/admin/owner/fulfillment/route.ts"),
-      source("src/app/api/admin/centers/route.ts"),
       source("supabase/migrations/20260724063531_simplify_direct_store_fulfillment.sql"),
     ]);
 
@@ -121,8 +119,6 @@ test("center assignment capabilities are revoked after direct-store cutover", as
     migration,
     /delete from public\.fulfillment_center_staff_assignments as assignments[\s\S]*where not exists[\s\S]*roles\.role_code in \('operator', 'employee'\)/i,
   );
-  assert.match(route, /center_topology_removed/);
-  assert.match(centerRoute, /center_management_removed/);
   assert.match(cutover, /revoke all on function public\.configure_fulfillment_center_staff_assignment/);
   assert.match(cutover, /revoke all on function public\.delete_fulfillment_center_staff_assignment/);
   assert.match(cutover, /revoke all on function public\.configure_store_fulfillment_route/);

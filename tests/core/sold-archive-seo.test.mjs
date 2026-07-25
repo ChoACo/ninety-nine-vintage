@@ -28,17 +28,14 @@ test("single writes preserve an optional blank brand while bulk writes require a
   assert.match(singleRoute, /brand_source:\s*"explicit"/);
   assert.match(bulkRoute, /normalizeProductBrand\(body\.brand\)/);
   assert.match(bulkRoute, /brand_source:\s*"explicit"/);
-  const [operatorUpdate, ownerUpdate, operatorMutation] = await Promise.all([
+  const [operatorUpdate, operatorMutation] = await Promise.all([
     source("src/app/api/admin/operator/products/[id]/route.ts"),
-    source("src/app/api/admin/owner/products/[id]/route.ts"),
     source("supabase/migrations/20260721030000_harden_operator_product_mutations.sql"),
   ]);
   assert.match(operatorUpdate, /normalizeProductBrand\(body\.brand\)/);
   assert.match(operatorUpdate, /\.rpc\("update_operator_product"/);
   assert.match(operatorMutation, /brand_slug\s*=\s*v_brand_slug/);
   assert.match(operatorMutation, /brand_source\s*=\s*'explicit'/);
-  assert.match(ownerUpdate, /PATCH as updateManagedProduct/);
-  assert.doesNotMatch(ownerUpdate, /auth\.admin\.from\("products"\)/);
 });
 
 test("sold RPCs expose only archive-safe fields with cursor and brand filtering", async () => {

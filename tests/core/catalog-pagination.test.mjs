@@ -7,7 +7,6 @@ import {
   getNextCatalogOffset,
   MAX_CATALOG_FETCH_BATCHES,
   mergeCatalogProductBatch,
-  sortCatalogProducts,
 } from "../../src/lib/catalog/pagination.ts";
 import { normalizeProductOffset } from "../../src/lib/catalog/query.ts";
 
@@ -47,26 +46,6 @@ test("catalog batch progression stops on a short page and rejects unsafe ranges"
   );
 });
 
-test("catalog UI sorting is deterministic after immutable batches are merged", () => {
-  const products = [
-    { closesAt: "2026-07-21T12:00:00Z", currentPrice: 30_000, fixedPrice: null, id: "b", publishAt: "2026-07-21T10:00:00Z", saleType: "auction" },
-    { closesAt: "2026-07-21T11:00:00Z", currentPrice: 30_000, fixedPrice: null, id: "a", publishAt: "2026-07-21T10:00:00Z", saleType: "auction" },
-    { closesAt: "2026-07-21T13:00:00Z", currentPrice: 10_000, fixedPrice: null, id: "c", publishAt: "2026-07-21T11:00:00Z", saleType: "auction" },
-  ];
-
-  assert.deepEqual(sortCatalogProducts(products, "latest").map(({ id }) => id), ["c", "a", "b"]);
-  assert.deepEqual(sortCatalogProducts(products, "ending").map(({ id }) => id), ["a", "b", "c"]);
-  assert.deepEqual(sortCatalogProducts(products, "price_asc").map(({ id }) => id), ["c", "a", "b"]);
-  assert.deepEqual(sortCatalogProducts(products, "price_desc").map(({ id }) => id), ["a", "b", "c"]);
-  assert.deepEqual(products.map(({ id }) => id), ["b", "a", "c"]);
-
-  const fixedProducts = [
-    { closesAt: "2026-07-21T12:00:00Z", currentPrice: 1, fixedPrice: 50_000, id: "fixed-b", publishAt: "2026-07-21T10:00:00Z", saleType: "fixed" },
-    { closesAt: "2026-07-21T12:00:00Z", currentPrice: 999_999, fixedPrice: 20_000, id: "fixed-a", publishAt: "2026-07-21T10:00:00Z", saleType: "fixed" },
-  ];
-  assert.deepEqual(sortCatalogProducts(fixedProducts, "price_asc").map(({ id }) => id), ["fixed-a", "fixed-b"]);
-});
-
 test("public product API and feed retain bounded, stable, abortable full-catalog loading", async () => {
   const [service, route, grid] = await Promise.all([
     source("src/services/products.ts"),
@@ -85,8 +64,8 @@ test("public product API and feed retain bounded, stable, abortable full-catalog
 
   assert.match(grid, /batchIndex < MAX_CATALOG_FETCH_BATCHES/);
   assert.match(grid, /input\.signal\.throwIfAborted\(\)/);
-  assert.match(grid, /sort:\s*"latest"/);
-  assert.doesNotMatch(grid, /sort:\s*input\.sort/);
+  assert.doesNotMatch(route, /searchParams\.get\("sort"\)/);
+  assert.doesNotMatch(grid, /sort:/);
   assert.match(grid, /mergeCatalogProductBatch\(products, batch\)/);
   assert.match(grid, /const visibleCards = useMemo\(\(\) => cards\.filter/);
   assert.doesNotMatch(grid, /sortCatalogProducts\(products, sort\)/);

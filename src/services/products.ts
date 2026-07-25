@@ -122,14 +122,12 @@ export async function fetchPublishedProducts(input: {
   offset?: number;
   saleType?: ProductRow["sale_type"];
   search?: string;
-  sort?: "latest" | "ending" | "price_asc" | "price_desc";
 } = {}): Promise<PublishedProduct[]> {
   const {
     limit = 24,
     offset = 0,
     saleType = "auction",
     search = "",
-    sort = "latest",
   } = input;
   const safeLimit = normalizeProductLimit(limit);
   const safeOffset = normalizeProductOffset(offset);
@@ -151,10 +149,7 @@ export async function fetchPublishedProducts(input: {
     query = query.eq("status", "active");
   }
   if (safeSearch) query = query.or(`title.ilike.%${safeSearch}%,description.ilike.%${safeSearch}%`);
-  if (sort === "ending") query = query.order("closes_at", { ascending: true });
-  else if (sort === "price_asc") query = query.order(saleType === "fixed" ? "fixed_price" : "current_price", { ascending: true, nullsFirst: false });
-  else if (sort === "price_desc") query = query.order(saleType === "fixed" ? "fixed_price" : "current_price", { ascending: false, nullsFirst: false });
-  else query = query.order("publish_at", { ascending: false });
+  query = query.order("publish_at", { ascending: false });
   query = query.order("id", { ascending: true });
   const { data, error } = await query.range(safeOffset, safeOffset + safeLimit - 1);
   if (error) throw new Error("상품 목록을 불러오지 못했습니다.");

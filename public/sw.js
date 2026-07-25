@@ -1,6 +1,28 @@
-const CACHE_NAME = "ninetynine-public-v2";
+const CACHE_NAME = "ninetynine-public-v3";
+const CACHE_PREFIX = "ninetynine-public-";
 const CACHE_CONSENT_NAME = "ninetynine-cache-consent-v1";
 const CACHE_CONSENT_KEY = "/__cache-consent__";
+const MAX_PUBLIC_CACHE_ENTRIES = 160;
+
+async function deletePublicCaches({ includeCurrent = false } = {}) {
+  const names = await caches.keys();
+  await Promise.all(names
+    .filter((name) => name.startsWith(CACHE_PREFIX)
+      && (includeCurrent || name !== CACHE_NAME))
+    .map((name) => caches.delete(name)));
+}
+
+async function trimPublicCache(cache) {
+  const keys = await cache.keys();
+  const overflow = keys.length - MAX_PUBLIC_CACHE_ENTRIES;
+  if (overflow <= 0) return;
+  await Promise.all(keys.slice(0, overflow).map((request) => cache.delete(request)));
+}
+
+async function cachePublicResponse(cache, request, response) {
+  await cache.put(request, response);
+  await trimPublicCache(cache);
+}
 
 function isCacheable(request) {
   const url = new URL(request.url);
@@ -14,7 +36,12 @@ function isCacheable(request) {
 }
 
 self.addEventListener("install", (event) => { event.waitUntil(self.skipWaiting()); });
-self.addEventListener("activate", (event) => { event.waitUntil(self.clients.claim()); });
+self.addEventListener("activate", (event) => {
+  event.waitUntil((async () => {
+    await deletePublicCaches();
+    await self.clients.claim();
+  })());
+});
 self.addEventListener("message", (event) => {
   if (event.data?.type === "ENABLE_PUBLIC_CACHE") {
     event.waitUntil((async () => {
@@ -23,10 +50,10 @@ self.addEventListener("message", (event) => {
     })());
   }
   if (event.data?.type === "CLEAR_PUBLIC_CACHE") {
-    event.waitUntil(Promise.all([
-      caches.delete(CACHE_NAME),
-      caches.delete(CACHE_CONSENT_NAME),
-    ]));
+    event.waitUntil((async () => {
+      await deletePublicCaches({ includeCurrent: true });
+      await caches.delete(CACHE_CONSENT_NAME);
+    })());
   }
 });
 self.addEventListener("fetch", (event) => {
@@ -38,7 +65,12 @@ self.addEventListener("fetch", (event) => {
     if (!consent) return fetch(event.request);
     const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(event.request);
-    const network = fetch(event.request).then(async (response) => { if (response.ok) await cache.put(event.request, response.clone()); return response; }).catch(() => null);
+    const network = fetch(event.request).then(async (response) => {
+      if (response.ok) {
+        await cachePublicResponse(cache, event.request, response.clone());
+      }
+      return response;
+    }).catch(() => null);
     if (isProductApi) return (await network) || cached || new Response("{\"products\":[]}", { headers: { "Content-Type": "application/json" } });
     return cached || (await network) || Response.error();
   })());

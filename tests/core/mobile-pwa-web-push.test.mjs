@@ -38,6 +38,9 @@ test("service worker suppresses OS push in the foreground and handles background
 
   assert.match(worker, /ENABLE_PUBLIC_CACHE/);
   assert.match(worker, /CACHE_CONSENT_NAME/);
+  assert.match(worker, /MAX_PUBLIC_CACHE_ENTRIES = 160/);
+  assert.match(worker, /deletePublicCaches/);
+  assert.match(worker, /trimPublicCache/);
   assert.match(cacheConsent, /CACHE_CONSENT_COOKIE/);
   assert.match(cacheConsent, /writeCookieConsent\(value\)/);
   assert.match(consent, /setConsent\("accepted"\)/);

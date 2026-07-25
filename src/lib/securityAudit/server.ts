@@ -110,6 +110,7 @@ export function getTrustedClientIp(request: Request): string {
   const candidates = process.env.VERCEL === "1"
     ? [vercelForwarded]
     : [
+        request.headers.get("cf-connecting-ip"),
         vercelForwarded,
         request.headers.get("x-forwarded-for"),
         request.headers.get("x-real-ip"),

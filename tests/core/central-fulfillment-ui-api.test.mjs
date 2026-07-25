@@ -39,10 +39,8 @@ test("operator fulfillment uses direct-store storage with dated product grids", 
 });
 
 test("center topology and address management surfaces are retired", async () => {
-  const [ownerRoute, centerRoute, ownerPage, operatorCenterPage, employeeCenterPage, ownerLayout, dashboard, migration] =
+  const [ownerPage, operatorCenterPage, employeeCenterPage, ownerLayout, dashboard, migration] =
     await Promise.all([
-      source("src/app/api/admin/owner/fulfillment/route.ts"),
-      source("src/app/api/admin/centers/route.ts"),
       source("src/app/(admin)/admin/owner/fulfillment/page.tsx"),
       source("src/app/(admin)/admin/operator/center/page.tsx"),
       source("src/app/(admin)/admin/employee/center/page.tsx"),
@@ -51,10 +49,9 @@ test("center topology and address management surfaces are retired", async () => 
       source("supabase/migrations/20260724063531_simplify_direct_store_fulfillment.sql"),
     ]);
 
-  assert.match(ownerRoute, /center_topology_removed/);
-  assert.match(centerRoute, /center_management_removed/);
-  assert.match(ownerRoute, /410/);
-  assert.match(centerRoute, /410/);
+  await assert.rejects(access(new URL("src/app/api/admin/owner/fulfillment/route.ts", rootUrl)));
+  await assert.rejects(access(new URL("src/app/api/admin/centers/route.ts", rootUrl)));
+  await assert.rejects(access(new URL("src/components/admin/center/StaffCenterManagementConsole.tsx", rootUrl)));
   assert.match(ownerPage, /redirect\("\/admin\/owner"\)/);
   assert.match(operatorCenterPage, /redirect\("\/admin\/operator\/fulfillment"\)/);
   assert.match(employeeCenterPage, /redirect\("\/admin\/employee\/fulfillment"\)/);

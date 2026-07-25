@@ -5,6 +5,32 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
+test("support authorization helpers are executable only by authenticated users", async () => {
+  const migration = await source(
+    "supabase/migrations/20260725073000_lock_down_support_authorization_helpers.sql",
+  );
+
+  for (const helper of [
+    "can_access_support_conversation",
+    "can_send_support_message",
+  ]) {
+    assert.match(
+      migration,
+      new RegExp(
+        `revoke all on function public\\.${helper}\\(uuid\\)[\\s\\S]*from public, anon, authenticated, service_role`,
+        "i",
+      ),
+    );
+    assert.match(
+      migration,
+      new RegExp(
+        `grant execute on function public\\.${helper}\\(uuid\\)[\\s\\S]*to authenticated`,
+        "i",
+      ),
+    );
+  }
+});
+
 test("support chat is scoped to one member room per active store", async () => {
   const [migration, memberRoute, operatorRoute] = await Promise.all([
     source("supabase/migrations/20260724093922_store_scoped_support_chat.sql"),
@@ -74,6 +100,33 @@ test("member and operator surfaces expose store selection and direct member chat
   assert.match(storagePanel, /\/admin\/operator\/chat\?memberId=/);
   assert.match(operatorLayout, /회원 채팅/);
   assert.match(localAccounts, /slot === "operator-secondary" \? 1 : 0/);
+});
+
+test("employees can handle only their assigned store chats and receive role-correct links", async () => {
+  const [migration, operatorRoute, employeePage, unreadRoute] =
+    await Promise.all([
+      source(
+        "supabase/migrations/20260725053459_fix_employee_internal_chat_and_notifications.sql",
+      ),
+      source("src/app/api/admin/operator/chat/route.ts"),
+      source("src/app/(admin)/admin/employee/inquiries/page.tsx"),
+      source("src/app/api/chat/unread/route.ts"),
+    ]);
+
+  assert.match(
+    migration,
+    /support_access_role\(auth\.uid\(\)\) = 'employee'[\s\S]*store_memberships/,
+  );
+  assert.match(
+    migration,
+    /create policy "Users read their notifications"[\s\S]*member_id = \(select auth\.uid\(\)\)/,
+  );
+  assert.match(migration, /\/admin\/employee\/inquiries/);
+  assert.match(operatorRoute, /auth\.effectiveOperatorId/);
+  assert.match(operatorRoute, /\.in\("conversation_type", \["general", "internal"\]\)/);
+  assert.match(employeePage, /basePath="\/admin\/employee\/inquiries"/);
+  assert.match(unreadRoute, /roleCode === "employee"/);
+  assert.match(unreadRoute, /\/admin\/employee\/inquiries\?conversationId=/);
 });
 
 test("realtime chat events render an unread badge and dismissible five-second toast", async () => {

@@ -31,7 +31,6 @@ import {
   resolveVisibleCommerceCount,
   shouldPersistCommerceLocally,
 } from "../../src/lib/commerce/cacheOwnership.ts";
-import { ownerSnapshotMatchesSession } from "../../src/lib/ownerAccess/sessionOwnership.ts";
 import {
   paymentModeMatches,
   readCommercePaymentMode,
@@ -640,7 +639,6 @@ test("commerce toolbar counts appear only for the resolved current owner", async
 test("manual transfer is the only live checkout mode while PortOne stays archived", async () => {
   const [
     ownerRoute,
-    ownerConsole,
     cartRoute,
     checkoutRoute,
     cartView,
@@ -653,13 +651,6 @@ test("manual transfer is the only live checkout mode while PortOne stays archive
     await Promise.all([
       readFile(
         new URL("src/app/api/admin/owner/payment-mode/route.ts", rootUrl),
-        "utf8",
-      ),
-      readFile(
-        new URL(
-          "src/components/admin/owner/OwnerOperationsConsole.tsx",
-          rootUrl,
-        ),
         "utf8",
       ),
       readFile(new URL("src/app/api/cart/route.ts", rootUrl), "utf8"),
@@ -687,13 +678,6 @@ test("manual transfer is the only live checkout mode while PortOne stays archive
   assert.match(ownerRoute, /getManualTransferAccount\(admin\)/);
   assert.match(ownerRoute, /mode\s*===\s*"portone"[\s\S]*?"portone_archived"/);
   assert.doesNotMatch(ownerRoute, /set_payment_runtime_mode/);
-  assert.match(ownerConsole, /useSupabaseSession\(\)/);
-  assert.match(ownerConsole, /ownerSnapshotMatchesSession\(/);
-  assert.match(ownerConsole, /snapshotIsCurrent\s*\?\s*runtime\s*:\s*null/);
-  assert.match(ownerConsole, /parseRuntime\(paymentPayload\)/);
-  assert.match(ownerConsole, /PortOne 코드는 향후 재도입을 위해 보관 중/);
-  assert.doesNotMatch(ownerConsole, /changePaymentMode/);
-  assert.doesNotMatch(ownerConsole, /window\.confirm\(/);
   assert.match(cartRoute, /const\s*\{\s*admin\s*\}\s*=\s*createSupabaseServerClients\(\)/);
   assert.match(cartRoute, /getManualTransferAccount\(admin\)/);
   assert.match(cartRoute, /ACTIVE_COMMERCE_PAYMENT_MODE/);
@@ -727,14 +711,6 @@ test("manual transfer is the only live checkout mode while PortOne stays archive
     commerceClient,
     /latest\?\.user\.id\s*===\s*expectedUserId\s*&&\s*latest\.access_token\s*===\s*token/,
   );
-});
-
-test("owner operation snapshots are visible only to the auth revision that loaded them", () => {
-  assert.equal(ownerSnapshotMatchesSession(4, 4, true, false), true);
-  assert.equal(ownerSnapshotMatchesSession(4, 5, true, false), false);
-  assert.equal(ownerSnapshotMatchesSession(4, 4, false, false), false);
-  assert.equal(ownerSnapshotMatchesSession(4, 4, true, true), false);
-  assert.equal(ownerSnapshotMatchesSession(null, 4, true, false), false);
 });
 
 test("checkout payment-mode handshake accepts only an exact current mode", () => {

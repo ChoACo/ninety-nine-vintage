@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const [{ data: role }, { data: memberAccount }] = await Promise.all([
     auth.admin
       .from("account_access_roles")
-      .select("role_code")
+      .select("role_code, reports_to_operator_id")
       .eq("user_id", auth.userId)
       .maybeSingle(),
     auth.admin
@@ -31,18 +31,23 @@ export async function GET(request: Request) {
   ]);
 
   const roleCode = role?.role_code ?? (memberAccount ? "member" : null);
-  let query = auth.admin
+  let query = auth.user
     .from("support_conversations")
     .select(
       "id, member_id, assigned_staff_id, store_id, last_message_at, last_sender_id",
     )
-    .eq("conversation_type", "general")
     .not("last_message_at", "is", null);
 
   if (roleCode === "member" || roleCode === "band_member") {
-    query = query.eq("member_id", auth.userId);
+    query = query
+      .eq("member_id", auth.userId)
+      .eq("conversation_type", "general");
   } else if (roleCode === "operator") {
-    query = query.eq("assigned_staff_id", auth.userId);
+    query = query
+      .eq("assigned_staff_id", auth.userId)
+      .in("conversation_type", ["general", "internal"]);
+  } else if (roleCode === "employee" && role?.reports_to_operator_id) {
+    query = query.in("conversation_type", ["general", "internal"]);
   } else {
     return commerceJson({
       unreadCount: 0,
@@ -97,6 +102,10 @@ export async function GET(request: Request) {
         ? latest
           ? `/admin/operator/chat?conversationId=${encodeURIComponent(latest.id)}`
           : "/admin/operator/chat"
+        : roleCode === "employee"
+          ? latest
+            ? `/admin/employee/inquiries?conversationId=${encodeURIComponent(latest.id)}`
+            : "/admin/employee/inquiries"
         : latest
           ? `/chat?conversationId=${encodeURIComponent(latest.id)}`
           : "/chat",

@@ -160,27 +160,15 @@ test("operator product console publishes directly and manages active listings fr
   assert.match(publishMigration, /grant execute[\s\S]*to authenticated/i);
 });
 
-test("owner products use the same canonical and optimistic product-management path", async () => {
-  const [page, route, patchRoute, bulkRoute] = await Promise.all([
-    source("src/app/(admin)/admin/owner/products/page.tsx"),
-    source("src/app/api/admin/owner/products/route.ts"),
-    source("src/app/api/admin/owner/products/[id]/route.ts"),
-    source("src/app/api/admin/owner/products/bulk/route.ts"),
+test("owner product work uses the single operator management surface", async () => {
+  const [dashboard, ownerLayout] = await Promise.all([
+    source("src/components/admin/owner/OwnerDashboard.tsx"),
+    source("src/app/(admin)/admin/owner/layout.tsx"),
   ]);
 
-  assert.match(page, /OperatorProductsConsole/);
-  assert.doesNotMatch(page, /OwnerProductsConsole/);
-  assert.match(route, /GET as getManagedProducts/);
-  assert.match(route, /POST as createManagedProduct/);
-  assert.match(route, /auth\.roleCode === "owner"/);
-  assert.match(patchRoute, /PATCH as updateManagedProduct/);
-  assert.match(patchRoute, /auth\.roleCode !== "owner"/);
-  assert.match(bulkRoute, /POST as createManagedProducts/);
-  assert.match(bulkRoute, /auth\.roleCode !== "owner"/);
-  for (const ownerRoute of [route, patchRoute, bulkRoute]) {
-    assert.doesNotMatch(ownerRoute, /auth\.admin\.from\("products"\)/);
-    assert.doesNotMatch(ownerRoute, /getCatalogImageUrl/);
-  }
+  assert.match(dashboard, /href="\/admin\/operator"/);
+  assert.doesNotMatch(ownerLayout, /\/admin\/owner\/products/);
+  assert.doesNotMatch(ownerLayout, /\/admin\/owner\/operations/);
 });
 
 test("operator settlement and shipping remain server-authoritative after the UI restoration", async () => {

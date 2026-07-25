@@ -104,16 +104,13 @@ test("employee and operator navigation use direct-store fulfillment without cent
 });
 
 test("retired center management is gone and product control uses explicit store membership", async () => {
-  const [centerRoute, productRoute, pauseRoute, migration] =
+  const [productRoute, pauseRoute, migration] =
     await Promise.all([
-      source("src/app/api/admin/centers/route.ts"),
       source("src/app/api/admin/operator/products/route.ts"),
       source("src/app/api/admin/operator/products/[id]/pause/route.ts"),
       source("supabase/migrations/20260723043642_member_center_admin_workflows.sql"),
     ]);
 
-  assert.match(centerRoute, /center_management_removed/);
-  assert.match(centerRoute, /410/);
   assert.match(productRoute, /from\("store_memberships"\)/);
   assert.doesNotMatch(productRoute, /fulfillment_center_staff_assignments|home_fulfillment_center_id/);
   assert.match(pauseRoute, /"pause_managed_product"/);
@@ -148,11 +145,10 @@ test("orders and payment confirmation use compact rows with linked product detai
 });
 
 test("owner save paths use user-scoped persistence while center topology is retired", async () => {
-  const [siteRoute, memberRoute, ownerCenterRoute, migration] =
+  const [siteRoute, memberRoute, migration] =
     await Promise.all([
       source("src/app/api/admin/owner/site-status/route.ts"),
       source("src/app/api/admin/owner/members/route.ts"),
-      source("src/app/api/admin/owner/fulfillment/route.ts"),
       source("supabase/migrations/20260723043642_member_center_admin_workflows.sql"),
     ]);
 
@@ -162,8 +158,6 @@ test("owner save paths use user-scoped persistence while center topology is reti
   assert.match(memberRoute, /p_reports_to_operator_id:\s*reportsToOperatorId/);
   assert.doesNotMatch(memberRoute, /p_display_name:\s*body/);
   assert.match(migration, /v_role not in \('operator', 'employee', 'band_member', 'member'\)/);
-  assert.match(ownerCenterRoute, /center_topology_removed/);
-  assert.match(ownerCenterRoute, /410/);
   assert.match(migration, /function public\.set_site_status/i);
   assert.match(migration, /function public\.set_managed_staff_role/i);
 });

@@ -11,9 +11,6 @@ export async function GET(request: Request) {
   const offset = normalizeProductOffset(searchParams.get("offset") ?? "0");
   const saleType = searchParams.get("saleType") === "fixed" ? "fixed" : "auction";
   const soldOnly = searchParams.get("view") === "sold";
-  const sort = ["latest", "ending", "price_asc", "price_desc"].includes(searchParams.get("sort") ?? "")
-    ? (searchParams.get("sort") as "latest" | "ending" | "price_asc" | "price_desc")
-    : "latest";
   try {
     const products = soldOnly
       ? await fetchSoldFeedProducts({ limit, offset, saleType })
@@ -21,7 +18,6 @@ export async function GET(request: Request) {
         limit,
         offset,
         saleType,
-        sort,
         search: searchParams.get("q") ?? "",
       });
     const hasMore = products.length === limit;

@@ -704,7 +704,10 @@ test("operator payment API is shared, nested, strict, and confirms only the obse
   assert.match(consoleSource, /observedReceivedAmount:\s*payment\.receivedAmount/);
   assert.match(consoleSource, /observedLedgerEntryCount:\s*payment\.ledgerEntryCount/);
   assert.match(consoleSource, /expectedVersion:\s*payment\.version/);
-  assert.match(consoleSource, /sessionStorage\.getItem\(key\)\s*\?\?\s*crypto\.randomUUID\(\)/);
+  assert.match(consoleSource, /manualTransferReceiptFingerprint\(\{/);
+  assert.match(consoleSource, /getOrCreatePendingManualTransferReceipt\(/);
+  assert.match(consoleSource, /clearPendingManualTransferReceipt\(/);
+  assert.doesNotMatch(consoleSource, /sessionStorage\.getItem\(key\)/);
   assert.match(consoleSource, /입금 확인 완료/);
   assert.match(consoleSource, /상세보기/);
   assert.match(consoleSource, /구매자별 주문 상품/);

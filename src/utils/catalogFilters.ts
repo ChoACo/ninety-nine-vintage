@@ -1,7 +1,6 @@
 import type { AuctionPost } from "@/src/types/auction";
 import { getProductFeedDetails } from "@/src/utils/productFeedDetails";
 
-export type CatalogSort = "latest" | "closing" | "price-desc" | "price-asc";
 export type CatalogSize = "all" | "S" | "M" | "L" | "XL";
 export type CatalogGender = "all" | "남성" | "여성" | "공용";
 export type CatalogCategory =
@@ -112,32 +111,4 @@ export function matchesCatalogCategory(post: AuctionPost, category: CatalogCateg
 
 export function matchesCatalogBrand(post: AuctionPost, brand: string): boolean {
   return brand === "all" || getCatalogBrand(post) === brand;
-}
-
-function validTime(value: string): number {
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
-}
-
-export function sortCatalogPosts(
-  posts: readonly AuctionPost[],
-  sort: CatalogSort,
-): AuctionPost[] {
-  if (sort === "latest") return [...posts];
-
-  return posts
-    .map((post, originalIndex) => ({ post, originalIndex }))
-    .sort((left, right) => {
-      let difference = 0;
-      if (sort === "closing") {
-        difference = validTime(left.post.closesAt) - validTime(right.post.closesAt);
-      } else if (sort === "price-desc") {
-        difference = right.post.currentPrice - left.post.currentPrice;
-      } else {
-        difference = left.post.currentPrice - right.post.currentPrice;
-      }
-
-      return difference || left.originalIndex - right.originalIndex;
-    })
-    .map(({ post }) => post);
 }

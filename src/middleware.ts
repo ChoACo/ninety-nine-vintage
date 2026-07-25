@@ -22,8 +22,22 @@ const SKIPPED_PATHS = [
   "/sitemap.xml",
 ];
 const LEGACY_UI_MODE_COOKIE = "ninety-nine-ui-mode";
+const APEX_HOST = "ninety-nine-vintage.store";
+const CANONICAL_HOST = "www.ninety-nine-vintage.store";
+
+function canonicalHostRedirect(request: NextRequest): NextResponse | null {
+  if (request.nextUrl.hostname !== APEX_HOST) return null;
+  const destination = request.nextUrl.clone();
+  destination.hostname = CANONICAL_HOST;
+  return NextResponse.redirect(destination, 308);
+}
 
 function getTrustedClientIp(request: NextRequest): string | null {
+  const cloudflareConnectingIp = request.headers
+    .get("cf-connecting-ip")
+    ?.trim();
+  if (cloudflareConnectingIp) return cloudflareConnectingIp;
+
   const vercelForwarded = request.headers.get("x-vercel-forwarded-for");
   const forwarded =
     vercelForwarded ??
@@ -56,15 +70,18 @@ async function isBlockedIp(ipAddress: string): Promise<boolean> {
   if (!supabaseUrl || !serviceKey) return false;
 
   try {
+    const headers: Record<string, string> = {
+      apikey: serviceKey,
+      "Content-Type": "application/json",
+    };
+    if (!serviceKey.startsWith("sb_secret_")) {
+      headers.Authorization = `Bearer ${serviceKey}`;
+    }
     const response = await fetch(
       `${supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/is_security_ip_blocked`,
       {
         method: "POST",
-        headers: {
-          apikey: serviceKey,
-          Authorization: `Bearer ${serviceKey}`,
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({ p_ip: ipAddress }),
         cache: "no-store",
         signal: AbortSignal.timeout(2_000),
@@ -137,6 +154,9 @@ function expireLegacyUiModeCookie(request: NextRequest, response: NextResponse):
 }
 
 export async function middleware(request: NextRequest) {
+  const canonicalRedirect = canonicalHostRedirect(request);
+  if (canonicalRedirect) return canonicalRedirect;
+
   if (shouldSkip(request.nextUrl.pathname)) return NextResponse.next();
 
   const ipAddress = getTrustedClientIp(request);

@@ -3,6 +3,13 @@
 import { CheckCircle2, Clock3, Pencil, RefreshCw, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CatalogImage } from "@/components/ui/CatalogImage";
+import {
+  clearPendingManualTransferReceipt,
+  getOrCreatePendingManualTransferReceipt,
+  MANUAL_TRANSFER_DEPOSITOR_NAME_MAX_LENGTH,
+  manualTransferReceiptFingerprint,
+  manualTransferReversalFingerprint,
+} from "@/lib/manualTransferReceipt";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type PaymentKind = "commerce" | "auction" | "shipping_fee";
@@ -178,6 +185,7 @@ function sessionKey(payment: PaymentRow) {
 
 export function OperatorPaymentsConsole() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [actorId, setActorId] = useState<string | null>(null);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [serverTime, setServerTime] = useState<string | null>(null);
   const [includeHistory] = useState(true);
@@ -220,6 +228,7 @@ export function OperatorPaymentsConsole() {
         const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
         const token = session?.access_token ?? null;
         setAccessToken(token);
+        setActorId(session?.user.id ?? null);
         if (token) await load(token, true, 0);
       } catch (error) {
         setNotice(error instanceof Error ? error.message : "입금 대기열을 불러오지 못했습니다.");
@@ -241,7 +250,7 @@ export function OperatorPaymentsConsole() {
   };
 
   const confirm = async (payment: PaymentRow) => {
-    if (!accessToken || busyKey || payment.remainingAmount < 1) return;
+    if (!accessToken || !actorId || busyKey || payment.remainingAmount < 1) return;
     const key = sessionKey(payment);
     const depositorName = (depositorNames[key] ?? payment.lastDepositorName ?? "").trim();
     const confirmationAmount = Number(
@@ -261,9 +270,24 @@ export function OperatorPaymentsConsole() {
       setNotice("입금자명을 입력해 주세요.");
       return;
     }
-    const idempotencyStorageKey = `${key}:amount:${confirmationAmount}`;
-    const idempotencyKey = sessionStorage.getItem(idempotencyStorageKey) ?? crypto.randomUUID();
-    sessionStorage.setItem(idempotencyStorageKey, idempotencyKey);
+    const receiptKind = payment.paymentKind === "shipping_fee"
+      ? "shipping"
+      : payment.paymentKind;
+    const receiptScope = `unified:${payment.paymentKind}:${payment.paymentId}:receipt`;
+    const receiptFingerprint = await manualTransferReceiptFingerprint({
+      kind: receiptKind,
+      targetId: payment.paymentId,
+      amount: confirmationAmount,
+      depositorName,
+      memo: confirmationAmount === payment.remainingAmount
+        ? ""
+        : "입금 확인 목록에서 금액 변경",
+    });
+    const idempotencyKey = getOrCreatePendingManualTransferReceipt(
+      actorId,
+      receiptScope,
+      receiptFingerprint,
+    );
     setBusyKey(key);
     setNotice("");
     try {
@@ -284,9 +308,7 @@ export function OperatorPaymentsConsole() {
             },
             body: JSON.stringify({
               action: "record",
-              kind: payment.paymentKind === "shipping_fee"
-                ? "shipping"
-                : payment.paymentKind,
+              kind: receiptKind,
               amount: confirmationAmount,
               depositorName,
               expectedReceivedAmount: payment.receivedAmount,
@@ -304,7 +326,11 @@ export function OperatorPaymentsConsole() {
               : "변경한 입금 금액을 기록하지 못했습니다.",
           );
         }
-        sessionStorage.removeItem(idempotencyStorageKey);
+        clearPendingManualTransferReceipt(
+          actorId,
+          receiptScope,
+          receiptFingerprint,
+        );
         setNotice(`${formatWon(confirmationAmount)} 입금을 확인했습니다.`);
         await load(accessToken, includeHistory, offset);
         return;
@@ -340,7 +366,11 @@ export function OperatorPaymentsConsole() {
           : "입금 확인 결과를 검증하지 못했습니다.";
         throw new Error(message);
       }
-      sessionStorage.removeItem(idempotencyStorageKey);
+      clearPendingManualTransferReceipt(
+        actorId,
+        receiptScope,
+        receiptFingerprint,
+      );
       setNotice(payload.payment.idempotent_replay
         ? "기존 입금 확인 결과를 다시 확인했습니다."
         : "잔액 전액을 입금 확인 처리했습니다.");
@@ -353,12 +383,26 @@ export function OperatorPaymentsConsole() {
   };
 
   const reverse = async (payment: PaymentRow) => {
-    if (!accessToken || busyKey || !payment.reversibleLedgerId) return;
+    if (!accessToken || !actorId || busyKey || !payment.reversibleLedgerId) return;
     const reason = window.prompt("입금 확인 취소 사유를 입력해 주세요.");
     if (!reason?.trim()) return;
     const key = `reverse:${payment.paymentKind}:${payment.paymentId}:${payment.reversibleLedgerId}`;
-    const idempotencyKey = sessionStorage.getItem(key) ?? crypto.randomUUID();
-    sessionStorage.setItem(key, idempotencyKey);
+    const reversalScope = `unified:${payment.paymentKind}:${payment.paymentId}:reversal`;
+    const reversalFingerprint = await manualTransferReversalFingerprint({
+      kind: payment.paymentKind === "shipping_fee"
+        ? "shipping"
+        : payment.paymentKind,
+      targetId: payment.paymentId,
+      ledgerId: payment.reversibleLedgerId,
+      reason: reason.trim(),
+      expectedReceivedAmount: payment.receivedAmount,
+      expectedLedgerEntryCount: payment.ledgerEntryCount,
+    });
+    const idempotencyKey = getOrCreatePendingManualTransferReceipt(
+      actorId,
+      reversalScope,
+      reversalFingerprint,
+    );
     setBusyKey(key);
     setNotice("");
     try {
@@ -391,7 +435,11 @@ export function OperatorPaymentsConsole() {
             : "입금 확인을 취소하지 못했습니다.",
         );
       }
-      sessionStorage.removeItem(key);
+      clearPendingManualTransferReceipt(
+        actorId,
+        reversalScope,
+        reversalFingerprint,
+      );
       setNotice("입금 확인을 취소하고 이전 단계로 되돌렸습니다.");
       await load(accessToken, includeHistory, offset);
     } catch (error) {
@@ -557,7 +605,7 @@ export function OperatorPaymentsConsole() {
                       <input
                         className="mt-2 h-10 w-full border border-line bg-paper px-3 text-xs"
                         id={`depositor-${key}`}
-                        maxLength={80}
+                        maxLength={MANUAL_TRANSFER_DEPOSITOR_NAME_MAX_LENGTH}
                         onChange={(event) => setDepositorNames((current) => ({ ...current, [key]: event.target.value }))}
                         placeholder="입금자명"
                         value={depositorNames[key] ?? payment.lastDepositorName ?? ""}

@@ -20,6 +20,6 @@ function toPayload(products: Awaited<ReturnType<typeof fetchPublishedProducts>>)
 
 export default async function MobileShopPage({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
   const query = (await searchParams).q;
-  const initialProducts = toPayload(await fetchPublishedProducts({ limit: 100, saleType: "fixed", sort: "latest", search: typeof query === "string" ? query : "" }));
+  const initialProducts = toPayload(await fetchPublishedProducts({ limit: 100, saleType: "fixed", search: typeof query === "string" ? query : "" }));
   return <div><AuctionFilterSidebar saleType="fixed" surface="mobile" /><Suspense fallback={<div className="min-h-64" />}><AuctionFeedGrid basePath="/m" initialProducts={initialProducts} saleType="fixed" surface="mobile" title="상시 즉시 구매" /></Suspense></div>;
 }

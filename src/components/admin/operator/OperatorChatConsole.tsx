@@ -17,6 +17,7 @@ interface Conversation {
   id: string;
   member_id: string;
   store_id: string | null;
+  conversation_type: "general" | "internal";
   status: string;
   subject: string | null;
   last_message_at: string | null;
@@ -55,8 +56,12 @@ function problemMessage(payload: unknown, fallback: string) {
 }
 
 export function OperatorChatConsole({
+  basePath = "/admin/operator/chat",
   staffLabel = "운영자",
-}: Readonly<{ staffLabel?: string }>) {
+}: Readonly<{
+  basePath?: "/admin/operator/chat" | "/admin/employee/inquiries";
+  staffLabel?: string;
+}>) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [token, setToken] = useState<string | null>(null);
@@ -165,7 +170,7 @@ export function OperatorChatConsole({
         }
         await loadInbox(accessToken, payload.conversation.id);
         router.replace(
-          `/admin/operator/chat?conversationId=${encodeURIComponent(
+          `${basePath}?conversationId=${encodeURIComponent(
             payload.conversation.id,
           )}`,
           { scroll: false },
@@ -174,7 +179,7 @@ export function OperatorChatConsole({
       }
       await loadInbox(accessToken, requestedConversationId);
     },
-    [loadInbox, router, searchParams],
+    [basePath, loadInbox, router, searchParams],
   );
 
   useEffect(() => {
@@ -284,7 +289,7 @@ export function OperatorChatConsole({
   const selectConversation = (conversationId: string) => {
     setSelected(conversationId);
     router.replace(
-      `/admin/operator/chat?conversationId=${encodeURIComponent(
+      `${basePath}?conversationId=${encodeURIComponent(
         conversationId,
       )}`,
       { scroll: false },
@@ -320,7 +325,9 @@ export function OperatorChatConsole({
               </span>
               <span className="mt-2 flex items-center gap-1 text-[10px] font-bold opacity-70">
                 <Store size={11} />
-                {storeName(conversation.store_id)}
+                {conversation.conversation_type === "internal"
+                  ? "내부 운영 대화"
+                  : storeName(conversation.store_id)}
               </span>
               <span className="mt-2 block truncate text-[11px] opacity-70">
                 {conversation.last_message_preview || "새 상담"}
@@ -345,7 +352,9 @@ export function OperatorChatConsole({
           </p>
           <p className="mt-2 text-[11px] text-muted">
             {selectedConversation
-              ? `${storeName(selectedConversation.store_id)} · 회원의 상품 및 주문 문의`
+              ? selectedConversation.conversation_type === "internal"
+                ? "직원과 담당 운영자의 내부 운영 대화"
+                : `${storeName(selectedConversation.store_id)} · 회원의 상품 및 주문 문의`
               : "회원 보관함의 채팅하기 버튼으로도 바로 연결할 수 있습니다."}
           </p>
         </div>

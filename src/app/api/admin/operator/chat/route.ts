@@ -13,12 +13,24 @@ function isUuid(value: string | null | undefined): value is string {
 export async function GET(request: Request) {
   const auth = await authenticateStaffRequest(request);
   if (!auth.ok) return auth.response;
+  if (auth.roleCode !== "owner" && !auth.effectiveOperatorId) {
+    return commerceJson(
+      {
+        error: "operator_assignment_required",
+        message: "담당 운영자 배정을 확인해 주세요.",
+      },
+      409,
+    );
+  }
+  const scopedOperatorId = auth.effectiveOperatorId ?? auth.userId;
   const conversationId = new URL(request.url).searchParams.get("conversationId");
   if (conversationId) {
     if (!isUuid(conversationId)) {
       return commerceJson({ error: "conversation_not_found" }, 404);
     }
-    const conversationQuery = auth.admin
+    const conversationQuery = (
+      auth.roleCode === "owner" ? auth.admin : auth.user
+    )
       .from("support_conversations")
       .select("*")
       .eq("id", conversationId);
@@ -26,7 +38,7 @@ export async function GET(request: Request) {
       auth.roleCode === "owner"
         ? await conversationQuery.maybeSingle()
         : await conversationQuery
-            .eq("assigned_staff_id", auth.userId)
+            .eq("assigned_staff_id", scopedOperatorId)
             .maybeSingle();
     if (!conversation) {
       return commerceJson({ error: "conversation_not_found" }, 404);
@@ -45,18 +57,20 @@ export async function GET(request: Request) {
     return commerceJson({ conversation, messages: messages ?? [] });
   }
 
-  const query = auth.admin
+  const query = (
+    auth.roleCode === "owner" ? auth.admin : auth.user
+  )
     .from("support_conversations")
     .select(
       "id, member_id, assigned_staff_id, store_id, status, subject, conversation_type, product_id, last_message_at, last_message_preview, last_sender_id, created_at",
     )
-    .eq("conversation_type", "general")
+    .in("conversation_type", ["general", "internal"])
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
   const { data: conversations, error } =
     auth.roleCode === "owner"
       ? await query
-      : await query.eq("assigned_staff_id", auth.userId);
+      : await query.eq("assigned_staff_id", scopedOperatorId);
   if (error) {
     return commerceJson(
       { error: "operator_chat_unavailable", message: error.message },
@@ -99,8 +113,14 @@ export async function POST(request: Request) {
   if (auth.roleCode === "owner") {
     return commerceJson({ error: "owner_chat_read_only" }, 403);
   }
-  if (auth.roleCode !== "operator") {
-    return commerceJson({ error: "operator_chat_required" }, 403);
+  if (!auth.effectiveOperatorId) {
+    return commerceJson(
+      {
+        error: "operator_assignment_required",
+        message: "담당 운영자 배정을 확인해 주세요.",
+      },
+      409,
+    );
   }
 
   const body = (await request.json().catch(() => null)) as {
@@ -113,6 +133,9 @@ export async function POST(request: Request) {
   } | null;
 
   if (body?.action === "ensure") {
+    if (auth.roleCode !== "operator") {
+      return commerceJson({ error: "operator_chat_required" }, 403);
+    }
     if (!isUuid(body.memberId) || !isUuid(body.storeId)) {
       return commerceJson({ error: "회원과 매장을 확인해 주세요." }, 400);
     }
@@ -144,19 +167,23 @@ export async function POST(request: Request) {
   ) {
     return commerceJson({ error: "메시지를 확인해 주세요." }, 400);
   }
-  const { data: conversation } = await auth.admin
+  const { data: authorizedConversation } = await auth.user
     .from("support_conversations")
-    .select("id, assigned_staff_id")
+    .select("id, assigned_staff_id, conversation_type")
     .eq("id", body.conversationId)
     .maybeSingle();
-  if (!conversation || conversation.assigned_staff_id !== auth.userId) {
+  if (
+    !authorizedConversation ||
+    authorizedConversation.assigned_staff_id !== auth.effectiveOperatorId ||
+    !["general", "internal"].includes(authorizedConversation.conversation_type)
+  ) {
     return commerceJson({ error: "담당 매장 상담만 답변할 수 있습니다." }, 403);
   }
 
   const { data: message, error } = await auth.user
     .from("support_messages")
     .insert({
-      conversation_id: conversation.id,
+      conversation_id: authorizedConversation.id,
       body: messageBody,
       client_nonce: body.clientNonce?.trim() || crypto.randomUUID(),
       sender_id: auth.userId,

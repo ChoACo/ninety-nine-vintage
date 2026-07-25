@@ -100,7 +100,7 @@ export function OperatorRevenueConsole() {
         <div>
           <p className="eyebrow text-muted">운영자 / 매장별 재무 원장</p>
           <h1 className="mt-3 text-3xl font-black tracking-[-.06em] sm:text-4xl sm:tracking-[-.08em]">매출 현황</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">결제 확정 상품은 원등록 매장 매출로, 결제 취소와 환불은 같은 매장의 음수 원장으로 기록합니다. 배송비는 중앙 수익으로 분리합니다.</p>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">결제 확정 상품은 원등록 매장 매출로, 결제 취소와 환불은 같은 매장의 음수 원장으로 기록합니다. 배송비는 사업체 공용 수익으로 분리합니다.</p>
         </div>
         <button className="flex items-center justify-center gap-2 border border-line px-4 py-3 text-xs font-bold disabled:opacity-40" disabled={!token || loading} onClick={() => void load()} type="button"><RefreshCw size={14} /> 새로고침</button>
       </header>
@@ -117,7 +117,7 @@ export function OperatorRevenueConsole() {
         <article className="bg-paper p-5"><p className="text-xs text-muted">상품 결제</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(totals.gross)}</p></article>
         <article className="bg-paper p-5"><p className="text-xs text-muted">결제 취소·상품 환불</p><p className="mt-3 font-mono text-2xl font-bold">-{formatKRW(totals.refunds)}</p></article>
         <article className="bg-ink p-5 text-paper"><p className="text-xs text-zinc-400">매장 순매출</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(totals.net)}</p></article>
-        <article className="bg-paper p-5"><p className="text-xs text-muted">중앙 배송비 수익</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(centralShippingFees)}</p></article>
+        <article className="bg-paper p-5"><p className="text-xs text-muted">공용 배송비 수익</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(centralShippingFees)}</p></article>
       </div>
 
       <section className="space-y-5" aria-busy={loading}>

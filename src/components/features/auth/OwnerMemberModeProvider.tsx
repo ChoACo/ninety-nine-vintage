@@ -2,10 +2,8 @@
 
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
-  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -30,6 +28,11 @@ const EMPTY_STATE: OwnerMemberModeState = {
 const OwnerMemberModeContext =
   createContext<OwnerMemberModeContextValue | null>(null);
 
+interface OwnerMemberModeSnapshot {
+  mode: OwnerMemberModeState;
+  sessionKey: string | null;
+}
+
 export function useOwnerMemberMode() {
   const value = useContext(OwnerMemberModeContext);
   if (!value) {
@@ -44,20 +47,25 @@ export function OwnerMemberModeProvider({
   children,
 }: Readonly<{ children: ReactNode }>) {
   const { loading, revision, session } = useSupabaseSession();
-  const [state, setState] = useState<OwnerMemberModeState>(EMPTY_STATE);
+  const accessToken = session?.access_token ?? null;
+  const sessionKey = session ? `${session.user.id}:${revision}` : null;
+  const [snapshot, setSnapshot] = useState<OwnerMemberModeSnapshot>({
+    mode: EMPTY_STATE,
+    sessionKey: null,
+  });
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const state =
+    sessionKey && snapshot.sessionKey === sessionKey
+      ? snapshot.mode
+      : EMPTY_STATE;
 
   useEffect(() => {
-    if (loading) return;
-    if (!session) {
-      setState(EMPTY_STATE);
-      return;
-    }
+    if (loading || !accessToken || !sessionKey) return;
     const controller = new AbortController();
     void fetch("/api/owner/member-mode", {
       cache: "no-store",
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
       signal: controller.signal,
     })
       .then(async (response) => {
@@ -65,13 +73,17 @@ export function OwnerMemberModeProvider({
         return response.json() as Promise<OwnerMemberModeState>;
       })
       .then((next) => {
-        if (!controller.signal.aborted) setState(next);
+        if (!controller.signal.aborted) {
+          setSnapshot({ mode: next, sessionKey });
+        }
       })
       .catch(() => {
-        if (!controller.signal.aborted) setState(EMPTY_STATE);
+        if (!controller.signal.aborted) {
+          setSnapshot({ mode: EMPTY_STATE, sessionKey });
+        }
       });
     return () => controller.abort();
-  }, [loading, revision, session]);
+  }, [accessToken, loading, sessionKey]);
 
   useEffect(() => {
     if (!state.active || !state.expiresAt) return;
@@ -88,50 +100,39 @@ export function OwnerMemberModeProvider({
 
   useEffect(() => {
     if (state.active && remainingSeconds === 0) {
-      setState((current) => ({
-        ...current,
-        active: false,
-        expiresAt: null,
-      }));
       window.location.assign("/home");
     }
   }, [remainingSeconds, state.active]);
 
-  const run = useCallback(
-    async (action: OwnerMemberModeAction) => {
-      if (!session?.access_token || busy) return false;
-      setBusy(true);
-      try {
-        const response = await fetch("/api/owner/member-mode", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ action }),
-        });
-        const payload = await response.json().catch(() => null) as
-          | (OwnerMemberModeState & { message?: string })
-          | null;
-        if (!response.ok || !payload) {
-          throw new Error(payload?.message ?? "임시 회원 권한을 변경하지 못했습니다.");
-        }
-        setNow(Date.now());
-        setState(payload);
-        return true;
-      } catch {
-        return false;
-      } finally {
-        setBusy(false);
+  const run = async (action: OwnerMemberModeAction) => {
+    if (!accessToken || !sessionKey || busy) return false;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/owner/member-mode", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action }),
+      });
+      const payload = await response.json().catch(() => null) as
+        | (OwnerMemberModeState & { message?: string })
+        | null;
+      if (!response.ok || !payload) {
+        throw new Error(payload?.message ?? "임시 회원 권한을 변경하지 못했습니다.");
       }
-    },
-    [busy, session?.access_token],
-  );
+      setNow(Date.now());
+      setSnapshot({ mode: payload, sessionKey });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
 
-  const value = useMemo(
-    () => ({ ...state, busy, remainingSeconds, run }),
-    [busy, remainingSeconds, run, state],
-  );
+  const value = { ...state, busy, remainingSeconds, run };
 
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;

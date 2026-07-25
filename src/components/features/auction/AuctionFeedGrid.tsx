@@ -23,7 +23,6 @@ import {
   getNextCatalogOffset,
   MAX_CATALOG_FETCH_BATCHES,
   mergeCatalogProductBatch,
-  type CatalogProductSort,
 } from "@/lib/catalog/pagination";
 import { getCatalogImageUrl } from "@/lib/images";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -72,7 +71,6 @@ interface CatalogFilters {
   closingOnly: boolean;
   date?: string;
   query?: string;
-  sort: CatalogProductSort;
 }
 
 interface AuctionFeedGridProps {
@@ -109,7 +107,6 @@ async function fetchCompleteProductCatalog(input: {
       limit: String(CATALOG_FETCH_BATCH_SIZE),
       offset: String(offset),
       saleType: input.saleType,
-      sort: "latest",
     });
     if (input.soldOnly) params.set("view", "sold");
     const response = await fetch(`/api/products?${params.toString()}`, {

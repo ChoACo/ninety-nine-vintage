@@ -8,50 +8,69 @@ const supabaseImageHostname = (() => {
   }
 })();
 
+const allowedDevOrigins = (process.env.DEV_ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://kauth.kakao.com https://kapi.kakao.com",
+  "font-src 'self' data:",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "img-src 'self' data: blob: https://*.supabase.co",
+  "manifest-src 'self'",
+  "media-src 'self' blob:",
+  "object-src 'none'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "worker-src 'self' blob:",
+].join("; ");
+
+const securityHeaders = [
+  { key: "Content-Security-Policy", value: contentSecurityPolicy },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
+  },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Strict-Transport-Security",
+    value: "max-age=31536000; includeSubDomains",
+  },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "DENY" },
+] as const;
+
 const nextConfig: NextConfig = {
-  // Allow a phone on this local network to receive Turbopack updates while
-  // testing the mobile site through the development server.
-  allowedDevOrigins: ["192.168.45.119"],
+  ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
   // Keep the App Router in its default SSR mode. Product images use next/image;
   // the allow-list below limits remote optimization to Supabase Storage while
   // AVIF/WebP variants and device-specific srcsets reduce storefront payloads.
-  // PortOne's public VITE_* names are retained for deployment compatibility;
-  // Next exposes the same values to the client bundle through this explicit
-  // mapping instead of relying on Vite's import.meta.env transform.
-  env: {
-    VITE_PORTONE_STORE_ID: process.env.VITE_PORTONE_STORE_ID,
-    VITE_PORTONE_CHANNEL_KEY: process.env.VITE_PORTONE_CHANNEL_KEY,
-    VITE_PORTONE_CARD_CHANNEL_KEY: process.env.VITE_PORTONE_CARD_CHANNEL_KEY,
-    VITE_PORTONE_KAKAOPAY_CHANNEL_KEY:
-      process.env.VITE_PORTONE_KAKAOPAY_CHANNEL_KEY,
-    VITE_PORTONE_VIRTUAL_ACCOUNT_CHANNEL_KEY:
-      process.env.VITE_PORTONE_VIRTUAL_ACCOUNT_CHANNEL_KEY,
-    VITE_PORTONE_WEBHOOK_URL: process.env.VITE_PORTONE_WEBHOOK_URL,
-    NEXT_PUBLIC_PORTONE_WEBHOOK_URL:
-      process.env.NEXT_PUBLIC_PORTONE_WEBHOOK_URL ??
-      process.env.VITE_PORTONE_WEBHOOK_URL,
-  },
   images: {
     deviceSizes: [360, 480, 640, 768, 1024, 1280, 1536, 1920],
     formats: ["image/avif", "image/webp"],
     imageSizes: [48, 64, 96, 128, 256, 384],
     minimumCacheTTL: 86400,
-    remotePatterns: [
+    remotePatterns: supabaseImageHostname
+      ? [
+          {
+            hostname: supabaseImageHostname,
+            pathname: "/storage/v1/**",
+            protocol: "https" as const,
+          },
+        ]
+      : [],
+  },
+  async headers() {
+    return [
       {
-        hostname: "**.supabase.co",
-        pathname: "/storage/v1/**",
-        protocol: "https",
+        source: "/:path*",
+        headers: [...securityHeaders],
       },
-      ...(supabaseImageHostname
-        ? [
-            {
-              hostname: supabaseImageHostname,
-              pathname: "/storage/v1/**",
-              protocol: "https" as const,
-            },
-          ]
-        : []),
-    ],
+    ];
   },
   async redirects() {
     return [

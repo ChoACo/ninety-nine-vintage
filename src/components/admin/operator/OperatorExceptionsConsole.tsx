@@ -85,7 +85,7 @@ function resolutionLabel(value: string | null) {
   return { resume: "배송 재개", exclude_for_later: "다음 배송으로 제외", refund: "환불 요청 생성" }[value] ?? value;
 }
 function statusLabel(value: string) {
-  return { open: "처리 중", resolved: "처리 완료", center_stored: "중앙 보관 완료", held: "보류" }[value] ?? value;
+  return { open: "처리 중", resolved: "처리 완료", center_stored: "매장 보관 완료", held: "보류" }[value] ?? value;
 }
 function commandKey(prefix: string, values: string[]) {
   return `${prefix}${values.join(":")}`;

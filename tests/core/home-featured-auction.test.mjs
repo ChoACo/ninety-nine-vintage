@@ -66,7 +66,7 @@ test("home hero rotates auction product main images every five seconds and keeps
     source("src/app/(mobile)/m/home/page.tsx"),
     source("src/components/features/home/HomeFeaturedAuction.tsx"),
   ]);
-  assert.match(home, /limit: 100, saleType: "auction", sort: "latest"/);
+  assert.match(home, /limit: 100, saleType: "auction"/);
   assert.match(home, /selectFeaturedAuctionCandidates\(auctions\)/);
   assert.match(home, /imageUrl: product\.imageUrls\[0\]/);
   assert.doesNotMatch(home, /fixed\[0\]/);
@@ -79,7 +79,7 @@ test("home hero rotates auction product main images every five seconds and keeps
   assert.match(hero, /\/banners\/brand-banner-mobile\.jpg/);
   assert.match(hero, /href=\{`\$\{basePath\}\/feed`\}/);
   assert.match(hero, /href=\{`\$\{basePath\}\/auction\/\$\{product\.id\}`\}/);
-  assert.match(mobileHome, /limit: 100, saleType: "auction", sort: "latest"/);
+  assert.match(mobileHome, /limit: 100, saleType: "auction"/);
   assert.match(mobileHome, /selectFeaturedAuctionCandidates\(auctions\)/);
   assert.match(mobileHome, /basePath="\/m"/);
   assert.match(mobileHome, /surface="mobile"/);

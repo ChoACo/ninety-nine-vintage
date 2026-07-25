@@ -1,58 +1,6 @@
 export const CATALOG_FETCH_BATCH_SIZE = 100;
 export const MAX_CATALOG_FETCH_BATCHES = 100;
 
-export type CatalogProductSort = "latest" | "ending" | "price_asc" | "price_desc";
-
-interface SortableCatalogProduct {
-  closesAt: string;
-  currentPrice: number;
-  fixedPrice: number | null;
-  id: string;
-  publishAt: string;
-  saleType: "auction" | "fixed";
-}
-
-function compareProductIds(left: string, right: string) {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
-
-function validTimestamp(value: string, fallback: number) {
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? timestamp : fallback;
-}
-
-function validPrice(product: SortableCatalogProduct, fallback: number) {
-  const price = product.saleType === "fixed"
-    ? product.fixedPrice
-    : product.currentPrice;
-  return typeof price === "number" && Number.isFinite(price) ? price : fallback;
-}
-
-export function sortCatalogProducts<T extends SortableCatalogProduct>(
-  products: readonly T[],
-  sort: CatalogProductSort,
-): T[] {
-  return [...products].sort((left, right) => {
-    let primary = 0;
-    if (sort === "ending") {
-      primary = validTimestamp(left.closesAt, Number.POSITIVE_INFINITY)
-        - validTimestamp(right.closesAt, Number.POSITIVE_INFINITY);
-    } else if (sort === "price_asc") {
-      primary = validPrice(left, Number.POSITIVE_INFINITY)
-        - validPrice(right, Number.POSITIVE_INFINITY);
-    } else if (sort === "price_desc") {
-      primary = validPrice(right, Number.NEGATIVE_INFINITY)
-        - validPrice(left, Number.NEGATIVE_INFINITY);
-    } else {
-      primary = validTimestamp(right.publishAt, Number.NEGATIVE_INFINITY)
-        - validTimestamp(left.publishAt, Number.NEGATIVE_INFINITY);
-    }
-    return primary || compareProductIds(left.id, right.id);
-  });
-}
-
 export function mergeCatalogProductBatch<T extends { id: string }>(
   current: readonly T[],
   incoming: readonly T[],

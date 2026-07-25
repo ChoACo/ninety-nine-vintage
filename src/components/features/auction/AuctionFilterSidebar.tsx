@@ -8,7 +8,6 @@ import { PremiumDialog } from "@/components/ui/PremiumDialog";
 const genders = ["all", "남성", "여성", "공용"] as const;
 
 type CatalogGender = (typeof genders)[number];
-type Sort = "latest" | "ending" | "price_asc" | "price_desc";
 
 interface CatalogFilters {
   brand?: string;
@@ -19,7 +18,6 @@ interface CatalogFilters {
   liveOnly: boolean;
   query?: string;
   sizes: string[];
-  sort: Sort;
 }
 
 interface CatalogFilterOptions {
@@ -107,7 +105,6 @@ export function AuctionFilterSidebar({
     liveOnly: true,
     query: next.query ?? query,
     sizes: [],
-    sort: "latest",
   });
 
   const resetFilters = () => {
@@ -124,7 +121,6 @@ export function AuctionFilterSidebar({
       liveOnly: true,
       query: "",
       sizes: [],
-      sort: "latest",
     });
   };
 

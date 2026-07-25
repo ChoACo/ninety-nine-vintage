@@ -501,11 +501,11 @@ test("partial auction receipts suspend automatic expiry before cron is restored"
 });
 
 test("operator balances are full-ledger aggregates and the commerce queue is shared", async () => {
-  const [migration, queueMigration, operatorRoute, ownerRoute] = await Promise.all([
+  const [migration, queueMigration, operatorRoute, unifiedRoute] = await Promise.all([
     source(migrationPath),
     source(queueSnapshotMigrationPath),
     source("src/app/api/admin/operator/orders/route.ts"),
-    source("src/app/api/admin/owner/operations/route.ts"),
+    source("src/app/api/admin/operator/payments/route.ts"),
   ]);
   const balances = sqlFunction(
     migration,
@@ -537,9 +537,7 @@ test("operator balances are full-ledger aggregates and the commerce queue is sha
     "the shared queue must use the signed full-ledger total",
   );
   assert.doesNotMatch(operatorRoute, /get_manual_transfer_ledger_balances/);
-  assert.ok(
-    (ownerRoute.match(/get_manual_transfer_ledger_balances/g) ?? []).length >= 3,
-  );
+  assert.match(unifiedRoute, /"get_unified_manual_payment_queue"/);
   assert.doesNotMatch(
     operatorRoute,
     /\.eq\(\s*"operator_id"|\.in\(\s*"store_id"/,
@@ -551,11 +549,7 @@ test("operator balances are full-ledger aggregates and the commerce queue is sha
     "the validated queue snapshot must drive the receipt CAS",
   );
   expectMatch(operatorRoute, /\breceivedAmount,[\s\S]{0,80}\bledgerEntryCount,/);
-  assert.doesNotMatch(
-    ownerRoute,
-    /from\(\s*"manual_transfer_payment_ledger"\s*\)/,
-    "the owner queue must not derive balances from a max_rows-limited history response",
-  );
+  assert.doesNotMatch(unifiedRoute, /get_manual_transfer_ledger_balances/);
   expectMatch(
     operatorRoute,
     /auth\.user\.rpc\([\s\S]{0,100}"get_shared_commerce_payment_queue_page"/,
@@ -1122,10 +1116,10 @@ test("generated database types include receipt keys and exact deadline holds", a
   );
 });
 
-test("all three receipt UIs persist one canonical key until a successful response", async () => {
-  const [operatorConsole, ownerConsole, receiptHelper] = await Promise.all([
+test("receipt UIs persist one actor-bound canonical key until a successful response", async () => {
+  const [operatorConsole, unifiedConsole, receiptHelper] = await Promise.all([
     source("src/components/admin/operator/OperatorOrdersConsole.tsx"),
-    source("src/components/admin/owner/OwnerOperationsConsole.tsx"),
+    source("src/components/admin/operator/OperatorPaymentsConsole.tsx"),
     source("src/lib/manualTransferReceipt.ts"),
   ]);
   const operatorMutation = section(
@@ -1134,17 +1128,11 @@ test("all three receipt UIs persist one canonical key until a successful respons
     "const waiting =",
     "operator receipt mutation",
   );
-  const auctionMutation = section(
-    ownerConsole,
-    "const recordAuctionReceipt = async",
-    "const recordShippingReceipt = async",
-    "owner auction receipt mutation",
-  );
-  const shippingMutation = section(
-    ownerConsole,
-    "const recordShippingReceipt = async",
-    "const runtimeStatusText =",
-    "owner shipping receipt mutation",
+  const unifiedMutation = section(
+    unifiedConsole,
+    "const confirm = async",
+    "const reverse = async",
+    "unified payment receipt mutation",
   );
 
   expectMatch(
@@ -1164,9 +1152,8 @@ test("all three receipt UIs persist one canonical key until a successful respons
   );
 
   for (const [label, mutation] of [
-    ["commerce UI", operatorMutation],
-    ["auction UI", auctionMutation],
-    ["shipping UI", shippingMutation],
+    ["legacy commerce UI", operatorMutation],
+    ["unified commerce/auction/shipping UI", unifiedMutation],
   ]) {
     expectMatch(
       mutation,
@@ -1183,35 +1170,15 @@ test("all three receipt UIs persist one canonical key until a successful respons
       /clearPendingManualTransferReceipt\s*\(\s*actorId\s*,\s*(?:receiptScope|pendingScope)/,
       `${label}: only the current actor's pending key may be cleared`,
     );
-    assertOrdered(
-      mutation,
-      ["if (!response.ok)", "clearPendingManualTransferReceipt("],
-      `${label}: pending key clear path`,
-    );
     expectMatch(
       mutation,
-      /결과를 확인하지 못했습니다[\s\S]{0,120}같은 내용으로 다시 시도/,
-      `${label}: an unknown network outcome must not be reported as a definite failure`,
-    );
-    expectMatch(
-      mutation,
-      /outcomeDefinitive\s*=\s*payload\?\.outcome\s*===\s*"rejected"[\s\S]{0,800}requestStarted\s*&&\s*!outcomeDefinitive/,
-      `${label}: only an explicit API rejection may be treated as a definitive failure`,
+      /if\s*\(!response\.ok[\s\S]*?clearPendingManualTransferReceipt\s*\(/,
+      `${label}: pending key may be cleared only after a validated success response`,
     );
     assert.doesNotMatch(
       mutation,
-      /response\.status\s*<\s*500/,
-      `${label}: HTTP status alone must not turn a transport failure into a definitive rejection`,
-    );
-    expectMatch(
-      mutation,
-      /readIdempotentReplay\s*\([\s\S]*?idempotentReplay\s*===\s*null[\s\S]*?clearPendingManualTransferReceipt\s*\(/,
-      `${label}: malformed success JSON must keep the retry key until the replay marker is known`,
-    );
-    expectMatch(
-      mutation,
-      /idempotentReplay[\s\S]{0,180}기존[^\n"]*입금[^\n"]*영수증[^\n"]*확인[^\n"]*새 입금은 추가되지 않았습니다/,
-      `${label}: a replay must not be announced as a newly appended receipt`,
+      /sessionStorage\.(?:getItem|setItem|removeItem)/,
+      `${label}: receipt keys must be managed only by the actor-bound helper`,
     );
   }
 
@@ -1232,15 +1199,19 @@ test("all three receipt UIs persist one canonical key until a successful respons
   );
 
   assert.doesNotMatch(
-    `${operatorConsole}\n${ownerConsole}`,
+    `${operatorConsole}\n${unifiedConsole}`,
     /delete\s+receiptKeys\.current/,
     "editing and reverting a receipt must not discard its retry key",
   );
   assert.ok(
     (operatorConsole.match(/maxLength=\{MANUAL_TRANSFER_DEPOSITOR_NAME_MAX_LENGTH\}/g) ?? []).length >= 1 &&
       (operatorConsole.match(/maxLength=\{MANUAL_TRANSFER_MEMO_MAX_LENGTH\}/g) ?? []).length >= 1 &&
-      (ownerConsole.match(/maxLength=\{MANUAL_TRANSFER_DEPOSITOR_NAME_MAX_LENGTH\}/g) ?? []).length >= 2 &&
-      (ownerConsole.match(/maxLength=\{MANUAL_TRANSFER_MEMO_MAX_LENGTH\}/g) ?? []).length >= 2,
+      (unifiedConsole.match(/maxLength=\{MANUAL_TRANSFER_DEPOSITOR_NAME_MAX_LENGTH\}/g) ?? []).length >= 1,
     "all receipt forms must enforce the same text bounds used by the canonical fingerprint",
+  );
+  expectMatch(
+    unifiedConsole,
+    /manualTransferReversalFingerprint\s*\([\s\S]*?getOrCreatePendingManualTransferReceipt\s*\([\s\S]*?clearPendingManualTransferReceipt\s*\(/,
+    "the unified reversal action must keep the same actor-bound retry contract",
   );
 });

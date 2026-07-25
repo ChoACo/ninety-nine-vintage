@@ -27,7 +27,7 @@ export default function AdminLayout({
             NINETY-NINE 운영 센터
           </Link>
           <div className="flex items-center gap-2">
-            <ChatNotificationLink ariaLabel="운영 채팅" className="grid size-10 place-items-center border border-line" fallbackHref="/admin/operator/chat"><MessageCircle size={16} /></ChatNotificationLink>
+            <ChatNotificationLink ariaLabel="운영 채팅" className="grid size-10 place-items-center border border-line" fallbackHref="/admin"><MessageCircle size={16} /></ChatNotificationLink>
             <ThemeToggle className="size-10 px-0 sm:w-auto sm:px-3" />
             <Link className="text-xs font-bold underline" href="/">
               쇼핑 화면으로 이동

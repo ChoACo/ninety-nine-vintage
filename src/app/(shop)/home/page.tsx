@@ -24,9 +24,9 @@ export const metadata: Metadata = {
 async function loadHomeData() {
   const [auctionResult, fixedResult] = await Promise.allSettled([
     LIVE_AUCTION_ENABLED
-      ? fetchPublishedProducts({ limit: 100, saleType: "auction", sort: "latest" })
+      ? fetchPublishedProducts({ limit: 100, saleType: "auction" })
       : Promise.resolve([]),
-    fetchPublishedProducts({ limit: 6, saleType: "fixed", sort: "latest" }),
+    fetchPublishedProducts({ limit: 6, saleType: "fixed" }),
   ]);
   return {
     auctions: auctionResult.status === "fulfilled" ? auctionResult.value : [],

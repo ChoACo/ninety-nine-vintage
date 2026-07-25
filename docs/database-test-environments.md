@@ -1,5 +1,9 @@
 # Database contract test environments
 
+The central-fulfillment suites below are historical migration compatibility
+tests. Current application behavior is direct-store fulfillment; center IDs
+remain internal compatibility keys only.
+
 The manual-transfer reversal contract has two isolated PostgreSQL runners. Both
 apply the same five-step plan: bootstrap, legacy rows, the forward migration,
 functional contracts, and real multi-session concurrency checks.

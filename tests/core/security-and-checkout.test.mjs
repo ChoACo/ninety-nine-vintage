@@ -310,7 +310,10 @@ test("public shop surfaces expose shopper controls while admin links remain sess
 
   assert.match(authStatus, /useSupabaseSession\(\)/);
   assert.match(authStatus, /label: "내 정보"/);
-  assert.match(authStatus, /label: "출고·보관"/);
+  assert.match(
+    authStatus,
+    /href: "\/admin\/operator", label: "운영자센터"/,
+  );
   assert.match(authStatus, /label: "직원센터"/);
   assert.match(authStatus, /aria-label="로그아웃"/);
   for (const source of [authStatus, accountPage]) {

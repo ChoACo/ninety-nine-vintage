@@ -35,7 +35,7 @@ export function AuthStatus({ basePath = "" }: { basePath?: "" | "/m" }) {
     ><LogIn size={15} /> 카카오 로그인</Link>;
   }
   const accountLink = access.roleCode === "operator"
-    ? { href: "/admin/operator/fulfillment", label: "출고·보관", Icon: Building2 }
+    ? { href: "/admin/operator", label: "운영자센터", Icon: Building2 }
     : access.roleCode === "employee"
       ? { href: "/admin/employee", label: "직원센터", Icon: Building2 }
       : access.roleCode === "owner"

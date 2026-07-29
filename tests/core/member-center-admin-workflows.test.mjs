@@ -99,7 +99,10 @@ test("employee and operator navigation use direct-store fulfillment without cent
   assert.doesNotMatch(operatorLayout, /\/admin\/operator\/members/);
   assert.match(operatorLayout, /\/admin\/operator\/chat/);
   assert.match(operatorLayout, /회원 채팅/);
-  assert.match(header, /label: "출고·보관"/);
+  assert.match(
+    header,
+    /href: "\/admin\/operator", label: "운영자센터"/,
+  );
   assert.match(header, /label: "직원센터"/);
 });
 

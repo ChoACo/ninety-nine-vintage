@@ -12,6 +12,16 @@ import {
 import { useNotificationExperience } from "@/components/features/notifications/NotificationExperienceProvider";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import {
+  ANDROID_CHROME_STORE_URL,
+  buildAndroidChromeIntent,
+  buildIosChromeUrl,
+  detectInstallBrowser,
+  getInstallFallbackMode,
+  IOS_CHROME_STORE_URL,
+  type InstallFallbackMode,
+  type MobilePlatform,
+} from "@/lib/pwa/chromeLaunch";
+import {
   type BeforeInstallPromptEvent,
   disableWebPush,
   enableWebPush,
@@ -37,7 +47,9 @@ type PushState =
 
 export interface MobilePwaState {
   install(): Promise<void>;
+  installActionLabel: string;
   installHelp: string | null;
+  installStoreUrl: string | null;
   installed: boolean;
   isMobile: boolean;
   standalone: boolean;
@@ -57,7 +69,12 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
   const [standalone, setStandalone] = useState(false);
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
+  const [installFallbackMode, setInstallFallbackMode] =
+    useState<InstallFallbackMode>("manual");
+  const [mobilePlatform, setMobilePlatform] =
+    useState<MobilePlatform>("other");
   const [installHelp, setInstallHelp] = useState<string | null>(null);
+  const [installStoreUrl, setInstallStoreUrl] = useState<string | null>(null);
   const [pushState, setPushState] = useState<PushState>("unsupported");
   const [pushError, setPushError] = useState<string | null>(null);
 
@@ -70,6 +87,13 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
       const runningStandalone = isInstalledWebApp();
       setInstalled(runningStandalone);
       setStandalone(runningStandalone);
+      const browserContext = detectInstallBrowser(
+        navigator.userAgent,
+        navigator.platform,
+        navigator.maxTouchPoints,
+      );
+      setInstallFallbackMode(getInstallFallbackMode(browserContext));
+      setMobilePlatform(browserContext.platform);
     });
     if (!mobile) {
       return () => {
@@ -81,6 +105,7 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
     const capturePrompt = (event: Event) => {
       event.preventDefault();
       setInstallPrompt(event as BeforeInstallPromptEvent);
+      setInstallStoreUrl(null);
     };
     const captureInstalled = () => {
       setInstalled(true);
@@ -177,18 +202,59 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
 
   const install = useCallback(async () => {
     setInstallHelp(null);
+    setInstallStoreUrl(null);
     if (installPrompt) {
-      await installPrompt.prompt();
-      const choice = await installPrompt.userChoice;
-      if (choice.outcome === "accepted") setInstallPrompt(null);
+      try {
+        await installPrompt.prompt();
+        const choice = await installPrompt.userChoice;
+        setInstallPrompt(null);
+        if (choice.outcome === "dismissed") {
+          setInstallHelp(
+            "설치를 취소했습니다. 다시 설치하려면 Chrome 메뉴(⋮)의 ‘앱 설치’를 이용해 주세요.",
+          );
+        }
+      } catch {
+        setInstallPrompt(null);
+        setInstallHelp(
+          "설치창을 열지 못했습니다. Chrome 메뉴(⋮)에서 ‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택해 주세요.",
+        );
+      }
       return;
     }
+
+    if (installFallbackMode === "open_chrome") {
+      if (mobilePlatform === "android") {
+        const chromeIntent = buildAndroidChromeIntent(window.location.href);
+        setInstallHelp(
+          "Chrome으로 이동합니다. 열린 페이지에서 ‘앱 설치하기’를 다시 눌러 주세요. Chrome이 없으면 설치 화면으로 연결됩니다.",
+        );
+        setInstallStoreUrl(ANDROID_CHROME_STORE_URL);
+        if (chromeIntent) window.location.assign(chromeIntent);
+        return;
+      }
+      if (mobilePlatform === "ios") {
+        const chromeUrl = buildIosChromeUrl(window.location.href);
+        setInstallHelp(
+          "Chrome으로 이동합니다. Chrome의 공유 메뉴에서 ‘홈 화면에 추가’를 선택해 주세요. Chrome이 열리지 않으면 아래에서 Chrome을 먼저 설치해 주세요.",
+        );
+        setInstallStoreUrl(IOS_CHROME_STORE_URL);
+        if (chromeUrl) window.location.assign(chromeUrl);
+        return;
+      }
+    }
+
     setInstallHelp(
       isIosMobile()
-        ? "Safari의 공유 버튼을 누른 뒤 ‘홈 화면에 추가’를 선택해 주세요."
+        ? "브라우저의 공유 버튼을 누른 뒤 ‘홈 화면에 추가’를 선택해 주세요."
         : "Chrome 메뉴(⋮)에서 ‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택해 주세요.",
     );
-  }, [installPrompt]);
+  }, [installFallbackMode, installPrompt, mobilePlatform]);
+
+  const installActionLabel = installPrompt
+    ? "앱 설치하기"
+    : installFallbackMode === "open_chrome"
+      ? "Chrome에서 열고 설치"
+      : "앱 설치 방법 보기";
 
   const togglePush = useCallback(async () => {
     if (
@@ -248,7 +314,9 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       install,
+      installActionLabel,
       installHelp,
+      installStoreUrl,
       installed,
       isMobile,
       standalone,
@@ -259,7 +327,9 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
     }),
     [
       install,
+      installActionLabel,
       installHelp,
+      installStoreUrl,
       installed,
       isMobile,
       standalone,

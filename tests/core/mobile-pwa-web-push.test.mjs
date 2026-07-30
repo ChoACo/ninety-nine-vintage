@@ -20,8 +20,12 @@ test("the install control is mobile-device gated and the manifest opens the mobi
   assert.match(client, /userAgentData\?\.mobile/);
   assert.match(client, /Android\|iPhone/);
   assert.match(controls, /if \(!state\?\.isMobile\) return null/);
-  assert.match(controls, /앱 설치하기/);
+  assert.match(controls, /state\.installActionLabel/);
   assert.match(provider, /beforeinstallprompt/);
+  assert.match(provider, /Chrome에서 열고 설치/);
+  assert.match(provider, /buildAndroidChromeIntent\(window\.location\.href\)/);
+  assert.match(provider, /buildIosChromeUrl\(window\.location\.href\)/);
+  assert.match(controls, /Chrome 설치 페이지 열기/);
   assert.match(provider, /install_required/);
   assert.match(provider, /getWebPushClientMode/);
   assert.match(controls, /Android Chrome에서는 앱을 설치하지 않아도/);

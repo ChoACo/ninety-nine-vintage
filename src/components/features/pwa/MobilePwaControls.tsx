@@ -138,7 +138,7 @@ export function MobilePwaControls({
           onClick={() => void state.install()}
           type="button"
         >
-          <Download size={16} /> 앱 설치하기
+          <Download size={16} /> {state.installActionLabel}
         </button>
       )}
       {state.pushState !== "install_required" ? (
@@ -267,7 +267,22 @@ export function MobilePwaControls({
         </>
       )}
       {state.installHelp && (
-        <p className="text-[11px] leading-5 text-muted">{state.installHelp}</p>
+        <div
+          aria-live="polite"
+          className="border border-line bg-surface p-3 text-[11px] leading-5 text-muted"
+        >
+          <p>{state.installHelp}</p>
+          {state.installStoreUrl && (
+            <a
+              className="mt-2 inline-flex min-h-10 items-center font-black text-ink underline underline-offset-4"
+              href={state.installStoreUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Chrome 설치 페이지 열기
+            </a>
+          )}
+        </div>
       )}
       {state.pushError && (
         <p className="text-[11px] leading-5 text-danger">{state.pushError}</p>

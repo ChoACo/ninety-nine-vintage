@@ -11,6 +11,8 @@ const retentionMigrationPath =
   "supabase/migrations/20260723130000_owner_member_management_retention.sql";
 const profileLedgerMigrationPath =
   "supabase/migrations/20260723140000_link_profiles_to_ledger_principals.sql";
+const boundedCleanupMigrationPath =
+  "supabase/migrations/20260730042126_purge_closed_test_catalog_and_withdrawn_logs.sql";
 
 test("owner member management actions use confirmed reasons and separate seven-day withdrawn retention", async () => {
   const [
@@ -97,6 +99,21 @@ test("owner member management actions use confirmed reasons and separate seven-d
   assert.match(archiveConsole, /익명 회원/);
   assert.match(archiveConsole, /정리 재시도/);
   assert.doesNotMatch(archiveConsole, /member\.email|member\.phone|legal_name/);
+});
+
+test("test catalog and withdrawn-member cleanup is cutoff-bound and restores immutable guards", async () => {
+  const migration = await source(boundedCleanupMigrationPath);
+
+  assert.match(migration, /^begin;/);
+  assert.match(migration, /created_at < timestamptz '2026-07-30 13:21:00\+09'/);
+  assert.match(migration, /deleted_at < timestamptz '2026-07-31 00:00:00\+09'/);
+  assert.match(migration, /cleanup_withdrawn_member\([\s\S]*purge_due_at/);
+  assert.match(migration, /disable trigger security_activity_logs_append_only/);
+  assert.match(migration, /enable trigger security_activity_logs_append_only/);
+  assert.match(migration, /add constraint inventory_shipments_shipping_credit_ledger_id_fkey/);
+  assert.match(migration, /add constraint inventory_shipments_shipping_fee_payment_id_fkey/);
+  assert.match(migration, /테스트 상품 정리 범위를 벗어난 주문·환불·예외 참조/);
+  assert.match(migration, /commit;\s*$/);
 });
 
 test("center assignment capabilities are revoked after direct-store cutover", async () => {

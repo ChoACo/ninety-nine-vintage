@@ -5,9 +5,7 @@ import {
   ArrowUpRight,
   Banknote,
   Clock3,
-  FileSpreadsheet,
   Package,
-  Plus,
   Truck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -149,6 +147,9 @@ export function OperatorConsole({
     ["배송 요청", shipping, Truck],
     ["이번 달 순매출", `${netRevenue.toLocaleString("ko-KR")}원`, Banknote],
   ] as const;
+  const activeProducts = products.filter(
+    (product) => product.status === "active",
+  );
 
   return (
     <div className="space-y-10">
@@ -159,22 +160,8 @@ export function OperatorConsole({
             운영자 센터
           </h1>
           <p className="mt-3 text-sm text-muted">
-            소속 매장의 상품 등록, 입금 확인, 출고와 택배 업무를 확인합니다.
+            소속 매장의 진행 상품, 입금 확인, 출고와 택배 업무를 확인합니다.
           </p>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex">
-          <Link
-            className="flex items-center justify-center gap-2 bg-ink px-3 py-3 text-xs font-bold text-paper sm:px-5"
-            href="/admin/operator/products?import=xlsx"
-          >
-            <FileSpreadsheet size={15} /> 엑셀 일괄 등록
-          </Link>
-          <Link
-            className="flex items-center justify-center gap-2 border border-ink px-3 py-3 text-xs font-bold sm:px-5"
-            href="/admin/operator/products?create=single"
-          >
-            <Plus size={15} /> 단품 등록
-          </Link>
         </div>
       </div>
 
@@ -213,7 +200,7 @@ export function OperatorConsole({
             </Link>
           </div>
           <div className="divide-y divide-line border-y border-line">
-            {products.slice(0, 8).map((product) => (
+            {activeProducts.slice(0, 8).map((product) => (
               <div className="flex flex-wrap items-center gap-3 py-4 sm:gap-4" key={product.id}>
                 <CatalogImage
                   alt=""
@@ -250,9 +237,9 @@ export function OperatorConsole({
                   )}
               </div>
             ))}
-            {products.length === 0 && (
+            {activeProducts.length === 0 && (
               <p className="py-12 text-center text-sm text-muted">
-                등록된 상품이 없습니다.
+                현재 진행 중인 상품이 없습니다.
               </p>
             )}
           </div>
@@ -263,9 +250,9 @@ export function OperatorConsole({
           <div className="mt-7 space-y-5 text-xs">
             <Link
               className="flex gap-3 underline"
-              href="/admin/operator/products"
+              href="/admin/operator/products/registration"
             >
-              상품 이미지와 실측 확인 <ArrowUpRight size={14} />
+              업로드 예정·초안 확인 <ArrowUpRight size={14} />
             </Link>
             <Link
               className="flex gap-3 underline"

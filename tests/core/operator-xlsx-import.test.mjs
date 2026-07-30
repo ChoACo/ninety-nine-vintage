@@ -81,10 +81,19 @@ async function workbookFile({
 }
 
 test("operator XLSX UI validates products, supports per-product deletion, and requires explicit confirmation", async () => {
-  const [modal, consoleSource, dashboard, parser, bulkRoute, categoryIds] = await Promise.all([
+  const [
+    modal,
+    consoleSource,
+    dashboard,
+    registrationPage,
+    parser,
+    bulkRoute,
+    categoryIds,
+  ] = await Promise.all([
     source("src/components/admin/operator/OperatorXlsxImportModal.tsx"),
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
     source("src/components/admin/operator/OperatorConsole.tsx"),
+    source("src/app/(admin)/admin/operator/products/registration/page.tsx"),
     source("src/lib/import/batchAuction.ts"),
     source("src/app/api/admin/operator/products/bulk/route.ts"),
     source("src/lib/import/categoryIds.ts"),
@@ -124,8 +133,10 @@ test("operator XLSX UI validates products, supports per-product deletion, and re
   assert.match(consoleSource, /stores\.some\(\(store\) => store\.id === scopedStoreId\)/);
   assert.match(consoleSource, /get\("import"\) === "xlsx"/);
   assert.match(consoleSource, /category: row\.category\?\.label \?\? "기타"/);
-  assert.match(dashboard, /href="\/admin\/operator\/products\?import=xlsx"/);
-  assert.match(dashboard, /엑셀 일괄 등록/);
+  assert.match(registrationPage, /<OperatorProductsConsole view="registration"\s*\/>/);
+  assert.match(consoleSource, /view === "registration" && xlsxImportOpen/);
+  assert.doesNotMatch(dashboard, /href="\/admin\/operator\/products\?import=xlsx"/);
+  assert.doesNotMatch(dashboard, /엑셀 일괄 등록/);
 
   assert.match(bulkRoute, /authenticateStaffRequest\(request, true\)/);
   assert.match(bulkRoute, /auth\.user[\s\S]*\.from\("products"\)[\s\S]*\.insert/);

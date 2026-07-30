@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 
 const links = [
   { exact: true, href: "/admin/operator", label: "대시보드" },
-  { exact: true, href: "/admin/operator/products", label: "상품" },
+  { exact: true, href: "/admin/operator/products", label: "진행 상품" },
+  { exact: true, href: "/admin/operator/products/registration", label: "상품 등록" },
   { exact: false, href: "/admin/operator/payments", label: "주문·입금 확인" },
   { exact: false, href: "/admin/operator/fulfillment", label: "출고·보관" },
   { exact: false, href: "/admin/operator/storage", label: "회원 상품 보관함" },

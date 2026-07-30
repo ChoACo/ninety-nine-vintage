@@ -81,7 +81,7 @@ test("operator product console publishes directly and manages active listings fr
   assert.match(products, /> 일시중지<\/button>/);
   assert.match(products, /grid grid-cols-1 gap-3[^"]*sm:grid-cols-2/);
   assert.doesNotMatch(products, /measurementShoulder|measurementChest|measurementSleeve|measurementLength/);
-  assert.match(products, /grid grid-cols-1 gap-3 sm:grid-cols-3/);
+  assert.match(products, /grid grid-cols-1 gap-2 sm:grid-cols-3/);
 
   assert.doesNotMatch(productRoute, /getCatalogImageUrl/);
   assert.match(productRoute, /products:\s*products \?\? \[\]/);

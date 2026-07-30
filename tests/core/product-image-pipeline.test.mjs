@@ -161,7 +161,7 @@ test("uploads overlap both variants without adding device measurements to produc
   assert.doesNotMatch(uploadModal, /measurement\.targetMet|measurement\.totalMs|100ms 목표|기기 실측/);
   assert.equal((uploadModal.match(/accept=\{PRODUCT_IMAGE_INPUT_ACCEPT\}/g) ?? []).length, 2);
   assert.match(uploadModal, /PRODUCT_IMAGE_HEIC_CONVERSION_NOTE/);
-  assert.match(operatorConsole, /파일 선택/);
+  assert.match(operatorConsole, /사진 선택/);
   assert.match(operatorConsole, /최대 15장 · 표시된 순서대로 저장/);
   assert.match(operatorConsole, /singleImages\.map\(\(image\) => image\.file\)/);
   assert.doesNotMatch(operatorConsole, /일괄 등록 CSV|CSV 일괄 등록 실행/);

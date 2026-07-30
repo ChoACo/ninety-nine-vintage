@@ -26,15 +26,38 @@ test("owner product feed exposes an audited immediate auction close and winner a
 });
 
 test("single product registration is separate, scheduled for next-day 10 by default, and uploads up to 15 ordered files", async () => {
-  const [consoleSource, route, dashboard, categoryMigration] = await Promise.all([
+  const [
+    consoleSource,
+    route,
+    dashboard,
+    layout,
+    activePage,
+    registrationPage,
+    categoryMigration,
+  ] = await Promise.all([
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
     source("src/app/api/admin/operator/products/route.ts"),
     source("src/components/admin/operator/OperatorConsole.tsx"),
+    source("src/app/(admin)/admin/operator/layout.tsx"),
+    source("src/app/(admin)/admin/operator/products/page.tsx"),
+    source("src/app/(admin)/admin/operator/products/registration/page.tsx"),
     source("supabase/migrations/20260724010000_remove_legacy_used_clothing_category.sql"),
   ]);
 
   assert.match(consoleSource, /엑셀 일괄 등록[\s\S]*variant="primary"/);
-  assert.match(consoleSource, /단품 등록/);
+  assert.match(consoleSource, /즉시구매 간편등록/);
+  assert.match(consoleSource, /경매 간편등록/);
+  assert.ok(
+    consoleSource.indexOf("1. 상품 사진 선택")
+      < consoleSource.indexOf('placeholder="상품명 (필수)"'),
+  );
+  assert.doesNotMatch(consoleSource, /브랜드명 \(선택\)/);
+  assert.doesNotMatch(consoleSource, /상태등급 미입력/);
+  assert.equal(
+    consoleSource.match(/aria-label="판매 방식"/g)?.length,
+    1,
+    "판매 방식 입력은 기존 상품 수정 폼에만 남아야 합니다.",
+  );
   assert.match(consoleSource, /useState<PublicationMode>\("next-day-10"\)/);
   assert.match(consoleSource, /다음 날 오전 10시 공개 \(기본\)/);
   assert.match(consoleSource, /singleImages\.length \+ selected\.length > 15/);
@@ -61,8 +84,20 @@ test("single product registration is separate, scheduled for next-day 10 by defa
   assert.match(categoryMigration, /alter column category set default '기타'/);
   assert.match(categoryMigration, /where btrim\(category\) in \('구제 의류', '구제의류'\)/);
 
-  assert.match(dashboard, /products\?import=xlsx/);
-  assert.match(dashboard, /products\?create=single/);
+  assert.doesNotMatch(dashboard, /products\?import=xlsx/);
+  assert.doesNotMatch(dashboard, /products\?create=single/);
+  assert.doesNotMatch(dashboard, /엑셀 일괄 등록|단품 등록/);
+  assert.match(layout, /href:\s*"\/admin\/operator\/products"[\s\S]*label:\s*"진행 상품"/);
+  assert.match(layout, /href:\s*"\/admin\/operator\/products\/registration"[\s\S]*label:\s*"상품 등록"/);
+  assert.match(activePage, /<OperatorProductsConsole view="active"\s*\/>/);
+  assert.match(registrationPage, /<OperatorProductsConsole view="registration"\s*\/>/);
+  assert.match(consoleSource, /product\.status === "active"[\s\S]*product\.sale_type === filter\.saleType/);
+  assert.match(consoleSource, /aria-label="진행 상품 판매 방식"/);
+  assert.match(consoleSource, /즉시구매 상품/);
+  assert.match(consoleSource, /경매 상품/);
+  assert.match(consoleSource, /aria-label="상품 등록 상태"/);
+  assert.match(consoleSource, /업로드 예정/);
+  assert.match(consoleSource, /registrationStage === "scheduled"/);
 });
 
 test("single registration resets immediately and finishes safely in the background", async () => {
@@ -72,15 +107,17 @@ test("single registration resets immediately and finishes safely in the backgrou
 
   assert.match(
     consoleSource,
-    /const snapshot: SingleRegistrationSnapshot[\s\S]*resetForm\(\);[\s\S]*void processSingleRegistration\(snapshot\);[\s\S]*return;/,
+    /const snapshot: SingleRegistrationSnapshot[\s\S]*prepareNextSingleRegistration\(\);[\s\S]*void processSingleRegistration\(snapshot\);[\s\S]*return;/,
   );
   assert.doesNotMatch(
     consoleSource,
     /await processSingleRegistration\(snapshot\)/,
   );
-  assert.match(consoleSource, /단품 백그라운드 등록/);
+  assert.match(consoleSource, /단품 백그라운드 저장/);
   assert.match(consoleSource, /건 처리 중/);
-  assert.match(consoleSource, /다른 단품을 계속 등록할 수 있습니다/);
+  assert.match(consoleSource, /간편등록칸에서 다음 상품을 계속 등록할 수 있습니다/);
+  assert.match(consoleSource, /setBlankSingleRegistration\(form\.saleType,\s*true\)/);
+  assert.match(consoleSource, /바로 다음 \$\{snapshot\.form\.saleType/);
   assert.match(consoleSource, /beforeunload/);
   assert.match(consoleSource, /processingSingleRegistrationIdsRef/);
   assert.match(consoleSource, /retrySingleRegistration\(job\.id\)/);

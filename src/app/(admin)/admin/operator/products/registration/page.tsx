@@ -2,6 +2,6 @@ import { OperatorProductsConsole } from "@/components/admin/operator/OperatorPro
 
 export const dynamic = "force-dynamic";
 
-export default function OperatorProductsPage() {
-  return <OperatorProductsConsole view="active" />;
+export default function OperatorProductRegistrationPage() {
+  return <OperatorProductsConsole view="registration" />;
 }

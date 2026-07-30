@@ -29,9 +29,10 @@ test("single registration requires a feed title while keeping description and ca
   assert.match(consoleSource, /상품 설명 \(선택\)/);
   assert.match(consoleSource, /required=\{Boolean\(editingId\)\}/);
   assert.match(consoleSource, /!form\.title\.trim\(\)[\s\S]*상품명을 입력해 주세요/);
-  assert.match(consoleSource, /브랜드명 \(선택\)/);
   assert.match(consoleSource, /성별 미입력/);
-  assert.match(consoleSource, /상태등급 미입력/);
+  assert.doesNotMatch(consoleSource, /브랜드명 \(선택\)/);
+  assert.doesNotMatch(consoleSource, /상태등급 미입력/);
+  assert.match(consoleSource, /aria-label=\{form\.saleType === "fixed" \? "즉시구매 가격" : "경매 시작가"\}/);
   assert.match(route, /!title \|\| title\.length > 160/);
   assert.match(route, /\(!singleRegistration && !description\)/);
   assert.match(route, /description\.length > 10000/);

@@ -96,6 +96,9 @@ interface SingleRegistrationJob {
   title: string;
 }
 
+type ProductConsoleView = "active" | "registration";
+type RegistrationStage = "scheduled" | "draft";
+
 const emptyForm: FormState = {
   title: "", description: "", brand: "", category: "기타", storeId: "", saleType: "fixed", price: "", imageUrls: "",
   sizeLabel: "", conditionGrade: "", gender: "", storageClass: "small", status: "active", bidIncrement: "1000", publishAt: "", closesAt: "",
@@ -133,6 +136,19 @@ function productStatusLabel(status: string) {
 function isManageableProductStatus(status: string) {
   return status === "pending" || status === "active";
 }
+function isScheduledProduct(product: Product, now: number) {
+  const publishAt = new Date(product.publish_at).getTime();
+  return product.status === "pending"
+    && Number.isFinite(publishAt)
+    && publishAt > now;
+}
+function requestedSingleSaleType() {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search).get("create");
+  if (value === "auction") return "auction" as const;
+  if (value === "fixed" || value === "single") return "fixed" as const;
+  return null;
+}
 interface PublishPendingResult {
   requested_count: number;
   published_count: number;
@@ -162,14 +178,20 @@ async function publishProductNow(accessToken: string, productId: string) {
   return result;
 }
 
-export function OperatorProductsConsole() {
+export function OperatorProductsConsole({
+  view = "active",
+}: Readonly<{ view?: ProductConsoleView }>) {
+  const requestedSaleType = requestedSingleSaleType();
   const [token, setToken] = useState<string | null>(null);
   const [stores, setStores] = useState<Store[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [form, setForm] = useState<FormState>(emptyForm);
-  const [singleCreateOpen, setSingleCreateOpen] = useState(() =>
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("create") === "single",
+  const [productReferenceNow, setProductReferenceNow] = useState(0);
+  const [form, setForm] = useState<FormState>(() => ({
+    ...emptyForm,
+    saleType: requestedSaleType ?? "fixed",
+  }));
+  const [singleCreateOpen, setSingleCreateOpen] = useState(
+    () => view === "registration" && requestedSaleType !== null,
   );
   const [singleImages, setSingleImages] = useState<SingleImage[]>([]);
   const [publicationMode, setPublicationMode] =
@@ -182,7 +204,15 @@ export function OperatorProductsConsole() {
     canMutate: false,
     canPublish: false,
   });
-  const [filter, setFilter] = useState({ search: "", status: "all", saleType: "all" });
+  const [filter, setFilter] = useState<{
+    saleType: "all" | "fixed" | "auction";
+    search: string;
+  }>({
+    saleType: view === "active" ? "fixed" : "all",
+    search: "",
+  });
+  const [registrationStage, setRegistrationStage] =
+    useState<RegistrationStage>("scheduled");
   const [selectedPendingIds, setSelectedPendingIds] = useState<Set<string>>(new Set());
   const [xlsxImportOpen, setXlsxImportOpen] = useState(() =>
     typeof window !== "undefined"
@@ -258,6 +288,7 @@ export function OperatorProductsConsole() {
       const nextStores = payload.stores ?? [];
       setStores(nextStores);
       setProducts(payload.products ?? []);
+      setProductReferenceNow(Date.now());
       setPermissions(nextPermissions);
       const publishableStoreIds = new Set(nextStores.filter((store) => store.canPublish).map((store) => store.id));
       const pendingIds = new Set((payload.products ?? [])
@@ -290,12 +321,55 @@ export function OperatorProductsConsole() {
     })();
   }, [load]);
 
-  const visibleProducts = useMemo(() => products.filter((product) => {
+  const workspaceProducts = useMemo(() => {
+    return products.filter((product) => {
+      if (view === "active") {
+        return product.status === "active"
+          && product.sale_type === filter.saleType;
+      }
+      if (product.status !== "pending") return false;
+      const scheduled = isScheduledProduct(product, productReferenceNow);
+      return registrationStage === "scheduled" ? scheduled : !scheduled;
+    });
+  }, [filter.saleType, productReferenceNow, products, registrationStage, view]);
+  const visibleProducts = useMemo(() => {
     const query = filter.search.trim().toLowerCase();
-    return (!query || product.title.toLowerCase().includes(query) || product.brand.toLowerCase().includes(query) || (product.stores?.name ?? "").toLowerCase().includes(query))
-      && (filter.status === "all" || product.status === filter.status)
-      && (filter.saleType === "all" || product.sale_type === filter.saleType);
-  }), [filter, products]);
+    return workspaceProducts.filter((product) =>
+      (!query
+        || product.title.toLowerCase().includes(query)
+        || product.brand.toLowerCase().includes(query)
+        || (product.stores?.name ?? "").toLowerCase().includes(query))
+      && (view === "active"
+        || filter.saleType === "all"
+        || product.sale_type === filter.saleType),
+    );
+  }, [filter, view, workspaceProducts]);
+  const activeProductCounts = useMemo(
+    () => ({
+      auction: products.filter(
+        (product) =>
+          product.status === "active" && product.sale_type === "auction",
+      ).length,
+      fixed: products.filter(
+        (product) =>
+          product.status === "active" && product.sale_type === "fixed",
+      ).length,
+    }),
+    [products],
+  );
+  const registrationCounts = useMemo(() => {
+    return products.reduce(
+      (counts, product) => {
+        if (product.status !== "pending") return counts;
+        if (isScheduledProduct(product, productReferenceNow)) {
+          counts.scheduled += 1;
+        }
+        else counts.draft += 1;
+        return counts;
+      },
+      { draft: 0, scheduled: 0 },
+    );
+  }, [productReferenceNow, products]);
   const visiblePendingIds = useMemo(
     () => permissions.canPublish
       ? visibleProducts
@@ -338,10 +412,35 @@ export function OperatorProductsConsole() {
     });
   };
 
-  const startSingleCreate = () => {
-    resetForm();
-    setSingleCreateOpen(true);
+  const setBlankSingleRegistration = (
+    saleType: "fixed" | "auction",
+    keepOpen: boolean,
+  ) => {
+    clearSingleImages();
+    setEditingId(null);
+    setEditingUpdatedAt(null);
+    setSingleCreateOpen(keepOpen);
+    setForm((current) => {
+      const storeId = current.storeId || stores[0]?.id || "";
+      const canPublish =
+        stores.find((store) => store.id === storeId)?.canPublish === true;
+      return {
+        ...emptyForm,
+        saleType,
+        storeId,
+        status: canPublish ? "active" : "pending",
+      };
+    });
+  };
+
+  const startSingleCreate = (saleType: "fixed" | "auction") => {
+    setPublicationMode("next-day-10");
+    setBlankSingleRegistration(saleType, true);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const prepareNextSingleRegistration = () => {
+    setBlankSingleRegistration(form.saleType, true);
   };
 
   const addSingleImages = (files: FileList | null) => {
@@ -525,9 +624,9 @@ export function OperatorProductsConsole() {
         ...current,
         { id: snapshot.id, status: "pending", title: snapshot.form.title },
       ]);
-      resetForm();
+      prepareNextSingleRegistration();
       setNotice(
-        `“${snapshot.form.title}” 등록을 접수했습니다. 사진 처리는 백그라운드에서 계속됩니다.`,
+        `“${snapshot.form.title}” 백그라운드 저장을 시작했습니다. 바로 다음 ${snapshot.form.saleType === "fixed" ? "즉시구매" : "경매"} 상품을 등록할 수 있습니다.`,
       );
       void processSingleRegistration(snapshot);
       return;
@@ -949,22 +1048,64 @@ export function OperatorProductsConsole() {
   };
 
   return <div className="space-y-8">
-    <SectionHeading action={<div className="grid grid-cols-2 gap-2 sm:flex"><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate || busy} onClick={() => setXlsxImportOpen(true)} type="button" variant="primary"><FileSpreadsheet size={15} /> 엑셀 일괄 등록</Button><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate} onClick={startSingleCreate} type="button"><Plus size={15} /> 단품 등록</Button></div>} description="엑셀 일괄 등록을 기본으로 사용하고, 단품은 별도 간편 폼에서 등록합니다." eyebrow="운영자 / 상품 관리" title="상품 등록·관리" variant="page" />
+    <SectionHeading
+      action={view === "registration" ? <div className="grid grid-cols-1 gap-2 sm:grid-cols-3"><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate || busy} onClick={() => setXlsxImportOpen(true)} type="button" variant="primary"><FileSpreadsheet size={15} /> 엑셀 일괄 등록</Button><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate} onClick={() => startSingleCreate("fixed")} type="button"><Plus size={15} /> 즉시구매 간편등록</Button><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate} onClick={() => startSingleCreate("auction")} type="button"><Plus size={15} /> 경매 간편등록</Button></div> : undefined}
+      description={view === "active" ? "현재 공개 중인 상품만 판매 방식별로 나누어 관리합니다." : "신규 상품을 등록하고 업로드 예정 상품과 초안을 따로 관리합니다."}
+      eyebrow={view === "active" ? "운영자 / 상품" : "운영자 / 상품 등록"}
+      title={view === "active" ? "진행 중 상품" : "상품 등록"}
+      variant="page"
+    />
     {notice && <StatusNotice>{notice}</StatusNotice>}
-    {singleRegistrationJobs.length > 0 && <section aria-live="polite" className="border border-line bg-surface px-4 py-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold">단품 백그라운드 등록</p><p className="font-mono text-[10px] text-muted">{pendingSingleRegistrationCount > 0 ? `${pendingSingleRegistrationCount}건 처리 중` : "처리 대기 없음"}</p></div>{pendingSingleRegistrationCount > 0 && <p className="mt-2 text-[11px] text-muted">사진 처리와 저장이 진행되는 동안 다른 단품을 계속 등록할 수 있습니다. 완료 전에는 이 페이지를 닫지 마세요.</p>}{failedSingleRegistrations.length > 0 && <div className="mt-3 space-y-2">{failedSingleRegistrations.map((job) => <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2" key={job.id}><p className="min-w-0 truncate text-[11px] font-bold text-red-700">“{job.title}” 등록 실패</p><div className="flex gap-2"><Button disabled={!token} onClick={() => retrySingleRegistration(job.id)} size="compact" type="button">다시 시도</Button><Button onClick={() => dismissFailedSingleRegistration(job.id)} size="compact" type="button" variant="ghost">닫기</Button></div></div>)}</div>}</section>}
-    {products.some((product) => product.brand_source === "inferred" && product.status === "pending") && <StatusNotice>초안 중 제목에서 임시 추론한 브랜드가 있습니다. 수정 저장하면 확인된 브랜드로 전환됩니다.</StatusNotice>}
-    {products.some((product) => product.brand_source === "inferred" && product.status === "pending") && <section className="border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-bold text-amber-900">브랜드 확인 필요</p><div className="mt-3 flex flex-wrap gap-2">{products.filter((product) => product.brand_source === "inferred" && product.status === "pending").map((product) => <button className="border border-amber-300 bg-paper px-3 py-2 text-left text-[11px] text-amber-900 disabled:cursor-not-allowed disabled:opacity-40" disabled={!permissions.canMutate} key={product.id} onClick={() => edit(product)} type="button"><span className="font-bold">{product.brand}</span> · {product.title}</button>)}</div></section>}
-    {(editingId || singleCreateOpen) && (
+    {view === "registration" && singleRegistrationJobs.length > 0 && <section aria-live="polite" className="border border-line bg-surface px-4 py-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold">단품 백그라운드 저장</p><p className="font-mono text-[10px] text-muted">{pendingSingleRegistrationCount > 0 ? `${pendingSingleRegistrationCount}건 처리 중` : "처리 대기 없음"}</p></div>{pendingSingleRegistrationCount > 0 && <p className="mt-2 text-[11px] text-muted">사진 처리와 저장이 진행되는 동안 간편등록칸에서 다음 상품을 계속 등록할 수 있습니다. 완료 전에는 이 페이지를 닫지 마세요.</p>}{failedSingleRegistrations.length > 0 && <div className="mt-3 space-y-2">{failedSingleRegistrations.map((job) => <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2" key={job.id}><p className="min-w-0 truncate text-[11px] font-bold text-red-700">“{job.title}” 등록 실패</p><div className="flex gap-2"><Button disabled={!token} onClick={() => retrySingleRegistration(job.id)} size="compact" type="button">다시 시도</Button><Button onClick={() => dismissFailedSingleRegistration(job.id)} size="compact" type="button" variant="ghost">닫기</Button></div></div>)}</div>}</section>}
+    {view === "active" ? (
+      <nav aria-label="진행 상품 판매 방식" className="grid grid-cols-2 border border-ink">
+        {(["fixed", "auction"] as const).map((saleType) => <button aria-pressed={filter.saleType === saleType} className={`min-h-12 px-4 text-xs font-black ${filter.saleType === saleType ? "bg-ink text-paper" : "bg-paper text-ink"}`} key={saleType} onClick={() => setFilter((current) => ({ ...current, saleType }))} type="button">{saleType === "fixed" ? "즉시구매 상품" : "경매 상품"} <span className="ml-1 font-mono">{activeProductCounts[saleType]}</span></button>)}
+      </nav>
+    ) : (
+      <nav aria-label="상품 등록 상태" className="grid grid-cols-2 border border-ink">
+        {(["scheduled", "draft"] as const).map((stage) => <button aria-pressed={registrationStage === stage} className={`min-h-12 px-4 text-xs font-black ${registrationStage === stage ? "bg-ink text-paper" : "bg-paper text-ink"}`} key={stage} onClick={() => setRegistrationStage(stage)} type="button">{stage === "scheduled" ? "업로드 예정" : "초안"} <span className="ml-1 font-mono">{registrationCounts[stage]}</span></button>)}
+      </nav>
+    )}
+    {view === "registration" && products.some((product) => product.brand_source === "inferred" && product.status === "pending") && <StatusNotice>초안 중 제목에서 임시 추론한 브랜드가 있습니다. 수정 저장하면 확인된 브랜드로 전환됩니다.</StatusNotice>}
+    {view === "registration" && products.some((product) => product.brand_source === "inferred" && product.status === "pending") && <section className="border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-bold text-amber-900">브랜드 확인 필요</p><div className="mt-3 flex flex-wrap gap-2">{products.filter((product) => product.brand_source === "inferred" && product.status === "pending").map((product) => <button className="border border-amber-300 bg-paper px-3 py-2 text-left text-[11px] text-amber-900 disabled:cursor-not-allowed disabled:opacity-40" disabled={!permissions.canMutate} key={product.id} onClick={() => edit(product)} type="button"><span className="font-bold">{product.brand}</span> · {product.title}</button>)}</div></section>}
+    {(editingId || (view === "registration" && singleCreateOpen)) && (
       <form className="grid grid-cols-1 gap-3 border border-ink bg-surface p-4 sm:grid-cols-2 sm:p-6" onSubmit={submit}>
         <div className="flex items-center justify-between sm:col-span-2">
           <div>
-            <p className="text-sm font-bold">{editingId ? "상품 수정" : "단품 간편 등록"}</p>
-            {!editingId && <p className="mt-1 text-[11px] text-muted">상품명은 피드에 보이는 간판글로 필수입니다. 상품설명·브랜드·성별·상태등급은 선택 사항입니다.</p>}
+            <p className="text-sm font-bold">{editingId ? "상품 수정" : form.saleType === "fixed" ? "즉시구매 간편등록" : "경매 간편등록"}</p>
+            {!editingId && <p className="mt-1 text-[11px] text-muted">사진을 먼저 선택하세요. 상품명은 피드에 보이는 간판글로 필수이며 상품설명과 성별은 선택 사항입니다.</p>}
           </div>
           <Button size="compact" variant="ghost" onClick={resetForm} type="button">
             <X size={13} /> {editingId ? "수정 취소" : "닫기"}
           </Button>
         </div>
+
+        {!editingId && (
+          <section className="border border-line bg-paper p-4 sm:col-span-2">
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div><p className="text-xs font-black">1. 상품 사진 선택</p><p className="mt-1 text-[11px] text-muted">최대 15장 · 표시된 순서대로 저장</p></div>
+              <label className="inline-flex cursor-pointer items-center justify-center gap-2 border border-ink px-4 py-3 text-xs font-bold">
+                <ImagePlus size={15} /> 사진 선택
+                <input accept={PRODUCT_IMAGE_INPUT_ACCEPT} className="sr-only" multiple onChange={(event) => { addSingleImages(event.currentTarget.files); event.currentTarget.value = ""; }} type="file" />
+              </label>
+            </div>
+            {singleImages.length > 0 ? (
+              <ol className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                {singleImages.map((image, index) => (
+                  <li className="border border-line bg-surface p-2" key={image.id}>
+                    <CatalogImage alt={`선택 사진 ${index + 1}`} className="aspect-square w-full object-cover" src={image.previewUrl} />
+                    <p className="mt-2 truncate text-[10px] font-bold">{index + 1}. {image.file.name}</p>
+                    <div className="mt-2 grid grid-cols-3 gap-1">
+                      <button aria-label={`${index + 1}번 사진 앞으로 이동`} className="grid place-items-center border border-line p-2 disabled:opacity-30" disabled={index === 0} onClick={() => moveSingleImage(index, -1)} type="button"><ArrowUp size={12} /></button>
+                      <button aria-label={`${index + 1}번 사진 뒤로 이동`} className="grid place-items-center border border-line p-2 disabled:opacity-30" disabled={index === singleImages.length - 1} onClick={() => moveSingleImage(index, 1)} type="button"><ArrowDown size={12} /></button>
+                      <button aria-label={`${index + 1}번 사진 삭제`} className="grid place-items-center border border-red-200 p-2 text-red-700" onClick={() => removeSingleImage(image.id)} type="button"><Trash2 size={12} /></button>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : <p className="mt-4 border border-dashed border-line px-4 py-8 text-center text-xs text-muted">등록할 사진을 먼저 선택해 주세요.</p>}
+          </section>
+        )}
 
         {editingId ? (
           <>
@@ -974,19 +1115,11 @@ export function OperatorProductsConsole() {
         ) : (
           <>
             <TextInput aria-label="상품명" onChange={(event) => update("title", event.target.value)} placeholder="상품명 (필수)" required value={form.title} />
-            <TextInput aria-label="브랜드명" onChange={(event) => update("brand", event.target.value)} placeholder="브랜드명 (선택)" value={form.brand} />
             <SelectInput aria-label="성별" onChange={(event) => update("gender", event.target.value)} value={form.gender}>
               <option value="">성별 미입력</option>
               <option value="여성">여성</option>
               <option value="남성">남성</option>
               <option value="공용">공용</option>
-            </SelectInput>
-            <SelectInput aria-label="상태등급" onChange={(event) => update("conditionGrade", event.target.value)} value={form.conditionGrade}>
-              <option value="">상태등급 미입력</option>
-              <option value="S">S</option>
-              <option value="A+">A+</option>
-              <option value="A">A</option>
-              <option value="B">B</option>
             </SelectInput>
           </>
         )}
@@ -999,7 +1132,7 @@ export function OperatorProductsConsole() {
             status: stores.find((store) => store.id === storeId)?.canPublish === true ? current.status : "pending",
           }));
         }} required value={form.storeId}>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</SelectInput>
-        <div className="flex flex-col gap-2 sm:flex-row"><SelectInput aria-label="판매 방식" className="flex-1" disabled={!saleSetupEditable} onChange={(event) => update("saleType", event.target.value)} value={form.saleType}><option value="fixed">즉시구매</option><option value="auction">경매</option></SelectInput><TextInput aria-label="가격" className="w-full sm:w-40" disabled={!saleSetupEditable} min="1" onChange={(event) => update("price", event.target.value)} placeholder="가격" required type="number" value={form.price} /></div>
+        {editingId ? <div className="flex flex-col gap-2 sm:flex-row"><SelectInput aria-label="판매 방식" className="flex-1" disabled={!saleSetupEditable} onChange={(event) => update("saleType", event.target.value)} value={form.saleType}><option value="fixed">즉시구매</option><option value="auction">경매</option></SelectInput><TextInput aria-label="가격" className="w-full sm:w-40" disabled={!saleSetupEditable} min="1" onChange={(event) => update("price", event.target.value)} placeholder="가격" required type="number" value={form.price} /></div> : <TextInput aria-label={form.saleType === "fixed" ? "즉시구매 가격" : "경매 시작가"} min="1" onChange={(event) => update("price", event.target.value)} placeholder={form.saleType === "fixed" ? "즉시구매 가격" : "경매 시작가"} required type="number" value={form.price} />}
         <TextArea aria-label="상품 설명" className="min-h-24 sm:col-span-2" disabled={!productFieldsEditable} onChange={(event) => update("description", event.target.value)} placeholder={editingId ? "상품 설명" : "상품 설명 (선택)"} required={Boolean(editingId)} value={form.description} />
 
         {editingId ? (
@@ -1027,46 +1160,22 @@ export function OperatorProductsConsole() {
                 <option value="now">즉시 공개</option>
               </SelectInput>
             </label>
-            <section className="border border-line bg-paper p-4 sm:col-span-2">
-              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                <div><p className="text-xs font-black">상품 사진</p><p className="mt-1 text-[11px] text-muted">최대 15장 · 표시된 순서대로 저장</p></div>
-                <label className="inline-flex cursor-pointer items-center justify-center gap-2 border border-ink px-4 py-3 text-xs font-bold">
-                  <ImagePlus size={15} /> 파일 선택
-                  <input accept={PRODUCT_IMAGE_INPUT_ACCEPT} className="sr-only" multiple onChange={(event) => { addSingleImages(event.currentTarget.files); event.currentTarget.value = ""; }} type="file" />
-                </label>
-              </div>
-              {singleImages.length > 0 ? (
-                <ol className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                  {singleImages.map((image, index) => (
-                    <li className="border border-line bg-surface p-2" key={image.id}>
-                      <CatalogImage alt={`선택 사진 ${index + 1}`} className="aspect-square w-full object-cover" src={image.previewUrl} />
-                      <p className="mt-2 truncate text-[10px] font-bold">{index + 1}. {image.file.name}</p>
-                      <div className="mt-2 grid grid-cols-3 gap-1">
-                        <button aria-label={`${index + 1}번 사진 앞으로 이동`} className="grid place-items-center border border-line p-2 disabled:opacity-30" disabled={index === 0} onClick={() => moveSingleImage(index, -1)} type="button"><ArrowUp size={12} /></button>
-                        <button aria-label={`${index + 1}번 사진 뒤로 이동`} className="grid place-items-center border border-line p-2 disabled:opacity-30" disabled={index === singleImages.length - 1} onClick={() => moveSingleImage(index, 1)} type="button"><ArrowDown size={12} /></button>
-                        <button aria-label={`${index + 1}번 사진 삭제`} className="grid place-items-center border border-red-200 p-2 text-red-700" onClick={() => removeSingleImage(image.id)} type="button"><Trash2 size={12} /></button>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              ) : <p className="mt-4 border border-dashed border-line px-4 py-8 text-center text-xs text-muted">등록할 사진을 선택해 주세요.</p>}
-            </section>
           </>
         )}
-        <div className="flex flex-wrap gap-2 sm:col-span-2"><Button className="px-5" disabled={busy || !token || !productFieldsEditable || (!editingId && singleImages.length === 0)} variant="primary" type="submit">{editingId ? "수정 저장" : publicationMode === "now" ? "등록하고 즉시 공개" : "등록하고 오전 10시 예약"}</Button><Button className="px-5" onClick={resetForm} type="button">{editingId ? "수정 취소" : "취소"}</Button></div>
+        <div className="flex flex-wrap gap-2 sm:col-span-2"><Button className="px-5" disabled={busy || !token || !productFieldsEditable || (!editingId && singleImages.length === 0)} variant="primary" type="submit">{editingId ? "수정 저장" : publicationMode === "now" ? `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 즉시 공개` : `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 오전 10시 예약`}</Button><Button className="px-5" onClick={resetForm} type="button">{editingId ? "수정 취소" : "취소"}</Button></div>
       </form>
     )}
-    <div className="flex flex-col items-start justify-between gap-3 text-xs text-muted sm:flex-row sm:items-center"><span>{loading ? "상품을 불러오는 중…" : `${visibleProducts.length} / ${products.length}개 상품 · 실시간 데이터`}</span><div className="flex items-center gap-4"><button className="flex items-center gap-2 underline" disabled={loading} onClick={() => void load(token).catch((error) => setNotice(error instanceof Error ? error.message : "새로고침에 실패했습니다."))} type="button"><RefreshCw size={13} /> 새로고침</button></div></div>
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><input aria-label="상품 검색" className="border border-line bg-paper px-3 py-3 text-xs" onChange={(event) => setFilter({ ...filter, search: event.target.value })} placeholder="상품명·숍 검색" value={filter.search} /><select aria-label="상품 상태 필터" className="border border-line bg-paper px-3 py-3 text-xs" onChange={(event) => setFilter({ ...filter, status: event.target.value })} value={filter.status}><option value="all">전체 상태</option><option value="pending">초안</option><option value="active">공개</option><option value="closed">마감</option></select><select aria-label="판매 방식 필터" className="border border-line bg-paper px-3 py-3 text-xs" onChange={(event) => setFilter({ ...filter, saleType: event.target.value })} value={filter.saleType}><option value="all">전체 판매 방식</option><option value="fixed">즉시구매</option><option value="auction">경매</option></select></div>
-    <div className="flex flex-col items-start justify-between gap-3 border border-line bg-surface px-4 py-3 sm:flex-row sm:items-center">
-      <label className="flex items-center gap-3 text-xs font-bold"><input checked={allVisiblePendingSelected} disabled={busy || !permissions.canPublish || visiblePendingIds.length === 0} onChange={toggleAllVisiblePending} type="checkbox" /> 검색 결과의 초안 전체 선택</label>
+    <div className="flex flex-col items-start justify-between gap-3 text-xs text-muted sm:flex-row sm:items-center"><span>{loading ? "상품을 불러오는 중…" : `${visibleProducts.length} / ${workspaceProducts.length}개 상품 · 실시간 데이터`}</span><div className="flex items-center gap-4"><button className="flex items-center gap-2 underline" disabled={loading} onClick={() => void load(token).catch((error) => setNotice(error instanceof Error ? error.message : "새로고침에 실패했습니다."))} type="button"><RefreshCw size={13} /> 새로고침</button></div></div>
+    <div className={`grid grid-cols-1 gap-3 ${view === "registration" ? "sm:grid-cols-2" : ""}`}><input aria-label="상품 검색" className="border border-line bg-paper px-3 py-3 text-xs" onChange={(event) => setFilter({ ...filter, search: event.target.value })} placeholder="상품명·숍 검색" value={filter.search} />{view === "registration" && <select aria-label="판매 방식 필터" className="border border-line bg-paper px-3 py-3 text-xs" onChange={(event) => setFilter({ ...filter, saleType: event.target.value as "all" | "fixed" | "auction" })} value={filter.saleType}><option value="all">전체 판매 방식</option><option value="fixed">즉시구매</option><option value="auction">경매</option></select>}</div>
+    {view === "registration" && <div className="flex flex-col items-start justify-between gap-3 border border-line bg-surface px-4 py-3 sm:flex-row sm:items-center">
+      <label className="flex items-center gap-3 text-xs font-bold"><input checked={allVisiblePendingSelected} disabled={busy || !permissions.canPublish || visiblePendingIds.length === 0} onChange={toggleAllVisiblePending} type="checkbox" /> 검색 결과 전체 선택</label>
       <div className="flex flex-wrap items-center gap-3"><span className="font-mono text-xs text-muted">{selectedPendingIds.size}개 선택</span>{selectedPendingIds.size > 0 && <Button disabled={busy} onClick={() => setSelectedPendingIds(new Set())} size="compact" variant="ghost" type="button">선택 해제</Button>}<Button disabled={busy || !permissions.canPublish || selectedPendingIds.size === 0} onClick={() => void publishSelected()} size="compact" variant="primary" type="button">지금 즉시 공개</Button></div>
-    </div>
-    <div className="overflow-x-auto border-y border-line"><table className="w-full min-w-[1180px] text-left text-xs"><thead className="border-b border-line bg-surface text-[10px] tracking-[.12em] text-muted"><tr><th className="px-4 py-4">선택</th><th className="px-4 py-4">상품</th><th className="px-4 py-4">숍</th><th className="px-4 py-4">판매 방식</th><th className="px-4 py-4">가격</th><th className="px-4 py-4">보관</th><th className="px-4 py-4">상태</th><th className="px-4 py-4" /></tr></thead><tbody className="divide-y divide-line">{visibleProducts.map((product) => { const manageable = isManageableProductStatus(product.status); const canPublishStore = stores.some((store) => store.id === product.store_id && store.canPublish); return <tr key={product.id}><td className="px-4 py-4"><input aria-label={`${product.title} 공개 선택`} checked={selectedPendingIds.has(product.id)} disabled={busy || !canPublishStore || product.status !== "pending"} onChange={() => togglePending(product.id)} type="checkbox" /></td><td className="px-4 py-4"><div className="flex items-center gap-3"><CatalogImage alt="" className="size-12 object-cover" src={product.image_urls?.[0] ?? ""} /><span className="font-bold">{product.title}</span></div></td><td className="px-4 py-4 text-muted">{product.stores?.name ?? "미지정"}</td><td className="px-4 py-4">{product.sale_type === "fixed" ? "즉시구매" : "경매"}</td><td className="px-4 py-4 font-mono">{(product.fixed_price ?? product.current_price).toLocaleString("ko-KR")}원</td><td className="px-4 py-4">{product.storage_class === "large" ? "대형 · 7일" : "소형 · 14일"}</td><td className="px-4 py-4"><span className="border border-line px-2 py-1 text-[10px] font-bold">{productStatusLabel(product.status)}</span></td><td className="px-4 py-4 text-right"><div className="flex justify-end gap-3">{permissions.canCloseAuctions && product.sale_type === "auction" && product.status === "active" && <button aria-label={`${product.title} 즉시 마감`} className="inline-flex items-center gap-1 font-bold text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy} onClick={() => void closeAuctionNow(product)} type="button"><CircleStop size={13} /> 즉시 마감·낙찰 확정</button>}{product.status === "active" && <button aria-label={`${product.title} 일시중지`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate} onClick={() => void pause(product)} type="button"><PauseCircle size={13} /> 일시중지</button>}{product.status === "pending" && <button aria-label={`${product.title} 공개`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !canPublishStore} onClick={() => void publish(product)} type="button"><PlayCircle size={13} /> 공개</button>}<button aria-label={`${product.title} 점검`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product, "inspection")} type="button"><ClipboardCheck size={13} /> 점검</button><button aria-label={`${product.title} 수정`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product)} type="button"><Edit3 size={13} /> 수정</button><button aria-label={`${product.title} 삭제`} className="inline-flex items-center gap-1 text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => void remove(product)} type="button"><Trash2 size={13} /> 삭제</button>{product.status === "active" && <Link className="underline" href={`/auction/${product.id}`}>보기</Link>}</div></td></tr>; })}{visibleProducts.length === 0 && <tr><td className="px-4 py-16 text-center text-muted" colSpan={8}>조건에 맞는 상품이 없습니다.</td></tr>}</tbody></table></div>
+    </div>}
+    <div className="overflow-x-auto border-y border-line"><table className="w-full min-w-[1080px] text-left text-xs"><thead className="border-b border-line bg-surface text-[10px] tracking-[.12em] text-muted"><tr>{view === "registration" && <th className="px-4 py-4">선택</th>}<th className="px-4 py-4">상품</th><th className="px-4 py-4">숍</th><th className="px-4 py-4">판매 방식</th><th className="px-4 py-4">가격</th><th className="px-4 py-4">보관</th><th className="px-4 py-4">상태</th><th className="px-4 py-4" /></tr></thead><tbody className="divide-y divide-line">{visibleProducts.map((product) => { const manageable = isManageableProductStatus(product.status); const canPublishStore = stores.some((store) => store.id === product.store_id && store.canPublish); return <tr key={product.id}>{view === "registration" && <td className="px-4 py-4"><input aria-label={`${product.title} 공개 선택`} checked={selectedPendingIds.has(product.id)} disabled={busy || !canPublishStore || product.status !== "pending"} onChange={() => togglePending(product.id)} type="checkbox" /></td>}<td className="px-4 py-4"><div className="flex items-center gap-3"><CatalogImage alt="" className="size-12 object-cover" src={product.image_urls?.[0] ?? ""} /><span className="font-bold">{product.title}</span></div></td><td className="px-4 py-4 text-muted">{product.stores?.name ?? "미지정"}</td><td className="px-4 py-4">{product.sale_type === "fixed" ? "즉시구매" : "경매"}</td><td className="px-4 py-4 font-mono">{(product.fixed_price ?? product.current_price).toLocaleString("ko-KR")}원</td><td className="px-4 py-4">{product.storage_class === "large" ? "대형 · 7일" : "소형 · 14일"}</td><td className="px-4 py-4"><span className="border border-line px-2 py-1 text-[10px] font-bold">{view === "registration" && isScheduledProduct(product, productReferenceNow) ? "업로드 예정" : productStatusLabel(product.status)}</span></td><td className="px-4 py-4 text-right"><div className="flex justify-end gap-3">{permissions.canCloseAuctions && product.sale_type === "auction" && product.status === "active" && <button aria-label={`${product.title} 즉시 마감`} className="inline-flex items-center gap-1 font-bold text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy} onClick={() => void closeAuctionNow(product)} type="button"><CircleStop size={13} /> 즉시 마감·낙찰 확정</button>}{product.status === "active" && <button aria-label={`${product.title} 일시중지`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate} onClick={() => void pause(product)} type="button"><PauseCircle size={13} /> 일시중지</button>}{product.status === "pending" && <button aria-label={`${product.title} 공개`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !canPublishStore} onClick={() => void publish(product)} type="button"><PlayCircle size={13} /> 공개</button>}<button aria-label={`${product.title} 점검`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product, "inspection")} type="button"><ClipboardCheck size={13} /> 점검</button><button aria-label={`${product.title} 수정`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product)} type="button"><Edit3 size={13} /> 수정</button><button aria-label={`${product.title} 삭제`} className="inline-flex items-center gap-1 text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => void remove(product)} type="button"><Trash2 size={13} /> 삭제</button>{product.status === "active" && <Link className="underline" href={`/auction/${product.id}`}>보기</Link>}</div></td></tr>; })}{visibleProducts.length === 0 && <tr><td className="px-4 py-16 text-center text-muted" colSpan={view === "registration" ? 8 : 7}>조건에 맞는 상품이 없습니다.</td></tr>}</tbody></table></div>
     <OperatorXlsxImportModal
       onClose={() => setXlsxImportOpen(false)}
       onSubmit={importXlsx}
-      open={xlsxImportOpen && permissions.canCreate}
+      open={view === "registration" && xlsxImportOpen && permissions.canCreate}
       stores={stores}
     />
   </div>;

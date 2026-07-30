@@ -64,3 +64,25 @@ test("single product registration is separate, scheduled for next-day 10 by defa
   assert.match(dashboard, /products\?import=xlsx/);
   assert.match(dashboard, /products\?create=single/);
 });
+
+test("single registration resets immediately and finishes safely in the background", async () => {
+  const consoleSource = await source(
+    "src/components/admin/operator/OperatorProductsConsole.tsx",
+  );
+
+  assert.match(
+    consoleSource,
+    /const snapshot: SingleRegistrationSnapshot[\s\S]*resetForm\(\);[\s\S]*void processSingleRegistration\(snapshot\);[\s\S]*return;/,
+  );
+  assert.doesNotMatch(
+    consoleSource,
+    /await processSingleRegistration\(snapshot\)/,
+  );
+  assert.match(consoleSource, /단품 백그라운드 등록/);
+  assert.match(consoleSource, /건 처리 중/);
+  assert.match(consoleSource, /다른 단품을 계속 등록할 수 있습니다/);
+  assert.match(consoleSource, /beforeunload/);
+  assert.match(consoleSource, /processingSingleRegistrationIdsRef/);
+  assert.match(consoleSource, /retrySingleRegistration\(job\.id\)/);
+  assert.match(consoleSource, /discardUnpersistedProductImages\(uploadedPaths\)/);
+});

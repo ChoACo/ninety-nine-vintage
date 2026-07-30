@@ -80,6 +80,22 @@ interface SingleImage {
   previewUrl: string;
 }
 
+interface SingleRegistrationSnapshot {
+  accessToken: string;
+  canPublishImmediately: boolean;
+  files: File[];
+  form: FormState;
+  id: string;
+  productId: string;
+  publicationMode: PublicationMode;
+}
+
+interface SingleRegistrationJob {
+  id: string;
+  status: "pending" | "failed";
+  title: string;
+}
+
 const emptyForm: FormState = {
   title: "", description: "", brand: "", category: "기타", storeId: "", saleType: "fixed", price: "", imageUrls: "",
   sizeLabel: "", conditionGrade: "", gender: "", storageClass: "small", status: "active", bidIncrement: "1000", publishAt: "", closesAt: "",
@@ -175,8 +191,15 @@ export function OperatorProductsConsole() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
+  const [singleRegistrationJobs, setSingleRegistrationJobs] = useState<
+    SingleRegistrationJob[]
+  >([]);
   const inspectionNotesRef = useRef<HTMLTextAreaElement>(null);
   const singleImagesRef = useRef<SingleImage[]>([]);
+  const singleRegistrationSnapshotsRef = useRef(
+    new Map<string, SingleRegistrationSnapshot>(),
+  );
+  const processingSingleRegistrationIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     singleImagesRef.current = singleImages;
@@ -190,6 +213,24 @@ export function OperatorProductsConsole() {
     },
     [],
   );
+
+  const pendingSingleRegistrationCount = singleRegistrationJobs.filter(
+    (job) => job.status === "pending",
+  ).length;
+  const failedSingleRegistrations = singleRegistrationJobs.filter(
+    (job) => job.status === "failed",
+  );
+
+  useEffect(() => {
+    if (singleRegistrationJobs.length === 0) return;
+    const confirmBackgroundWork = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", confirmBackgroundWork);
+    return () =>
+      window.removeEventListener("beforeunload", confirmBackgroundWork);
+  }, [singleRegistrationJobs.length]);
 
   const load = useCallback(async (accessToken: string | null) => {
     if (!accessToken) return;
@@ -337,89 +378,51 @@ export function OperatorProductsConsole() {
     });
   };
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!token || busy) return;
-    if (!editingId && !form.title.trim()) {
-      setNotice("상품명을 입력해 주세요.");
-      return;
-    }
-    if (!editingId && (!singleCreateOpen || singleImages.length === 0)) {
-      setNotice("단품 사진을 한 장 이상 선택해 주세요.");
-      return;
-    }
-    setBusy(true); setNotice("");
+  const processSingleRegistration = async (
+    snapshot: SingleRegistrationSnapshot,
+  ) => {
+    if (processingSingleRegistrationIdsRef.current.has(snapshot.id)) return;
+    processingSingleRegistrationIdsRef.current.add(snapshot.id);
+    setSingleRegistrationJobs((current) =>
+      current.map((job) =>
+        job.id === snapshot.id ? { ...job, status: "pending" } : job,
+      ),
+    );
     const uploadedPaths: string[] = [];
     let persisted = false;
     try {
-      if (editingId && (!permissions.canMutate || !editingProduct || !editingUpdatedAt || !isManageableProductStatus(editingProduct.status))) {
-        throw new Error("수정할 상품의 최신 상태를 확인하지 못했습니다. 목록을 새로고침해 주세요.");
-      }
-      const canPublishStore =
-        stores.find((store) => store.id === form.storeId)?.canPublish === true;
-      const shouldPublishAfterSave = editingId
-        ? canPublishStore &&
-          form.status === "active" &&
-          editingProduct?.status === "pending"
-        : canPublishStore && publicationMode === "now";
-      const publishAt = toIsoDateTime(form.publishAt);
-      const closesAt = toIsoDateTime(form.closesAt);
-      let body: Record<string, unknown>;
-      if (editingId) {
-        body = {
-          title: form.title,
-          brand: form.brand,
-          description: form.description,
-          category: form.category,
-          imageUrls: splitImages(form.imageUrls),
-          sizeLabel: form.sizeLabel,
-          conditionGrade: form.conditionGrade,
-          storageClass: form.storageClass,
-          status: shouldPublishAfterSave ? "pending" : form.status,
-          expectedUpdatedAt: editingId ? editingUpdatedAt : undefined,
-          ...(saleSetupEditable
-            ? {
-                storeId: form.storeId,
-                saleType: form.saleType,
-                startingPrice: Number(form.price),
-                fixedPrice:
-                  form.saleType === "fixed" ? Number(form.price) : undefined,
-                bidIncrement: Number(form.bidIncrement),
-                publishAt,
-                closesAt,
-              }
-            : {}),
-          inspectionNotes: splitLines(form.inspectionNotes),
-        };
-      } else {
-        const productId = crypto.randomUUID();
-        const uploaded = await uploadProductImages(
-          singleImages.map((image) => image.file),
-          productId,
-        );
-        uploadedPaths.push(...uploaded.paths);
-        body = {
-          id: productId,
-          registrationMode: "single",
-          title: form.title,
-          brand: form.brand,
-          gender: form.gender,
-          conditionGrade: form.conditionGrade,
-          description: form.description,
-          storeId: form.storeId,
-          saleType: form.saleType,
-          startingPrice: Number(form.price),
-          fixedPrice:
-            form.saleType === "fixed" ? Number(form.price) : undefined,
-          bidIncrement: Number(form.bidIncrement),
-          storageClass: form.storageClass,
-          publicationMode,
-          imageUrls: uploaded.imageUrls,
-          thumbnailUrls: uploaded.thumbnailUrls,
-        };
-      }
-      const response = await fetch(editingId ? `/api/admin/operator/products/${editingId}` : "/api/admin/operator/products", {
-        method: editingId ? "PATCH" : "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      const uploaded = await uploadProductImages(
+        snapshot.files,
+        snapshot.productId,
+      );
+      uploadedPaths.push(...uploaded.paths);
+      const body = {
+        id: snapshot.productId,
+        registrationMode: "single",
+        title: snapshot.form.title,
+        brand: snapshot.form.brand,
+        gender: snapshot.form.gender,
+        conditionGrade: snapshot.form.conditionGrade,
+        description: snapshot.form.description,
+        storeId: snapshot.form.storeId,
+        saleType: snapshot.form.saleType,
+        startingPrice: Number(snapshot.form.price),
+        fixedPrice:
+          snapshot.form.saleType === "fixed"
+            ? Number(snapshot.form.price)
+            : undefined,
+        bidIncrement: Number(snapshot.form.bidIncrement),
+        storageClass: snapshot.form.storageClass,
+        publicationMode: snapshot.publicationMode,
+        imageUrls: uploaded.imageUrls,
+        thumbnailUrls: uploaded.thumbnailUrls,
+      };
+      const response = await fetch("/api/admin/operator/products", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${snapshot.accessToken}`,
+        },
         body: JSON.stringify(body),
       });
       const payload = await response.json() as {
@@ -433,27 +436,170 @@ export function OperatorProductsConsole() {
         );
       }
       persisted = true;
-      let message = editingId
-        ? "상품 정보를 저장했습니다."
-        : publicationMode === "next-day-10"
-          ? "단품을 등록하고 다음 날 오전 10시 공개로 예약했습니다."
-          : "단품을 등록했습니다.";
+      let message = snapshot.publicationMode === "next-day-10"
+        ? `“${snapshot.form.title}” 단품 등록과 오전 10시 공개 예약을 완료했습니다.`
+        : `“${snapshot.form.title}” 단품 등록을 완료했습니다.`;
+      if (snapshot.canPublishImmediately) {
+        if (!payload.product?.id) {
+          message = `“${snapshot.form.title}” 상품은 등록했지만 즉시 공개 결과를 확인하지 못했습니다. 초안 목록을 확인해 주세요.`;
+        } else {
+          try {
+            await publishProductNow(snapshot.accessToken, payload.product.id);
+            message = `“${snapshot.form.title}” 상품을 등록하고 지금 공개했습니다.`;
+          } catch (error) {
+            const reason = error instanceof Error
+              ? error.message
+              : "즉시 공개 결과를 확인하지 못했습니다.";
+            message = `“${snapshot.form.title}” 상품은 등록했지만 즉시 공개하지 못했습니다. ${reason}`;
+          }
+        }
+      }
+      singleRegistrationSnapshotsRef.current.delete(snapshot.id);
+      setSingleRegistrationJobs((current) =>
+        current.filter((job) => job.id !== snapshot.id),
+      );
+      setNotice(message);
+      try {
+        await load(snapshot.accessToken);
+      } catch {
+        setNotice(`${message} 목록은 새로고침하면 확인할 수 있습니다.`);
+      }
+    } catch (error) {
+      if (!persisted) await discardUnpersistedProductImages(uploadedPaths);
+      setSingleRegistrationJobs((current) =>
+        current.map((job) =>
+          job.id === snapshot.id ? { ...job, status: "failed" } : job,
+        ),
+      );
+      const reason = error instanceof Error
+        ? error.message
+        : "상품을 저장하지 못했습니다.";
+      setNotice(
+        `“${snapshot.form.title}” 백그라운드 등록에 실패했습니다. ${reason}`,
+      );
+    } finally {
+      processingSingleRegistrationIdsRef.current.delete(snapshot.id);
+    }
+  };
+
+  const retrySingleRegistration = (jobId: string) => {
+    const snapshot = singleRegistrationSnapshotsRef.current.get(jobId);
+    if (!snapshot || !token) return;
+    const retrySnapshot = { ...snapshot, accessToken: token };
+    singleRegistrationSnapshotsRef.current.set(jobId, retrySnapshot);
+    void processSingleRegistration(retrySnapshot);
+  };
+
+  const dismissFailedSingleRegistration = (jobId: string) => {
+    singleRegistrationSnapshotsRef.current.delete(jobId);
+    setSingleRegistrationJobs((current) =>
+      current.filter((job) => job.id !== jobId),
+    );
+  };
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!token || busy) return;
+    if (!editingId && !form.title.trim()) {
+      setNotice("상품명을 입력해 주세요.");
+      return;
+    }
+    if (!editingId && (!singleCreateOpen || singleImages.length === 0)) {
+      setNotice("단품 사진을 한 장 이상 선택해 주세요.");
+      return;
+    }
+    if (!editingId) {
+      const canPublishStore =
+        stores.find((store) => store.id === form.storeId)?.canPublish === true;
+      const snapshot: SingleRegistrationSnapshot = {
+        accessToken: token,
+        canPublishImmediately: canPublishStore && publicationMode === "now",
+        files: singleImages.map((image) => image.file),
+        form: { ...form },
+        id: crypto.randomUUID(),
+        productId: crypto.randomUUID(),
+        publicationMode,
+      };
+      singleRegistrationSnapshotsRef.current.set(snapshot.id, snapshot);
+      setSingleRegistrationJobs((current) => [
+        ...current,
+        { id: snapshot.id, status: "pending", title: snapshot.form.title },
+      ]);
+      resetForm();
+      setNotice(
+        `“${snapshot.form.title}” 등록을 접수했습니다. 사진 처리는 백그라운드에서 계속됩니다.`,
+      );
+      void processSingleRegistration(snapshot);
+      return;
+    }
+    setBusy(true); setNotice("");
+    try {
+      if (editingId && (!permissions.canMutate || !editingProduct || !editingUpdatedAt || !isManageableProductStatus(editingProduct.status))) {
+        throw new Error("수정할 상품의 최신 상태를 확인하지 못했습니다. 목록을 새로고침해 주세요.");
+      }
+      const canPublishStore =
+        stores.find((store) => store.id === form.storeId)?.canPublish === true;
+      const shouldPublishAfterSave =
+        canPublishStore &&
+        form.status === "active" &&
+        editingProduct?.status === "pending";
+      const publishAt = toIsoDateTime(form.publishAt);
+      const closesAt = toIsoDateTime(form.closesAt);
+      const body: Record<string, unknown> = {
+        title: form.title,
+        brand: form.brand,
+        description: form.description,
+        category: form.category,
+        imageUrls: splitImages(form.imageUrls),
+        sizeLabel: form.sizeLabel,
+        conditionGrade: form.conditionGrade,
+        storageClass: form.storageClass,
+        status: shouldPublishAfterSave ? "pending" : form.status,
+        expectedUpdatedAt: editingId ? editingUpdatedAt : undefined,
+        ...(saleSetupEditable
+          ? {
+              storeId: form.storeId,
+              saleType: form.saleType,
+              startingPrice: Number(form.price),
+              fixedPrice:
+                form.saleType === "fixed" ? Number(form.price) : undefined,
+              bidIncrement: Number(form.bidIncrement),
+              publishAt,
+              closesAt,
+            }
+          : {}),
+        inspectionNotes: splitLines(form.inspectionNotes),
+      };
+      const response = await fetch(`/api/admin/operator/products/${editingId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json() as {
+        product?: { id: string };
+        error?: string;
+        message?: string;
+      };
+      if (!response.ok) {
+        throw new Error(
+          payload.message ?? payload.error ?? "상품을 저장하지 못했습니다.",
+        );
+      }
+      let message = "상품 정보를 저장했습니다.";
       if (shouldPublishAfterSave) {
         if (!payload.product?.id) {
-          message = `${editingId ? "상품 정보는 저장했지만" : "상품은 등록했지만"} 즉시 공개 결과를 확인하지 못했습니다. 초안 목록을 확인해 주세요.`;
+          message = "상품 정보는 저장했지만 즉시 공개 결과를 확인하지 못했습니다. 초안 목록을 확인해 주세요.";
         } else {
           try {
             await publishProductNow(token, payload.product.id);
-            message = editingId ? "상품 정보를 저장하고 지금 공개했습니다." : "상품을 등록하고 지금 공개했습니다.";
+            message = "상품 정보를 저장하고 지금 공개했습니다.";
           } catch (error) {
             const reason = error instanceof Error ? error.message : "즉시 공개 결과를 확인하지 못했습니다.";
-            message = `${editingId ? "상품 정보는 저장했지만" : "상품은 등록했지만"} 즉시 공개하지 못했습니다. ${reason}`;
+            message = `상품 정보는 저장했지만 즉시 공개하지 못했습니다. ${reason}`;
           }
         }
       }
       setNotice(message); resetForm(); await load(token);
     } catch (error) {
-      if (!persisted) await discardUnpersistedProductImages(uploadedPaths);
       setNotice(error instanceof Error ? error.message : "상품을 저장하지 못했습니다.");
     }
     finally { setBusy(false); }
@@ -805,6 +951,7 @@ export function OperatorProductsConsole() {
   return <div className="space-y-8">
     <SectionHeading action={<div className="grid grid-cols-2 gap-2 sm:flex"><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate || busy} onClick={() => setXlsxImportOpen(true)} type="button" variant="primary"><FileSpreadsheet size={15} /> 엑셀 일괄 등록</Button><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate} onClick={startSingleCreate} type="button"><Plus size={15} /> 단품 등록</Button></div>} description="엑셀 일괄 등록을 기본으로 사용하고, 단품은 별도 간편 폼에서 등록합니다." eyebrow="운영자 / 상품 관리" title="상품 등록·관리" variant="page" />
     {notice && <StatusNotice>{notice}</StatusNotice>}
+    {singleRegistrationJobs.length > 0 && <section aria-live="polite" className="border border-line bg-surface px-4 py-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold">단품 백그라운드 등록</p><p className="font-mono text-[10px] text-muted">{pendingSingleRegistrationCount > 0 ? `${pendingSingleRegistrationCount}건 처리 중` : "처리 대기 없음"}</p></div>{pendingSingleRegistrationCount > 0 && <p className="mt-2 text-[11px] text-muted">사진 처리와 저장이 진행되는 동안 다른 단품을 계속 등록할 수 있습니다. 완료 전에는 이 페이지를 닫지 마세요.</p>}{failedSingleRegistrations.length > 0 && <div className="mt-3 space-y-2">{failedSingleRegistrations.map((job) => <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2" key={job.id}><p className="min-w-0 truncate text-[11px] font-bold text-red-700">“{job.title}” 등록 실패</p><div className="flex gap-2"><Button disabled={!token} onClick={() => retrySingleRegistration(job.id)} size="compact" type="button">다시 시도</Button><Button onClick={() => dismissFailedSingleRegistration(job.id)} size="compact" type="button" variant="ghost">닫기</Button></div></div>)}</div>}</section>}
     {products.some((product) => product.brand_source === "inferred" && product.status === "pending") && <StatusNotice>초안 중 제목에서 임시 추론한 브랜드가 있습니다. 수정 저장하면 확인된 브랜드로 전환됩니다.</StatusNotice>}
     {products.some((product) => product.brand_source === "inferred" && product.status === "pending") && <section className="border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-bold text-amber-900">브랜드 확인 필요</p><div className="mt-3 flex flex-wrap gap-2">{products.filter((product) => product.brand_source === "inferred" && product.status === "pending").map((product) => <button className="border border-amber-300 bg-paper px-3 py-2 text-left text-[11px] text-amber-900 disabled:cursor-not-allowed disabled:opacity-40" disabled={!permissions.canMutate} key={product.id} onClick={() => edit(product)} type="button"><span className="font-bold">{product.brand}</span> · {product.title}</button>)}</div></section>}
     {(editingId || singleCreateOpen) && (

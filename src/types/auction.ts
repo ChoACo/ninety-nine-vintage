@@ -245,6 +245,7 @@ export interface Item {
   brand: string;
   category: string;
   description: string;
+  gender?: "" | "남성" | "여성" | "공용";
   imageUrl: string;
   thumbnailUrl?: string;
   condition?: "NEW" | "EXCELLENT" | "GOOD" | "FAIR";

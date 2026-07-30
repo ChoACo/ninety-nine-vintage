@@ -340,6 +340,10 @@ export function OperatorProductsConsole() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!token || busy) return;
+    if (!editingId && !form.title.trim()) {
+      setNotice("상품명을 입력해 주세요.");
+      return;
+    }
     if (!editingId && (!singleCreateOpen || singleImages.length === 0)) {
       setNotice("단품 사진을 한 장 이상 선택해 주세요.");
       return;
@@ -808,7 +812,7 @@ export function OperatorProductsConsole() {
         <div className="flex items-center justify-between sm:col-span-2">
           <div>
             <p className="text-sm font-bold">{editingId ? "상품 수정" : "단품 간편 등록"}</p>
-            {!editingId && <p className="mt-1 text-[11px] text-muted">상품명·브랜드·성별·상태등급은 선택 사항이며, 미입력하면 공란으로 저장됩니다.</p>}
+            {!editingId && <p className="mt-1 text-[11px] text-muted">상품명은 피드에 보이는 간판글로 필수입니다. 상품설명·브랜드·성별·상태등급은 선택 사항입니다.</p>}
           </div>
           <Button size="compact" variant="ghost" onClick={resetForm} type="button">
             <X size={13} /> {editingId ? "수정 취소" : "닫기"}
@@ -822,7 +826,7 @@ export function OperatorProductsConsole() {
           </>
         ) : (
           <>
-            <TextInput aria-label="상품명" onChange={(event) => update("title", event.target.value)} placeholder="상품명 (선택)" value={form.title} />
+            <TextInput aria-label="상품명" onChange={(event) => update("title", event.target.value)} placeholder="상품명 (필수)" required value={form.title} />
             <TextInput aria-label="브랜드명" onChange={(event) => update("brand", event.target.value)} placeholder="브랜드명 (선택)" value={form.brand} />
             <SelectInput aria-label="성별" onChange={(event) => update("gender", event.target.value)} value={form.gender}>
               <option value="">성별 미입력</option>
@@ -849,7 +853,7 @@ export function OperatorProductsConsole() {
           }));
         }} required value={form.storeId}>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</SelectInput>
         <div className="flex flex-col gap-2 sm:flex-row"><SelectInput aria-label="판매 방식" className="flex-1" disabled={!saleSetupEditable} onChange={(event) => update("saleType", event.target.value)} value={form.saleType}><option value="fixed">즉시구매</option><option value="auction">경매</option></SelectInput><TextInput aria-label="가격" className="w-full sm:w-40" disabled={!saleSetupEditable} min="1" onChange={(event) => update("price", event.target.value)} placeholder="가격" required type="number" value={form.price} /></div>
-        <TextArea aria-label="상품 설명" className="min-h-24 sm:col-span-2" disabled={!productFieldsEditable} onChange={(event) => update("description", event.target.value)} placeholder="상품 설명" required value={form.description} />
+        <TextArea aria-label="상품 설명" className="min-h-24 sm:col-span-2" disabled={!productFieldsEditable} onChange={(event) => update("description", event.target.value)} placeholder={editingId ? "상품 설명" : "상품 설명 (선택)"} required={Boolean(editingId)} value={form.description} />
 
         {editingId ? (
           <>

@@ -374,6 +374,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
       brand: product.brand,
       category: product.category,
       description: product.description,
+      gender: product.gender,
       imageUrl: getCatalogImageUrl(product.thumbnailUrls[0] ?? product.imageUrls[0] ?? ""),
       thumbnailUrl: getCatalogImageUrl(product.thumbnailUrls[0] ?? product.imageUrls[0] ?? ""),
       imageUrls,

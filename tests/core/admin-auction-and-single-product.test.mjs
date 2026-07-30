@@ -46,7 +46,9 @@ test("single product registration is separate, scheduled for next-day 10 by defa
 
   assert.match(route, /registrationMode === "single"/);
   assert.match(route, /const title = text\(body\?\.title\)/);
-  assert.match(route, /title\.length > 160/);
+  assert.match(route, /!title \|\| title\.length > 160/);
+  assert.match(route, /\(!singleRegistration && !description\)/);
+  assert.match(route, /description\.length > 10000/);
   assert.match(route, /brandSlug: ""/);
   assert.match(route, /const gender = \["남성", "여성", "공용"\]/);
   assert.match(route, /const category = singleRegistration[\s\S]*\? "기타"/);

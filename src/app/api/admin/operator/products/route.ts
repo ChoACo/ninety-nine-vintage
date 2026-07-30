@@ -152,7 +152,7 @@ export async function POST(request: Request) {
       ? FIXED_PRODUCT_OPEN_UNTIL
       : getNextAuctionDeadline(publishAt).toISOString()
     : text(body?.closesAt, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
-  if (title.length > 160 || !description || !normalizedBrand || !storeId || imageUrls.length === 0 || thumbnailUrls.length !== imageUrls.length || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
+  if (!title || title.length > 160 || (!singleRegistration && !description) || description.length > 10000 || !normalizedBrand || !storeId || imageUrls.length === 0 || thumbnailUrls.length !== imageUrls.length || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
     return commerceJson({ error: "상품 입력값을 확인해 주세요." }, 400);
   }
   const { data: canManageStore, error: permissionError } = await auth.user.rpc(

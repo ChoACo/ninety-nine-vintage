@@ -11,6 +11,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { rememberFixedPurchaseIntent } from "@/lib/commerce/purchaseIntent";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
+import { ProductFeedTags } from "@/components/features/catalog/ProductFeedTags";
 
 interface AuctionCardProps { basePath?: "" | "/m"; item: Omit<Item, "bidHistory"> & { closesAt?: string; timeLeft?: string }; surface?: "desktop" | "mobile"; }
 
@@ -86,6 +87,7 @@ function EnabledAuctionCard({ basePath = "", item, surface = basePath === "/m" ?
       <div className="pt-3">
         <div className="flex items-center justify-between gap-2 text-[10px] text-muted"><span className="truncate">{item.brand}</span><span className="shrink-0 font-mono tabular-nums">{item.timeLeft ?? "진행 중"}</span></div>
         <Link className="mt-1 block truncate text-sm font-medium hover:underline" href={`${basePath}/auction/${item.id}`} prefetch={false}>{item.name}</Link>
+        <ProductFeedTags description={item.description} gender={item.gender} size={item.size} />
         <div className="mt-3 flex items-end justify-between gap-2">
           <div><p className="text-[10px] text-muted">{isFixed ? "판매 정가" : "현재 입찰가"}</p><p className="font-mono text-sm font-bold tabular-nums">{price.toLocaleString("ko-KR")}원</p></div>
           <p className="text-[10px] text-muted">{isFixed ? "즉시 구매" : `입찰 ${item.bidCount}건`}</p>

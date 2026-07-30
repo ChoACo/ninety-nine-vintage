@@ -11,6 +11,7 @@ test("single registration requires a feed title while keeping description and ca
     route,
     migration,
     productTextConstraintMigration,
+    legacyProductTitleMigration,
     paymentOrderNameMigration,
     productsService,
     filters,
@@ -20,6 +21,7 @@ test("single registration requires a feed title while keeping description and ca
       source("src/app/api/admin/operator/products/route.ts"),
       source("supabase/migrations/20260724123534_owner_member_mode_product_gender.sql"),
       source("supabase/migrations/20260730000920_require_product_title_allow_blank_description.sql"),
+      source("supabase/migrations/20260730040925_normalize_legacy_blank_product_titles.sql"),
       source("supabase/migrations/20260730000215_normalize_blank_manual_transfer_order_names.sql"),
       source("src/services/products.ts"),
       source("src/utils/catalogFilters.ts"),
@@ -53,6 +55,14 @@ test("single registration requires a feed title while keeping description and ca
   assert.match(
     productTextConstraintMigration,
     /products_description_length_check[\s\S]*between 0 and 10000/,
+  );
+  assert.match(
+    legacyProductTitleMigration,
+    /update public\.products[\s\S]*nullif\(btrim\(description\), ''\)[\s\S]*where nullif\(btrim\(title\), ''\) is null/,
+  );
+  assert.match(
+    legacyProductTitleMigration,
+    /validate constraint products_title_length_check/,
   );
   assert.match(
     paymentOrderNameMigration,

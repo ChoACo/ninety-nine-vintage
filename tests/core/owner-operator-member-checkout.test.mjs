@@ -140,8 +140,8 @@ test("every operator can confirm shared payments while owner retains site and re
   assert.doesNotMatch(ownerLayout, /센터·매장 구조/);
   assert.match(ownerLayout, /환불 승인/);
   assert.doesNotMatch(ownerLayout, /배송·결제/);
-  assert.match(operatorLayout, /주문·입금 확인/);
-  assert.match(operatorLayout, /택배·송장/);
+  assert.match(operatorLayout, /label:\s*"주문·입금"/);
+  assert.match(operatorLayout, /label:\s*"택배"/);
 });
 
 test("checkout quotes shipping per business, defaults to paying it, and projects a one-use entitlement after payment", async () => {

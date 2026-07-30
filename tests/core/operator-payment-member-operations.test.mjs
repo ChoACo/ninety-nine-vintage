@@ -42,7 +42,7 @@ test("member storage is cross-store while winners and fulfillment stay assigned-
   assert.match(winnerMigration, /create or replace function public\.get_operator_winning_members/);
   assert.match(migration, /revoke all on function public\.get_operator_member_storage[\s\S]*from public, anon, service_role/);
   assert.match(route, /auth\.roleCode !== "owner" && auth\.roleCode !== "operator"/);
-  assert.match(layout, /회원 상품 보관함/);
+  assert.match(layout, /회원 보관함/);
   assert.match(layout, /낙찰된 회원/);
   assert.match(consoleSource, /매장 출고 전/);
   assert.match(consoleSource, /보관 완료/);

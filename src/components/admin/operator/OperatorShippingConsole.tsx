@@ -14,6 +14,7 @@ import { CatalogImage } from "@/components/ui/CatalogImage";
 
 type ShipmentAction = "pack" | "ship" | "tracking_update" | "tracking_delete";
 type ShippingForm = { courier: string; trackingNumber: string };
+type ShippingConsoleView = "requests" | "completed" | "history";
 
 interface StoreWork {
   id: string;
@@ -260,11 +261,15 @@ function sessionKey(shipment: InventoryShipment, action: ShipmentAction, form?: 
 
 export function OperatorShippingConsole({
   staffLabel = "운영자",
-}: Readonly<{ staffLabel?: string }>) {
+  view = "requests",
+}: Readonly<{
+  staffLabel?: string;
+  view?: ShippingConsoleView;
+}>) {
   const [token, setToken] = useState<string | null>(null);
   const [shipments, setShipments] = useState<InventoryShipment[]>([]);
   const [completedDeliveries, setCompletedDeliveries] = useState<CompletedDelivery[]>([]);
-  const includeShipped = true;
+  const includeShipped = view !== "requests";
   const [offset, setOffset] = useState(0);
   const [forms, setForms] = useState<Record<string, ShippingForm>>({});
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -295,15 +300,19 @@ export function OperatorShippingConsole({
   useEffect(() => {
     void (async () => {
       try {
+        setOffset(0);
+        setShipments([]);
+        setCompletedDeliveries([]);
+        setNotice("");
         const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
         const accessToken = session?.access_token ?? null;
         setToken(accessToken);
-        if (accessToken) await load(accessToken, true, 0);
+        if (accessToken) await load(accessToken, includeShipped, 0);
       } catch (error) {
         setNotice(error instanceof Error ? error.message : "배송 대기열을 불러오지 못했습니다.");
       }
     })();
-  }, [load]);
+  }, [includeShipped, load, view]);
 
   const refresh = () => {
     void load(token, includeShipped, offset).catch((error) => {
@@ -423,44 +432,77 @@ export function OperatorShippingConsole({
     () => groupCompletedByMember(completedDeliveries),
     [completedDeliveries],
   );
+  const shipmentSections = view === "requests"
+    ? [{
+        groups: activeMemberGroups,
+        key: "active",
+        title: `택배 요청 · ${activeShipments.length}건`,
+      }]
+    : view === "completed"
+      ? [{
+          groups: shippedMemberGroups,
+          key: "shipped",
+          title: `택배 발송 완료 · ${shippedShipments.length}건`,
+        }]
+      : [];
+  const viewHeading = {
+    completed: {
+      description: "발송 완료된 택배의 송장 정보를 확인하고 필요한 경우 수정하거나 삭제합니다.",
+      title: "택배 발송 완료",
+    },
+    history: {
+      description: "배송까지 완료된 택배 기록을 최근 30일 범위에서 확인합니다.",
+      title: "지난 택배 기록",
+    },
+    requests: {
+      description: "배송 신청을 확인하고 합포장, 택배사와 송장 등록까지 처리합니다.",
+      title: "택배 요청",
+    },
+  }[view];
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col items-stretch justify-between gap-5 border-b border-ink pb-6 sm:flex-row sm:items-end">
         <div>
-          <p className="eyebrow text-muted">{staffLabel} / 매장 통합 배송</p>
-          <h1 className="mt-3 text-3xl font-black tracking-[-.06em] sm:text-4xl sm:tracking-[-.08em]">배송 업무</h1>
-          <p className="mt-3 text-sm text-muted">모든 매장의 배송 신청을 함께 확인합니다. 상품 사진과 매장별 출고 여부를 확인한 뒤 합포장과 송장을 처리하세요.</p>
+          <p className="eyebrow text-muted">{staffLabel} / 택배</p>
+          <h1 className="mt-3 text-3xl font-black tracking-[-.06em] sm:text-4xl sm:tracking-[-.08em]">{viewHeading.title}</h1>
+          <p className="mt-3 text-sm text-muted">{viewHeading.description}</p>
         </div>
         <button className="flex items-center justify-center gap-2 border border-line px-4 py-3 text-xs font-bold" onClick={refresh} type="button"><RefreshCw size={13} /> 새로고침</button>
       </div>
 
       {notice && <div aria-live="polite" className="border border-line bg-surface px-4 py-3 text-xs">{notice}</div>}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="border border-line p-5"><p className="text-xs text-muted">매장 출고 대기 신청</p><p className="mt-3 font-mono text-3xl font-bold">{summary.collecting}</p></div>
-        <div className="border border-line p-5"><PackageCheck size={17} /><p className="mt-7 text-xs text-muted">송장 등록 대기</p><p className="mt-3 font-mono text-3xl font-bold">{summary.packed}</p></div>
-        <div className="border border-line bg-ink p-5 text-paper"><Truck size={17} /><p className="mt-7 text-xs text-zinc-400">발송 완료</p><p className="mt-3 font-mono text-3xl font-bold">{summary.shipped}</p></div>
-      </div>
+      {view === "requests" && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="border border-line p-5"><p className="text-xs text-muted">매장 출고 대기 신청</p><p className="mt-3 font-mono text-3xl font-bold">{summary.collecting}</p></div>
+          <div className="border border-line p-5"><PackageCheck size={17} /><p className="mt-7 text-xs text-muted">송장 등록 대기</p><p className="mt-3 font-mono text-3xl font-bold">{summary.packed}</p></div>
+        </div>
+      )}
+      {view === "completed" && (
+        <div className="border border-line bg-ink p-5 text-paper">
+          <Truck size={17} />
+          <p className="mt-7 text-xs text-zinc-400">송장 등록·발송 완료</p>
+          <p className="mt-3 font-mono text-3xl font-bold">{summary.shipped}</p>
+        </div>
+      )}
+      {view === "history" && (
+        <div className="border border-line p-5">
+          <CheckCircle2 size={17} />
+          <p className="mt-7 text-xs text-muted">최근 30일 배송 완료 기록</p>
+          <p className="mt-3 font-mono text-3xl font-bold">{completedDeliveries.length}</p>
+        </div>
+      )}
 
-      <div className="flex items-center justify-between gap-4 border-b border-line pb-4">
-        <p className="text-xs font-bold">처리 중과 발송 완료 내역을 분리해 표시합니다.</p>
-        <p className="text-xs text-muted">현재 페이지 {shipments.length}건</p>
-      </div>
+      {view !== "history" && (
+        <div className="flex items-center justify-between gap-4 border-b border-line pb-4">
+          <p className="text-xs font-bold">{view === "requests" ? "처리가 필요한 택배 요청만 표시합니다." : "발송 완료된 택배와 송장 정보만 표시합니다."}</p>
+          <p className="text-xs text-muted">현재 페이지 {view === "requests" ? activeShipments.length : shippedShipments.length}건</p>
+        </div>
+      )}
 
-      <div className="border border-line">
-        {[
-          {
-            groups: activeMemberGroups,
-            key: "active",
-            title: `처리 중 배송 · ${activeShipments.length}건`,
-          },
-          {
-            groups: shippedMemberGroups,
-            key: "shipped",
-            title: `발송 완료 내역 · ${shippedShipments.length}건`,
-          },
-        ].map((section) => (
+      {view !== "history" && <div className="border border-line">
+        {shipmentSections.map((section) => (
           <section className="border-b border-ink last:border-b-0" key={section.key}>
             <div className="bg-surface px-5 py-3 text-sm font-black">
               {section.title}
@@ -607,12 +649,9 @@ export function OperatorShippingConsole({
             )}
           </section>
         ))}
-        {shipments.length === 0 && completedDeliveries.length === 0 && (
-          <p className="py-16 text-center text-sm text-muted">표시할 배송 요청이 없습니다.</p>
-        )}
-      </div>
+      </div>}
 
-      <section className="border border-line">
+      {view === "history" && <section className="border border-line">
         <div className="flex items-center justify-between gap-4 bg-ink px-5 py-3 text-paper">
           <p className="text-sm font-black">배송 완료 · {completedDeliveries.length}건</p>
           <p className="text-[10px] text-zinc-400">완료 후 30일 보관</p>
@@ -670,13 +709,13 @@ export function OperatorShippingConsole({
             최근 30일 이내 배송 완료 기록이 없습니다.
           </p>
         )}
-      </section>
+      </section>}
 
-      <div className="flex items-center justify-between gap-4">
+      {view !== "history" && <div className="flex items-center justify-between gap-4">
         <button className="border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={offset === 0} onClick={() => changePage(Math.max(0, offset - PAGE_SIZE))} type="button">이전</button>
         <p className="font-mono text-[11px] text-muted">{offset + 1}–{offset + shipments.length}</p>
         <button className="border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={shipments.length < PAGE_SIZE} onClick={() => changePage(offset + PAGE_SIZE)} type="button">다음</button>
-      </div>
+      </div>}
     </div>
   );
 }

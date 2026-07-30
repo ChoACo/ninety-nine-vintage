@@ -155,9 +155,9 @@ export function OperatorConsole({
     <div className="space-y-10">
       <div className="flex flex-col items-stretch justify-between gap-5 border-b border-ink pb-7 sm:flex-row sm:items-end">
         <div>
-          <p className="eyebrow text-muted">운영자 / 통합 현황</p>
+          <p className="eyebrow text-muted">운영자 센터 / 통합 현황</p>
           <h1 className="mt-3 text-3xl font-black tracking-[-0.06em] sm:text-4xl sm:tracking-[-0.08em]">
-            운영자 센터
+            메인
           </h1>
           <p className="mt-3 text-sm text-muted">
             소속 매장의 진행 상품, 입금 확인, 출고와 택배 업무를 확인합니다.

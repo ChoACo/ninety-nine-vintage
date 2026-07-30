@@ -40,6 +40,54 @@ test("operator revenue is summarized on the dashboard and retains a guarded deta
   assert.match(revenue, /grid grid-cols-2[^"]*lg:grid-cols-4/);
 });
 
+test("operator center uses major and minor navigation with separated shipping workspaces", async () => {
+  const [
+    layout,
+    dashboard,
+    shipping,
+    requestPage,
+    completedPage,
+    historyPage,
+  ] = await Promise.all([
+    source("src/app/(admin)/admin/operator/layout.tsx"),
+    source("src/components/admin/operator/OperatorConsole.tsx"),
+    source("src/components/admin/operator/OperatorShippingConsole.tsx"),
+    source("src/app/(admin)/admin/operator/shipping/page.tsx"),
+    source("src/app/(admin)/admin/operator/shipping/completed/page.tsx"),
+    source("src/app/(admin)/admin/operator/shipping/history/page.tsx"),
+  ]);
+
+  assert.match(layout, /aria-label="운영자 대분류"/);
+  assert.match(layout, /aria-label=\{`\$\{activeGroup\.label\} 소분류`\}/);
+  for (const label of ["메인", "상품", "주문·입금", "출고·보관", "기록", "택배"]) {
+    assert.match(layout, new RegExp(`label:\\s*"${label}"`));
+  }
+  for (const label of [
+    "상품 등록",
+    "주문",
+    "낙찰된 회원",
+    "출고·보관",
+    "회원 보관함",
+    "지난 상품",
+    "예외",
+    "택배 요청",
+    "택배 발송 완료",
+    "지난 택배 기록",
+  ]) {
+    assert.match(layout, new RegExp(`label:\\s*"${label}"`));
+  }
+  assert.match(dashboard, />\s*메인\s*</);
+  assert.match(requestPage, /<OperatorShippingConsole\s*\/>/);
+  assert.match(completedPage, /<OperatorShippingConsole view="completed"\s*\/>/);
+  assert.match(historyPage, /<OperatorShippingConsole view="history"\s*\/>/);
+  assert.match(shipping, /type ShippingConsoleView = "requests" \| "completed" \| "history"/);
+  assert.match(shipping, /includeShipped = view !== "requests"/);
+  assert.match(shipping, /view === "requests"[\s\S]*activeMemberGroups/);
+  assert.match(shipping, /view === "completed"[\s\S]*shippedMemberGroups/);
+  assert.match(shipping, /view === "history" && <section/);
+  assert.match(shipping, /최근 30일 배송 완료 기록/);
+});
+
 test("operator product console publishes directly and manages active listings from explicit store permission", async () => {
   const [products, productRoute, patchRoute, bulkRoute, publishRoute, publishMigration, mutationMigration, restoredManagementMigration, databaseTypes] = await Promise.all([
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),

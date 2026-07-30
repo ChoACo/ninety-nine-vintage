@@ -133,7 +133,7 @@ test("orders and payment confirmation use compact rows with linked product detai
     source("src/app/(admin)/admin/operator/orders/page.tsx"),
   ]);
 
-  assert.match(layout, /주문·입금 확인/);
+  assert.match(layout, /label:\s*"주문·입금"/);
   assert.match(redirectPage, /redirect\("\/admin\/operator\/payments"\)/);
   assert.match(route, /from\("profiles"\)/);
   assert.match(route, /from\("commerce_order_items"\)/);

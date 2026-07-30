@@ -16,13 +16,12 @@ interface OperatorNavGroup {
   label: string;
 }
 
+const mainNavigationItem = {
+  href: "/admin/operator",
+  label: "메인",
+} as const;
+
 const navigation: readonly OperatorNavGroup[] = [
-  {
-    href: "/admin/operator",
-    items: [],
-    key: "main",
-    label: "메인",
-  },
   {
     href: "/admin/operator/products",
     items: [
@@ -80,23 +79,6 @@ const navigation: readonly OperatorNavGroup[] = [
     label: "출고·보관",
   },
   {
-    href: "/admin/operator/products/past",
-    items: [
-      {
-        exact: false,
-        href: "/admin/operator/products/past",
-        label: "지난 상품",
-      },
-      {
-        exact: false,
-        href: "/admin/operator/exceptions",
-        label: "예외",
-      },
-    ],
-    key: "records",
-    label: "기록",
-  },
-  {
     href: "/admin/operator/shipping",
     items: [
       {
@@ -118,6 +100,23 @@ const navigation: readonly OperatorNavGroup[] = [
     key: "shipping",
     label: "택배",
   },
+  {
+    href: "/admin/operator/products/past",
+    items: [
+      {
+        exact: false,
+        href: "/admin/operator/products/past",
+        label: "지난 상품",
+      },
+      {
+        exact: false,
+        href: "/admin/operator/exceptions",
+        label: "예외",
+      },
+    ],
+    key: "records",
+    label: "기록",
+  },
 ] as const;
 
 function matchesPath(pathname: string, item: OperatorNavItem) {
@@ -126,7 +125,6 @@ function matchesPath(pathname: string, item: OperatorNavItem) {
 }
 
 function isGroupActive(pathname: string, group: OperatorNavGroup) {
-  if (group.key === "main") return pathname === group.href;
   return group.items.some((item) => matchesPath(pathname, item));
 }
 
@@ -140,6 +138,20 @@ export default function OperatorLayout({
 
   return (
     <div>
+      <nav aria-label="운영자 상단 탭" className="mb-3 border-b border-ink pb-3">
+        <Link
+          aria-current={pathname === mainNavigationItem.href ? "page" : undefined}
+          className={`inline-flex min-h-11 items-center whitespace-nowrap px-5 text-xs font-black ${
+            pathname === mainNavigationItem.href
+              ? "bg-ink text-paper"
+              : "border border-line text-muted"
+          }`}
+          href={mainNavigationItem.href}
+        >
+          {mainNavigationItem.label}
+        </Link>
+      </nav>
+      <p className="mb-2 text-[10px] font-black tracking-[.12em] text-muted">운영 탭</p>
       <nav
         aria-label="운영자 대분류"
         className="flex max-w-full gap-2 overflow-x-auto whitespace-nowrap border-b border-ink pb-3 text-xs font-black [scrollbar-width:none]"
@@ -184,7 +196,7 @@ export default function OperatorLayout({
         </nav>
       )}
 
-      {!activeGroup?.items.length && <div className="mb-8" />}
+      {!activeGroup && <div className="mb-8" />}
       {children}
     </div>
   );

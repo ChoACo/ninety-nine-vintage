@@ -58,6 +58,8 @@ test("operator center uses major and minor navigation with separated shipping wo
   ]);
 
   assert.match(layout, /aria-label="운영자 대분류"/);
+  assert.match(layout, /aria-label="운영자 상단 탭"/);
+  assert.match(layout, />운영 탭<\/p>/);
   assert.match(layout, /aria-label=\{`\$\{activeGroup\.label\} 소분류`\}/);
   for (const label of ["메인", "상품", "주문·입금", "출고·보관", "기록", "택배"]) {
     assert.match(layout, new RegExp(`label:\\s*"${label}"`));
@@ -77,6 +79,10 @@ test("operator center uses major and minor navigation with separated shipping wo
     assert.match(layout, new RegExp(`label:\\s*"${label}"`));
   }
   assert.match(dashboard, />\s*메인\s*</);
+  assert.ok(
+    layout.indexOf('label: "택배"') < layout.indexOf('label: "기록"'),
+    "택배 대분류는 기록 대분류보다 앞에 있어야 합니다.",
+  );
   assert.match(requestPage, /<OperatorShippingConsole\s*\/>/);
   assert.match(completedPage, /<OperatorShippingConsole view="completed"\s*\/>/);
   assert.match(historyPage, /<OperatorShippingConsole view="history"\s*\/>/);

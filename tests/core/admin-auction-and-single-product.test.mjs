@@ -47,12 +47,32 @@ test("single product registration is separate, scheduled for next-day 10 by defa
   assert.match(consoleSource, /엑셀 일괄 등록[\s\S]*variant="primary"/);
   assert.match(consoleSource, /즉시구매 간편등록/);
   assert.match(consoleSource, /경매 간편등록/);
+  assert.match(consoleSource, /const singleRegistrationSubmitLabel/);
+  assert.ok(
+    consoleSource.indexOf("{singleRegistrationSubmitLabel}")
+      < consoleSource.indexOf("1. 상품 사진 선택"),
+    "간편등록 실행 버튼은 사진 선택 영역보다 위에 있어야 합니다.",
+  );
   assert.ok(
     consoleSource.indexOf("1. 상품 사진 선택")
       < consoleSource.indexOf('placeholder="상품명 (필수)"'),
   );
   assert.doesNotMatch(consoleSource, /브랜드명 \(선택\)/);
   assert.doesNotMatch(consoleSource, /상태등급 미입력/);
+  assert.match(
+    consoleSource,
+    /aria-label="상품명"[\s\S]*form\.saleType === "auction"[\s\S]*aria-label="경매 시작가"/,
+  );
+  assert.match(
+    consoleSource,
+    /\(editingId \|\| form\.saleType === "fixed"\) && <TextArea aria-label="상품 설명"/,
+  );
+  assert.doesNotMatch(
+    consoleSource,
+    /form\.saleType === "auction" \? <TextInput aria-label="입찰 단위"/,
+  );
+  assert.match(consoleSource, /bidIncrement:\s*"1000"/);
+  assert.match(consoleSource, /입찰 최소 단위는 1,000원으로 자동 적용됩니다/);
   assert.equal(
     consoleSource.match(/aria-label="판매 방식"/g)?.length,
     1,

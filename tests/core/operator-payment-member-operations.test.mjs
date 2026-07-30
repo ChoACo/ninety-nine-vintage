@@ -65,6 +65,9 @@ test("operator payments expose seven-day history, amount adjustment, and reversi
   assert.match(consoleSource, /금액 변경하기/);
   assert.match(consoleSource, /입금 확인 취소하기/);
   assert.match(consoleSource, /입금 확인 완료 · 최근 7일/);
+  assert.match(consoleSource, /<PremiumDialog/);
+  assert.match(consoleSource, /입금 확인 상세보기/);
+  assert.match(consoleSource, /내용 확인 후 입금 확인 완료/);
   assert.match(consoleSource, /manualTransferReceiptFingerprint/);
   assert.match(consoleSource, /manualTransferReversalFingerprint/);
   assert.match(consoleSource, /getOrCreatePendingManualTransferReceipt/);

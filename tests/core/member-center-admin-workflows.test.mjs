@@ -143,8 +143,11 @@ test("orders and payment confirmation use compact rows with linked product detai
   assert.match(consoleSource, /payment\.buyerName/);
   assert.match(consoleSource, /productSummary/);
   assert.match(consoleSource, /상세보기/);
-  assert.match(consoleSource, /payment\.products\.map/);
-  assert.match(consoleSource, /void confirm\(payment\)/);
+  assert.match(consoleSource, /selectedPayment\.products\.map/);
+  assert.match(consoleSource, /ariaLabel="입금 확인 상세보기"/);
+  assert.match(consoleSource, /onClick=\{\(\) => openPaymentDetails\(payment\)\}/);
+  assert.match(consoleSource, /void confirm\(selectedPayment\)/);
+  assert.match(consoleSource, /내용 확인 후 입금 확인 완료/);
 });
 
 test("owner save paths use user-scoped persistence while center topology is retired", async () => {

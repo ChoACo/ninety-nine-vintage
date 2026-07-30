@@ -1046,6 +1046,11 @@ export function OperatorProductsConsole({
       setBusy(false);
     }
   };
+  const singleRegistrationSubmitLabel = publicationMode === "now"
+    ? `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 즉시 공개`
+    : `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 오전 10시 예약`;
+  const singleRegistrationDisabled =
+    busy || !token || !productFieldsEditable || singleImages.length === 0;
 
   return <div className="space-y-8">
     <SectionHeading
@@ -1070,14 +1075,23 @@ export function OperatorProductsConsole({
     {view === "registration" && products.some((product) => product.brand_source === "inferred" && product.status === "pending") && <section className="border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-bold text-amber-900">브랜드 확인 필요</p><div className="mt-3 flex flex-wrap gap-2">{products.filter((product) => product.brand_source === "inferred" && product.status === "pending").map((product) => <button className="border border-amber-300 bg-paper px-3 py-2 text-left text-[11px] text-amber-900 disabled:cursor-not-allowed disabled:opacity-40" disabled={!permissions.canMutate} key={product.id} onClick={() => edit(product)} type="button"><span className="font-bold">{product.brand}</span> · {product.title}</button>)}</div></section>}
     {(editingId || (view === "registration" && singleCreateOpen)) && (
       <form className="grid grid-cols-1 gap-3 border border-ink bg-surface p-4 sm:grid-cols-2 sm:p-6" onSubmit={submit}>
-        <div className="flex items-center justify-between sm:col-span-2">
-          <div>
+        <div className="flex flex-col gap-3 sm:col-span-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <p className="text-sm font-bold">{editingId ? "상품 수정" : form.saleType === "fixed" ? "즉시구매 간편등록" : "경매 간편등록"}</p>
-            {!editingId && <p className="mt-1 text-[11px] text-muted">사진을 먼저 선택하세요. 상품명은 피드에 보이는 간판글로 필수이며 상품설명과 성별은 선택 사항입니다.</p>}
+            {!editingId && <p className="mt-1 text-[11px] leading-5 text-muted">{form.saleType === "auction" ? "사진을 먼저 선택하세요. 상품명은 피드에 보이는 간판글로 필수이며 성별은 선택 사항입니다." : "사진을 먼저 선택하세요. 상품명은 피드에 보이는 간판글로 필수이며 상품설명과 성별은 선택 사항입니다."}</p>}
           </div>
-          <Button size="compact" variant="ghost" onClick={resetForm} type="button">
-            <X size={13} /> {editingId ? "수정 취소" : "닫기"}
-          </Button>
+          {editingId ? (
+            <Button className="shrink-0" size="compact" variant="ghost" onClick={resetForm} type="button">
+              <X size={13} /> 수정 취소
+            </Button>
+          ) : (
+            <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+              <Button className="px-5" disabled={singleRegistrationDisabled} size="compact" variant="primary" type="submit">
+                {singleRegistrationSubmitLabel}
+              </Button>
+              <Button className="px-5" onClick={resetForm} size="compact" type="button">취소</Button>
+            </div>
+          )}
         </div>
 
         {!editingId && (
@@ -1115,15 +1129,27 @@ export function OperatorProductsConsole({
         ) : (
           <>
             <TextInput aria-label="상품명" onChange={(event) => update("title", event.target.value)} placeholder="상품명 (필수)" required value={form.title} />
+            {form.saleType === "auction" ? (
+              <TextInput aria-label="경매 시작가" min="1" onChange={(event) => update("price", event.target.value)} placeholder="경매 시작가" required type="number" value={form.price} />
+            ) : (
             <SelectInput aria-label="성별" onChange={(event) => update("gender", event.target.value)} value={form.gender}>
               <option value="">성별 미입력</option>
               <option value="여성">여성</option>
               <option value="남성">남성</option>
               <option value="공용">공용</option>
             </SelectInput>
+            )}
           </>
         )}
 
+        {!editingId && form.saleType === "auction" && (
+          <SelectInput aria-label="성별" onChange={(event) => update("gender", event.target.value)} value={form.gender}>
+            <option value="">성별 미입력</option>
+            <option value="여성">여성</option>
+            <option value="남성">남성</option>
+            <option value="공용">공용</option>
+          </SelectInput>
+        )}
         <SelectInput aria-label="숍" disabled={!saleSetupEditable} onChange={(event) => {
           const storeId = event.target.value;
           setForm((current) => ({
@@ -1132,8 +1158,8 @@ export function OperatorProductsConsole({
             status: stores.find((store) => store.id === storeId)?.canPublish === true ? current.status : "pending",
           }));
         }} required value={form.storeId}>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</SelectInput>
-        {editingId ? <div className="flex flex-col gap-2 sm:flex-row"><SelectInput aria-label="판매 방식" className="flex-1" disabled={!saleSetupEditable} onChange={(event) => update("saleType", event.target.value)} value={form.saleType}><option value="fixed">즉시구매</option><option value="auction">경매</option></SelectInput><TextInput aria-label="가격" className="w-full sm:w-40" disabled={!saleSetupEditable} min="1" onChange={(event) => update("price", event.target.value)} placeholder="가격" required type="number" value={form.price} /></div> : <TextInput aria-label={form.saleType === "fixed" ? "즉시구매 가격" : "경매 시작가"} min="1" onChange={(event) => update("price", event.target.value)} placeholder={form.saleType === "fixed" ? "즉시구매 가격" : "경매 시작가"} required type="number" value={form.price} />}
-        <TextArea aria-label="상품 설명" className="min-h-24 sm:col-span-2" disabled={!productFieldsEditable} onChange={(event) => update("description", event.target.value)} placeholder={editingId ? "상품 설명" : "상품 설명 (선택)"} required={Boolean(editingId)} value={form.description} />
+        {editingId ? <div className="flex flex-col gap-2 sm:flex-row"><SelectInput aria-label="판매 방식" className="flex-1" disabled={!saleSetupEditable} onChange={(event) => update("saleType", event.target.value)} value={form.saleType}><option value="fixed">즉시구매</option><option value="auction">경매</option></SelectInput><TextInput aria-label="가격" className="w-full sm:w-40" disabled={!saleSetupEditable} min="1" onChange={(event) => update("price", event.target.value)} placeholder="가격" required type="number" value={form.price} /></div> : form.saleType === "fixed" ? <TextInput aria-label="즉시구매 가격" min="1" onChange={(event) => update("price", event.target.value)} placeholder="즉시구매 가격" required type="number" value={form.price} /> : null}
+        {(editingId || form.saleType === "fixed") && <TextArea aria-label="상품 설명" className="min-h-24 sm:col-span-2" disabled={!productFieldsEditable} onChange={(event) => update("description", event.target.value)} placeholder={editingId ? "상품 설명" : "상품 설명 (선택)"} required={Boolean(editingId)} value={form.description} />}
 
         {editingId ? (
           <>
@@ -1152,7 +1178,7 @@ export function OperatorProductsConsole({
         ) : (
           <>
             <SelectInput aria-label="보관 등급" onChange={(event) => update("storageClass", event.target.value)} value={form.storageClass}><option value="small">소형 · 14일 보관</option><option value="large">대형 · 7일 보관</option></SelectInput>
-            {form.saleType === "auction" ? <TextInput aria-label="입찰 단위" min="1" onChange={(event) => update("bidIncrement", event.target.value)} placeholder="입찰 단위" required type="number" value={form.bidIncrement} /> : <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">즉시구매 상품은 입찰 단위를 사용하지 않습니다.</div>}
+            {form.saleType === "auction" ? <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">입찰 최소 단위는 1,000원으로 자동 적용됩니다.</div> : <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">즉시구매 상품은 입찰 단위를 사용하지 않습니다.</div>}
             <label className="text-xs font-bold sm:col-span-2">
               공개 시각
               <SelectInput aria-label="단품 공개 시각" className="mt-2" onChange={(event) => setPublicationMode(event.target.value as PublicationMode)} value={publicationMode}>
@@ -1162,7 +1188,7 @@ export function OperatorProductsConsole({
             </label>
           </>
         )}
-        <div className="flex flex-wrap gap-2 sm:col-span-2"><Button className="px-5" disabled={busy || !token || !productFieldsEditable || (!editingId && singleImages.length === 0)} variant="primary" type="submit">{editingId ? "수정 저장" : publicationMode === "now" ? `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 즉시 공개` : `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 오전 10시 예약`}</Button><Button className="px-5" onClick={resetForm} type="button">{editingId ? "수정 취소" : "취소"}</Button></div>
+        {editingId && <div className="flex flex-wrap gap-2 sm:col-span-2"><Button className="px-5" disabled={busy || !token || !productFieldsEditable} variant="primary" type="submit">수정 저장</Button><Button className="px-5" onClick={resetForm} type="button">수정 취소</Button></div>}
       </form>
     )}
     <div className="flex flex-col items-start justify-between gap-3 text-xs text-muted sm:flex-row sm:items-center"><span>{loading ? "상품을 불러오는 중…" : `${visibleProducts.length} / ${workspaceProducts.length}개 상품 · 실시간 데이터`}</span><div className="flex items-center gap-4"><button className="flex items-center gap-2 underline" disabled={loading} onClick={() => void load(token).catch((error) => setNotice(error instanceof Error ? error.message : "새로고침에 실패했습니다."))} type="button"><RefreshCw size={13} /> 새로고침</button></div></div>

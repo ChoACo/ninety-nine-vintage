@@ -1,6 +1,6 @@
 "use client";
 
-import { Accessibility, Headphones, Search } from "lucide-react";
+import { Headphones, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -52,7 +52,6 @@ export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean })
             onClick={() => void simpleMode.toggle().catch(() => undefined)}
             type="button"
           >
-            <Accessibility size={17} />
             {simpleMode.enabled ? "일반모드" : "간편모드"}
           </button>
           {!simpleMode.enabled && <>

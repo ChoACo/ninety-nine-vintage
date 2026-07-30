@@ -221,7 +221,7 @@ html[data-theme="dark"] .theme-invariant-dark {
   }
 
   html[data-simple-mode="on"] {
-    font-size: 18px;
+    font-size: 19px;
   }
 
   html[data-simple-mode="on"] body {
@@ -229,7 +229,7 @@ html[data-theme="dark"] .theme-invariant-dark {
   }
 
   html[data-simple-mode="on"] :is(button, [role="button"], input, select, a) {
-    min-height: 48px;
+    min-height: 52px;
   }
 
   html[data-simple-mode="on"] :focus-visible {
@@ -239,6 +239,25 @@ html[data-theme="dark"] .theme-invariant-dark {
 
   [data-ui-surface="desktop"] :is(nav a, button, [role="button"], dt, dd) {
     white-space: nowrap;
+  }
+
+  @media (max-width: 767px) {
+    :is([data-ui-surface="mobile"], [data-admin-surface]) {
+      word-break: keep-all;
+      overflow-wrap: break-word;
+      line-break: strict;
+    }
+
+    :is([data-ui-surface="mobile"], [data-admin-surface])
+      :is(a, button, label, legend, dt, dd, h1, h2, h3, h4, p, span) {
+      writing-mode: horizontal-tb;
+      text-orientation: mixed;
+    }
+
+    :is([data-ui-surface="mobile"], [data-admin-surface])
+      :is(a, button, label, legend) {
+      line-height: 1.35;
+    }
   }
 
   .premium-interaction {

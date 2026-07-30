@@ -32,7 +32,12 @@ test("single registration requires a feed title while keeping description and ca
   assert.match(consoleSource, /성별 미입력/);
   assert.doesNotMatch(consoleSource, /브랜드명 \(선택\)/);
   assert.doesNotMatch(consoleSource, /상태등급 미입력/);
-  assert.match(consoleSource, /aria-label=\{form\.saleType === "fixed" \? "즉시구매 가격" : "경매 시작가"\}/);
+  assert.match(consoleSource, /aria-label="즉시구매 가격"/);
+  assert.match(consoleSource, /aria-label="경매 시작가"/);
+  assert.match(
+    consoleSource,
+    /\(editingId \|\| form\.saleType === "fixed"\) && <TextArea aria-label="상품 설명"/,
+  );
   assert.match(route, /!title \|\| title\.length > 160/);
   assert.match(route, /\(!singleRegistration && !description\)/);
   assert.match(route, /description\.length > 10000/);

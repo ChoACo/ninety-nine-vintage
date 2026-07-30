@@ -1,6 +1,6 @@
 "use client";
 
-import { Accessibility, LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { useSimpleMode } from "@/components/features/accessibility/SimpleModeProvider";
 
 export function SimpleModeToggle({
@@ -24,11 +24,7 @@ export function SimpleModeToggle({
         onClick={() => void simpleMode.toggle().catch(() => undefined)}
         type="button"
       >
-        {simpleMode.saving ? (
-          <LoaderCircle className="animate-spin" size={19} />
-        ) : (
-          <Accessibility size={19} />
-        )}
+        {simpleMode.saving && <LoaderCircle className="animate-spin" size={19} />}
         {simpleMode.enabled ? "간편모드 끄기" : "간편모드 켜기"}
       </button>
       {detailed && (

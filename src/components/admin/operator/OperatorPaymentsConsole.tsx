@@ -3,6 +3,7 @@
 import { CheckCircle2, Clock3, Pencil, RefreshCw, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CatalogImage } from "@/components/ui/CatalogImage";
+import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import {
   clearPendingManualTransferReceipt,
   getOrCreatePendingManualTransferReceipt,
@@ -249,6 +250,11 @@ export function OperatorPaymentsConsole() {
     });
   };
 
+  const openPaymentDetails = (payment: PaymentRow) => {
+    setNotice("");
+    setExpandedKey(sessionKey(payment));
+  };
+
   const confirm = async (payment: PaymentRow) => {
     if (!accessToken || !actorId || busyKey || payment.remainingAmount < 1) return;
     const key = sessionKey(payment);
@@ -332,6 +338,7 @@ export function OperatorPaymentsConsole() {
           receiptFingerprint,
         );
         setNotice(`${formatWon(confirmationAmount)} 입금을 확인했습니다.`);
+        setExpandedKey(null);
         await load(accessToken, includeHistory, offset);
         return;
       }
@@ -374,6 +381,7 @@ export function OperatorPaymentsConsole() {
       setNotice(payload.payment.idempotent_replay
         ? "기존 입금 확인 결과를 다시 확인했습니다."
         : "잔액 전액을 입금 확인 처리했습니다.");
+      setExpandedKey(null);
       await load(accessToken, includeHistory, offset);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "입금 확인을 처리하지 못했습니다.");
@@ -457,6 +465,10 @@ export function OperatorPaymentsConsole() {
     ...payments.filter((payment) => payment.remainingAmount > 0),
     ...payments.filter((payment) => payment.remainingAmount === 0),
   ], [payments]);
+  const selectedPayment = useMemo(
+    () => payments.find((payment) => sessionKey(payment) === expandedKey) ?? null,
+    [expandedKey, payments],
+  );
   const pendingCount = summary.pending;
 
   return (
@@ -506,12 +518,10 @@ export function OperatorPaymentsConsole() {
             )
           );
           const needsLedgerAdjustment = payment.receivedAmount < 0 || payment.remainingAmount < 0;
-          const account = [payment.bankNameSnapshot, payment.accountNumberSnapshot].filter(Boolean).join(" · ") || "계좌 정보 없음";
           const firstProduct = payment.products[0];
           const productSummary = firstProduct
             ? `${firstProduct.title}${payment.products.length > 1 ? ` 외 ${payment.products.length - 1}개` : ""}`
             : payment.reference;
-          const expanded = expandedKey === key;
           return (
             <div key={`${payment.paymentKind}:${payment.paymentId}`}>
               {index === pendingCount && (
@@ -527,12 +537,12 @@ export function OperatorPaymentsConsole() {
                 </div>
                 <button
                   className="min-w-0 text-left"
-                  onClick={() => setExpandedKey(expanded ? null : key)}
+                  onClick={() => openPaymentDetails(payment)}
                   type="button"
                 >
                   <p className="truncate text-xs font-bold">{productSummary}</p>
                   <p className="mt-1 text-[10px] font-bold underline">
-                    {expanded ? "상세 닫기" : "상세보기"}
+                    상세보기
                   </p>
                 </button>
                 <p className="font-mono text-sm font-black md:text-right">
@@ -540,7 +550,7 @@ export function OperatorPaymentsConsole() {
                   {pending && (
                     <button
                       className="mt-1 flex items-center gap-1 text-[10px] font-bold underline md:ml-auto"
-                      onClick={() => setExpandedKey(expanded ? null : key)}
+                      onClick={() => openPaymentDetails(payment)}
                       type="button"
                     >
                       <Pencil size={10} /> 금액 변경하기
@@ -554,7 +564,7 @@ export function OperatorPaymentsConsole() {
                   <button
                     className="h-10 bg-ink px-3 text-xs font-bold text-paper disabled:opacity-40"
                     disabled={busyKey !== null}
-                    onClick={() => void confirm(payment)}
+                    onClick={() => openPaymentDetails(payment)}
                     type="button"
                   >
                     {busyKey === key ? "처리 중..." : "입금 확인 완료"}
@@ -570,69 +580,6 @@ export function OperatorPaymentsConsole() {
                   </button>
                 )}
               </div>
-
-              {expanded && (
-                <div className="border-t border-line bg-surface px-4 py-4">
-                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(240px,.7fr)]">
-                    <div>
-                      <p className="text-xs font-black">
-                        상품 {payment.products.length}개
-                      </p>
-                      <div className="mt-3 divide-y divide-line border-y border-line bg-paper">
-                        {payment.products.map((product) => (
-                          <div className="flex items-center gap-3 py-2" key={product.id}>
-                            <CatalogImage
-                              alt=""
-                              className="size-10 shrink-0 object-cover"
-                              src={product.imageUrl ?? ""}
-                            />
-                            <span className="min-w-0 truncate text-xs font-bold">
-                              {product.title}
-                            </span>
-                          </div>
-                        ))}
-                        {payment.products.length === 0 && (
-                          <p className="py-4 text-xs text-muted">{payment.reference}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-xs">
-                      <p><span className="text-muted">입금 계좌</span><br />{account}</p>
-                      <p className="mt-3"><span className="text-muted">요청 시각</span><br />{formatAt(payment.requestedAt)}</p>
-                      <label className="mt-4 block font-bold" htmlFor={`depositor-${key}`}>
-                        입금자명
-                      </label>
-                      <input
-                        className="mt-2 h-10 w-full border border-line bg-paper px-3 text-xs"
-                        id={`depositor-${key}`}
-                        maxLength={MANUAL_TRANSFER_DEPOSITOR_NAME_MAX_LENGTH}
-                        onChange={(event) => setDepositorNames((current) => ({ ...current, [key]: event.target.value }))}
-                        placeholder="입금자명"
-                        value={depositorNames[key] ?? payment.lastDepositorName ?? ""}
-                      />
-                      {pending && (
-                        <>
-                          <label className="mt-4 block font-bold" htmlFor={`amount-${key}`}>
-                            이번 확인 금액
-                          </label>
-                          <input
-                            className="mt-2 h-10 w-full border border-line bg-paper px-3 font-mono text-xs"
-                            id={`amount-${key}`}
-                            inputMode="numeric"
-                            max={payment.remainingAmount}
-                            min={1}
-                            onChange={(event) => setConfirmationAmounts((current) => ({
-                              ...current,
-                              [key]: event.target.value.replace(/[^0-9]/gu, ""),
-                            }))}
-                            value={confirmationAmounts[key] ?? String(payment.remainingAmount)}
-                          />
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
               {needsLedgerAdjustment && (
                 <p className="border-t border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900">
                   부분·초과 입금 또는 역분개 상태입니다. 이 단순 확인 화면에서는 처리하지 않고 고급 원장 조정을 사용해 주세요.
@@ -644,6 +591,104 @@ export function OperatorPaymentsConsole() {
         })}
         {payments.length === 0 && <p className="py-16 text-center text-sm text-muted">표시할 입금 요청이 없습니다.</p>}
       </div>
+
+      <PremiumDialog
+        ariaLabel="입금 확인 상세보기"
+        closeDisabled={busyKey !== null}
+        onClose={() => setExpandedKey(null)}
+        open={selectedPayment !== null}
+        panelClassName="max-w-3xl"
+      >
+        {selectedPayment && (() => {
+          const key = sessionKey(selectedPayment);
+          const pending = selectedPayment.remainingAmount > 0;
+          const confirmable = selectedPayment.receivedAmount >= 0 && (
+            pending || (
+              selectedPayment.paymentKind === "shipping_fee" &&
+              selectedPayment.status === "partially_paid" &&
+              selectedPayment.remainingAmount === 0
+            )
+          );
+          const account = [
+            selectedPayment.bankNameSnapshot,
+            selectedPayment.accountNumberSnapshot,
+          ].filter(Boolean).join(" · ") || "계좌 정보 없음";
+          return (
+            <div className="p-5 sm:p-7">
+              <div className="flex items-start justify-between gap-4 border-b border-ink pb-5">
+                <div className="min-w-0">
+                  <p className="eyebrow text-muted">입금 확인 상세보기</p>
+                  <h2 className="mt-2 text-xl font-black sm:text-2xl">{selectedPayment.buyerName}</h2>
+                  <p className="mt-2 text-xs text-muted">{kindLabel(selectedPayment.paymentKind)} · {statusLabel(selectedPayment.status)}</p>
+                </div>
+                <button className="shrink-0 border border-line px-3 py-2 text-xs font-bold" disabled={busyKey !== null} onClick={() => setExpandedKey(null)} type="button">취소</button>
+              </div>
+
+              <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(240px,.8fr)]">
+                <section>
+                  <p className="text-xs font-black">상품 {selectedPayment.products.length}개</p>
+                  <div className="mt-3 divide-y divide-line border-y border-line">
+                    {selectedPayment.products.map((product) => (
+                      <div className="flex items-center gap-3 py-3" key={product.id}>
+                        <CatalogImage alt="" className="size-12 shrink-0 object-cover" src={product.imageUrl ?? ""} />
+                        <span className="min-w-0 text-xs font-bold">{product.title}</span>
+                      </div>
+                    ))}
+                    {selectedPayment.products.length === 0 && <p className="py-4 text-xs text-muted">{selectedPayment.reference}</p>}
+                  </div>
+                  <dl className="mt-5 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
+                    <div className="border border-line p-3"><dt className="text-muted">결제 예정액</dt><dd className="mt-2 font-mono font-black">{formatWon(selectedPayment.expectedAmount)}</dd></div>
+                    <div className="border border-line p-3"><dt className="text-muted">기입금액</dt><dd className="mt-2 font-mono font-black">{formatWon(selectedPayment.receivedAmount)}</dd></div>
+                    <div className="col-span-2 border border-ink bg-surface p-3 sm:col-span-1"><dt className="text-muted">확인할 잔액</dt><dd className="mt-2 font-mono font-black">{formatWon(selectedPayment.remainingAmount)}</dd></div>
+                  </dl>
+                </section>
+
+                <section className="text-xs">
+                  <p><span className="text-muted">입금 계좌</span><br />{account}</p>
+                  <p className="mt-3"><span className="text-muted">요청 시각</span><br />{formatAt(selectedPayment.requestedAt)}</p>
+                  <label className="mt-5 block font-bold" htmlFor={`depositor-${key}`}>입금자명</label>
+                  <input
+                    autoFocus
+                    className="mt-2 h-11 w-full border border-line bg-paper px-3 text-xs"
+                    id={`depositor-${key}`}
+                    maxLength={MANUAL_TRANSFER_DEPOSITOR_NAME_MAX_LENGTH}
+                    onChange={(event) => setDepositorNames((current) => ({ ...current, [key]: event.target.value }))}
+                    placeholder="실제 입금자명"
+                    value={depositorNames[key] ?? selectedPayment.lastDepositorName ?? ""}
+                  />
+                  {pending && (
+                    <>
+                      <label className="mt-4 block font-bold" htmlFor={`amount-${key}`}>이번 확인 금액</label>
+                      <input
+                        className="mt-2 h-11 w-full border border-line bg-paper px-3 font-mono text-xs"
+                        id={`amount-${key}`}
+                        inputMode="numeric"
+                        max={selectedPayment.remainingAmount}
+                        min={1}
+                        onChange={(event) => setConfirmationAmounts((current) => ({
+                          ...current,
+                          [key]: event.target.value.replace(/[^0-9]/gu, ""),
+                        }))}
+                        value={confirmationAmounts[key] ?? String(selectedPayment.remainingAmount)}
+                      />
+                    </>
+                  )}
+                </section>
+              </div>
+
+              {notice && <p aria-live="polite" className="mt-5 border border-line bg-surface px-4 py-3 text-xs font-bold">{notice}</p>}
+              <div className="mt-6 flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-end">
+                <button className="h-11 border border-line px-5 text-xs font-bold" disabled={busyKey !== null} onClick={() => setExpandedKey(null)} type="button">취소</button>
+                {confirmable && (
+                  <button className="h-11 bg-ink px-5 text-xs font-black text-paper disabled:opacity-40" disabled={busyKey !== null} onClick={() => void confirm(selectedPayment)} type="button">
+                    {busyKey === key ? "처리 중..." : "내용 확인 후 입금 확인 완료"}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+      </PremiumDialog>
 
       <div className="flex items-center justify-between gap-4">
         <button className="border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={offset === 0} onClick={() => changePage(Math.max(0, offset - PAGE_SIZE))} type="button">이전</button>

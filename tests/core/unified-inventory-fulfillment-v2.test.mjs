@@ -712,7 +712,8 @@ test("operator payment API is shared, nested, strict, and confirms only the obse
   assert.match(consoleSource, /상세보기/);
   assert.match(consoleSource, /구매자별 주문 상품/);
   assert.match(consoleSource, /productSummary/);
-  assert.match(consoleSource, /payment\.products\.map/);
+  assert.match(consoleSource, /selectedPayment\.products\.map/);
+  assert.match(consoleSource, /void confirm\(selectedPayment\)/);
   assert.match(consoleSource, /response\.status\s*===\s*409/);
   assert.match(layout, /href:\s*"\/admin\/operator\/payments"/);
 });

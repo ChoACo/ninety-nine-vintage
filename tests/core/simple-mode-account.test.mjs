@@ -26,10 +26,14 @@ test("simple mode persists on the device and synchronizes to the signed-in accou
 });
 
 test("simple mode exposes only the five consumer core destinations", async () => {
-  const [bottomNav, header, taskGrid] = await Promise.all([
+  const [bottomNav, header, taskGrid, pcHeader, toggle, globalCss, adminLayout] = await Promise.all([
     source("src/components/mobile/MobileSiteBottomNav.tsx"),
     source("src/components/mobile/MobileSiteHeader.tsx"),
     source("src/components/features/account/MobileAccountTaskGrid.tsx"),
+    source("src/components/layout/PcHeader.tsx"),
+    source("src/components/features/accessibility/SimpleModeToggle.tsx"),
+    source("src/app/globals.css"),
+    source("src/app/(admin)/admin/layout.tsx"),
   ]);
 
   assert.match(bottomNav, /consumerSimpleMode/);
@@ -39,6 +43,13 @@ test("simple mode exposes only the five consumer core destinations", async () =>
   assert.match(header, /\["배송 신청·현황", "\/m\/account\/shipping"/);
   assert.match(taskGrid, /simpleMode\.enabled[\s\S]*tasks\.filter/);
   assert.match(taskGrid, /grid-cols-1/);
+  assert.doesNotMatch(pcHeader, /Accessibility/);
+  assert.doesNotMatch(toggle, /Accessibility/);
+  assert.match(globalCss, /html\[data-simple-mode="on"\]\s*\{\s*font-size:\s*19px/);
+  assert.match(globalCss, /min-height:\s*52px/);
+  assert.match(globalCss, /data-ui-surface="mobile"[\s\S]*data-admin-surface[\s\S]*word-break:\s*keep-all/);
+  assert.match(globalCss, /writing-mode:\s*horizontal-tb/);
+  assert.match(adminLayout, /flex-col[\s\S]*sm:flex-row/);
 });
 
 test("mobile account tabs render dedicated views and tolerate partial API failures", async () => {

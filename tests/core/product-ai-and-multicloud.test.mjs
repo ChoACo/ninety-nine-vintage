@@ -60,6 +60,7 @@ test("Gemini route is server authenticated and keeps a safe fallback boundary", 
   assert.match(route, /product_enhancement_unavailable/);
   assert.match(enhancer, /response(?:Json)?Schema/);
   assert.match(enhancer, /gemini-3\.6-flash/);
+  assert.doesNotMatch(enhancer, /temperature\s*:/);
   assert.match(enhancer, /getBatchClothingCategory/);
   assert.match(consoleSource, /processQuickRegistrationAI/);
   assert.match(modal, /concurrency: 5/);

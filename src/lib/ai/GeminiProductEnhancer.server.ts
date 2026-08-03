@@ -158,7 +158,6 @@ ${untrustedSource}` },
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: RESPONSE_JSON_SCHEMA,
-        temperature: 0.2,
         maxOutputTokens: 1_500,
       },
     });

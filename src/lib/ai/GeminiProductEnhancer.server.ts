@@ -102,7 +102,7 @@ export class GeminiProductEnhancer {
   constructor(options: { apiKey?: string; model?: string } = {}) {
     const apiKey = options.apiKey ?? process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY가 설정되지 않았습니다.");
-    const modelName = options.model ?? process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+    const modelName = options.model ?? process.env.GEMINI_MODEL ?? "gemini-3.6-flash";
     this.model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: modelName });
   }
 

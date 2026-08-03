@@ -474,7 +474,11 @@ export function OperatorProductsConsole({
         token,
         controller.signal,
       ).then((enhancement) => {
-        if (!enhancement || controller.signal.aborted) return;
+        if (controller.signal.aborted) return;
+        if (!enhancement) {
+          setNotice("AI 분석을 완료하지 못해 기존 입력값을 유지했습니다. 잠시 후 다시 시도해 주세요.");
+          return;
+        }
         setForm((current) => ({
           ...current,
           // 분석 중 운영자가 직접 입력했다면 사용자 입력을 우선합니다.

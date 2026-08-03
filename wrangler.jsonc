@@ -9,6 +9,11 @@
 	],
 	"workers_dev": false,
 	"preview_urls": false,
+	"placement": {
+		// Gemini가 지원되지 않는 인접 엣지(HKG)에서 실행되는 간헐 장애를 막습니다.
+		// 도쿄는 Gemini 지원 지역이며 한국·서울 DB와도 가까운 고정 실행 지점입니다.
+		"region": "gcp:asia-northeast1"
+	},
 	"secrets": {
 		"required": [
 			"GEMINI_API_KEY",

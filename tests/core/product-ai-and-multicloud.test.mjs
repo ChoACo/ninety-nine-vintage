@@ -49,12 +49,13 @@ test("Excel AI enhancement limits concurrency and isolates failed rows", async (
 });
 
 test("Gemini route is server authenticated and keeps a safe fallback boundary", async () => {
-  const [route, enhancer, consoleSource, modal, quotaMigration] = await Promise.all([
+  const [route, enhancer, consoleSource, modal, quotaMigration, wrangler] = await Promise.all([
     source("src/app/api/admin/operator/products/enhance/route.ts"),
     source("src/lib/ai/GeminiProductEnhancer.server.ts"),
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
     source("src/components/admin/operator/OperatorXlsxImportModal.tsx"),
     source("supabase/migrations/20260803151227_reserve_gemini_product_enhancement_daily_quota.sql"),
+    source("wrangler.jsonc"),
   ]);
   assert.match(route, /authenticateStaffRequest\(request, true\)/);
   assert.match(route, /product_enhancement_unavailable/);
@@ -70,6 +71,7 @@ test("Gemini route is server authenticated and keeps a safe fallback boundary", 
   assert.match(quotaMigration, /where usage\.request_count < 300/);
   assert.match(quotaMigration, /role\.role_code in \('owner', 'operator'\)/);
   assert.match(quotaMigration, /revoke all on table[\s\S]*from public, anon, authenticated/);
+  assert.match(wrangler, /"region":\s*"gcp:asia-northeast1"/);
 });
 
 test("multi-provider pool encodes capacity routing, exact reads, circuit breaking, and file-first TTL", async () => {

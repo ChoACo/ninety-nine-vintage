@@ -1,6 +1,11 @@
 import "server-only";
 
-import { GoogleGenAI } from "@google/genai";
+import {
+  GoogleGenerativeAI,
+  SchemaType,
+  type GenerativeModel,
+  type ResponseSchema,
+} from "@google/generative-ai";
 import {
   BATCH_CLOTHING_CATEGORIES,
   getBatchClothingCategory,
@@ -15,9 +20,8 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_SOURCE_TEXT = 12_000;
 const VALID_GENDERS = new Set<ProductGender>(["여성", "남성", "공용"]);
 
-const RESPONSE_JSON_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
+const RESPONSE_JSON_SCHEMA: ResponseSchema = {
+  type: SchemaType.OBJECT,
   required: [
     "enhanced_title",
     "brand",
@@ -27,20 +31,25 @@ const RESPONSE_JSON_SCHEMA = {
     "hashtags",
   ],
   properties: {
-    enhanced_title: { type: "string", maxLength: 160 },
-    brand: { type: "string", maxLength: 80 },
-    gender: { type: "string", enum: ["여성", "남성", "공용"] },
-    category_recommend: {
-      anyOf: [{ type: "string" }, { type: "null" }],
+    enhanced_title: { type: SchemaType.STRING },
+    brand: { type: SchemaType.STRING },
+    gender: {
+      type: SchemaType.STRING,
+      format: "enum",
+      enum: ["여성", "남성", "공용"],
     },
-    refined_description: { type: "string", maxLength: 10_000 },
+    category_recommend: {
+      type: SchemaType.STRING,
+      nullable: true,
+    },
+    refined_description: { type: SchemaType.STRING },
     hashtags: {
-      type: "array",
+      type: SchemaType.ARRAY,
       maxItems: 8,
-      items: { type: "string", maxLength: 40 },
+      items: { type: SchemaType.STRING },
     },
   },
-} as const;
+};
 
 interface GeminiRawEnhancement {
   enhanced_title?: unknown;
@@ -88,14 +97,13 @@ function normalizeResponse(
 }
 
 export class GeminiProductEnhancer {
-  private readonly ai: GoogleGenAI;
-  private readonly model: string;
+  private readonly model: GenerativeModel;
 
   constructor(options: { apiKey?: string; model?: string } = {}) {
     const apiKey = options.apiKey ?? process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY가 설정되지 않았습니다.");
-    this.ai = new GoogleGenAI({ apiKey });
-    this.model = options.model ?? process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+    const modelName = options.model ?? process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+    this.model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: modelName });
   }
 
   async enhance(
@@ -127,8 +135,7 @@ export class GeminiProductEnhancer {
       },
     })));
 
-    const response = await this.ai.models.generateContent({
-      model: this.model,
+    const { response } = await this.model.generateContent({
       contents: [{
         role: "user",
         parts: [
@@ -148,15 +155,15 @@ ${untrustedSource}` },
           ...imageParts,
         ],
       }],
-      config: {
+      generationConfig: {
         responseMimeType: "application/json",
-        responseJsonSchema: RESPONSE_JSON_SCHEMA,
+        responseSchema: RESPONSE_JSON_SCHEMA,
         temperature: 0.2,
         maxOutputTokens: 1_500,
       },
     });
 
-    const text = response.text;
+    const text = response.text();
     if (!text) throw new Error("Gemini가 분석 결과를 반환하지 않았습니다.");
     const parsed = JSON.parse(text) as GeminiRawEnhancement;
     return normalizeResponse(parsed, source);

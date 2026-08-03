@@ -11,6 +11,7 @@
 	"preview_urls": false,
 	"secrets": {
 		"required": [
+			"GEMINI_API_KEY",
 			"SUPABASE_SECRET_KEY",
 			"KAKAO_REST_API_KEY",
 			"KAKAO_CLIENT_SECRET"

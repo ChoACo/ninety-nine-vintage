@@ -7619,6 +7619,14 @@ export type Database = {
           skipped_ids: string[]
         }[]
       }
+      reserve_gemini_product_enhancement_quota: {
+        Args: never
+        Returns: {
+          allowed: boolean
+          daily_limit: number
+          used: number
+        }[]
+      }
       reconcile_inventory_item_route: {
         Args: {
           p_expected_version: number

@@ -4,6 +4,7 @@ import {
   findBatchClothingCategory,
   type BatchClothingCategory,
 } from "@/lib/import/categoryIds";
+import type { ProductEnhancement } from "@/lib/ai/productEnhancement";
 
 export type BatchAuctionCanonicalField =
   | "description"
@@ -78,6 +79,7 @@ export interface BatchAuctionImageMatch {
 }
 
 export interface BatchAuctionPreviewRow {
+  aiEnhancement?: ProductEnhancement;
   rowNumber: number;
   title: string;
   category: BatchClothingCategory | null;

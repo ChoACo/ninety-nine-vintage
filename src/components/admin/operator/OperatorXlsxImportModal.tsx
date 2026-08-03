@@ -29,6 +29,11 @@ import {
   PRODUCT_IMAGE_INPUT_ACCEPT,
 } from "@/lib/supabase/productImagePolicy";
 import { formatKRW, getNextAuctionPublishAt } from "@/utils/formatters";
+import {
+  processExcelWithAI,
+  type ProductEnhancement,
+} from "@/lib/ai/productEnhancement";
+import { getBatchClothingCategory } from "@/lib/import/categoryIds";
 
 interface StoreOption {
   id: string;
@@ -43,6 +48,7 @@ interface SubmitProgress {
 }
 
 export interface OperatorXlsxImportModalProps {
+  accessToken: string;
   open: boolean;
   stores: readonly StoreOption[];
   onClose: () => void;
@@ -84,6 +90,7 @@ function resetInput(input: HTMLInputElement | null) {
 }
 
 export function OperatorXlsxImportModal({
+  accessToken,
   open,
   stores,
   onClose,
@@ -107,6 +114,9 @@ export function OperatorXlsxImportModal({
   const [submittedCount, setSubmittedCount] = useState(0);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState<SubmitProgress | null>(null);
+  const [aiEnhancements, setAiEnhancements] = useState<Map<number, ProductEnhancement>>(new Map());
+  const [aiProgress, setAiProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const parseRequestRef = useRef(0);
   const workbookInputRef = useRef<HTMLInputElement>(null);
   const directoryInputRef = useRef<HTMLInputElement>(null);
@@ -124,6 +134,33 @@ export function OperatorXlsxImportModal({
       saleType,
     });
   }, [bidIncrement, excludedRowNumbers, imageFiles, parsedWorkbook, saleType]);
+  const enhancedPreview = useMemo(() => {
+    if (!preview || aiEnhancements.size === 0) return preview;
+    const rows = preview.rows.map((row) => {
+      const enhancement = aiEnhancements.get(row.rowNumber);
+      if (!enhancement) return row;
+      const category = getBatchClothingCategory(enhancement.categoryId) ?? row.category;
+      return {
+        ...row,
+        aiEnhancement: enhancement,
+        title: enhancement.enhancedTitle || row.title,
+        description: enhancement.refinedDescription || row.description,
+        category,
+        draft: row.draft ? {
+          ...row.draft,
+          title: enhancement.enhancedTitle || row.draft.title,
+          description: enhancement.refinedDescription || row.draft.description,
+        } : null,
+      };
+    });
+    return {
+      ...preview,
+      rows,
+      drafts: preview.canSubmit
+        ? rows.flatMap((row) => row.draft ? [row.draft] : [])
+        : [],
+    };
+  }, [aiEnhancements, preview]);
   const selectedStoreId = stores.some((store) => store.id === storeId)
     ? storeId
     : stores[0]?.id ?? "";
@@ -133,6 +170,9 @@ export function OperatorXlsxImportModal({
     setSubmittedCount(0);
     setError("");
     setProgress(null);
+    setAiEnhancements(new Map());
+    setAiProgress(null);
+    setIsEnhancing(false);
   }, []);
 
   const reset = useCallback(() => {
@@ -192,8 +232,44 @@ export function OperatorXlsxImportModal({
     source: "directory" | "multiple",
   ) => {
     setImageFiles(Array.from(event.currentTarget.files ?? []));
+    setAiEnhancements(new Map());
     resetInput(source === "directory" ? multipleInputRef.current : directoryInputRef.current);
     resetResult();
+  };
+
+  const handleAiEnhancement = async () => {
+    if (!preview || !accessToken || isEnhancing) return;
+    const candidates = preview.rows.flatMap((row) => row.imageMatches.length > 0 ? [{
+      rowNumber: row.rowNumber,
+      images: row.imageMatches.map((match) => match.file),
+      source: {
+        title: row.title,
+        description: row.sourceDescription || row.description,
+        condition: row.condition,
+        categoryId: row.category?.id ?? null,
+      },
+    }] : []);
+    if (candidates.length === 0) return;
+    setIsEnhancing(true);
+    setError("");
+    setAiProgress({ completed: 0, total: candidates.length });
+    try {
+      const results = await processExcelWithAI(candidates, accessToken, {
+        concurrency: 5,
+        onProgress: (completed, total) => setAiProgress({ completed, total }),
+      });
+      const next = new Map<number, ProductEnhancement>();
+      results.forEach(({ rowNumber, enhancement }) => {
+        if (enhancement) next.set(rowNumber, enhancement);
+      });
+      setAiEnhancements(next);
+      if (next.size === 0) {
+        setError("AI 분석을 완료하지 못해 모든 기존 입력값을 유지했습니다.");
+      }
+      setConfirmed(false);
+    } finally {
+      setIsEnhancing(false);
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -212,7 +288,7 @@ export function OperatorXlsxImportModal({
       return;
     }
 
-    const finalPreview = buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
+    const rawFinalPreview = buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
       publishAt:
         publicationMode === "now"
           ? new Date().toISOString()
@@ -221,6 +297,29 @@ export function OperatorXlsxImportModal({
       excludedRowNumbers: [...excludedRowNumbers],
       saleType,
     });
+    const finalRows = rawFinalPreview.rows.map((row) => {
+      const enhancement = aiEnhancements.get(row.rowNumber);
+      if (!enhancement) return row;
+      return {
+        ...row,
+        aiEnhancement: enhancement,
+        category: getBatchClothingCategory(enhancement.categoryId) ?? row.category,
+        title: enhancement.enhancedTitle || row.title,
+        description: enhancement.refinedDescription || row.description,
+        draft: row.draft ? {
+          ...row.draft,
+          title: enhancement.enhancedTitle || row.draft.title,
+          description: enhancement.refinedDescription || row.draft.description,
+        } : null,
+      };
+    });
+    const finalPreview = {
+      ...rawFinalPreview,
+      rows: finalRows,
+      drafts: rawFinalPreview.canSubmit
+        ? finalRows.flatMap((row) => row.draft ? [row.draft] : [])
+        : [],
+    };
     if (!finalPreview.canSubmit || finalPreview.drafts.length === 0) {
       setConfirmed(false);
       setError("오류가 있는 상품과 이미지 연결을 모두 확인해 주세요.");
@@ -257,7 +356,7 @@ export function OperatorXlsxImportModal({
     }
   };
 
-  const rowErrorCount = preview?.rows.filter((row) =>
+  const rowErrorCount = enhancedPreview?.rows.filter((row) =>
     row.issues.some((issue) => issue.severity === "error"),
   ).length ?? 0;
   const progressValue = progressPercentage(progress);
@@ -434,23 +533,28 @@ export function OperatorXlsxImportModal({
             </section>
           )}
 
-          {preview && (
+          {enhancedPreview && (
             <section aria-label="상품별 검증 미리보기">
               <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
                 <div>
                   <h3 className="text-sm font-bold">4. 상품별 검증 미리보기</h3>
                   <p className="mt-1 text-xs text-muted">
-                    총 {preview.rows.length.toLocaleString("ko-KR")}개 상품 · 오류 {rowErrorCount.toLocaleString("ko-KR")}개 상품 · 미사용 사진 {preview.unusedImageFiles.length.toLocaleString("ko-KR")}개
+                    총 {enhancedPreview.rows.length.toLocaleString("ko-KR")}개 상품 · 오류 {rowErrorCount.toLocaleString("ko-KR")}개 상품 · 미사용 사진 {enhancedPreview.unusedImageFiles.length.toLocaleString("ko-KR")}개
                   </p>
                 </div>
-                <span className={`border px-3 py-2 text-xs font-bold ${preview.canSubmit ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-red-300 bg-red-50 text-red-800"}`}>
-                  {preview.canSubmit ? "등록 준비 완료" : "오류 확인 필요"}
-                </span>
+                <div className="flex flex-wrap gap-2">
+                  <Button disabled={!accessToken || isEnhancing || isSubmitting || enhancedPreview.rows.length === 0} onClick={() => void handleAiEnhancement()} size="compact" type="button">
+                    {isEnhancing ? `AI 보정 중 ${aiProgress?.completed ?? 0}/${aiProgress?.total ?? 0}` : "Gemini AI 자동 보정"}
+                  </Button>
+                  <span className={`border px-3 py-2 text-xs font-bold ${enhancedPreview.canSubmit ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-red-300 bg-red-50 text-red-800"}`}>
+                    {enhancedPreview.canSubmit ? "등록 준비 완료" : "오류 확인 필요"}
+                  </span>
+                </div>
               </div>
 
-              {preview.globalIssues.length > 0 && (
+              {enhancedPreview.globalIssues.length > 0 && (
                 <ul className="mt-3 space-y-2" role="alert">
-                  {preview.globalIssues.map((issue, index) => (
+                  {enhancedPreview.globalIssues.map((issue, index) => (
                     <li className={`border px-4 py-3 text-xs font-bold ${issueClasses(issue)}`} key={`${issue.code}-${index}`}>
                       {issue.message}
                     </li>
@@ -473,16 +577,20 @@ export function OperatorXlsxImportModal({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
-                    {preview.rows.map((row, productIndex) => {
+                    {enhancedPreview.rows.map((row, productIndex) => {
                       const hasRowError = row.issues.some((issue) => issue.severity === "error");
                       return (
                         <tr aria-invalid={hasRowError} className={hasRowError ? "bg-red-50" : "bg-paper"} key={row.rowNumber}>
                           <td className="px-3 py-3 align-top font-bold">{productIndex + 1}번째</td>
                           <td className="max-w-[320px] px-3 py-3 align-top">
                             <p className="font-bold">{row.title || "상품명 없음"}</p>
+                            {aiEnhancements.has(row.rowNumber) && <p className="mt-1 text-[10px] font-bold text-emerald-700">AI 보정 적용 · 등록 전 확인 필요</p>}
                             <p className="mt-1 whitespace-pre-line leading-5 text-muted">{row.description || "설명 없음"}</p>
                           </td>
-                          <td className="px-3 py-3 align-top font-bold">{inferBrandFromTitle(row.title).brand}</td>
+                          <td className="px-3 py-3 align-top font-bold">
+                            {row.aiEnhancement?.brand ?? inferBrandFromTitle(row.title).brand}
+                            {row.aiEnhancement?.hashtags.length ? <p className="mt-1 max-w-[180px] text-[10px] font-normal text-muted">{row.aiEnhancement.hashtags.join(" ")}</p> : null}
+                          </td>
                           <td className="whitespace-nowrap px-3 py-3 align-top">
                             <p className="font-mono font-bold">{row.category?.id ?? "미인식"}</p>
                             <p className="mt-1 text-[10px] text-muted">{row.category?.label ?? "기타"}</p>
@@ -552,20 +660,20 @@ export function OperatorXlsxImportModal({
             <label className={`flex items-start gap-3 border px-4 py-3 text-xs font-bold ${preview?.canSubmit ? "border-ink" : "border-line text-muted"}`}>
               <input
                 checked={confirmed}
-                disabled={!preview?.canSubmit || isParsing || isSubmitting || !selectedStoreId}
+                disabled={!enhancedPreview?.canSubmit || isParsing || isSubmitting || isEnhancing || !selectedStoreId}
                 onChange={(event) => { setConfirmed(event.target.checked); setError(""); }}
                 type="checkbox"
               />
-              검증 결과, 자동 추출 브랜드, 저장할 숍과 {preview?.rows.length ?? 0}개 {saleType === "auction" ? "경매" : "즉시 구매"} 상품을 모두 확인했습니다. 이제 데이터베이스 저장을 허용합니다.
+              검증 결과, AI 보정값, 자동 추출 브랜드, 저장할 숍과 {enhancedPreview?.rows.length ?? 0}개 {saleType === "auction" ? "경매" : "즉시 구매"} 상품을 모두 확인했습니다. 이제 데이터베이스 저장을 허용합니다.
             </label>
           )}
 
           <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-5">
             <Button disabled={isSubmitting} onClick={handleClose} type="button">{completed ? "닫기" : "취소"}</Button>
             {!completed && (
-              <Button className="inline-flex items-center gap-2" disabled={!confirmed || !preview?.canSubmit || isParsing || isSubmitting || !selectedStoreId} type="submit" variant="primary">
+              <Button className="inline-flex items-center gap-2" disabled={!confirmed || !preview?.canSubmit || isParsing || isSubmitting || isEnhancing || !selectedStoreId} type="submit" variant="primary">
                 <FileSpreadsheet size={14} />
-                {isSubmitting ? "등록 중…" : `${preview?.rows.length ?? 0}개 검증 완료 상품 저장`}
+                {isSubmitting ? "등록 중…" : `${enhancedPreview?.rows.length ?? 0}개 검증 완료 상품 저장`}
               </Button>
             )}
           </div>

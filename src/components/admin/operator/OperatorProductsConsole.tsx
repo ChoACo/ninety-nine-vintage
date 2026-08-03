@@ -25,6 +25,7 @@ import {
   type XlsxRegistrationOptions,
 } from "@/components/admin/operator/OperatorXlsxImportModal";
 import { getNextAuctionDeadline } from "@/utils/formatters";
+import { processQuickRegistrationAI } from "@/lib/ai/productEnhancement";
 
 interface Store { id: string; name: string; canPublish: boolean; }
 interface Product {
@@ -230,6 +231,8 @@ export function OperatorProductsConsole({
     new Map<string, SingleRegistrationSnapshot>(),
   );
   const processingSingleRegistrationIdsRef = useRef(new Set<string>());
+  const quickAiRequestRef = useRef<AbortController | null>(null);
+  const [quickAiBusy, setQuickAiBusy] = useState(false);
 
   useEffect(() => {
     singleImagesRef.current = singleImages;
@@ -457,6 +460,38 @@ export function OperatorProductsConsole({
     }));
     setSingleImages((current) => [...current, ...additions]);
     setNotice("");
+
+    // 새 사진 선택 요청이 이전 요청보다 늦게 끝나 폼을 덮지 않도록 취소합니다.
+    if (!editingId && token) {
+      quickAiRequestRef.current?.abort();
+      const controller = new AbortController();
+      quickAiRequestRef.current = controller;
+      const sourceSnapshot = { title: form.title, description: form.description };
+      setQuickAiBusy(true);
+      void processQuickRegistrationAI(
+        selected.slice(0, 2),
+        sourceSnapshot,
+        token,
+        controller.signal,
+      ).then((enhancement) => {
+        if (!enhancement || controller.signal.aborted) return;
+        setForm((current) => ({
+          ...current,
+          // 분석 중 운영자가 직접 입력했다면 사용자 입력을 우선합니다.
+          title: current.title === sourceSnapshot.title
+            ? enhancement.enhancedTitle
+            : current.title,
+          gender: current.gender || enhancement.gender,
+          brand: current.brand || enhancement.brand,
+        }));
+        setNotice("사진 AI 분석 결과를 상품명·성별·브랜드에 자동 입력했습니다. 등록 전에 확인해 주세요.");
+      }).finally(() => {
+        if (quickAiRequestRef.current === controller) {
+          quickAiRequestRef.current = null;
+          setQuickAiBusy(false);
+        }
+      });
+    }
   };
 
   const moveSingleImage = (index: number, direction: -1 | 1) => {
@@ -981,7 +1016,8 @@ export function OperatorProductsConsole({
         productsToInsert.push({
           id: productId,
           title: draft.title,
-          brand: inferBrandFromTitle(draft.title).brand,
+          brand: row.aiEnhancement?.brand || inferBrandFromTitle(draft.title).brand,
+          gender: row.aiEnhancement?.gender ?? "",
           description: draft.description,
           category: row.category?.label ?? "기타",
           storeId: scopedStoreId,
@@ -1097,7 +1133,7 @@ export function OperatorProductsConsole({
         {!editingId && (
           <section className="border border-line bg-paper p-4 sm:col-span-2">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-              <div><p className="text-xs font-black">1. 상품 사진 선택</p><p className="mt-1 text-[11px] text-muted">최대 15장 · 표시된 순서대로 저장</p></div>
+              <div><p className="text-xs font-black">1. 상품 사진 선택</p><p className="mt-1 text-[11px] text-muted">최대 15장 · 표시된 순서대로 저장{quickAiBusy ? " · AI 분석 중…" : ""}</p></div>
               <label className="inline-flex cursor-pointer items-center justify-center gap-2 border border-ink px-4 py-3 text-xs font-bold">
                 <ImagePlus size={15} /> 사진 선택
                 <input accept={PRODUCT_IMAGE_INPUT_ACCEPT} className="sr-only" multiple onChange={(event) => { addSingleImages(event.currentTarget.files); event.currentTarget.value = ""; }} type="file" />
@@ -1199,6 +1235,7 @@ export function OperatorProductsConsole({
     </div>}
     <div className="overflow-x-auto border-y border-line"><table className="w-full min-w-[1080px] text-left text-xs"><thead className="border-b border-line bg-surface text-[10px] tracking-[.12em] text-muted"><tr>{view === "registration" && <th className="px-4 py-4">선택</th>}<th className="px-4 py-4">상품</th><th className="px-4 py-4">숍</th><th className="px-4 py-4">판매 방식</th><th className="px-4 py-4">가격</th><th className="px-4 py-4">보관</th><th className="px-4 py-4">상태</th><th className="px-4 py-4" /></tr></thead><tbody className="divide-y divide-line">{visibleProducts.map((product) => { const manageable = isManageableProductStatus(product.status); const canPublishStore = stores.some((store) => store.id === product.store_id && store.canPublish); return <tr key={product.id}>{view === "registration" && <td className="px-4 py-4"><input aria-label={`${product.title} 공개 선택`} checked={selectedPendingIds.has(product.id)} disabled={busy || !canPublishStore || product.status !== "pending"} onChange={() => togglePending(product.id)} type="checkbox" /></td>}<td className="px-4 py-4"><div className="flex items-center gap-3"><CatalogImage alt="" className="size-12 object-cover" src={product.image_urls?.[0] ?? ""} /><span className="font-bold">{product.title}</span></div></td><td className="px-4 py-4 text-muted">{product.stores?.name ?? "미지정"}</td><td className="px-4 py-4">{product.sale_type === "fixed" ? "즉시구매" : "경매"}</td><td className="px-4 py-4 font-mono">{(product.fixed_price ?? product.current_price).toLocaleString("ko-KR")}원</td><td className="px-4 py-4">{product.storage_class === "large" ? "대형 · 7일" : "소형 · 14일"}</td><td className="px-4 py-4"><span className="border border-line px-2 py-1 text-[10px] font-bold">{view === "registration" && isScheduledProduct(product, productReferenceNow) ? "업로드 예정" : productStatusLabel(product.status)}</span></td><td className="px-4 py-4 text-right"><div className="flex justify-end gap-3">{permissions.canCloseAuctions && product.sale_type === "auction" && product.status === "active" && <button aria-label={`${product.title} 즉시 마감`} className="inline-flex items-center gap-1 font-bold text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy} onClick={() => void closeAuctionNow(product)} type="button"><CircleStop size={13} /> 즉시 마감·낙찰 확정</button>}{product.status === "active" && <button aria-label={`${product.title} 일시중지`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate} onClick={() => void pause(product)} type="button"><PauseCircle size={13} /> 일시중지</button>}{product.status === "pending" && <button aria-label={`${product.title} 공개`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !canPublishStore} onClick={() => void publish(product)} type="button"><PlayCircle size={13} /> 공개</button>}<button aria-label={`${product.title} 점검`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product, "inspection")} type="button"><ClipboardCheck size={13} /> 점검</button><button aria-label={`${product.title} 수정`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product)} type="button"><Edit3 size={13} /> 수정</button><button aria-label={`${product.title} 삭제`} className="inline-flex items-center gap-1 text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => void remove(product)} type="button"><Trash2 size={13} /> 삭제</button>{product.status === "active" && <Link className="underline" href={`/auction/${product.id}`}>보기</Link>}</div></td></tr>; })}{visibleProducts.length === 0 && <tr><td className="px-4 py-16 text-center text-muted" colSpan={view === "registration" ? 8 : 7}>조건에 맞는 상품이 없습니다.</td></tr>}</tbody></table></div>
     <OperatorXlsxImportModal
+      accessToken={token ?? ""}
       onClose={() => setXlsxImportOpen(false)}
       onSubmit={importXlsx}
       open={view === "registration" && xlsxImportOpen && permissions.canCreate}

@@ -46,7 +46,7 @@ export class CloudflareR2Adapter implements StorageAdapter {
     };
     if (contentType) headers["Content-Type"] = contentType;
 
-    const response = await fetch(url, { method, headers, body, cache: "no-store" });
+    const response = await fetch(url, { method, headers, body: body ? Buffer.from(body) : undefined, cache: "no-store" });
     if (!response.ok) throw new Error(`R2 Error: ${response.status} ${await response.text()}`);
     return response;
   }

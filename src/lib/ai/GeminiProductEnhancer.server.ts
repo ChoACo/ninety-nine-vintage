@@ -169,4 +169,3 @@ ${untrustedSource}`;
     return normalizeResponse({}, source);
   }
 }
-}

@@ -159,7 +159,8 @@ test("uploads overlap both variants without adding device measurements to produc
   assert.match(products, /onCompressionMeasured\?\.\(/);
   assert.doesNotMatch(operatorConsole, /onCompressionMeasured|compressedForProduct|기기 실측/);
   assert.doesNotMatch(uploadModal, /measurement\.targetMet|measurement\.totalMs|100ms 목표|기기 실측/);
-  assert.equal((uploadModal.match(/accept=\{PRODUCT_IMAGE_INPUT_ACCEPT\}/g) ?? []).length, 2);
+  assert.doesNotMatch(uploadModal, /PRODUCT_IMAGE_INPUT_ACCEPT/);
+  assert.match(uploadModal, /isSupportedProductImageMimeType\(file\.type\)/);
   assert.match(uploadModal, /PRODUCT_IMAGE_HEIC_CONVERSION_NOTE/);
   assert.match(operatorConsole, /사진 선택/);
   assert.match(operatorConsole, /최대 15장 · 표시된 순서대로 저장/);
@@ -180,8 +181,8 @@ test("zoom and fallback images keep fixed desktop sizing, responsive mobile sizi
     source("src/components/features/auction/detail/ItemGallery.tsx"),
   ]);
 
-  assert.match(nextConfig, /unoptimized:\s*true/);
-  assert.match(nextConfig, /\/_next\/image route currently returns 404/);
+  assert.match(nextConfig, /remotePatterns/);
+  assert.match(nextConfig, /pathname:\s*"\/storage\/v1\/\*\*"/);
   assert.match(catalogImage, /maxDimension <= CATALOG_TRANSFORM_MAX_DIMENSION/);
   assert.match(
     catalogImage,

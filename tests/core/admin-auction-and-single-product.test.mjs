@@ -57,7 +57,9 @@ test("single product registration is separate, scheduled for next-day 10 by defa
     consoleSource.indexOf("1. 상품 사진 선택")
       < consoleSource.indexOf('placeholder="상품명 (필수)"'),
   );
-  assert.doesNotMatch(consoleSource, /브랜드명 \(선택\)/);
+  assert.match(consoleSource, /브랜드 \(선택\)/);
+  assert.match(consoleSource, /카테고리 미입력/);
+  assert.match(consoleSource, /사이즈 \(선택\)/);
   assert.doesNotMatch(consoleSource, /상태등급 미입력/);
   assert.match(
     consoleSource,
@@ -65,7 +67,7 @@ test("single product registration is separate, scheduled for next-day 10 by defa
   );
   assert.match(
     consoleSource,
-    /\(editingId \|\| form\.saleType === "fixed"\) && <TextArea aria-label="상품 설명"/,
+    /<TextArea aria-label="상품 설명"/,
   );
   assert.doesNotMatch(
     consoleSource,
@@ -92,13 +94,13 @@ test("single product registration is separate, scheduled for next-day 10 by defa
   assert.match(route, /!title \|\| title\.length > 160/);
   assert.match(route, /\(!singleRegistration && !description\)/);
   assert.match(route, /description\.length > 10000/);
-  assert.match(route, /brandSlug: ""/);
+  assert.match(route, /normalizeProductBrand\("빈티지"\)/);
   assert.match(route, /const gender = \["남성", "여성", "공용"\]/);
-  assert.match(route, /const category = singleRegistration[\s\S]*\? "기타"/);
+  assert.match(route, /const category = text\(body\?\.category, "기타"\)/);
   assert.match(route, /getRelativeKoreanDateTime\(1,\s*"10:00:00"/);
   assert.match(route, /value\.length > 15/);
   assert.match(route, /p_permission:\s*"publish_products"/);
-  assert.match(route, /size_label:\s*singleRegistration \? ""/);
+  assert.match(route, /size_label:\s*text\(body\?\.sizeLabel\)/);
   assert.match(route, /inspection_notes:\s*singleRegistration[\s\S]*\?\s*\[\]/);
   assert.doesNotMatch(route, /구제 의류/);
   assert.match(categoryMigration, /alter column category set default '기타'/);

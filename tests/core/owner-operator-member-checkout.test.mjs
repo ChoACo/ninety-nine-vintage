@@ -141,29 +141,31 @@ test("center assignment capabilities are revoked after direct-store cutover", as
   assert.match(cutover, /revoke all on function public\.configure_store_fulfillment_route/);
 });
 
-test("every operator can confirm shared payments while owner retains site and refund authority", async () => {
-  const [migration, ownerLayout, operatorLayout] = await Promise.all([
-    source(migrationPath),
+test("only the owner confirms shared payments while operators retain fulfillment", async () => {
+  const [migration, platformMigration, ownerLayout, operatorLayout] = await Promise.all([
+    source(migrationPath), source("supabase/migrations/20260803173529_multi_operator_store_platform.sql"),
     source("src/app/(admin)/admin/owner/layout.tsx"),
     source("src/app/(admin)/admin/operator/layout.tsx"),
   ]);
 
   assert.match(
     migration,
-    /can_confirm_shared_payment[\s\S]*access_role_for_user\(auth\.uid\(\)\) in \('owner', 'operator'\)/i,
+    /can_confirm_shared_payment/i,
   );
+  assert.match(platformMigration, /can_confirm_shared_payment[\s\S]*public\.is_owner\(\)/i);
   assert.match(ownerLayout, /사이트·로그/);
   assert.match(ownerLayout, /회원·권한/);
   assert.doesNotMatch(ownerLayout, /센터·매장 구조/);
   assert.match(ownerLayout, /환불 승인/);
   assert.doesNotMatch(ownerLayout, /배송·결제/);
-  assert.match(operatorLayout, /label:\s*"주문·입금"/);
+  assert.doesNotMatch(operatorLayout, /label:\s*"주문·입금"/);
   assert.match(operatorLayout, /label:\s*"택배"/);
 });
 
-test("checkout quotes shipping per business, defaults to paying it, and projects a one-use entitlement after payment", async () => {
-  const [migration, cartRoute, checkoutRoute, cartView] = await Promise.all([
+test("checkout quotes shipping by store or fulfillment group and snapshots each charge", async () => {
+  const [migration, platformMigration, cartRoute, checkoutRoute, cartView] = await Promise.all([
     source(migrationPath),
+    source("supabase/migrations/20260803173529_multi_operator_store_platform.sql"),
     source("src/app/api/cart/route.ts"),
     source("src/app/api/orders/checkout/route.ts"),
     source("src/components/features/commerce/CartView.tsx"),
@@ -177,11 +179,16 @@ test("checkout quotes shipping per business, defaults to paying it, and projects
     migration,
     /new\.status in \('paid', 'shipped'\)[\s\S]*insert into public\.shipping_fee_waiver_entitlements/i,
   );
-  assert.match(cartRoute, /shipping_fee_amount/);
+  assert.match(platformMigration, /quote_commerce_shipping_fee/);
+  assert.match(platformMigration, /charge_mode[\s\S]*per_group/);
+  assert.match(platformMigration, /policy_snapshot/);
+  assert.match(cartRoute, /quote_commerce_shipping_fee/);
+  assert.match(cartRoute, /shippingCharges/);
   assert.match(cartRoute, /shippingFee/);
   assert.match(checkoutRoute, /p_include_shipping_fee:\s*includeShippingFee/);
   assert.match(cartView, /useState\(true\)/);
   assert.match(cartView, /배송비 함께 결제/);
+  assert.match(cartView, /배송비 \{shippingCharges\.length\}건/);
   assert.match(cartView, /includeShippingFee:\s*currentRequest\.includeShippingFee/);
   assert.match(
     cartView,

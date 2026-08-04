@@ -678,7 +678,7 @@ test("all public v2 RPCs pin search_path and receive explicit authenticated gran
   }
 });
 
-test("operator payment API is shared, nested, strict, and confirms only the observed full balance", async () => {
+test("payment API remains strict but mutations and navigation are owner-only", async () => {
   await access(new URL("src/app/(admin)/admin/operator/payments/page.tsx", rootUrl));
   const [queueRoute, confirmRoute, consoleSource, layout] = await Promise.all([
     source("src/app/api/admin/operator/payments/route.ts"),
@@ -688,6 +688,7 @@ test("operator payment API is shared, nested, strict, and confirms only the obse
   ]);
 
   assert.match(queueRoute, /"get_unified_manual_payment_queue"/);
+  assert.match(queueRoute, /auth\.roleCode !== "owner"/);
   assert.match(queueRoute, /auth\.user as unknown as RpcClient/);
   assert.doesNotMatch(queueRoute, /export\s+async\s+function\s+POST/);
   assert.match(confirmRoute, /authenticateStaffRequest\(request,\s*true\)/);
@@ -715,7 +716,7 @@ test("operator payment API is shared, nested, strict, and confirms only the obse
   assert.match(consoleSource, /selectedPayment\.products\.map/);
   assert.match(consoleSource, /void confirm\(selectedPayment\)/);
   assert.match(consoleSource, /response\.status\s*===\s*409/);
-  assert.match(layout, /href:\s*"\/admin\/operator\/payments"/);
+  assert.doesNotMatch(layout, /href:\s*"\/admin\/operator\/payments"/);
 });
 
 test("auction wins begin and confirm as one member-scoped payment", async () => {

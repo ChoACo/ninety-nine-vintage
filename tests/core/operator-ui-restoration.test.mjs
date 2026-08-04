@@ -61,12 +61,12 @@ test("operator center uses major and minor navigation with separated shipping wo
   assert.match(layout, /aria-label="운영자 상단 탭"/);
   assert.match(layout, />운영 탭<\/p>/);
   assert.match(layout, /aria-label=\{`\$\{activeGroup\.label\} 소분류`\}/);
-  for (const label of ["메인", "상품", "주문·입금", "출고·보관", "기록", "택배"]) {
+  for (const label of ["메인", "상품", "센터 설정", "판매 회원", "출고·보관", "기록", "택배"]) {
     assert.match(layout, new RegExp(`label:\\s*"${label}"`));
   }
   for (const label of [
     "상품 등록",
-    "주문",
+    "등급·정산계좌",
     "낙찰된 회원",
     "출고·보관",
     "회원 보관함",

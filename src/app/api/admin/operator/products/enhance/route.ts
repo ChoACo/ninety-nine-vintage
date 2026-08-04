@@ -14,6 +14,7 @@ function parseSource(value: FormDataEntryValue | null): ProductEnhancementSource
       description: typeof parsed.description === "string" ? parsed.description : "",
       condition: typeof parsed.condition === "string" ? parsed.condition : null,
       categoryId: typeof parsed.categoryId === "string" ? parsed.categoryId : null,
+      sizeLabel: typeof parsed.sizeLabel === "string" ? parsed.sizeLabel : null,
     };
   } catch {
     return null;
@@ -30,18 +31,30 @@ export async function POST(request: Request) {
   const formData = await request.formData().catch(() => null);
   if (!formData) return commerceJson({ error: "invalid_form_data" }, 400);
   const source = parseSource(formData.get("source"));
+  const storeId = formData.get("storeId");
   const images = formData.getAll("images").filter(
     (entry): entry is File => entry instanceof File,
   ).slice(0, 2);
-  if (!source || images.length === 0) {
+  if (!source || typeof storeId !== "string" || !/^[0-9a-f-]{36}$/i.test(storeId) || images.length === 0) {
     return commerceJson({ error: "invalid_enhancement_input" }, 400);
   }
 
   // 공급자 한도(10K RPD)보다 낮은 서비스 자체 300건/일 경계를 DB에서 원자적으로 예약합니다.
   // Gemini 호출이 실패해도 예약분은 반환하지 않아 반복 요청으로 비용 경계를 우회할 수 없습니다.
-  const { data: quotaRows, error: quotaError } = await auth.user.rpc(
-    "reserve_gemini_product_enhancement_quota",
-  );
+  const { data: quotaRows, error: quotaError } = await (
+    auth.user as unknown as {
+      rpc: (name: string, args: Record<string, unknown>) => Promise<{
+        data: Array<{
+          allowed: boolean;
+          used: number;
+          daily_limit: number | null;
+          global_used: number;
+          global_limit: number;
+        }> | null;
+        error: unknown;
+      }>;
+    }
+  ).rpc("reserve_store_ai_quota", { p_store_id: storeId });
   if (quotaError || !quotaRows?.[0]) {
     console.error("[product-enhancement] quota reservation failed", quotaError);
     return commerceJson({
@@ -53,7 +66,9 @@ export async function POST(request: Request) {
   if (!quota.allowed) {
     return commerceJson({
       error: "product_enhancement_daily_limit_reached",
-      message: `오늘의 AI 자동 보정 ${quota.daily_limit}건을 모두 사용해 기존 입력값을 유지합니다.`,
+      message: quota.daily_limit === null
+        ? "서비스 전체 AI 자동 보정 한도에 도달했습니다."
+        : `오늘 이 센터의 AI 자동 보정 ${quota.daily_limit}건을 모두 사용했습니다.`,
       used: quota.used,
       dailyLimit: quota.daily_limit,
     }, 429);

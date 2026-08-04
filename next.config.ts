@@ -13,18 +13,48 @@ const allowedDevOrigins = (process.env.DEV_ALLOWED_ORIGINS ?? "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// The strict production policy only allows hosted Supabase. A locally running
+// Supabase CLI (http://127.0.0.1:54321) must stay reachable from the same
+// browser session for local owner/operator scenario checks, so include the
+// configured origin when it is not already covered by the hosted wildcard.
+const supabaseOrigin = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").origin;
+  } catch {
+    return null;
+  }
+})();
+const allowedConnectOrigins = [
+  "https://*.supabase.co",
+  "wss://*.supabase.co",
+  "https://kauth.kakao.com",
+  "https://kapi.kakao.com",
+];
+if (
+  supabaseOrigin &&
+  !supabaseOrigin.match(/^https:\/\//u) &&
+  !allowedConnectOrigins.includes(supabaseOrigin)
+) {
+  allowedConnectOrigins.push(supabaseOrigin);
+}
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://kauth.kakao.com https://kapi.kakao.com",
+  `connect-src 'self' ${allowedConnectOrigins.join(" ")}`,
   "font-src 'self' data:",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "img-src 'self' data: blob: https://*.supabase.co",
+  "img-src 'self' data: blob: https://*.supabase.co https://storage.googleapis.com https://*.s3.amazonaws.com https://*.s3.*.amazonaws.com",
   "manifest-src 'self'",
   "media-src 'self' blob:",
   "object-src 'none'",
-  "script-src 'self' 'unsafe-inline'",
+  // React's dev-mode source-mapping relies on eval(), which the strict
+  // production policy intentionally omits. Keep the relaxation dev-only so
+  // the deployed worker never enables code execution.
+  `script-src 'self' 'unsafe-inline'${
+    process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""
+  }`,
   "style-src 'self' 'unsafe-inline'",
   "worker-src 'self' blob:",
 ].join("; ");
@@ -45,23 +75,24 @@ const securityHeaders = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["exceljs"],
   ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
-  // OpenNext's deployed /_next/image route currently returns 404 while the
-  // original Supabase object and transformed WebP URLs are healthy. Keep
-  // next/image's layout and loading behavior, but serve the already-bounded
-  // Supabase catalog sources directly instead of passing them through a broken
-  // second optimizer.
   images: {
-    unoptimized: true,
-    remotePatterns: supabaseImageHostname
-      ? [
-          {
-            hostname: supabaseImageHostname,
-            pathname: "/storage/v1/**",
-            protocol: "https" as const,
-          },
-        ]
-      : [],
+    remotePatterns: [
+      ...(supabaseImageHostname
+        ? [
+            {
+              hostname: supabaseImageHostname,
+              pathname: "/storage/v1/**",
+              protocol: "https" as const,
+            },
+          ]
+        : []),
+      { hostname: "*.supabase.co", pathname: "/storage/v1/**", protocol: "https" as const },
+      { hostname: "storage.googleapis.com", pathname: "/**", protocol: "https" as const },
+      { hostname: "*.s3.amazonaws.com", pathname: "/**", protocol: "https" as const },
+      { hostname: "*.s3.*.amazonaws.com", pathname: "/**", protocol: "https" as const },
+    ],
   },
   async headers() {
     return [
@@ -98,7 +129,3 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-
-import("@opennextjs/cloudflare").then((module) =>
-  module.initOpenNextCloudflareForDev(),
-);

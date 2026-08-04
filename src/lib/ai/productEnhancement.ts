@@ -6,6 +6,7 @@ export interface ProductEnhancement {
   gender: ProductGender;
   categoryId: string | null;
   categoryLabel: string | null;
+  sizeLabel: string;
   refinedDescription: string;
   hashtags: string[];
 }
@@ -15,6 +16,7 @@ export interface ProductEnhancementSource {
   description?: string;
   condition?: string | null;
   categoryId?: string | null;
+  sizeLabel?: string | null;
 }
 
 export interface ExcelEnhancementItem {
@@ -32,6 +34,7 @@ interface EnhanceRequestOptions {
   accessToken: string;
   images: readonly File[];
   source: ProductEnhancementSource;
+  storeId: string;
   signal?: AbortSignal;
 }
 
@@ -43,10 +46,12 @@ export async function requestProductEnhancement({
   accessToken,
   images,
   source,
+  storeId,
   signal,
 }: EnhanceRequestOptions): Promise<ProductEnhancement | null> {
   const formData = new FormData();
   formData.set("source", JSON.stringify(source));
+  formData.set("storeId", storeId);
   images.slice(0, 2).forEach((image) => formData.append("images", image));
 
   try {
@@ -66,6 +71,17 @@ export async function requestProductEnhancement({
   }
 }
 
+/** 간편등록 사진 선택 시 상품명·성별 등 안전한 자동 입력 후보를 반환합니다. */
+export function processQuickRegistrationAI(
+  images: readonly File[],
+  source: ProductEnhancementSource,
+  accessToken: string,
+  storeId: string,
+  signal?: AbortSignal,
+) {
+  return requestProductEnhancement({ accessToken, images, source, storeId, signal });
+}
+
 /**
  * Excel 상품을 정해진 동시성으로 처리합니다. 한 행의 실패가 다른 행이나
  * 원본 검증 결과를 손상시키지 않도록 각 작업을 독립적으로 격리합니다.
@@ -73,6 +89,7 @@ export async function requestProductEnhancement({
 export async function processExcelWithAI(
   items: readonly ExcelEnhancementItem[],
   accessToken: string,
+  storeId: string,
   options: {
     concurrency?: number;
     onProgress?: (completed: number, total: number) => void;
@@ -93,6 +110,7 @@ export async function processExcelWithAI(
         accessToken,
         images: item.images,
         source: item.source,
+        storeId,
         signal: options.signal,
       });
       results[index] = { enhancement, rowNumber: item.rowNumber };
@@ -105,14 +123,4 @@ export async function processExcelWithAI(
     Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
   );
   return results;
-}
-
-/** 간편등록 사진 선택 시 상품명·성별 등 안전한 자동 입력 후보를 반환합니다. */
-export function processQuickRegistrationAI(
-  images: readonly File[],
-  source: ProductEnhancementSource,
-  accessToken: string,
-  signal?: AbortSignal,
-) {
-  return requestProductEnhancement({ accessToken, images, source, signal });
 }

@@ -95,7 +95,8 @@ test("employee and operator navigation use direct-store fulfillment without cent
   assert.doesNotMatch(employeeLayout, /\/admin\/employee\/center/);
   assert.doesNotMatch(operatorLayout, /\/admin\/operator\/center/);
   assert.match(operatorLayout, /출고·보관/);
-  assert.match(operatorLayout, /\/admin\/operator\/payments/);
+  assert.doesNotMatch(operatorLayout, /\/admin\/operator\/payments/);
+  assert.match(operatorLayout, /\/admin\/operator\/platform/);
   assert.doesNotMatch(operatorLayout, /\/admin\/operator\/members/);
   assert.match(operatorLayout, /\/admin\/operator\/chat/);
   assert.match(operatorLayout, /회원 채팅/);
@@ -125,7 +126,7 @@ test("retired center management is gone and product control uses explicit store 
   assert.match(migration, /v_product\.status <> 'active'/i);
 });
 
-test("orders and payment confirmation use compact rows with linked product details", async () => {
+test("payment confirmation is owner-only and the operator payment page redirects to fulfillment", async () => {
   const [layout, route, consoleSource, redirectPage] = await Promise.all([
     source("src/app/(admin)/admin/operator/layout.tsx"),
     source("src/app/api/admin/operator/payments/route.ts"),
@@ -133,8 +134,9 @@ test("orders and payment confirmation use compact rows with linked product detai
     source("src/app/(admin)/admin/operator/orders/page.tsx"),
   ]);
 
-  assert.match(layout, /label:\s*"주문·입금"/);
-  assert.match(redirectPage, /redirect\("\/admin\/operator\/payments"\)/);
+  assert.doesNotMatch(layout, /label:\s*"주문·입금"/);
+  assert.match(redirectPage, /redirect\("\/admin\/operator\/fulfillment"\)/);
+  assert.match(route, /auth\.roleCode !== "owner"/);
   assert.match(route, /from\("profiles"\)/);
   assert.match(route, /from\("commerce_order_items"\)/);
   assert.match(route, /from\("manual_transfer_orders"\)/);

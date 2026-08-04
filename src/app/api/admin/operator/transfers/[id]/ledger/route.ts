@@ -117,7 +117,7 @@ function normalizeShippingCreditReversalResult(value: unknown) {
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await authenticateStaffRequest(request, true);
   if (!auth.ok) return auth.response;
-  if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
+  if (auth.roleCode !== "owner") {
     return commerceJson({ error: "forbidden" }, 403);
   }
   const { id } = await params;

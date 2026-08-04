@@ -19,12 +19,12 @@ test("legacy title inference removes the size prefix and falls back safely", () 
   assert.deepEqual(inferBrandFromTitle("[S] !!!"), { brand: "기타", brandSlug: "etc" });
 });
 
-test("single writes preserve an optional blank brand while bulk writes require an explicit brand", async () => {
+test("single writes normalize an omitted brand while bulk writes require an explicit brand", async () => {
   const [singleRoute, bulkRoute] = await Promise.all([
     source("src/app/api/admin/operator/products/route.ts"),
     source("src/app/api/admin/operator/products/bulk/route.ts"),
   ]);
-  assert.match(singleRoute, /singleRegistration[\s\S]*\? \{ brand: "", brandSlug: "" \}/);
+  assert.match(singleRoute, /singleRegistration[\s\S]*normalizeProductBrand\("빈티지"\)/);
   assert.match(singleRoute, /brand_source:\s*"explicit"/);
   assert.match(bulkRoute, /normalizeProductBrand\(body\.brand\)/);
   assert.match(bulkRoute, /brand_source:\s*"explicit"/);

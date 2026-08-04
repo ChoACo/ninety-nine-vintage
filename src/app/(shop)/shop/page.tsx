@@ -28,6 +28,11 @@ function toPayload(products: Awaited<ReturnType<typeof fetchPublishedProducts>>)
     imageUrls: product.imageUrls,
     thumbnailUrls: product.thumbnailUrls,
     sizeLabel: product.sizeLabel,
+    storeId: product.storeId,
+    storeName: product.storeName,
+    storeSlug: product.storeSlug,
+    enhancedTitle: product.enhancedTitle,
+    hashtags: product.hashtags,
   }));
 }
 

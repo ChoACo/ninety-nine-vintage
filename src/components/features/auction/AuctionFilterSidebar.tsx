@@ -18,11 +18,13 @@ interface CatalogFilters {
   liveOnly: boolean;
   query?: string;
   sizes: string[];
+  storeId?: string;
 }
 
 interface CatalogFilterOptions {
   brands?: string[];
   dates?: string[];
+  stores?: Array<{ id: string; name: string }>;
 }
 
 function readInitialParam(name: string, fallback: string) {
@@ -58,6 +60,8 @@ export function AuctionFilterSidebar({
   });
   const [brandOptions, setBrandOptions] = useState<string[]>(["all"]);
   const [dateOptions, setDateOptions] = useState<string[]>([]);
+  const [storeOptions, setStoreOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState(() => readInitialParam("store", "all"));
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -79,6 +83,9 @@ export function AuctionFilterSidebar({
       if (Array.isArray(detail?.dates)) {
         setDateOptions(detail.dates.filter(Boolean));
       }
+      if (Array.isArray(detail?.stores)) {
+        setStoreOptions(detail.stores.filter((store) => Boolean(store?.id && store?.name)));
+      }
     };
     window.addEventListener("catalog-filter-options", receiveOptions);
     return () =>
@@ -92,7 +99,7 @@ export function AuctionFilterSidebar({
 
   const sharedFilters = (
     next: Partial<
-      Pick<CatalogFilters, "brand" | "date" | "gender" | "query">
+      Pick<CatalogFilters, "brand" | "date" | "gender" | "query" | "storeId">
     > = {},
   ): CatalogFilters => ({
     brand: next.brand ?? selectedBrand,
@@ -105,6 +112,7 @@ export function AuctionFilterSidebar({
     liveOnly: true,
     query: next.query ?? query,
     sizes: [],
+    storeId: next.storeId ?? selectedStoreId,
   });
 
   const resetFilters = () => {
@@ -112,6 +120,7 @@ export function AuctionFilterSidebar({
     setSelectedBrand("all");
     setSelectedDate("all");
     setSelectedGender("all");
+    setSelectedStoreId("all");
     notify({
       brand: "all",
       categories: [],
@@ -121,6 +130,7 @@ export function AuctionFilterSidebar({
       liveOnly: true,
       query: "",
       sizes: [],
+      storeId: "all",
     });
   };
 
@@ -178,6 +188,23 @@ export function AuctionFilterSidebar({
             value={query}
           />
         </label>
+      </section>
+
+      <section className="border-b border-zinc-200 py-5">
+        <h3 className="mb-3 text-xs font-bold">운영 센터</h3>
+        <select
+          aria-label="운영 센터"
+          className="h-11 w-full border border-zinc-200 bg-white px-3 text-xs font-bold outline-none focus:border-zinc-950"
+          onChange={(event) => {
+            const storeId = event.target.value;
+            setSelectedStoreId(storeId);
+            notify(sharedFilters({ storeId }));
+          }}
+          value={selectedStoreId === "all" || storeOptions.some((store) => store.id === selectedStoreId) ? selectedStoreId : "all"}
+        >
+          <option value="all">모든 센터</option>
+          {storeOptions.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
+        </select>
       </section>
 
       <section className="border-b border-zinc-200 py-5">
@@ -251,7 +278,8 @@ export function AuctionFilterSidebar({
   const selectedCount = Number(Boolean(query.trim())) +
     Number(effectiveBrand !== "all") +
     Number(selectedGender !== "all") +
-    Number(saleType === "auction" && effectiveDate !== "all");
+    Number(saleType === "auction" && effectiveDate !== "all") +
+    Number(selectedStoreId !== "all");
 
   return (
     <>

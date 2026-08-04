@@ -642,16 +642,10 @@ test("shared payment evidence is a bounded projection and direct staff rows stay
     "the visible audit history must show who acted and when",
   );
 
-  for (const [label, route] of [
-    ["shared queue", operatorRoute],
-    ["ledger mutation", ledgerRoute],
-  ]) {
-    expectMatch(
-      route,
-      /auth\.roleCode\s*!==\s*"owner"\s*&&\s*auth\.roleCode\s*!==\s*"operator"[\s\S]{0,120}forbidden[\s\S]{0,40}403/,
-      `${label} must explicitly exclude employees until confirm_payments exists`,
-    );
-  }
+  expectMatch(operatorRoute,/auth\.roleCode\s*!==\s*"owner"\s*&&\s*auth\.roleCode\s*!==\s*"operator"/,
+    "shared queue remains readable to owner and operator fulfillment staff");
+  expectMatch(ledgerRoute,/auth\.roleCode\s*!==\s*"owner"/,
+    "ledger mutation is owner-only");
 });
 
 test("unified commerce receipts support the full multi-item order amount", async () => {

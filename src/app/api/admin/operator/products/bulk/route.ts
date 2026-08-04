@@ -113,6 +113,24 @@ export async function POST(request: Request) {
     return commerceJson({ error: "상품의 숍 권한을 확인해 주세요." }, 403);
   }
 
+  const entitlementResults = await Promise.all(storeIds.map((storeId) => (
+    auth.user as unknown as {
+      rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+    }
+  ).rpc("get_store_daily_entitlements", { p_store_id: storeId })));
+  if (entitlementResults.some((result) => result.error)) {
+    return commerceJson({ error: "센터 일괄등록 등급을 확인하지 못했습니다." }, 503);
+  }
+  if (entitlementResults.some((result) => {
+    const value = result.data as { bulkImportEnabled?: unknown } | null;
+    return value?.bulkImportEnabled !== true;
+  })) {
+    return commerceJson({
+      error: "bulk_import_plan_required",
+      message: "일괄등록은 월 5만원 등급 센터에서만 사용할 수 있습니다.",
+    }, 403);
+  }
+
   const { data, error } = await auth.user
     .from("products")
     .insert(rows as ProductInsert[])

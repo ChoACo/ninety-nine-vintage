@@ -81,9 +81,15 @@ export async function GET(request: Request) {
   }
   const { data: storeRows, error: storeError } = await storeQuery.order("name");
   if (storeError) return commerceJson({ error: "operator_products_unavailable" }, 503);
-  const stores = (storeRows ?? []).map((store) => ({
-    ...store,
-    canPublish: auth.roleCode === "owner" || membershipPermissions.get(store.id)?.canPublish === true,
+  const stores = await Promise.all((storeRows ?? []).map(async (store) => {
+    const { data } = await (user as unknown as {
+      rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown }>;
+    }).rpc("get_store_daily_entitlements", { p_store_id: store.id });
+    return {
+      ...store,
+      canPublish: auth.roleCode === "owner" || membershipPermissions.get(store.id)?.canPublish === true,
+      entitlements: data && typeof data === "object" ? data : null,
+    };
   }));
   const storeIds = (stores ?? []).map((store) => store.id);
   const { data: products, error: productError } = storeIds.length === 0
@@ -117,14 +123,15 @@ export async function POST(request: Request) {
     : crypto.randomUUID();
   const title = text(body?.title);
   const description = text(body?.description);
-  const category = singleRegistration
-    ? "기타"
-    : text(body?.category, "기타");
+  const category = text(body?.category, "기타");
+  const categoryId = /^\d{6,9}$/u.test(text(body?.categoryId))
+    ? text(body?.categoryId)
+    : null;
   const enteredBrand = text(body?.brand);
   const normalizedBrand = enteredBrand
     ? normalizeProductBrand(enteredBrand)
     : singleRegistration
-      ? { brand: "", brandSlug: "" }
+      ? normalizeProductBrand("빈티지")
       : null;
   const gender = ["남성", "여성", "공용"].includes(text(body?.gender))
     ? text(body?.gender)
@@ -181,11 +188,19 @@ export async function POST(request: Request) {
     }
   }
   const price = saleType === "fixed" ? fixedPrice as number : startingPrice;
+  // enhanced_title/hashtags columns are added by migration 20260804020000
+  const aiMetadata = {
+    enhanced_title: typeof body?.enhancedTitle === "string" && body.enhancedTitle.length <= 160 ? body.enhancedTitle.trim() : null,
+    hashtags: Array.isArray(body?.hashtags) && body.hashtags.length <= 8
+      ? body.hashtags.filter((v): v is string => typeof v === "string").slice(0, 8)
+      : [],
+  };
   const { data: product, error } = await auth.user.from("products").insert({
     id: productId,
     title,
     description,
     category,
+    category_id: categoryId,
     gender,
     brand: normalizedBrand.brand,
     brand_slug: normalizedBrand.brandSlug,
@@ -203,7 +218,7 @@ export async function POST(request: Request) {
     status: "pending",
     created_by: auth.userId,
     updated_by: auth.userId,
-    size_label: singleRegistration ? "" : text(body?.sizeLabel),
+    size_label: text(body?.sizeLabel),
     condition_grade: singleRegistration
       ? ["S", "A+", "A", "B"].includes(text(body?.conditionGrade))
         ? text(body?.conditionGrade)
@@ -219,6 +234,7 @@ export async function POST(request: Request) {
             (value): value is string => typeof value === "string",
           )
         : [],
+    ...aiMetadata as Record<string, unknown>,
   }).select("*").single();
   if (error) return commerceJson({ error: error.message || "상품을 등록하지 못했습니다." }, 409);
   return commerceJson({ product }, 201);

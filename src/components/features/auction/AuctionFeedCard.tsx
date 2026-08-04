@@ -25,6 +25,8 @@ export type AuctionFeedItem = Omit<Item, "bidHistory"> & {
   imageUrls: string[];
   participantCount?: number;
   timeLeft?: string;
+  enhancedTitle?: string | null;
+  hashtags?: string[];
 };
 
 interface AuctionFeedCardProps {
@@ -114,8 +116,8 @@ function EnabledAuctionFeedCard({ basePath = "", bidCapability, item, participat
 
       <div className="pt-3">
         <div className="flex items-center justify-between gap-2 text-[10px] text-muted"><span className="truncate">{item.brand}</span><span className={`shrink-0 font-mono tabular-nums ${phase === "CLOSING_SOON" ? "text-amber-700" : phase === "CLOSED" ? "text-red-700" : ""}`}>{item.timeLeft ?? "진행 중"}</span></div>
-        <div className="mt-1 flex items-start justify-between gap-2"><Link className="min-w-0 truncate text-sm font-medium hover:underline" href={`${basePath}/auction/${item.id}`}>{item.name}</Link>{participationState && <span className={`shrink-0 rounded-lg border px-2 py-1 text-[9px] font-bold ${participationState === "leading" || participationState === "final" ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}>{participationLabels[participationState]}</span>}</div>
-        <ProductFeedTags description={item.description} gender={item.gender} size={item.size} />
+        <div className="mt-1 flex items-start justify-between gap-2"><Link className="min-w-0 truncate text-sm font-medium hover:underline" href={`${basePath}/auction/${item.id}`}>{item.enhancedTitle || item.name}</Link>{participationState && <span className={`shrink-0 rounded-lg border px-2 py-1 text-[9px] font-bold ${participationState === "leading" || participationState === "final" ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}>{participationLabels[participationState]}</span>}</div>
+        <ProductFeedTags description={item.description} gender={item.gender} hashtags={item.hashtags} size={item.size} />
         <div className="mt-3 border-y border-line py-3">
           <div className="flex items-end justify-between gap-2"><div><p className="text-[10px] text-muted">{phase === "CLOSED" ? "최종 낙찰가" : "현재 최고 입찰가"}</p><p className="font-mono text-base font-bold tabular-nums">{currentPrice.toLocaleString("ko-KR")}원</p></div><button aria-label={`입찰 내역 ${bidCount}건 보기`} className="flex items-center gap-1 text-right text-[10px] text-muted underline" onClick={() => setHistoryOpen(true)} type="button"><List size={12} /> 입찰 {bidCount}건 · 참여 {participantCount}명</button></div>
         </div>

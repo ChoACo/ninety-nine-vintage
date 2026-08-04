@@ -11,9 +11,6 @@ import {
   toMobilePath,
 } from "@/lib/uiMode";
 
-// Keep this entrypoint on the Edge middleware convention: the current
-// OpenNext Cloudflare adapter rejects Next.js's Node.js-only proxy runtime.
-
 const SKIPPED_PATHS = [
   "/api/security/session",
   "/api/webhook/portone",
@@ -33,11 +30,6 @@ function canonicalHostRedirect(request: NextRequest): NextResponse | null {
 }
 
 function getTrustedClientIp(request: NextRequest): string | null {
-  const cloudflareConnectingIp = request.headers
-    .get("cf-connecting-ip")
-    ?.trim();
-  if (cloudflareConnectingIp) return cloudflareConnectingIp;
-
   const vercelForwarded = request.headers.get("x-vercel-forwarded-for");
   const forwarded =
     vercelForwarded ??

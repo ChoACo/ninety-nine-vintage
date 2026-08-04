@@ -9,7 +9,10 @@ import {
 } from "@/lib/catalog/query";
 import { formatProductDisplayNumber } from "@/lib/productDisplayNumber";
 
-type ProductRow = Database["public"]["Tables"]["products"]["Row"];
+type ProductRow = Database["public"]["Tables"]["products"]["Row"] & {
+  enhanced_title?: string | null;
+  hashtags?: string[] | null;
+};
 
 function sanitizePublicBidHistory(value: Json): Json {
   if (!Array.isArray(value)) return [];
@@ -66,11 +69,15 @@ export interface PublishedProduct {
   antiSnipingExtensionCount: number;
   updatedAt: string;
   storeId: string | null;
+  storeName: string;
+  storeSlug: string;
   storageClass: "small" | "large";
   sizeLabel: string;
   conditionGrade: "" | "S" | "A+" | "A" | "B";
   measurements: Json;
   inspectionNotes: string[];
+  enhancedTitle: string | null;
+  hashtags: string[];
 }
 
 export interface SoldFeedProduct extends PublishedProduct {
@@ -78,7 +85,7 @@ export interface SoldFeedProduct extends PublishedProduct {
   soldPrice: number;
 }
 
-export function mapPublishedProduct(row: ProductRow): PublishedProduct {
+export function mapPublishedProduct(row: ProductRow & { stores?: { name?: string; slug?: string } | null }): PublishedProduct {
   return {
     id: row.id,
     title: row.title || formatProductDisplayNumber(row.id),
@@ -109,11 +116,15 @@ export function mapPublishedProduct(row: ProductRow): PublishedProduct {
     antiSnipingExtensionCount: row.anti_sniping_extension_count,
     updatedAt: row.updated_at,
     storeId: row.store_id,
+    storeName: row.stores?.name?.trim() ?? "",
+    storeSlug: row.stores?.slug?.trim() ?? "",
     storageClass: row.storage_class === "large" ? "large" : "small",
     sizeLabel: resolveSizeLabel(row.title, row.size_label),
     conditionGrade: ["S", "A+", "A", "B"].includes(row.condition_grade) ? row.condition_grade as "S" | "A+" | "A" | "B" : "",
     measurements: row.measurements,
     inspectionNotes: row.inspection_notes,
+    enhancedTitle: row.enhanced_title ?? null,
+    hashtags: Array.isArray(row.hashtags) ? row.hashtags.filter((t): t is string => typeof t === "string") : [],
   };
 }
 
@@ -136,7 +147,7 @@ export async function fetchPublishedProducts(input: {
   const now = new Date().toISOString();
   let query = verifier
     .from("products")
-    .select("*")
+    .select("*, stores(name, slug)")
     .eq("sale_type", saleType)
     .lte("publish_at", now);
   if (saleType === "auction") {
@@ -153,7 +164,7 @@ export async function fetchPublishedProducts(input: {
   query = query.order("id", { ascending: true });
   const { data, error } = await query.range(safeOffset, safeOffset + safeLimit - 1);
   if (error) throw new Error("상품 목록을 불러오지 못했습니다.");
-  return (data ?? []).map(mapPublishedProduct);
+  return (data ?? []).map((row) => mapPublishedProduct(row as ProductRow & { stores?: { name?: string; slug?: string } | null }));
 }
 
 export async function fetchSoldFeedProducts(input: {
@@ -204,9 +215,13 @@ export async function fetchSoldFeedProducts(input: {
     status: "closed",
     storageClass: "small",
     storeId: null,
+    storeName: "",
+    storeSlug: "",
     thumbnailUrls: row.thumbnail_urls,
     title: row.title,
     updatedAt: row.sold_at,
+    enhancedTitle: null,
+    hashtags: [],
   }));
 }
 
@@ -215,7 +230,7 @@ export async function fetchPublishedProduct(productId: string): Promise<Publishe
   const now = new Date().toISOString();
   const { data, error } = await verifier
     .from("products")
-    .select("*")
+    .select("*, stores(name, slug)")
     .eq("id", productId)
     .lte("publish_at", now)
     .or(
@@ -225,7 +240,7 @@ export async function fetchPublishedProduct(productId: string): Promise<Publishe
     )
     .maybeSingle();
   if (error) throw new Error("상품을 불러오지 못했습니다.");
-  return data ? mapPublishedProduct(data) : null;
+  return data ? mapPublishedProduct(data as ProductRow & { stores?: { name?: string; slug?: string } | null }) : null;
 }
 
 export async function publishPendingProductsNow(accessToken: string, productIds: string[]) {

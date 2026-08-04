@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import Script from "next/script";
 import { ChatNotificationProvider } from "@/components/features/chat/ChatNotificationProvider";
 import { NotificationExperienceProvider } from "@/components/features/notifications/NotificationExperienceProvider";
 import { OwnerMemberModeProvider } from "@/components/features/auth/OwnerMemberModeProvider";
 import { SimpleModeProvider } from "@/components/features/accessibility/SimpleModeProvider";
 import "./globals.css";
-
-const geist = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
 
 const themeInitializationScript = `
 (() => {
@@ -57,13 +52,17 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html className={geist.variable} lang="ko" suppressHydrationWarning>
+    <html lang="ko" suppressHydrationWarning>
       <head>
         <meta content="light dark" name="color-scheme" />
         <meta content="#fbfaf7" name="theme-color" />
-        <script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} />
       </head>
       <body className="font-sans antialiased">
+        <Script
+          id="theme-initialization"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: themeInitializationScript }}
+        />
         <OwnerMemberModeProvider>
           <SimpleModeProvider>
             <NotificationExperienceProvider>

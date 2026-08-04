@@ -23,6 +23,12 @@ const mainNavigationItem = {
 
 const navigation: readonly OperatorNavGroup[] = [
   {
+    href: "/admin/operator/platform",
+    items: [{ exact: true, href: "/admin/operator/platform", label: "등급·정산계좌" }],
+    key: "platform",
+    label: "센터 설정",
+  },
+  {
     href: "/admin/operator/products",
     items: [
       {
@@ -40,13 +46,8 @@ const navigation: readonly OperatorNavGroup[] = [
     label: "상품",
   },
   {
-    href: "/admin/operator/payments",
+    href: "/admin/operator/winners",
     items: [
-      {
-        exact: false,
-        href: "/admin/operator/payments",
-        label: "주문",
-      },
       {
         exact: false,
         href: "/admin/operator/winners",
@@ -59,7 +60,7 @@ const navigation: readonly OperatorNavGroup[] = [
       },
     ],
     key: "orders",
-    label: "주문·입금",
+    label: "판매 회원",
   },
   {
     href: "/admin/operator/fulfillment",

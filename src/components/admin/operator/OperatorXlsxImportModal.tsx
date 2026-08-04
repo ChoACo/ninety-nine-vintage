@@ -23,17 +23,17 @@ import {
   type BatchAuctionProgressReporter,
   type ParsedAuctionWorkbook,
 } from "@/lib/import/batchAuction";
-import {
-  PRODUCT_IMAGE_FORMAT_LABEL,
-  PRODUCT_IMAGE_HEIC_CONVERSION_NOTE,
-  PRODUCT_IMAGE_INPUT_ACCEPT,
-} from "@/lib/supabase/productImagePolicy";
-import { formatKRW, getNextAuctionPublishAt } from "@/utils/formatters";
+import { getBatchClothingCategory } from "@/lib/import/categoryIds";
 import {
   processExcelWithAI,
   type ProductEnhancement,
 } from "@/lib/ai/productEnhancement";
-import { getBatchClothingCategory } from "@/lib/import/categoryIds";
+import {
+  PRODUCT_IMAGE_FORMAT_LABEL,
+  PRODUCT_IMAGE_HEIC_CONVERSION_NOTE,
+  isSupportedProductImageMimeType,
+} from "@/lib/supabase/productImagePolicy";
+import { formatKRW, getNextAuctionPublishAt } from "@/utils/formatters";
 
 interface StoreOption {
   id: string;
@@ -89,6 +89,17 @@ function resetInput(input: HTMLInputElement | null) {
   if (input) input.value = "";
 }
 
+function isWorkbookFile(file: File) {
+  const name = file.name.trim().toLowerCase();
+  return name.endsWith(".xlsx") && !name.startsWith("~$");
+}
+
+function selectedDirectoryName(files: readonly File[]) {
+  const relativePath = (files[0] as File & { webkitRelativePath?: string } | undefined)
+    ?.webkitRelativePath;
+  return relativePath?.split("/")[0] ?? "선택한 폴더";
+}
+
 export function OperatorXlsxImportModal({
   accessToken,
   open,
@@ -97,6 +108,7 @@ export function OperatorXlsxImportModal({
   onSubmit,
 }: Readonly<OperatorXlsxImportModalProps>) {
   const [workbookFileName, setWorkbookFileName] = useState("");
+  const [directoryName, setDirectoryName] = useState("");
   const [parsedWorkbook, setParsedWorkbook] = useState<ParsedAuctionWorkbook | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [storeId, setStoreId] = useState("");
@@ -118,12 +130,8 @@ export function OperatorXlsxImportModal({
   const [aiProgress, setAiProgress] = useState<{ completed: number; total: number } | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const parseRequestRef = useRef(0);
-  const workbookInputRef = useRef<HTMLInputElement>(null);
   const directoryInputRef = useRef<HTMLInputElement>(null);
-  const multipleInputRef = useRef<HTMLInputElement>(null);
-  const workbookId = useId();
   const directoryId = useId();
-  const multipleImagesId = useId();
 
   const preview = useMemo(() => {
     if (!parsedWorkbook) return null;
@@ -142,7 +150,6 @@ export function OperatorXlsxImportModal({
       const category = getBatchClothingCategory(enhancement.categoryId) ?? row.category;
       return {
         ...row,
-        aiEnhancement: enhancement,
         title: enhancement.enhancedTitle || row.title,
         description: enhancement.refinedDescription || row.description,
         category,
@@ -178,6 +185,7 @@ export function OperatorXlsxImportModal({
   const reset = useCallback(() => {
     parseRequestRef.current += 1;
     setWorkbookFileName("");
+    setDirectoryName("");
     setParsedWorkbook(null);
     setImageFiles([]);
     setStoreId(stores[0]?.id ?? "");
@@ -191,9 +199,7 @@ export function OperatorXlsxImportModal({
     setSubmittedCount(0);
     setError("");
     setProgress(null);
-    resetInput(workbookInputRef.current);
     resetInput(directoryInputRef.current);
-    resetInput(multipleInputRef.current);
   }, [stores]);
 
   const handleClose = useCallback(() => {
@@ -202,15 +208,31 @@ export function OperatorXlsxImportModal({
     onClose();
   }, [isSubmitting, onClose, reset]);
 
-  const handleWorkbookSelection = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0];
+  const handleDirectorySelection = async (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.currentTarget.files ?? []);
+    const workbookFiles = selectedFiles.filter(isWorkbookFile);
+    const selectedImages = selectedFiles.filter((file) =>
+      isSupportedProductImageMimeType(file.type),
+    );
+    const file = workbookFiles[0];
     const requestId = ++parseRequestRef.current;
     setParsedWorkbook(null);
     setExcludedRowNumbers(new Set());
     setWorkbookFileName(file?.name ?? "");
+    setDirectoryName(selectedFiles.length > 0 ? selectedDirectoryName(selectedFiles) : "");
+    setImageFiles(selectedImages);
     resetResult();
-    if (!file) {
+    if (selectedFiles.length === 0) {
       setIsParsing(false);
+      return;
+    }
+    if (workbookFiles.length !== 1) {
+      setIsParsing(false);
+      setError(
+        workbookFiles.length === 0
+          ? "선택한 폴더에서 .xlsx 엑셀 파일을 찾지 못했습니다."
+          : "선택한 폴더에는 등록용 .xlsx 엑셀 파일이 1개만 있어야 합니다.",
+      );
       return;
     }
 
@@ -227,18 +249,8 @@ export function OperatorXlsxImportModal({
     }
   };
 
-  const handleImageSelection = (
-    event: ChangeEvent<HTMLInputElement>,
-    source: "directory" | "multiple",
-  ) => {
-    setImageFiles(Array.from(event.currentTarget.files ?? []));
-    setAiEnhancements(new Map());
-    resetInput(source === "directory" ? multipleInputRef.current : directoryInputRef.current);
-    resetResult();
-  };
-
   const handleAiEnhancement = async () => {
-    if (!preview || !accessToken || isEnhancing) return;
+    if (!preview || !accessToken || !selectedStoreId || isEnhancing) return;
     const candidates = preview.rows.flatMap((row) => row.imageMatches.length > 0 ? [{
       rowNumber: row.rowNumber,
       images: row.imageMatches.map((match) => match.file),
@@ -247,14 +259,19 @@ export function OperatorXlsxImportModal({
         description: row.sourceDescription || row.description,
         condition: row.condition,
         categoryId: row.category?.id ?? null,
+        sizeLabel: row.size || null,
       },
     }] : []);
-    if (candidates.length === 0) return;
+    if (candidates.length === 0) {
+      setError("사진이 연결된 상품이 없어 AI 분석을 시작할 수 없습니다.");
+      return;
+    }
     setIsEnhancing(true);
     setError("");
+    setAiEnhancements(new Map());
     setAiProgress({ completed: 0, total: candidates.length });
     try {
-      const results = await processExcelWithAI(candidates, accessToken, {
+      const results = await processExcelWithAI(candidates, accessToken, selectedStoreId, {
         concurrency: 5,
         onProgress: (completed, total) => setAiProgress({ completed, total }),
       });
@@ -264,11 +281,13 @@ export function OperatorXlsxImportModal({
       });
       setAiEnhancements(next);
       if (next.size === 0) {
-        setError("AI 분석을 완료하지 못해 모든 기존 입력값을 유지했습니다.");
+        setError("AI 분석을 완료하지 못해 모든 기존 입력값을 유지했습니다. 잠시 후 다시 시도해 주세요.");
+      } else {
+        setConfirmed(false);
       }
-      setConfirmed(false);
     } finally {
       setIsEnhancing(false);
+      setAiProgress(null);
     }
   };
 
@@ -288,7 +307,7 @@ export function OperatorXlsxImportModal({
       return;
     }
 
-    const rawFinalPreview = buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
+    const finalPreview = buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
       publishAt:
         publicationMode === "now"
           ? new Date().toISOString()
@@ -297,12 +316,11 @@ export function OperatorXlsxImportModal({
       excludedRowNumbers: [...excludedRowNumbers],
       saleType,
     });
-    const finalRows = rawFinalPreview.rows.map((row) => {
+    const finalRows = finalPreview.rows.map((row) => {
       const enhancement = aiEnhancements.get(row.rowNumber);
       if (!enhancement) return row;
       return {
         ...row,
-        aiEnhancement: enhancement,
         category: getBatchClothingCategory(enhancement.categoryId) ?? row.category,
         title: enhancement.enhancedTitle || row.title,
         description: enhancement.refinedDescription || row.description,
@@ -313,20 +331,20 @@ export function OperatorXlsxImportModal({
         } : null,
       };
     });
-    const finalPreview = {
-      ...rawFinalPreview,
+    const finalPreviewWithAI = {
+      ...finalPreview,
       rows: finalRows,
-      drafts: rawFinalPreview.canSubmit
+      drafts: finalPreview.canSubmit
         ? finalRows.flatMap((row) => row.draft ? [row.draft] : [])
         : [],
     };
-    if (!finalPreview.canSubmit || finalPreview.drafts.length === 0) {
+    if (!finalPreviewWithAI.canSubmit || finalPreviewWithAI.drafts.length === 0) {
       setConfirmed(false);
       setError("오류가 있는 상품과 이미지 연결을 모두 확인해 주세요.");
       return;
     }
 
-    const totalImages = finalPreview.drafts.reduce(
+    const totalImages = finalPreviewWithAI.drafts.reduce(
       (total, draft) => total + draft.imageFiles.length,
       0,
     );
@@ -336,7 +354,7 @@ export function OperatorXlsxImportModal({
     setProgress({ completed: 0, total: Math.max(1, totalImages), phase: "uploading" });
     try {
       const count = await onSubmit(
-        finalPreview,
+        finalPreviewWithAI,
         selectedStoreId,
         { publicationMode, saleType },
         (completed, total, phase) => {
@@ -392,60 +410,40 @@ export function OperatorXlsxImportModal({
         </header>
 
         <form className="space-y-6 p-4 sm:p-6" onSubmit={handleSubmit}>
-          <section aria-label="일괄 등록 파일 선택" className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="border border-line bg-surface p-4">
-              <label className="text-sm font-bold" htmlFor={workbookId}>1. 엑셀 파일</label>
+          <section aria-label="일괄 등록 폴더 선택" className="border border-line bg-surface p-4">
+              <label className="text-sm font-bold" htmlFor={directoryId}>1. 엑셀·상품 이미지 폴더</label>
               <input
-                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                {...directoryPickerAttributes}
                 className="mt-3 block w-full text-xs file:mr-3 file:border file:border-ink file:bg-paper file:px-3 file:py-2 file:text-xs file:font-bold"
                 disabled={isParsing || isSubmitting || completed}
-                id={workbookId}
-                onChange={handleWorkbookSelection}
-                ref={workbookInputRef}
+                id={directoryId}
+                multiple
+                onChange={handleDirectorySelection}
+                ref={directoryInputRef}
                 type="file"
               />
               <p className="mt-3 text-[11px] leading-5 text-muted">
+                등록용 엑셀 1개와 상품 이미지를 같은 폴더에 넣고 폴더를 한 번만 선택하세요.
+                폴더 안의 엑셀과 지원 이미지가 자동으로 수집되고 AH열 이미지명으로 연결됩니다.
+              </p>
+              <p className="mt-2 text-[11px] leading-5 text-muted">
                 기존 고정 양식만 사용합니다. 1~5행은 안내로 제외하고 6행부터 A열 상품명,
                 D열 여성·남성 의류, E열 여성·남성 하의, F열 스포츠·등산복 사이즈,
                 W열 상태점수, X열 원문, Y열 시작가, AH열 이미지명을 읽습니다. 행 안의
                 등록된 여성·남성 의류 카테고리 ID는 성별·대분류·세부 품목으로 자동 변환합니다.
               </p>
               {isParsing && <p className="mt-3 text-xs font-bold" role="status">엑셀 파일을 분석하는 중…</p>}
-              {workbookFileName && !isParsing && <p className="mt-3 truncate bg-paper px-3 py-2 text-xs font-bold">{workbookFileName}</p>}
-            </div>
-
-            <div className="border border-line bg-surface p-4">
-              <p className="text-sm font-bold">2. 상품 사진</p>
-              <label className="mt-3 block text-xs font-bold" htmlFor={directoryId}>사진 폴더 선택</label>
-              <input
-                {...directoryPickerAttributes}
-                accept={PRODUCT_IMAGE_INPUT_ACCEPT}
-                className="mt-2 block w-full text-xs file:mr-3 file:border file:border-ink file:bg-paper file:px-3 file:py-2 file:text-xs file:font-bold"
-                disabled={isSubmitting || completed}
-                id={directoryId}
-                multiple
-                onChange={(event) => handleImageSelection(event, "directory")}
-                ref={directoryInputRef}
-                type="file"
-              />
-              <label className="mt-3 block text-xs font-bold" htmlFor={multipleImagesId}>또는 여러 사진 선택</label>
-              <input
-                accept={PRODUCT_IMAGE_INPUT_ACCEPT}
-                className="mt-2 block w-full text-xs file:mr-3 file:border file:border-ink file:bg-paper file:px-3 file:py-2 file:text-xs file:font-bold"
-                disabled={isSubmitting || completed}
-                id={multipleImagesId}
-                multiple
-                onChange={(event) => handleImageSelection(event, "multiple")}
-                ref={multipleInputRef}
-                type="file"
-              />
-              <p className="mt-3 text-[11px] leading-5 text-muted">
-                {imageFiles.length.toLocaleString("ko-KR")}개 선택 · {PRODUCT_IMAGE_FORMAT_LABEL}
-              </p>
+              {workbookFileName && !isParsing && (
+                <div className="mt-3 bg-paper px-3 py-2 text-xs font-bold">
+                  <p className="truncate">{directoryName} / {workbookFileName}</p>
+                  <p className="mt-1 text-[11px] font-normal text-muted">
+                    이미지 {imageFiles.length.toLocaleString("ko-KR")}개 자동 수집 · {PRODUCT_IMAGE_FORMAT_LABEL}
+                  </p>
+                </div>
+              )}
               <p className="mt-1 text-[11px] leading-5 text-amber-800">
                 {PRODUCT_IMAGE_HEIC_CONVERSION_NOTE}
               </p>
-            </div>
           </section>
 
           <section aria-label="일괄 등록 옵션" className="border border-line p-4">
@@ -552,6 +550,7 @@ export function OperatorXlsxImportModal({
                 </div>
               </div>
 
+
               {enhancedPreview.globalIssues.length > 0 && (
                 <ul className="mt-3 space-y-2" role="alert">
                   {enhancedPreview.globalIssues.map((issue, index) => (
@@ -579,17 +578,17 @@ export function OperatorXlsxImportModal({
                   <tbody className="divide-y divide-line">
                     {enhancedPreview.rows.map((row, productIndex) => {
                       const hasRowError = row.issues.some((issue) => issue.severity === "error");
+                      const aiApplied = aiEnhancements.has(row.rowNumber);
                       return (
                         <tr aria-invalid={hasRowError} className={hasRowError ? "bg-red-50" : "bg-paper"} key={row.rowNumber}>
                           <td className="px-3 py-3 align-top font-bold">{productIndex + 1}번째</td>
                           <td className="max-w-[320px] px-3 py-3 align-top">
                             <p className="font-bold">{row.title || "상품명 없음"}</p>
-                            {aiEnhancements.has(row.rowNumber) && <p className="mt-1 text-[10px] font-bold text-emerald-700">AI 보정 적용 · 등록 전 확인 필요</p>}
+                            {aiApplied && <p className="mt-1 text-[10px] font-bold text-violet-700">AI 보정 적용 · 등록 전 확인 필요</p>}
                             <p className="mt-1 whitespace-pre-line leading-5 text-muted">{row.description || "설명 없음"}</p>
                           </td>
                           <td className="px-3 py-3 align-top font-bold">
-                            {row.aiEnhancement?.brand ?? inferBrandFromTitle(row.title).brand}
-                            {row.aiEnhancement?.hashtags.length ? <p className="mt-1 max-w-[180px] text-[10px] font-normal text-muted">{row.aiEnhancement.hashtags.join(" ")}</p> : null}
+                            {inferBrandFromTitle(row.title).brand}
                           </td>
                           <td className="whitespace-nowrap px-3 py-3 align-top">
                             <p className="font-mono font-bold">{row.category?.id ?? "미인식"}</p>
@@ -619,7 +618,7 @@ export function OperatorXlsxImportModal({
                             <button
                               aria-label={`${productIndex + 1}번째 상품 삭제`}
                               className="inline-flex items-center gap-1 whitespace-nowrap border border-red-200 px-3 py-2 font-bold text-red-700"
-                              disabled={isSubmitting || completed}
+                              disabled={isSubmitting || completed || isEnhancing}
                               onClick={() => {
                                 setExcludedRowNumbers((current) => {
                                   const next = new Set(current);
@@ -657,21 +656,21 @@ export function OperatorXlsxImportModal({
           {error && <p className="border border-red-300 bg-red-50 px-4 py-3 text-xs font-bold text-red-800" role="alert">{error}</p>}
 
           {!completed && (
-            <label className={`flex items-start gap-3 border px-4 py-3 text-xs font-bold ${preview?.canSubmit ? "border-ink" : "border-line text-muted"}`}>
+            <label className={`flex items-start gap-3 border px-4 py-3 text-xs font-bold ${enhancedPreview?.canSubmit ? "border-ink" : "border-line text-muted"}`}>
               <input
                 checked={confirmed}
                 disabled={!enhancedPreview?.canSubmit || isParsing || isSubmitting || isEnhancing || !selectedStoreId}
                 onChange={(event) => { setConfirmed(event.target.checked); setError(""); }}
                 type="checkbox"
               />
-              검증 결과, AI 보정값, 자동 추출 브랜드, 저장할 숍과 {enhancedPreview?.rows.length ?? 0}개 {saleType === "auction" ? "경매" : "즉시 구매"} 상품을 모두 확인했습니다. 이제 데이터베이스 저장을 허용합니다.
+              검증 결과, AI 보정안, 자동 추출 브랜드, 저장할 숍과 {enhancedPreview?.rows.length ?? 0}개 {saleType === "auction" ? "경매" : "즉시 구매"} 상품을 모두 확인했습니다. 이제 데이터베이스 저장을 허용합니다.
             </label>
           )}
 
           <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-5">
             <Button disabled={isSubmitting} onClick={handleClose} type="button">{completed ? "닫기" : "취소"}</Button>
             {!completed && (
-              <Button className="inline-flex items-center gap-2" disabled={!confirmed || !preview?.canSubmit || isParsing || isSubmitting || isEnhancing || !selectedStoreId} type="submit" variant="primary">
+              <Button className="inline-flex items-center gap-2" disabled={!confirmed || !enhancedPreview?.canSubmit || isParsing || isSubmitting || isEnhancing || !selectedStoreId} type="submit" variant="primary">
                 <FileSpreadsheet size={14} />
                 {isSubmitting ? "등록 중…" : `${enhancedPreview?.rows.length ?? 0}개 검증 완료 상품 저장`}
               </Button>

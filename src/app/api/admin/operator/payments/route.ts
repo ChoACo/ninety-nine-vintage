@@ -160,7 +160,7 @@ function rpcFailure(error: RpcError) {
 export async function GET(request: Request) {
   const auth = await authenticateStaffRequest(request);
   if (!auth.ok) return auth.response;
-  if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
+  if (auth.roleCode !== "owner") {
     return commerceJson({ error: "payment_forbidden" }, 403);
   }
 

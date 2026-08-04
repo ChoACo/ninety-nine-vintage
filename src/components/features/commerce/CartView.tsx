@@ -29,6 +29,17 @@ interface PublishedFixedProduct {
   sizeLabel?: string;
   conditionGrade?: "S" | "A+" | "A" | "B";
   reservationExpiresAt?: string | null;
+  storeName?: string;
+}
+
+interface ShippingCharge {
+  chargeKey: string;
+  mode: "per_store" | "per_group";
+  groupId: string | null;
+  groupName: string | null;
+  amount: number;
+  storeIds: string[];
+  storeNames: string[];
 }
 
 interface CartProduct {
@@ -371,7 +382,7 @@ function toCartProduct(product: PublishedFixedProduct): CartProduct {
     saleType: "fixed",
     price: product.fixedPrice ?? product.currentPrice,
     closesAt: product.closesAt,
-    store: { name: "NINETY-NINE VINTAGE" },
+    store: { name: product.storeName || "NINETY-NINE VINTAGE" },
     imageUrls: product.imageUrls,
     reservationExpiresAt: product.reservationExpiresAt ?? null,
   };
@@ -412,6 +423,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const [reservationClock, setReservationClock] = useState(() => Date.now());
   const [paymentMode, setPaymentMode] = useState<CartPaymentMode>("loading");
   const [shippingFee, setShippingFee] = useState(0);
+  const [shippingCharges, setShippingCharges] = useState<ShippingCharge[]>([]);
   const [includeShippingFee, setIncludeShippingFee] = useState(true);
   const [heldCheckoutIds, setHeldCheckoutIds] = useState<string[]>([]);
   const [releaseCheckoutAllowed, setReleaseCheckoutAllowed] = useState(false);
@@ -466,6 +478,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
       setServerClockOffset(0);
       setPaymentMode("loading");
       setShippingFee(0);
+      setShippingCharges([]);
       setIncludeShippingFee(true);
       setMessage("");
       setMessageKind("success");
@@ -560,6 +573,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           staleProductIds?: string[];
           items?: PublishedFixedProduct[];
           shippingFee?: unknown;
+          shippingCharges?: ShippingCharge[];
         };
         if (!isCurrent()) return;
         if (payload.paymentMode !== "manual_transfer") {
@@ -580,6 +594,9 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           throw new Error("배송비 설정을 확인하지 못했습니다.");
         }
         if (!activeRequest) setShippingFee(cartProducts.length > 0 ? nextShippingFee : 0);
+        if (!activeRequest) {
+          setShippingCharges(Array.isArray(payload.shippingCharges) ? payload.shippingCharges : []);
+        }
         const serverTime =
           typeof payload.serverTime === "string"
             ? Date.parse(payload.serverTime)
@@ -1117,6 +1134,21 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                   : "나중에 결제"}
               </strong>
             </div>
+            {shippingCharges.length > 0 ? (
+              <div className="mt-3 space-y-2 border border-line bg-paper p-3 text-[11px]">
+                <p className="font-bold">배송비 {shippingCharges.length}건</p>
+                {shippingCharges.map((charge) => (
+                  <div className="flex items-start justify-between gap-3" key={charge.chargeKey}>
+                    <span className="text-muted">
+                      {charge.mode === "per_group"
+                        ? `${charge.groupName || "출고 그룹"} · ${charge.storeNames.join(", ")}`
+                        : charge.storeNames.join(", ")}
+                    </span>
+                    <strong className="shrink-0 font-mono">{Number(charge.amount).toLocaleString("ko-KR")}원</strong>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <div className="mt-6 flex justify-between border-t border-line pt-5">
               <span className="text-sm font-bold">예상 결제 금액</span>
               <strong className="font-mono text-xl">

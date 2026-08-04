@@ -184,6 +184,31 @@ export async function prepareLocalTestSupabase() {
   await mkdir(localMigrations, { recursive: true });
   await cp(sourceMigrations, localMigrations, { recursive: true });
 
+  // 로컬 Supabase 이미지에는 dblink 확장 함수가 public 스키마에 설치된다.
+  // 운영 프로젝트에는 이미 적용된 과거 보안 마이그레이션이 이를 앱 함수로
+  // 오인하지 않도록, 검증용 복사본에서만 확장 소유 함수는 권한 회수 대상에서
+  // 제외한다. 원본 마이그레이션 체크섬은 변경하지 않는다.
+  const advisorMigrationPath = path.join(
+    localMigrations,
+    "20260725103000_resolve_advisor_security_and_rls_warnings.sql",
+  );
+  const advisorMigration = await readFile(advisorMigrationPath, "utf8");
+  await writeFile(
+    advisorMigrationPath,
+    advisorMigration.replace(
+      /      and procedures\.prosecdef\r?\n/u,
+      `      and procedures.prosecdef
+      and not exists (
+        select 1
+        from pg_catalog.pg_depend as dependencies
+        where dependencies.classid = 'pg_proc'::regclass
+          and dependencies.objid = procedures.oid
+          and dependencies.deptype = 'e'
+      )
+`,
+    ),
+  );
+
   const config = await readFile(path.join(sourceSupabase, "config.toml"), "utf8");
   const localConfig = config
     .replace(

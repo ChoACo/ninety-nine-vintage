@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowDown, ArrowUp, CircleStop, ClipboardCheck, Edit3, FileSpreadsheet, ImagePlus, PauseCircle, PlayCircle, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleStop, ClipboardCheck, Edit3, FileSpreadsheet, ImagePlus, PauseCircle, PlayCircle, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -15,6 +15,7 @@ import type {
   BatchAuctionProgressReporter,
 } from "@/lib/import/batchAuction";
 import { inferBrandFromTitle } from "@/lib/catalog/brand";
+import { BATCH_CLOTHING_CATEGORIES } from "@/lib/import/categoryIds";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { Button } from "@/components/ui/Button";
 import { SelectInput, TextArea, TextInput } from "@/components/ui/FormControls";
@@ -25,9 +26,24 @@ import {
   type XlsxRegistrationOptions,
 } from "@/components/admin/operator/OperatorXlsxImportModal";
 import { getNextAuctionDeadline } from "@/utils/formatters";
-import { processQuickRegistrationAI } from "@/lib/ai/productEnhancement";
+import {
+  processQuickRegistrationAI,
+  type ProductEnhancement,
+} from "@/lib/ai/productEnhancement";
 
-interface Store { id: string; name: string; canPublish: boolean; }
+interface Store {
+  id: string;
+  name: string;
+  canPublish: boolean;
+  entitlements?: {
+    aiDailyLimit: number | null;
+    aiUsed: number;
+    bulkImportEnabled: boolean;
+    planCode: string;
+    productDailyLimit: number | null;
+    productsCreated: number;
+  } | null;
+}
 interface Product {
   id: string;
   title: string;
@@ -233,6 +249,7 @@ export function OperatorProductsConsole({
   const processingSingleRegistrationIdsRef = useRef(new Set<string>());
   const quickAiRequestRef = useRef<AbortController | null>(null);
   const [quickAiBusy, setQuickAiBusy] = useState(false);
+  const [quickAiPreview, setQuickAiPreview] = useState<ProductEnhancement | null>(null);
 
   useEffect(() => {
     singleImagesRef.current = singleImages;
@@ -381,6 +398,8 @@ export function OperatorProductsConsole({
       : [],
     [permissions.canPublish, stores, visibleProducts],
   );
+  const selectedStore = stores.find((store) => store.id === form.storeId) ?? null;
+  const selectedEntitlements = selectedStore?.entitlements ?? null;
   const allVisiblePendingSelected = visiblePendingIds.length > 0
     && visiblePendingIds.every((id) => selectedPendingIds.has(id));
   const editingProduct = useMemo(
@@ -403,6 +422,8 @@ export function OperatorProductsConsole({
     setSingleImages([]);
   };
   const resetForm = () => {
+    quickAiRequestRef.current?.abort();
+    setQuickAiPreview(null);
     clearSingleImages();
     setEditingId(null);
     setEditingUpdatedAt(null);
@@ -419,6 +440,8 @@ export function OperatorProductsConsole({
     saleType: "fixed" | "auction",
     keepOpen: boolean,
   ) => {
+    quickAiRequestRef.current?.abort();
+    setQuickAiPreview(null);
     clearSingleImages();
     setEditingId(null);
     setEditingUpdatedAt(null);
@@ -460,42 +483,60 @@ export function OperatorProductsConsole({
     }));
     setSingleImages((current) => [...current, ...additions]);
     setNotice("");
+  };
 
-    // 새 사진 선택 요청이 이전 요청보다 늦게 끝나 폼을 덮지 않도록 취소합니다.
-    if (!editingId && token) {
-      quickAiRequestRef.current?.abort();
-      const controller = new AbortController();
-      quickAiRequestRef.current = controller;
-      const sourceSnapshot = { title: form.title, description: form.description };
-      setQuickAiBusy(true);
-      void processQuickRegistrationAI(
-        selected.slice(0, 2),
-        sourceSnapshot,
+  const runQuickAi = async () => {
+    if (!token || !form.storeId || singleImages.length === 0 || quickAiBusy) return;
+    quickAiRequestRef.current?.abort();
+    const controller = new AbortController();
+    quickAiRequestRef.current = controller;
+    setQuickAiBusy(true);
+    setQuickAiPreview(null);
+    setNotice("");
+    try {
+      const enhancement = await processQuickRegistrationAI(
+        singleImages.slice(0, 2).map((image) => image.file),
+        {
+          title: form.title,
+          description: form.description,
+          categoryId: BATCH_CLOTHING_CATEGORIES.find((item) => item.label === form.category)?.id ?? null,
+          sizeLabel: form.sizeLabel,
+        },
         token,
+        form.storeId,
         controller.signal,
-      ).then((enhancement) => {
-        if (controller.signal.aborted) return;
-        if (!enhancement) {
-          setNotice("AI 분석을 완료하지 못해 기존 입력값을 유지했습니다. 잠시 후 다시 시도해 주세요.");
-          return;
-        }
-        setForm((current) => ({
-          ...current,
-          // 분석 중 운영자가 직접 입력했다면 사용자 입력을 우선합니다.
-          title: current.title === sourceSnapshot.title
-            ? enhancement.enhancedTitle
-            : current.title,
-          gender: current.gender || enhancement.gender,
-          brand: current.brand || enhancement.brand,
-        }));
-        setNotice("사진 AI 분석 결과를 상품명·성별·브랜드에 자동 입력했습니다. 등록 전에 확인해 주세요.");
-      }).finally(() => {
-        if (quickAiRequestRef.current === controller) {
-          quickAiRequestRef.current = null;
-          setQuickAiBusy(false);
-        }
-      });
+      );
+      if (!enhancement) {
+        setNotice("AI 분석을 완료하지 못해 기존 입력값을 유지했습니다. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+      setQuickAiPreview(enhancement);
+      setNotice("AI 보정안을 만들었습니다. 변경 내용을 확인한 뒤 적용해 주세요.");
+      await load(token);
+    } finally {
+      if (quickAiRequestRef.current === controller) {
+        quickAiRequestRef.current = null;
+        setQuickAiBusy(false);
+      }
     }
+  };
+
+  const applyQuickAi = (fields?: ReadonlySet<keyof FormState>) => {
+    if (!quickAiPreview) return;
+    const shouldApply = (field: keyof FormState) => !fields || fields.has(field);
+    setForm((current) => ({
+      ...current,
+      title: shouldApply("title") ? quickAiPreview.enhancedTitle : current.title,
+      gender: shouldApply("gender") ? quickAiPreview.gender : current.gender,
+      brand: shouldApply("brand") ? quickAiPreview.brand : current.brand,
+      category: shouldApply("category")
+        ? quickAiPreview.categoryLabel ?? current.category
+        : current.category,
+      sizeLabel: shouldApply("sizeLabel") ? quickAiPreview.sizeLabel : current.sizeLabel,
+      description: shouldApply("description") ? quickAiPreview.refinedDescription : current.description,
+    }));
+    setQuickAiPreview(null);
+    setNotice("선택한 AI 보정안을 입력란에 적용했습니다. 등록 전에 최종 확인해 주세요.");
   };
 
   const moveSingleImage = (index: number, direction: -1 | 1) => {
@@ -542,6 +583,9 @@ export function OperatorProductsConsole({
         gender: snapshot.form.gender,
         conditionGrade: snapshot.form.conditionGrade,
         description: snapshot.form.description,
+        category: snapshot.form.category,
+        categoryId: BATCH_CLOTHING_CATEGORIES.find((item) => item.label === snapshot.form.category)?.id ?? null,
+        sizeLabel: snapshot.form.sizeLabel,
         storeId: snapshot.form.storeId,
         saleType: snapshot.form.saleType,
         startingPrice: Number(snapshot.form.price),
@@ -1020,8 +1064,8 @@ export function OperatorProductsConsole({
         productsToInsert.push({
           id: productId,
           title: draft.title,
-          brand: row.aiEnhancement?.brand || inferBrandFromTitle(draft.title).brand,
-          gender: row.aiEnhancement?.gender ?? "",
+          brand: inferBrandFromTitle(draft.title).brand,
+          gender: row.category?.gender ?? "",
           description: draft.description,
           category: row.category?.label ?? "기타",
           storeId: scopedStoreId,
@@ -1094,7 +1138,7 @@ export function OperatorProductsConsole({
 
   return <div className="space-y-8">
     <SectionHeading
-      action={view === "registration" ? <div className="grid grid-cols-1 gap-2 sm:grid-cols-3"><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate || busy} onClick={() => setXlsxImportOpen(true)} type="button" variant="primary"><FileSpreadsheet size={15} /> 엑셀 일괄 등록</Button><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate} onClick={() => startSingleCreate("fixed")} type="button"><Plus size={15} /> 즉시구매 간편등록</Button><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate} onClick={() => startSingleCreate("auction")} type="button"><Plus size={15} /> 경매 간편등록</Button></div> : undefined}
+      action={view === "registration" ? <div className="grid grid-cols-1 gap-2 sm:grid-cols-3"><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate || busy || !stores.some((store) => store.entitlements?.bulkImportEnabled)} onClick={() => setXlsxImportOpen(true)} title={stores.some((store) => store.entitlements?.bulkImportEnabled) ? undefined : "월 5만원 등급 센터에서 사용할 수 있습니다."} type="button" variant="primary"><FileSpreadsheet size={15} /> 엑셀 일괄 등록</Button><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate} onClick={() => startSingleCreate("fixed")} type="button"><Plus size={15} /> 즉시구매 간편등록</Button><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate} onClick={() => startSingleCreate("auction")} type="button"><Plus size={15} /> 경매 간편등록</Button></div> : undefined}
       description={view === "active" ? "현재 공개 중인 상품만 판매 방식별로 나누어 관리합니다." : "신규 상품을 등록하고 업로드 예정 상품과 초안을 따로 관리합니다."}
       eyebrow={view === "active" ? "운영자 / 상품" : "운영자 / 상품 등록"}
       title={view === "active" ? "진행 중 상품" : "상품 등록"}
@@ -1137,11 +1181,14 @@ export function OperatorProductsConsole({
         {!editingId && (
           <section className="border border-line bg-paper p-4 sm:col-span-2">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-              <div><p className="text-xs font-black">1. 상품 사진 선택</p><p className="mt-1 text-[11px] text-muted">최대 15장 · 표시된 순서대로 저장{quickAiBusy ? " · AI 분석 중…" : ""}</p></div>
-              <label className="inline-flex cursor-pointer items-center justify-center gap-2 border border-ink px-4 py-3 text-xs font-bold">
-                <ImagePlus size={15} /> 사진 선택
-                <input accept={PRODUCT_IMAGE_INPUT_ACCEPT} className="sr-only" multiple onChange={(event) => { addSingleImages(event.currentTarget.files); event.currentTarget.value = ""; }} type="file" />
-              </label>
+              <div><p className="text-xs font-black">1. 상품 사진 선택</p><p className="mt-1 text-[11px] text-muted">최대 15장 · 표시된 순서대로 저장{quickAiBusy ? " · AI 분석 중…" : ""}</p>{selectedEntitlements && <p className="mt-1 text-[10px] font-bold text-muted">AI {selectedEntitlements.aiUsed}/{selectedEntitlements.aiDailyLimit ?? "전체 한도"} · 상품 {selectedEntitlements.productsCreated}/{selectedEntitlements.productDailyLimit ?? "무제한"}</p>}</div>
+              <div className="flex flex-wrap gap-2">
+                <Button disabled={!token || !form.storeId || singleImages.length === 0 || quickAiBusy} onClick={() => void runQuickAi()} type="button" variant="primary"><Sparkles size={15} /> {quickAiBusy ? "AI 분석 중" : "AI 자동 보정"}</Button>
+                <label className="inline-flex cursor-pointer items-center justify-center gap-2 border border-ink px-4 py-3 text-xs font-bold">
+                  <ImagePlus size={15} /> 사진 선택
+                  <input accept={PRODUCT_IMAGE_INPUT_ACCEPT} className="sr-only" multiple onChange={(event) => { addSingleImages(event.currentTarget.files); event.currentTarget.value = ""; }} type="file" />
+                </label>
+              </div>
             </div>
             {singleImages.length > 0 ? (
               <ol className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -1158,6 +1205,19 @@ export function OperatorProductsConsole({
                 ))}
               </ol>
             ) : <p className="mt-4 border border-dashed border-line px-4 py-8 text-center text-xs text-muted">등록할 사진을 먼저 선택해 주세요.</p>}
+            {quickAiPreview && <div className="mt-4 border border-violet-200 bg-violet-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-black text-violet-950">AI 자동 보정 미리보기</p><p className="mt-1 text-[10px] text-violet-800">각 항목을 적용하거나 전체 적용한 뒤 직접 수정할 수 있습니다.</p></div><Button onClick={() => applyQuickAi()} size="compact" type="button" variant="primary">전체 적용</Button></div>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {([
+                  ["title", "상품명", form.title, quickAiPreview.enhancedTitle],
+                  ["gender", "성별", form.gender, quickAiPreview.gender],
+                  ["brand", "브랜드", form.brand, quickAiPreview.brand],
+                  ["category", "카테고리", form.category, quickAiPreview.categoryLabel ?? form.category],
+                  ["sizeLabel", "사이즈", form.sizeLabel, quickAiPreview.sizeLabel],
+                  ["description", "설명", form.description, quickAiPreview.refinedDescription],
+                ] as const).map(([field, label, before, after]) => <div className="border border-violet-200 bg-paper p-3" key={field}><div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black">{label}</p><button className="text-[10px] font-bold underline" onClick={() => applyQuickAi(new Set([field]))} type="button">이 항목 적용</button></div><p className="mt-2 line-clamp-2 text-[10px] text-muted">기존: {before || "미입력"}</p><p className="mt-1 line-clamp-3 text-[11px] font-bold">제안: {after || "미입력"}</p></div>)}
+              </div>
+            </div>}
           </section>
         )}
 
@@ -1190,6 +1250,14 @@ export function OperatorProductsConsole({
             <option value="공용">공용</option>
           </SelectInput>
         )}
+        {!editingId && <>
+          <TextInput aria-label="브랜드" onChange={(event) => update("brand", event.target.value)} placeholder="브랜드 (선택)" value={form.brand} />
+          <SelectInput aria-label="카테고리" onChange={(event) => update("category", event.target.value)} value={form.category}>
+            <option value="기타">카테고리 미입력</option>
+            {BATCH_CLOTHING_CATEGORIES.map((category) => <option key={category.id} value={category.label}>{category.label}</option>)}
+          </SelectInput>
+          <TextInput aria-label="사이즈" onChange={(event) => update("sizeLabel", event.target.value)} placeholder="사이즈 (선택)" value={form.sizeLabel} />
+        </>}
         <SelectInput aria-label="숍" disabled={!saleSetupEditable} onChange={(event) => {
           const storeId = event.target.value;
           setForm((current) => ({
@@ -1199,7 +1267,7 @@ export function OperatorProductsConsole({
           }));
         }} required value={form.storeId}>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</SelectInput>
         {editingId ? <div className="flex flex-col gap-2 sm:flex-row"><SelectInput aria-label="판매 방식" className="flex-1" disabled={!saleSetupEditable} onChange={(event) => update("saleType", event.target.value)} value={form.saleType}><option value="fixed">즉시구매</option><option value="auction">경매</option></SelectInput><TextInput aria-label="가격" className="w-full sm:w-40" disabled={!saleSetupEditable} min="1" onChange={(event) => update("price", event.target.value)} placeholder="가격" required type="number" value={form.price} /></div> : form.saleType === "fixed" ? <TextInput aria-label="즉시구매 가격" min="1" onChange={(event) => update("price", event.target.value)} placeholder="즉시구매 가격" required type="number" value={form.price} /> : null}
-        {(editingId || form.saleType === "fixed") && <TextArea aria-label="상품 설명" className="min-h-24 sm:col-span-2" disabled={!productFieldsEditable} onChange={(event) => update("description", event.target.value)} placeholder={editingId ? "상품 설명" : "상품 설명 (선택)"} required={Boolean(editingId)} value={form.description} />}
+        <TextArea aria-label="상품 설명" className="min-h-24 sm:col-span-2" disabled={!productFieldsEditable} onChange={(event) => update("description", event.target.value)} placeholder={editingId ? "상품 설명" : "상품 설명 (선택)"} required={Boolean(editingId)} value={form.description} />
 
         {editingId ? (
           <>

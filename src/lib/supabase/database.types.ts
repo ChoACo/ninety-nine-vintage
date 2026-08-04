@@ -3806,6 +3806,7 @@ export type Database = {
           brand_slug: string
           brand_source: string
           category: string
+          category_id: string | null
           closes_at: string
           condition_grade: string
           created_at: string
@@ -3850,6 +3851,7 @@ export type Database = {
           brand_slug?: string
           brand_source?: string
           category?: string
+          category_id?: string | null
           closes_at: string
           condition_grade?: string
           created_at?: string
@@ -3894,6 +3896,7 @@ export type Database = {
           brand_slug?: string
           brand_source?: string
           category?: string
+          category_id?: string | null
           closes_at?: string
           condition_grade?: string
           created_at?: string

@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 
 import { OwnerManualTransferAccountPanel } from "@/components/admin/owner/OwnerManualTransferAccountPanel";
 import { OwnerSiteStatusPanel } from "@/components/admin/owner/OwnerSiteStatusPanel";
+import { StorageUsageGauge } from "@/components/admin/owner/StorageUsageGauge";
+import { TokenUsageGauge } from "@/components/admin/owner/TokenUsageGauge";
 import { LocalTestMemberSwitcher } from "@/components/admin/LocalTestMemberSwitcher";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useOwnerMemberMode } from "@/components/features/auth/OwnerMemberModeProvider";
@@ -103,6 +105,10 @@ export function OwnerDashboard({
         <div className="bg-ink p-6 text-paper"><p className="eyebrow text-zinc-400">감사 · 활동 기록</p><p className="mt-8 font-mono text-3xl font-bold">{data?.auditCount ?? 0}</p><p className="mt-2 text-xs text-zinc-400">감사 로그</p></div>
       </div>
       <OwnerManualTransferAccountPanel />
+      <div className="grid gap-4 md:grid-cols-2">
+        <TokenUsageGauge />
+        <StorageUsageGauge />
+      </div>
       <OwnerSiteStatusPanel />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/owner/stores"><Building2 size={18} /> 센터(매장)·인력 배치</Link>

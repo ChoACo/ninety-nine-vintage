@@ -15,6 +15,8 @@ function toPayload(products: Awaited<ReturnType<typeof fetchPublishedProducts>>)
     fixedPrice: product.fixedPrice, bidIncrement: product.bidIncrement, participantCount: product.participantCount,
     bidHistory: Array.isArray(product.bidHistory) ? product.bidHistory : [], imageUrls: product.imageUrls,
     thumbnailUrls: product.thumbnailUrls, sizeLabel: product.sizeLabel,
+    enhancedTitle: product.enhancedTitle,
+    hashtags: product.hashtags,
   }));
 }
 

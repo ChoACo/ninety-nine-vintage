@@ -58,8 +58,13 @@ export interface ProductPayload {
   imageUrls: string[];
   thumbnailUrls: string[];
   sizeLabel: string;
+  storeId?: string | null;
+  storeName?: string;
+  storeSlug?: string;
   soldAt?: string;
   soldPrice?: number;
+  enhancedTitle?: string | null;
+  hashtags?: string[];
 }
 
 interface CatalogFilters {
@@ -71,6 +76,7 @@ interface CatalogFilters {
   closingOnly: boolean;
   date?: string;
   query?: string;
+  storeId?: string;
 }
 
 interface AuctionFeedGridProps {
@@ -188,6 +194,8 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
   );
   const [selectedBrand, setSelectedBrand] = useState(() => routeSearchParams.get("brand") ?? "all");
   const [selectedGender, setSelectedGender] = useState<CatalogGender>(() => (routeSearchParams.get("gender") as CatalogGender | null) ?? "all");
+  const [selectedStoreId, setSelectedStoreId] = useState(() => routeSearchParams.get("store") ?? "all");
+  const [feedSeed] = useState(() => crypto.randomUUID());
   const [page, setPage] = useState(() => {
     const requested = Number(routeSearchParams.get("page"));
     return Number.isSafeInteger(requested) && requested > 0 ? requested : 1;
@@ -243,6 +251,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
       ) {
         setSelectedGender(next.gender);
       }
+      if (typeof next.storeId === "string") setSelectedStoreId(next.storeId);
       setPage(1);
     };
     window.addEventListener("catalog-filters", receiveFilters);
@@ -326,7 +335,19 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
     return () => window.clearInterval(refresh);
   }, [accountBidCapability, refreshAccountBids, saleType, showSoldOnly]);
 
-  const cards = useMemo(() => products.map((product) => {
+  const orderedProducts = useMemo(() => [...products].sort((left, right) => {
+    const leftDate = getKoreanFeedDateKey(left.publishAt);
+    const rightDate = getKoreanFeedDateKey(right.publishAt);
+    if (leftDate !== rightDate) return rightDate.localeCompare(leftDate);
+    const score = (value: string) => {
+      let hash = 2166136261;
+      for (const character of `${feedSeed}:${value}`) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+      return hash >>> 0;
+    };
+    return score(left.id) - score(right.id);
+  }), [feedSeed, products]);
+
+  const cards = useMemo(() => orderedProducts.map((product) => {
     const bidHistory = parsePublicBidHistory(Array.isArray(product.bidHistory) ? product.bidHistory : []);
     const activeBidHistory = bidHistory.filter(isActiveAuctionBid);
     const imageUrls = product.imageUrls.map((image) => getCatalogImageUrl(image)).filter(Boolean);
@@ -414,8 +435,10 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
           : auctionPhase === "CLOSED"
             ? "마감됨"
             : getAuctionRemainingLabel(product.closesAt, now),
+      enhancedTitle: product.enhancedTitle,
+      hashtags: product.hashtags,
     };
-  }), [dailyAuctionPhase, now, products, saleType, showSoldOnly]);
+  }), [dailyAuctionPhase, now, orderedProducts, saleType, showSoldOnly]);
 
   const dateKeys = useMemo(() => [...new Set(cards.map((card) => getKoreanFeedDateKey(card.publishAt ?? "")).filter(Boolean))].sort().reverse(), [cards]);
   const effectiveSelectedDate = saleType === "auction"
@@ -423,6 +446,11 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
     ? selectedDate
     : "all";
   const brandOptions = useMemo(() => ["all", ...new Set(cards.map((card) => card.brand.trim()).filter(Boolean))].sort((a, b) => a === "all" ? -1 : b === "all" ? 1 : a.localeCompare(b, "ko-KR")), [cards]);
+  const storeOptions = useMemo(() => {
+    const values = [...new Map(orderedProducts.filter((product) => product.storeId && product.storeName).map((product) => [product.storeId as string, product.storeName as string])).entries()];
+    const score = (value: string) => { let hash = 0; for (const character of `${feedSeed}:store:${value}`) hash = Math.imul(31, hash) + character.charCodeAt(0) | 0; return hash; };
+    return values.sort((left, right) => score(left[0]) - score(right[0])).map(([id, name]) => ({ id, name }));
+  }, [feedSeed, orderedProducts]);
   const effectiveSelectedBrand = selectedBrand === "all" || brandOptions.includes(selectedBrand) ? selectedBrand : "all";
   const effectiveSelectedGender = CATALOG_GENDERS.includes(selectedGender) ? selectedGender : "all";
   const bidStateByProduct = useMemo(() => new Map(accountBids.items.map((item) => [item.productId, item.state])), [accountBids.items]);
@@ -437,10 +465,11 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
         detail: {
           brands: brandOptions.filter((brand) => brand !== "all"),
           dates: saleType === "auction" ? dateKeys : [],
+          stores: storeOptions,
         },
       }),
     );
-  }, [brandOptions, dateKeys, saleType]);
+  }, [brandOptions, dateKeys, saleType, storeOptions]);
 
   const visibleCards = useMemo(() => cards.filter((card) => {
     const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
@@ -452,8 +481,10 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
       || getKoreanFeedDateKey(card.publishAt ?? "") === effectiveSelectedDate;
     const brandMatch = effectiveSelectedBrand === "all" || card.brand === effectiveSelectedBrand;
     const genderMatch = effectiveSelectedGender === "all" || card.catalogGender === effectiveSelectedGender;
-    return queryMatch && dateMatch && brandMatch && genderMatch;
-  }), [cards, effectiveSelectedBrand, effectiveSelectedDate, effectiveSelectedGender, query, saleType]);
+    const source = orderedProducts.find((product) => product.id === card.id);
+    const storeMatch = selectedStoreId === "all" || source?.storeId === selectedStoreId;
+    return queryMatch && dateMatch && brandMatch && genderMatch && storeMatch;
+  }), [cards, effectiveSelectedBrand, effectiveSelectedDate, effectiveSelectedGender, orderedProducts, query, saleType, selectedStoreId]);
   const pagination = useMemo(() => paginateAuctionFeed(visibleCards, page), [page, visibleCards]);
 
   useEffect(() => {
@@ -463,10 +494,11 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
     if (effectiveSelectedBrand !== "all") params.set("brand", effectiveSelectedBrand); else params.delete("brand");
     if (saleType === "auction" && effectiveSelectedDate !== "all") params.set("date", effectiveSelectedDate); else params.delete("date");
     if (effectiveSelectedGender !== "all") params.set("gender", effectiveSelectedGender); else params.delete("gender");
+    if (selectedStoreId !== "all") params.set("store", selectedStoreId); else params.delete("store");
     if (showSoldOnly) params.set("view", "sold"); else params.delete("view");
     const queryString = params.toString();
     window.history.replaceState(window.history.state, "", `${window.location.pathname}${queryString ? `?${queryString}` : ""}${window.location.hash}`);
-  }, [effectiveSelectedBrand, effectiveSelectedDate, effectiveSelectedGender, pagination.page, query, saleType, showSoldOnly]);
+  }, [effectiveSelectedBrand, effectiveSelectedDate, effectiveSelectedGender, pagination.page, query, saleType, selectedStoreId, showSoldOnly]);
 
   return (
     <section className={`min-w-0 ${className}`}>

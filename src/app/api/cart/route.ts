@@ -5,6 +5,27 @@ import { getManualTransferAccount } from "@/lib/manualTransferConfig";
 import { createSupabaseServerClients } from "@/lib/supabase/server";
 import { mapPublishedProduct } from "@/services/products";
 
+type ShippingQuote = {
+  shippingFee: number;
+  chargeCount: number;
+  charges: Array<{
+    chargeKey: string;
+    mode: "per_store" | "per_group";
+    groupId: string | null;
+    groupName: string | null;
+    amount: number;
+    storeIds: string[];
+    storeNames: string[];
+  }>;
+};
+
+type RpcClient = {
+  rpc: (name: string, args: Record<string, unknown>) => Promise<{
+    data: unknown;
+    error: { message?: string } | null;
+  }>;
+};
+
 export async function GET(request: Request) {
   const auth = await authenticateMemberRlsRequest(request);
   if (!auth.ok) return auth.response;
@@ -27,52 +48,27 @@ export async function GET(request: Request) {
       reservations: [],
       serverTime: null,
       shippingFee: 0,
+      shippingCharges: [],
     });
   }
   const { data: products, error: productError } = await auth.user
     .from("products")
-    .select("*")
+    .select("*,stores(name,slug)")
     .in("id", ids)
     .eq("sale_type", "fixed")
     .eq("status", "active")
     .lte("publish_at", new Date().toISOString());
   if (productError) return commerceJson({ error: "cart_unavailable" }, 503);
   const liveIds = (products ?? []).map((product) => product.id);
-  const storeIds = [
-    ...new Set((products ?? []).flatMap((product) =>
-      typeof product.store_id === "string" ? [product.store_id] : []
-    )),
-  ];
-  const { data: stores, error: storesError } = storeIds.length === 0
-    ? { data: [], error: null }
-    : await admin
-      .from("stores")
-      .select("id,business_id")
-      .in("id", storeIds);
-  const businessIds = [
-    ...new Set((stores ?? []).flatMap((store) =>
-      typeof store.business_id === "string" ? [store.business_id] : []
-    )),
-  ];
-  const { data: shippingSettings, error: settingsError } =
-    businessIds.length === 0
-      ? { data: [], error: null }
-      : await admin
-        .from("inventory_fulfillment_rollout_settings")
-        .select("business_id,shipping_fee_amount")
-        .in("business_id", businessIds);
-  if (
-    storesError ||
-    settingsError ||
-    storeIds.length !== (stores ?? []).length ||
-    businessIds.length !== (shippingSettings ?? []).length
-  ) {
+  const quoteResult = await (auth.user as unknown as RpcClient).rpc(
+    "quote_commerce_shipping_fee",
+    { p_product_ids: liveIds },
+  );
+  if (quoteResult.error || !quoteResult.data || typeof quoteResult.data !== "object") {
     return commerceJson({ error: "shipping_fee_unavailable" }, 503);
   }
-  const shippingFee = (shippingSettings ?? []).reduce(
-    (sum, setting) => sum + Number(setting.shipping_fee_amount),
-    0,
-  );
+  const quote = quoteResult.data as ShippingQuote;
+  const shippingFee = Number(quote.shippingFee);
   if (!Number.isSafeInteger(shippingFee) || shippingFee < 1) {
     return commerceJson({ error: "shipping_fee_unavailable" }, 503);
   }
@@ -102,6 +98,7 @@ export async function GET(request: Request) {
     })),
     serverTime: reservations[0]?.server_time ?? null,
     shippingFee,
+    shippingCharges: Array.isArray(quote.charges) ? quote.charges : [],
     staleProductIds: ids.filter((id) => !liveIds.includes(id)),
   });
 }

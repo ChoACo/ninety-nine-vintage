@@ -54,7 +54,7 @@ test("active fixed and auction feed cards render the shared compact tag row", as
   for (const card of [fixedCard, auctionCard]) {
     assert.match(
       card,
-      /<ProductFeedTags description=\{item\.description\} gender=\{item\.gender\} size=\{item\.size\} \/>/,
+      /<ProductFeedTags description=\{item\.description\} gender=\{item\.gender\} hashtags=\{item\.hashtags\} size=\{item\.size\} \/>/,
     );
   }
   assert.match(feed, /gender: product\.gender/);

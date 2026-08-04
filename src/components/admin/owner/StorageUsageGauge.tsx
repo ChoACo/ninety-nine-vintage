@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface StorageProviderUsage {
   providerId: string;
@@ -69,7 +70,15 @@ export function StorageUsageGauge() {
   useEffect(() => {
     void (async () => {
       try {
-        const response = await fetch("/api/admin/owner/storage-usage", { cache: "no-store" });
+        const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
+        if (!session) {
+          setNotice("소유자 계정으로 로그인해 주세요.");
+          return;
+        }
+        const response = await fetch("/api/admin/owner/storage-usage", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          cache: "no-store",
+        });
         const payload = await response.json() as StorageUsageData & { error?: string };
         if (!response.ok) {
           throw new Error("스토리지 연동 인증 키를 확인해 주세요");

@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const auth = await authenticateStaffRequest(request);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner") return commerceJson({ error: "forbidden" }, 403);
-  const { data, error } = await (auth.user as unknown as RpcClient).rpc(
+  const { data, error } = await (auth.admin as unknown as RpcClient).rpc(
     "get_owner_store_platform_management",
   );
   if (error) return commerceJson({ error: error.message ?? "platform_management_unavailable" }, 503);
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   if (!isRecord(body) || typeof body.action !== "string") {
     return commerceJson({ error: "invalid_platform_request" }, 422);
   }
-  const rpc = auth.user as unknown as RpcClient;
+  const rpc = auth.admin as unknown as RpcClient;
   const result = body.action === "save_group"
     ? await rpc.rpc("manage_owner_fulfillment_group", {
       p_group_id: typeof body.groupId === "string" ? body.groupId : null,

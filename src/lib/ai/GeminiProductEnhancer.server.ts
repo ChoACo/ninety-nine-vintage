@@ -131,28 +131,42 @@ ${untrustedSource}`;
       },
     })));
 
-    const result = await routeCompletion({
-      messages: [
-        { role: "user", content: [systemPrompt, ...imageParts] },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "product_enhancement",
-          schema: RESPONSE_JSON_SCHEMA,
-        },
-      },
-      max_tokens: 1500,
-      temperature: 0.3,
-    });
+    let attempt = 0;
+    while (attempt < 3) {
+      try {
+        const result = await routeCompletion({
+          messages: [
+            { role: "user", content: [systemPrompt, ...imageParts] },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "product_enhancement",
+              schema: RESPONSE_JSON_SCHEMA,
+            },
+          },
+          max_tokens: 1500,
+          temperature: 0.3,
+        });
 
-    logTokenUsage({ model: result.usedModel, usage: result.usage }).catch(() => {
-      console.error("[product-enhancement] failed to log token usage");
-    });
+        logTokenUsage({ model: result.usedModel, usage: result.usage }).catch(() => {
+          console.error("[product-enhancement] failed to log token usage");
+        });
 
-    const text = result.response.choices[0]?.message?.content;
-    if (!text) throw new Error("AI가 분석 결과를 반환하지 않았습니다.");
-    const parsed = JSON.parse(text) as GeminiRawEnhancement;
-    return normalizeResponse(parsed, source);
+        const text = result.response.choices[0]?.message?.content;
+        if (!text) throw new Error("AI가 분석 결과를 반환하지 않았습니다.");
+        const parsed = JSON.parse(text) as GeminiRawEnhancement;
+        return normalizeResponse(parsed, source);
+      } catch (error) {
+        attempt++;
+        if (attempt >= 3) {
+          console.error("[product-enhancement] All attempts failed, returning fallback:", error);
+          return normalizeResponse({}, source);
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+      }
+    }
+    return normalizeResponse({}, source);
   }
+}
 }

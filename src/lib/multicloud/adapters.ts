@@ -47,35 +47,6 @@ export class S3CompatibleStorageAdapter implements StorageAdapter {
   getUsageStats() { return this.usageProbe(); }
 }
 
-interface GcsBucketLike {
-  uploadBytes(key: string, body: Uint8Array, contentType: string): Promise<void>;
-  delete(key: string): Promise<void>;
-  download(key: string): Promise<Uint8Array>;
-}
-
-/** GCS SDK의 Bucket/File 호출을 얇은 GcsBucketLike로 감싼 뒤 주입합니다. */
-export class GcsStorageAdapter implements StorageAdapter {
-  constructor(
-    readonly id: string,
-    private readonly bucket: GcsBucketLike,
-    private readonly usageProbe: UsageProbe,
-    private readonly publicUrl?: (key: string) => string,
-  ) {}
-
-  async upload(input: StorageUploadInput): Promise<StoredObject> {
-    await this.bucket.uploadBytes(input.key, input.body, input.contentType);
-    return {
-      key: input.key,
-      providerId: this.id,
-      publicUrl: this.publicUrl?.(input.key),
-      sizeBytes: input.body.byteLength,
-    };
-  }
-
-  delete(key: string) { return this.bucket.delete(key); }
-  download(key: string) { return this.bucket.download(key); }
-  getUsageStats() { return this.usageProbe(); }
-}
 
 /** service-role/secret key로 만든 서버 전용 SupabaseClient만 전달해야 합니다. */
 export class SupabaseStorageAdapter implements StorageAdapter {

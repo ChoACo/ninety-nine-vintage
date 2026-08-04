@@ -6,6 +6,8 @@ import { MultiProviderRouter } from "@/lib/multicloud/MultiProviderRouter";
 import type { DatabaseAdapter, StorageAdapter, UsageStats } from "@/lib/multicloud/contracts";
 import { SupabaseStorageAdapter } from "@/lib/multicloud/adapters";
 
+import { CloudflareR2Adapter } from "@/lib/multicloud/r2";
+
 const PRODUCT_IMAGE_BUCKET = "product-images";
 
 function readConfiguredBucket() {
@@ -68,6 +70,19 @@ export function getMultiCloudPool(): MultiCloudPool {
   const storages: StorageAdapter[] = [
     new SupabaseStorageAdapter("supabase", bucket, admin, storageProbe),
   ];
+
+  if (process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY) {
+    storages.push(
+      new CloudflareR2Adapter(
+        "r2",
+        process.env.R2_ACCOUNT_ID,
+        process.env.MULTICLOUD_R2_BUCKET ?? bucket,
+        process.env.R2_ACCESS_KEY_ID,
+        process.env.R2_SECRET_ACCESS_KEY,
+        process.env.R2_PUBLIC_DOMAIN,
+      )
+    );
+  }
 
   const sql = new SupabaseSqlExecutor(admin);
   const databases: DatabaseAdapter[] = [

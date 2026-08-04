@@ -37,92 +37,9 @@ async function verifySupabase() {
   }
 }
 
-async function verifyGoogleDrive() {
-  const email = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL?.trim();
-  const privateKey = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY?.trim();
-  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID?.trim();
-
-  if (!email || !privateKey) {
-    console.log("ℹ️ Google Drive 서비스 계정이 설정되지 않아 검증을 건너뜁니다.");
-    return;
-  }
-
-  try {
-    // Basic JWT token request test
-    const normalizePem = (val) => {
-      const cleaned = val.replace(/\\n/g, "\n").trim();
-      const header = "-----BEGIN PRIVATE KEY-----";
-      const footer = "-----END PRIVATE KEY-----";
-      return cleaned.includes(header) ? cleaned : `${header}\n${cleaned}\n${footer}`;
-    };
-
-    const pem = normalizePem(privateKey);
-    const base64UrlEncode = (input) => Buffer.from(input).toString("base64url");
-
-    const now = Math.floor(Date.now() / 1000);
-    const header = base64UrlEncode(new TextEncoder().encode(JSON.stringify({ alg: "RS256", typ: "JWT" })));
-    const payload = base64UrlEncode(
-      new TextEncoder().encode(
-        JSON.stringify({
-          iss: email,
-          scope: "https://www.googleapis.com/auth/drive.file",
-          aud: "https://oauth2.googleapis.com/token",
-          iat: now,
-          exp: now + 3600,
-        })
-      )
-    );
-    const signingInput = `${header}.${payload}`;
-
-    // Import key and sign
-    const pemHeader = "-----BEGIN PRIVATE KEY-----";
-    const pemFooter = "-----END PRIVATE KEY-----";
-    const derBase64 = pem.replace(pemHeader, "").replace(pemFooter, "").replace(/\s+/g, "");
-    const der = Buffer.from(derBase64, "base64");
-
-    const imported = await crypto.subtle.importKey(
-      "pkcs8",
-      der,
-      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-      false,
-      ["sign"]
-    );
-    const signature = await crypto.subtle.sign(
-      "RSASSA-PKCS1-v1_5",
-      imported,
-      new TextEncoder().encode(signingInput)
-    );
-
-    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-        assertion: `${signingInput}.${base64UrlEncode(new Uint8Array(signature))}`,
-      }),
-    });
-
-    if (!tokenRes.ok) {
-      console.log(`❌ Google Drive 인증 실패: 토큰 발급 응답 코드 ${tokenRes.status}`);
-      return;
-    }
-
-    const tokenData = await tokenRes.json();
-    if (!tokenData.access_token) {
-      console.log("❌ Google Drive 인증 실패: access_token 누락");
-      return;
-    }
-
-    console.log("✅ Google Drive 연결 성공");
-  } catch (err) {
-    console.log(`❌ Google Drive 인증 실패: ${err instanceof Error ? err.message : "알 수 없는 오류"}`);
-  }
-}
-
 async function run() {
   console.log("🔍 환경 변수 및 멀티 클라우드 인증 검증 시작...\n");
   await verifySupabase();
-  await verifyGoogleDrive();
   console.log("\n✨ 검증 완료");
 }
 

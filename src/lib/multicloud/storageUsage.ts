@@ -23,18 +23,14 @@ export interface StorageUsageSummary {
 
 const DEFAULT_CAPACITY_BYTES = Number(process.env.MULTICLOUD_DEFAULT_CAPACITY_BYTES ?? "107374182400");
 const SUPABASE_CAPACITY_BYTES = Number(process.env.MULTICLOUD_SUPABASE_CAPACITY_BYTES ?? "107374182400");
-const GCS_CAPACITY_BYTES = Number(process.env.MULTICLOUD_GCS_CAPACITY_BYTES ?? "0");
 const R2_CAPACITY_BYTES = Number(process.env.MULTICLOUD_R2_CAPACITY_BYTES ?? "0");
-const S3_CAPACITY_BYTES = Number(process.env.MULTICLOUD_S3_CAPACITY_BYTES ?? "0");
 
 const CAPACITY_BY_PROVIDER: Record<string, number> = {
   supabase: SUPABASE_CAPACITY_BYTES,
-  gcs: GCS_CAPACITY_BYTES,
   r2: R2_CAPACITY_BYTES,
-  s3: S3_CAPACITY_BYTES,
 };
 
-const KNOWN_PROVIDERS = ["supabase", "gcs", "r2", "s3"];
+const KNOWN_PROVIDERS = ["supabase", "r2"];
 
 interface AggregateRow {
   storage_provider_id: string;

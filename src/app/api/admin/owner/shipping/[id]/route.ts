@@ -84,7 +84,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return commerceJson({ error: "invalid_tracking_correction", message: "운송장 정정 내용과 사유를 확인해 주세요." }, 400);
   }
 
-  const { data, error } = await auth.user.rpc(
+  const { data, error } = await auth.admin.rpc(
     "correct_commerce_shipment_tracking",
     {
       p_shipment_id: id,

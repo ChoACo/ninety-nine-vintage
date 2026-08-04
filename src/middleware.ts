@@ -45,7 +45,7 @@ function shouldSkip(pathname: string): boolean {
   return (
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/assets/") ||
-    /\.(?:avif|css|gif|ico|jpe?g|js|map|png|svg|webp|woff2?)$/i.test(pathname) ||
+    /\.(?:avif|css|gif|ico|jpe?g|js|map|png|svg|webp|woff2?|xml|txt|json)$/i.test(pathname) ||
     SKIPPED_PATHS.some(
       (path) => pathname === path || pathname.startsWith(`${path}/`),
     )
@@ -76,7 +76,7 @@ async function isBlockedIp(ipAddress: string): Promise<boolean> {
         headers,
         body: JSON.stringify({ p_ip: ipAddress }),
         cache: "no-store",
-        signal: AbortSignal.timeout(2_000),
+        signal: AbortSignal.timeout(500),
       },
     );
     if (!response.ok) return false;

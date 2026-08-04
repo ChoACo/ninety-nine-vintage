@@ -181,7 +181,7 @@ test("operator API validates the snapshot fail-closed and exposes summary mode",
   );
   expectMatch(
     route,
-    /expectedActivityKey[\s\S]{0,1200}activityKey\s*!==\s*expectedActivityKey/,
+    /expectedActivityKey[\s\S]{0,1500}activityKey\s*!==\s*expectedActivityKey/,
     "the parser must recompute exact activity and complete signed balance from visible ledger evidence",
   );
   expectMatch(route, /completeSignedAmount\s*!==\s*receivedAmount/);

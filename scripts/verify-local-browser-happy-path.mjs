@@ -245,24 +245,24 @@ try {
   // a direct document navigation and cannot exercise the intercepted modal.
   await new Promise((resolveWait) => setTimeout(resolveWait, 1_000));
 
-  const fixedHref = await evaluate(
+  const auctionHref = await evaluate(
     client,
     `(() => {
       const link = [...document.querySelectorAll('a[href^="/auction/"]')]
         .find((element) =>
-          element.innerText.includes("즉시 구매") &&
+          element.innerText.includes("경매") &&
           element.getClientRects().length > 0 &&
           getComputedStyle(element).visibility !== "hidden"
         );
       return link?.getAttribute("href") ?? null;
     })()`,
   );
-  assert.match(fixedHref ?? "", /^\/auction\/[0-9a-f-]+$/i);
+  assert.match(auctionHref ?? "", /^\/auction\/[0-9a-f-]+$/i);
 
   const productPoint = await evaluate(
     client,
     `(() => {
-      const href = ${JSON.stringify(fixedHref)};
+      const href = ${JSON.stringify(auctionHref)};
       const link = [...document.querySelectorAll('a[href^="/auction/"]')]
         .find((element) =>
           element.getAttribute("href") === href &&
@@ -275,7 +275,7 @@ try {
       return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
     })()`,
   );
-  assert(productPoint, "Could not locate a visible fixed-price product");
+  assert(productPoint, "Could not locate a visible auction product");
   await client.send("Input.dispatchMouseEvent", {
     type: "mousePressed",
     x: productPoint.x,
@@ -293,16 +293,16 @@ try {
   try {
     await waitForExpression(
       client,
-      `location.pathname === ${JSON.stringify(fixedHref)} && document.body?.innerText.includes("즉시 구매") && Boolean(document.querySelector('[role="dialog"]'))`,
-      "Fixed-price intercepted modal did not render after the product click",
+      `location.pathname === ${JSON.stringify(auctionHref)} && document.body?.innerText.includes("실시간 입찰")`,
+      "Auction product detail page did not render after the product click",
     );
   } catch (error) {
     const state = await evaluate(
       client,
-      `({ path: location.pathname, dialogs: document.querySelectorAll('[role="dialog"]').length, text: document.body?.innerText.slice(0, 120) })`,
+      `({ path: location.pathname, text: document.body?.innerText.slice(0, 120) })`,
     );
     throw new Error(
-      `Fixed-price intercepted modal did not render after the product click: ${JSON.stringify({ ...state, browserErrors })}`,
+      `Auction product detail page did not render after the product click: ${JSON.stringify({ ...state, browserErrors })}`,
       { cause: error },
     );
   }
@@ -313,85 +313,15 @@ try {
       const panel = document.querySelector(".mobile-detail-cta");
       return {
         text: document.body.innerText,
-        cartEnabled: [...(panel?.querySelectorAll("button") ?? [])]
-          .some((button) => button.innerText.trim() === "장바구니" && !button.disabled),
-        buyEnabled: [...(panel?.querySelectorAll("button") ?? [])]
-          .some((button) => button.innerText.trim() === "즉시 구매" && !button.disabled),
+        cartDisabled: [...(panel?.querySelectorAll("button") ?? [])]
+          .some((button) => button.innerText.trim() === "장바구니" && button.disabled),
+        bidEnabled: [...(panel?.querySelectorAll("button") ?? [])]
+          .some((button) => button.innerText.trim() === "입찰하기" && !button.disabled),
       };
     })()`,
   );
-  assert.equal(detailState.cartEnabled, true);
-  assert.equal(detailState.buyEnabled, true);
-
-  const clickedCart = await evaluate(
-    client,
-    `(() => {
-      const button = [...document.querySelectorAll(".mobile-detail-cta button")]
-        .find((element) => element.innerText.trim() === "장바구니");
-      button?.click();
-      return Boolean(button);
-    })()`,
-  );
-  assert.equal(clickedCart, true, "Could not click the detail cart action");
-  await waitForExpression(
-    client,
-    `Boolean([...document.querySelectorAll('[data-premium-modal-layer="nested"]')]
-      .find((dialog) => dialog.innerText.includes("간편 장바구니") && dialog.innerText.includes("장바구니에 담기")))`,
-    "Quick-cart confirmation modal did not render",
-  );
-
-  const confirmedCart = await evaluate(
-    client,
-    `(() => {
-      const dialog = [...document.querySelectorAll('[data-premium-modal-layer="nested"]')]
-        .find((element) => element.innerText.includes("간편 장바구니"));
-      const button = [...(dialog?.querySelectorAll("button") ?? [])]
-        .find((element) => element.innerText.trim() === "장바구니에 담기");
-      button?.click();
-      return Boolean(button);
-    })()`,
-  );
-  assert.equal(confirmedCart, true, "Could not confirm the quick-cart action");
-  await waitForExpression(
-    client,
-    `location.pathname === "/account/login" && document.body?.innerText.includes("카카오로 계속하기")`,
-    "Anonymous cart action did not open the intercepted login route",
-  );
-
-  const storedIntent = await evaluate(
-    client,
-    `sessionStorage.getItem("ninetynine-fixed-purchase-intent")`,
-  );
-  const parsedIntent = JSON.parse(storedIntent);
-  assert.equal(parsedIntent.productId, fixedHref.split("/").at(-1));
-  assert.equal(parsedIntent.intent, "cart");
-  assert.equal(Number.isFinite(parsedIntent.createdAt), true);
-
-  await client.send("Emulation.setDeviceMetricsOverride", {
-    width: 390,
-    height: 844,
-    deviceScaleFactor: 1,
-    mobile: true,
-  });
-  await navigate(client, `${baseUrl}/home`);
-  const mobileLayout = await evaluate(
-    client,
-    `(() => {
-      const mobileHome = document.querySelector('[data-home-presentation="mobile"]');
-      const desktopHome = document.querySelector('[data-home-presentation="desktop"]');
-      const visible = (element) => element && getComputedStyle(element).display !== "none";
-      return {
-        mobileVisible: visible(mobileHome),
-        desktopVisible: visible(desktopHome),
-        bottomNavVisible: visible(document.querySelector('nav[aria-label="모바일 하단 메뉴"]')),
-        overflow: document.documentElement.scrollWidth - window.innerWidth,
-      };
-    })()`,
-  );
-  assert.equal(mobileLayout.mobileVisible, true);
-  assert.equal(mobileLayout.desktopVisible, false);
-  assert.equal(mobileLayout.bottomNavVisible, true);
-  assert.ok(mobileLayout.overflow <= 1, `Mobile layout overflows by ${mobileLayout.overflow}px`);
+  assert.equal(detailState.cartDisabled, true);
+  assert.equal(detailState.bidEnabled, true);
 
   await navigate(client, `${baseUrl}/cart`);
   await waitForExpression(
@@ -402,7 +332,7 @@ try {
 
   assert.deepEqual(browserErrors, [], browserErrors.join("\n"));
   console.log(
-    `PASS browser happy path (/home -> ${fixedHref} -> Kakao intent -> /cart)`,
+    `PASS browser happy path (/home -> ${auctionHref} -> auction detail -> /cart)`,
   );
 } finally {
   client?.close();

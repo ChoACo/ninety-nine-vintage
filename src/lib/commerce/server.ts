@@ -95,7 +95,16 @@ export async function authenticateMemberCommerceRequest(request: Request, mutati
     .eq("account_status", "active")
     .maybeSingle();
   if (error) return { ok: false as const, response: commerceJson({ error: "member_unavailable", message: "회원 정보를 확인하지 못했습니다." }, 503) };
-  if (!account) return { ok: false as const, response: commerceJson({ error: "member_required", message: "카카오 회원 계정으로 이용해 주세요." }, 403) };
+  if (!account) {
+    const { data: role, error: roleError } = await auth.admin
+      .from("account_access_roles")
+      .select("role_code")
+      .eq("user_id", auth.userId)
+      .maybeSingle();
+    if (roleError || !role || !["owner", "operator", "employee"].includes(role.role_code)) {
+      return { ok: false as const, response: commerceJson({ error: "member_required", message: "카카오 회원 계정으로 이용해 주세요." }, 403) };
+    }
+  }
   return auth;
 }
 
@@ -151,7 +160,15 @@ export async function authenticateMemberRlsRequest(request: Request, mutation = 
       return { ok: false as const, response: commerceJson({ error: "member_unavailable", message: "회원 정보를 확인하지 못했습니다." }, 503) };
     }
     if (!account) {
-      return { ok: false as const, response: commerceJson({ error: "member_required", message: "카카오 회원 계정으로 이용해 주세요." }, 403) };
+      const { admin } = createSupabaseServerClients();
+       const { data: role, error: roleError } = await admin
+        .from("account_access_roles")
+        .select("role_code")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+      if (roleError || !role || !["owner", "operator", "employee"].includes(role.role_code)) {
+        return { ok: false as const, response: commerceJson({ error: "member_required", message: "카카오 회원 계정으로 이용해 주세요." }, 403) };
+      }
     }
     return { ok: true as const, userId: data.user.id, token, user };
   } catch {

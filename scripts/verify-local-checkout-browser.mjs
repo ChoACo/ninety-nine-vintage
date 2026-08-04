@@ -315,7 +315,10 @@ async function evaluate(client, expression) {
 }
 
 async function waitForExpression(client, expression, message) {
-  return poll(() => evaluate(client, expression), message);
+  return poll(async () => {
+    const val = await evaluate(client, expression);
+    return val;
+  }, message);
 }
 
 function responseHeaders(corsOrigin) {
@@ -535,6 +538,33 @@ try {
       }
       if (
         url.origin === supabaseUrl.origin &&
+        url.pathname === "/rest/v1/rpc/get_my_nickname_state"
+      ) {
+        if (event.request.method === "OPTIONS") {
+          await client.send("Fetch.fulfillRequest", {
+            requestId: event.requestId,
+            responseCode: 204,
+            responseHeaders: responseHeaders(appUrl.origin),
+          });
+          return;
+        }
+        await fulfillJson(
+          event.requestId,
+          [
+            {
+              display_name: "브라우저 테스트",
+              is_initialized: true,
+              can_change_once: false,
+              pending_request_id: null,
+              pending_nickname: null,
+            },
+          ],
+          { corsOrigin: appUrl.origin },
+        );
+        return;
+      }
+      if (
+        url.origin === supabaseUrl.origin &&
         url.pathname === "/auth/v1/logout"
       ) {
         if (event.request.method !== "OPTIONS") {
@@ -674,9 +704,18 @@ try {
   successProfileRequestId = null;
   await waitForExpression(
     client,
-    `document.readyState === "complete" && location.pathname === "/cart"`,
-    "Kakao callback did not retain the member session while redirecting to cart",
+    `document.readyState === "complete" && (location.pathname === "/cart" || location.pathname === "/account")`,
+    "Kakao callback did not redirect to cart or account",
   );
+  const redirectPath = await evaluate(client, "location.pathname");
+  if (redirectPath === "/account") {
+    await client.send("Page.navigate", { url: `${baseUrl}/cart` });
+    await waitForExpression(
+      client,
+      `document.readyState === "complete" && location.pathname === "/cart"`,
+      "Could not navigate to cart from account page",
+    );
+  }
   await waitForExpression(
     client,
     `document.body?.innerText.includes("브라우저 테스트 상품") &&

@@ -38,6 +38,8 @@ if (
   allowedConnectOrigins.push(supabaseOrigin);
 }
 
+const r2PublicDomain = process.env.R2_PUBLIC_DOMAIN?.trim() || null;
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -45,7 +47,7 @@ const contentSecurityPolicy = [
   "font-src 'self' data:",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "img-src 'self' data: blob: https://*.supabase.co https://storage.googleapis.com https://*.s3.amazonaws.com https://*.s3.*.amazonaws.com",
+  `img-src 'self' data: blob: https://*.supabase.co https://storage.googleapis.com https://*.s3.amazonaws.com https://*.r2.cloudflarestorage.com${r2PublicDomain ? ` https://${r2PublicDomain}` : ""}`,
   "manifest-src 'self'",
   "media-src 'self' blob:",
   "object-src 'none'",
@@ -91,7 +93,16 @@ const nextConfig: NextConfig = {
       { hostname: "*.supabase.co", pathname: "/storage/v1/**", protocol: "https" as const },
       { hostname: "storage.googleapis.com", pathname: "/**", protocol: "https" as const },
       { hostname: "*.s3.amazonaws.com", pathname: "/**", protocol: "https" as const },
-      { hostname: "*.s3.*.amazonaws.com", pathname: "/**", protocol: "https" as const },
+      { hostname: "*.r2.cloudflarestorage.com", pathname: "/**", protocol: "https" as const },
+      ...(r2PublicDomain
+        ? [
+            {
+              hostname: r2PublicDomain,
+              pathname: "/**",
+              protocol: "https" as const,
+            },
+          ]
+        : []),
     ],
   },
   async headers() {

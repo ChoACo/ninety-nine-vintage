@@ -71,10 +71,12 @@ export function StorageUsageGauge() {
       try {
         const response = await fetch("/api/admin/owner/storage-usage", { cache: "no-store" });
         const payload = await response.json() as StorageUsageData & { error?: string };
-        if (!response.ok) throw new Error(payload.error ?? "스토리지 사용량을 불러오지 못했습니다.");
+        if (!response.ok) {
+          throw new Error("스토리지 연동 인증 키를 확인해 주세요");
+        }
         setData(payload);
-      } catch (error) {
-        setNotice(error instanceof Error ? error.message : "스토리지 사용량을 불러오지 못했습니다.");
+      } catch {
+        setNotice("스토리지 연동 인증 키를 확인해 주세요");
       }
     })();
   }, []);

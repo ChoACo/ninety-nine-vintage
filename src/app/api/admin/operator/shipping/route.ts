@@ -236,9 +236,10 @@ export async function POST(request: Request) {
     !isUuid(body.shipmentId) || !isNonNegativeInteger(body.expectedVersion) ||
     !isUuid(body.idempotencyKey) || courier === undefined || trackingNumber === undefined || note === undefined ||
     ((action === "pack" || action === "tracking_delete") && (courier !== null || trackingNumber !== null)) ||
-    ((action === "ship" || action === "tracking_update") && (!courier || !trackingNumber))
+    ((action === "ship" || action === "tracking_update") && (!courier || !trackingNumber)) ||
+    ((action === "tracking_update" || action === "tracking_delete") && !note)
   ) {
-    return commerceJson({ error: "invalid_shipment_request", message: "배송 작업 내용을 확인해 주세요." }, 422);
+    return commerceJson({ error: "invalid_shipment_request", message: "송장 정정 사유를 입력해 주세요." }, 422);
   }
 
   const result = action === "pack"

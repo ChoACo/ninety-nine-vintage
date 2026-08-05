@@ -13,7 +13,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 
 type ShipmentAction = "pack" | "ship" | "tracking_update" | "tracking_delete";
-type ShippingForm = { courier: string; trackingNumber: string };
+type ShippingForm = { courier: string; trackingNumber: string; note: string };
 type ShippingConsoleView = "requests" | "completed" | "history";
 
 interface StoreWork {
@@ -255,7 +255,7 @@ function packGate(shipment: InventoryShipment) {
 function sessionKey(shipment: InventoryShipment, action: ShipmentAction, form?: ShippingForm) {
   const shipmentScope = `${shipment.id}:${action}:${shipment.version}`;
   return action === "ship" || action === "tracking_update"
-    ? `${SESSION_KEY_PREFIX}${shipmentScope}:${form?.courier.trim() ?? ""}:${form?.trackingNumber.trim() ?? ""}`
+    ? `${SESSION_KEY_PREFIX}${shipmentScope}:${form?.courier.trim() ?? ""}:${form?.trackingNumber.trim() ?? ""}:${form?.note.trim() ?? ""}`
     : `${SESSION_KEY_PREFIX}${shipmentScope}`;
 }
 
@@ -328,14 +328,14 @@ export function OperatorShippingConsole({
   const updateForm = (shipmentId: string, field: keyof ShippingForm, value: string) => {
     setForms((current) => ({
       ...current,
-      [shipmentId]: { ...(current[shipmentId] ?? { courier: "", trackingNumber: "" }), [field]: value },
+      [shipmentId]: { ...(current[shipmentId] ?? { courier: "", trackingNumber: "", note: "" }), [field]: value },
     }));
   };
 
   const mutateShipment = async (shipment: InventoryShipment, action: ShipmentAction) => {
     if (!token || busyKey) return;
     const gate = packGate(shipment);
-    const form = forms[shipment.id] ?? { courier: "", trackingNumber: "" };
+    const form = forms[shipment.id] ?? { courier: "", trackingNumber: "", note: "" };
     if (action === "pack" && !gate.ready) {
       setNotice(gate.reason ?? "미 출고된 상품이 존재합니다");
       return;
@@ -358,6 +358,10 @@ export function OperatorShippingConsole({
       setNotice("택배사와 송장번호를 입력해 주세요.");
       return;
     }
+    if ((action === "tracking_update" || action === "tracking_delete") && !form.note.trim()) {
+      setNotice("송장 정정 사유를 입력해 주세요.");
+      return;
+    }
     if (
       action === "tracking_delete" &&
       !window.confirm("송장을 삭제하고 포장 완료 단계로 되돌릴까요?")
@@ -376,6 +380,7 @@ export function OperatorShippingConsole({
           expectedVersion: shipment.version,
           action,
           idempotencyKey,
+          note: form.note.trim() || null,
           ...(action === "ship" || action === "tracking_update"
             ? { courier: form.courier.trim(), trackingNumber: form.trackingNumber.trim() }
             : {}),
@@ -530,6 +535,7 @@ export function OperatorShippingConsole({
           const form = forms[shipment.id] ?? {
             courier: shipment.courier ?? "",
             trackingNumber: shipment.trackingNumber ?? "",
+            note: "",
           };
           return (
             <article className="border-b border-line px-4 py-5 last:border-b-0 sm:px-5" key={shipment.id}>
@@ -602,9 +608,9 @@ export function OperatorShippingConsole({
               {shipment.status === "shipped" && (
                 <div className="mt-5 border-t border-line pt-4">
                   <p className="flex items-center gap-2 text-xs font-bold">
-                    <CheckCircle2 size={14} /> 발송 완료 · {formatAt(shipment.shippedAt)}
+                    <CheckCircle2 size={14} /> 발송 완료 · 송장 1개 · {formatAt(shipment.shippedAt)}
                   </p>
-                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,160px)_minmax(0,240px)_auto_auto]">
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,160px)_minmax(0,240px)_minmax(0,220px)_auto_auto]">
                     <input
                       aria-label={`${shipment.id} 수정할 택배사`}
                       className="h-10 border border-line px-3 text-xs"
@@ -616,6 +622,14 @@ export function OperatorShippingConsole({
                       className="h-10 border border-line px-3 font-mono text-xs"
                       onChange={(event) => updateForm(shipment.id, "trackingNumber", event.target.value)}
                       value={form.trackingNumber}
+                    />
+                    <input
+                      aria-label={`${shipment.id} 송장 정정 사유`}
+                      className="h-10 border border-line px-3 text-xs"
+                      maxLength={500}
+                      onChange={(event) => updateForm(shipment.id, "note", event.target.value)}
+                      placeholder="정정 사유"
+                      value={form.note}
                     />
                     <button
                       className="h-10 border border-ink px-4 text-xs font-bold disabled:opacity-40"

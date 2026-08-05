@@ -1196,9 +1196,13 @@ function AccountDashboardForSession({
                         <div className="p-3">
                           <p className="line-clamp-2 min-h-10 text-sm font-bold">{item.title}</p>
                           <p className="mt-2 text-[11px] text-muted">{item.originStoreName ?? "매장 상품"}</p>
-                          <p className="mt-1 text-[11px] font-bold text-muted">
+                          <p className={`mt-1 text-[11px] font-bold ${expires && expires.getTime() <= now ? "text-red-600" : "text-muted"}`}>
                             {item.storageClass === "large" ? "대형 · 1주 보관" : "소형 · 2주 보관"}
-                            {expires ? ` · ${expires.toLocaleDateString("ko-KR")}까지` : ""}
+                            {expires
+                              ? expires.getTime() <= now
+                                ? " · 보관 만료"
+                                : ` · ${expires.toLocaleDateString("ko-KR")}까지`
+                              : ""}
                           </p>
                           {disabled && (
                             <p className="mt-2 text-[11px] text-amber-700">

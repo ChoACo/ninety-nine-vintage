@@ -1,6 +1,15 @@
 "use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useToastStore } from "@/store/useToastStore";
+
+export const CART_HOLD_LIMIT_MESSAGE =
+  "한 번에 최대 3개까지만 구매 점유가 가능합니다. 기존 장바구니를 비워주세요.";
+
+function cartBasePath(): string {
+  if (typeof window === "undefined") return "";
+  return window.location.pathname.startsWith("/m") ? "/m" : "";
+}
 
 export async function persistWishlist(
   productId: string,
@@ -54,7 +63,16 @@ export async function reserveCartProduct(
     body: JSON.stringify({ productId }),
   });
   const payload = await response.json().catch(() => null) as Partial<CartReservation> & { error?: string } | null;
-  if (!response.ok) throw new Error(payload?.error || "상품 재고를 점유하지 못했습니다.");
+  if (!response.ok) {
+    if (payload?.error?.includes("최대 3개")) {
+      useToastStore.getState().pushToast("error", CART_HOLD_LIMIT_MESSAGE, {
+        action: { href: `${cartBasePath()}/cart`, label: "장바구니 보기" },
+        durationMs: 7_000,
+      });
+      throw new Error(CART_HOLD_LIMIT_MESSAGE);
+    }
+    throw new Error(payload?.error || "상품 재고를 점유하지 못했습니다.");
+  }
   if (payload?.productId !== productId || typeof payload.reservedUntil !== "string" || typeof payload.serverTime !== "string") {
     throw new Error("재고 점유 시간을 확인하지 못했습니다.");
   }

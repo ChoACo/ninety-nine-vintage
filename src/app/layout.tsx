@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { ChatNotificationProvider } from "@/components/features/chat/ChatNotificationProvider";
+import { GlobalToastHost } from "@/components/features/notifications/GlobalToastHost";
 import { NotificationExperienceProvider } from "@/components/features/notifications/NotificationExperienceProvider";
 import { OwnerMemberModeProvider } from "@/components/features/auth/OwnerMemberModeProvider";
 import { SimpleModeProvider } from "@/components/features/accessibility/SimpleModeProvider";
@@ -70,6 +71,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </NotificationExperienceProvider>
           </SimpleModeProvider>
         </OwnerMemberModeProvider>
+        <GlobalToastHost />
       </body>
     </html>
   );

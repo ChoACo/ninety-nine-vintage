@@ -1,4 +1,5 @@
 import { hasTrustedRequestOrigin } from "@/lib/kakao/oidc";
+import { enforceBidRateLimit } from "@/lib/ratelimit/server";
 import { placeBid, AuctionServiceError } from "@/services/auction";
 
 function response(body: Record<string, unknown>, status = 200) {
@@ -10,6 +11,9 @@ export async function POST(request: Request) {
   const authorization = request.headers.get("authorization")?.trim();
   const token = authorization?.startsWith("Bearer ") ? authorization.slice(7).trim() : null;
   if (!token) return response({ error: "unauthorized" }, 401);
+
+  const rateLimit = await enforceBidRateLimit(request);
+  if (!rateLimit.ok) return rateLimit.response;
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const productId = body?.productId;
   const amount = body?.amount;

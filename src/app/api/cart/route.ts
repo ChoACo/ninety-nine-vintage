@@ -2,6 +2,7 @@ import { authenticateMemberRlsRequest, commerceJson } from "@/lib/commerce/serve
 import { ACTIVE_COMMERCE_PAYMENT_MODE } from "@/lib/commerce/paymentMode";
 import { getCatalogImageUrl } from "@/lib/images";
 import { getManualTransferAccount } from "@/lib/manualTransferConfig";
+import { enforceCartRateLimit } from "@/lib/ratelimit/server";
 import { createSupabaseServerClients } from "@/lib/supabase/server";
 import { mapPublishedProduct } from "@/services/products";
 
@@ -106,6 +107,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await authenticateMemberRlsRequest(request, true);
   if (!auth.ok) return auth.response;
+  const rateLimit = await enforceCartRateLimit(request, auth.userId);
+  if (!rateLimit.ok) return rateLimit.response;
   const body = await request.json().catch(() => null) as { productId?: string } | null;
   if (!body?.productId) return commerceJson({ error: "상품을 선택해 주세요." }, 400);
 

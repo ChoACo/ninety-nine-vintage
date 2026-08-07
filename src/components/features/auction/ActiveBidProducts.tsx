@@ -8,6 +8,12 @@ import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { announceAuctionBidSucceeded } from "@/lib/auction/bidEvents";
+import {
+  BID_RATE_LIMIT_MESSAGE,
+  isRateLimitedResponse,
+  retryAfterMs,
+  useBidRateLimitCooldown,
+} from "@/lib/ratelimit/client";
 
 interface ActiveBidItem {
   amount: number;
@@ -60,6 +66,7 @@ export function ActiveBidProducts({
   const [notice, setNotice] = useState("");
   const [confirmItem, setConfirmItem] = useState<ActiveBidItem | null>(null);
   const [bidBusy, setBidBusy] = useState(false);
+  const { isCoolingDown, beginCooldown, cooldownSeconds } = useBidRateLimitCooldown();
   const accessToken = session?.access_token ?? null;
 
   const load = useCallback(async () => {
@@ -132,7 +139,7 @@ export function ActiveBidProducts({
   }, [accessToken, productIdKey, session?.user.id]);
 
   const quickBid = async () => {
-    if (!session?.access_token || !confirmItem || bidBusy) return;
+    if (!session?.access_token || !confirmItem || bidBusy || isCoolingDown) return;
     const amount = confirmItem.currentPrice + 1_000;
     setBidBusy(true);
     setNotice("");
@@ -148,6 +155,11 @@ export function ActiveBidProducts({
       const payload = await response.json().catch(() => null) as {
         error?: string;
       } | null;
+      if (isRateLimitedResponse(response)) {
+        beginCooldown(retryAfterMs(response));
+        setNotice(BID_RATE_LIMIT_MESSAGE);
+        return;
+      }
       if (!response.ok) {
         throw new Error(payload?.error ?? "간편입찰을 완료하지 못했습니다.");
       }
@@ -269,11 +281,12 @@ export function ActiveBidProducts({
                   </p>
                   {outbid ? (
                     <button
-                      className="mt-4 h-11 w-full bg-ink px-3 text-xs font-black text-paper"
+                      className="mt-4 h-11 w-full bg-ink px-3 text-xs font-black text-paper disabled:opacity-40"
+                      disabled={isCoolingDown}
                       onClick={() => setConfirmItem(item)}
                       type="button"
                     >
-                      +1,000원 간편입찰
+                      {isCoolingDown ? `${cooldownSeconds}초 후 다시 시도` : "+1,000원 간편입찰"}
                     </button>
                   ) : (
                     <p className="mt-4 flex h-11 items-center justify-center border border-emerald-300 bg-emerald-50 text-xs font-bold text-emerald-800">
@@ -323,11 +336,11 @@ export function ActiveBidProducts({
           </p>
           <button
             className="mt-5 h-11 w-full bg-ink text-xs font-black text-paper disabled:opacity-40"
-            disabled={bidBusy}
+            disabled={bidBusy || isCoolingDown}
             onClick={() => void quickBid()}
             type="button"
           >
-            {bidBusy ? "입찰 처리 중" : "확인하고 간편입찰"}
+            {bidBusy ? "입찰 처리 중" : isCoolingDown ? `${cooldownSeconds}초 후 다시 시도` : "확인하고 간편입찰"}
           </button>
         </div>
       </PremiumDialog>

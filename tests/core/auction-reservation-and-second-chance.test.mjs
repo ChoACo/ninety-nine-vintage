@@ -378,3 +378,35 @@ test("operator second chance is role, store, deadline, audit, and payment-mode c
   );
   assert.match(button, /method: "POST"/);
 });
+
+test("abuse-limit migration caps live cart holds at three and schedules minute cleanup", async () => {
+  const migration = await source(
+    "supabase/migrations/20260807000000_cart_reservation_abuse_limits.sql",
+  );
+
+  const reserveDefinition = extractSqlFunctionDefinition(
+    migration,
+    "public.reserve_fixed_product_for_cart",
+  );
+  assert.match(
+    reserveDefinition,
+    /select count\(\*\)[\s\S]*from public\.cart_items as cart_items[\s\S]*where cart_items\.member_id = v_user_id[\s\S]*and cart_items\.reserved_until > clock_timestamp\(\)/i,
+  );
+  assert.match(
+    reserveDefinition,
+    /if v_active_hold_count >= 3 then[\s\S]*errcode = 'P0001'[\s\S]*message = '한 번에 최대 3개의 상품만 점유할 수 있습니다\.'/i,
+  );
+  assert.match(
+    reserveDefinition,
+    /from public\.products as products[\s\S]*for update/i,
+  );
+
+  assert.match(
+    migration,
+    /create or replace function public\.purge_expired_cart_reservations\([\s\S]*delete from public\.cart_items as cart_items[\s\S]*where cart_items\.reserved_until <= p_at/i,
+  );
+  assert.match(
+    migration,
+    /cron\.schedule\(\s*'purge-expired-cart-reservations',\s*'\* \* \* \* \*'/i,
+  );
+});

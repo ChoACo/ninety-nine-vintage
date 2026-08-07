@@ -151,9 +151,14 @@ export async function middleware(request: NextRequest) {
 
   if (shouldSkip(request.nextUrl.pathname)) return NextResponse.next();
 
-  const ipAddress = getTrustedClientIp(request);
-  if (ipAddress && (await isBlockedIp(ipAddress))) {
-    return blockedResponse(request);
+  // DB 병목 제거: IP 차단 검사(네트워크 RPC)는 실데이터 변경이 일어나는
+  // API 경로에서만 수행한다. 정적 파일(shouldSkip)과 페이지 이동은 이미
+  // 아래에서 바로 통과되며, canonical/mobile redirect는 페이지에서도 유지된다.
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    const ipAddress = getTrustedClientIp(request);
+    if (ipAddress && (await isBlockedIp(ipAddress))) {
+      return blockedResponse(request);
+    }
   }
 
   return expireLegacyUiModeCookie(

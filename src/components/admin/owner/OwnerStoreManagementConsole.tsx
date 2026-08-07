@@ -35,6 +35,13 @@ interface Employee {
   reportsToOperatorId: string | null;
 }
 
+interface StoreOperator {
+  membershipId: string;
+  userId: string;
+  displayName: string;
+  version: number;
+}
+
 interface StoreEmployee {
   membershipId: string;
   userId: string;
@@ -53,6 +60,7 @@ interface ManagedStore {
   operatorName: string;
   isActive: boolean;
   version: number;
+  operators: StoreOperator[];
   employees: StoreEmployee[];
 }
 
@@ -93,6 +101,9 @@ export function OwnerStoreManagementConsole() {
     useState<ManagementDirectory>(emptyDirectory);
   const [drafts, setDrafts] = useState<Record<string, StoreDraft>>({});
   const [employeeDrafts, setEmployeeDrafts] = useState<Record<string, string>>(
+    {},
+  );
+  const [operatorDrafts, setOperatorDrafts] = useState<Record<string, string>>(
     {},
   );
   const [newStore, setNewStore] = useState({
@@ -261,6 +272,45 @@ export function OwnerStoreManagementConsole() {
         operatorId,
       },
       "새 담당 운영자를 매장에 배정했습니다.",
+    );
+  };
+
+  const assignAdditionalOperator = async (store: ManagedStore) => {
+    const operatorId = operatorDrafts[store.id];
+    if (!operatorId) {
+      setNotice("배정할 운영자를 선택해 주세요.");
+      return;
+    }
+    const assigned = await mutate(
+      `operator_assign:${store.id}:${operatorId}:${store.version}`,
+      {
+        action: "operator_assign",
+        storeId: store.id,
+        operatorId,
+        expectedStoreVersion: store.version,
+        expectedMembershipVersion: null,
+      },
+      "운영자를 매장에 함께 배정했습니다.",
+    );
+    if (assigned) {
+      setOperatorDrafts((current) => ({ ...current, [store.id]: "" }));
+    }
+  };
+
+  const removeAdditionalOperator = async (
+    store: ManagedStore,
+    operator: StoreOperator,
+  ) => {
+    await mutate(
+      `operator_remove:${store.id}:${operator.userId}:${operator.version}`,
+      {
+        action: "operator_remove",
+        storeId: store.id,
+        operatorId: operator.userId,
+        expectedStoreVersion: store.version,
+        expectedMembershipVersion: operator.version,
+      },
+      "운영자 배정을 해제했습니다.",
     );
   };
 
@@ -585,18 +635,26 @@ export function OwnerStoreManagementConsole() {
                             }
                             value={draft.operatorId}
                           >
-                            {directory.operators.map((operator) => (
-                              <option
-                                disabled={!operator.assignable}
-                                key={operator.id}
-                                value={operator.id}
-                              >
-                                {operator.displayName}
-                                {!operator.assignable
-                                  ? " (기존 관리자 담당)"
-                                  : ""}
-                              </option>
-                            ))}
+                            {directory.operators
+                              .filter(
+                                (operator) =>
+                                  operator.assignable ||
+                                  store.operators.some(
+                                    (assigned) =>
+                                      assigned.userId === operator.id,
+                                  ),
+                              )
+                              .map((operator) => (
+                                <option
+                                  key={operator.id}
+                                  value={operator.id}
+                                >
+                                  {operator.displayName}
+                                  {operator.roleCode === "owner"
+                                    ? " (소유자)"
+                                    : ""}
+                                </option>
+                              ))}
                           </select>
                           <button
                             className="inline-flex items-center justify-center gap-2 border border-ink px-4 py-3 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40"
@@ -659,82 +717,171 @@ export function OwnerStoreManagementConsole() {
                     </div>
                   </div>
 
-                  <div className="border-t border-line pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                    <h4 className="text-sm font-black">직원 배치</h4>
-                    <p className="mt-1 text-xs leading-5 text-muted">
-                      이 매장에서 실제 업무를 처리할 직원만 개별 배치합니다.
-                    </p>
-                    <div className="mt-4 space-y-2">
-                      {store.employees.map((employee) => (
-                        <div
-                          className="flex items-center justify-between border border-line px-3 py-3"
-                          key={employee.membershipId}
-                        >
-                          <span className="text-sm font-bold">
-                            {employee.displayName}
-                          </span>
-                          <button
-                            aria-label={`${employee.displayName} 배치 해제`}
-                            className="flex items-center gap-1 text-xs font-bold text-red-700 disabled:opacity-40"
-                            disabled={busyKey !== null}
-                            onClick={() =>
-                              void removeEmployee(store, employee)
-                            }
-                            type="button"
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="text-sm font-black">함께 운영하는 운영자</h4>
+                      <p className="mt-1 text-xs leading-5 text-muted">
+                        담당 운영자 외에 같은 센터에서 상품·입금·출고 업무를 함께
+                        처리할 운영자를 추가로 배정합니다.
+                      </p>
+                      <div className="mt-4 space-y-2">
+                        {store.operators.map((operator) => (
+                          <div
+                            className="flex items-center justify-between border border-line px-3 py-3"
+                            key={operator.membershipId}
                           >
-                            <UserMinus size={14} /> 해제
-                          </button>
-                        </div>
-                      ))}
-                      {store.employees.length === 0 && (
-                        <div className="border border-dashed border-line px-3 py-6 text-center text-xs text-muted">
-                          배치된 직원이 없습니다.
-                        </div>
+                            <span className="text-sm font-bold">
+                              {operator.displayName}
+                              {operator.userId === store.operatorId && (
+                                <span className="ml-2 text-[10px] font-bold text-muted">
+                                  대표
+                                </span>
+                              )}
+                            </span>
+                            <button
+                              aria-label={`${operator.displayName} 운영자 배정 해제`}
+                              className="flex items-center gap-1 text-xs font-bold text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                              disabled={
+                                busyKey !== null ||
+                                operator.userId === store.operatorId
+                              }
+                              onClick={() =>
+                                void removeAdditionalOperator(store, operator)
+                              }
+                              type="button"
+                            >
+                              <UserMinus size={14} /> 해제
+                            </button>
+                          </div>
+                        ))}
+                        {store.operators.length === 0 && (
+                          <div className="border border-dashed border-line px-3 py-6 text-center text-xs text-muted">
+                            함께 배정된 운영자가 없습니다.
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <select
+                          aria-label={`${store.name}에 추가 배정할 운영자`}
+                          className="min-w-0 flex-1 border border-line bg-paper px-3 py-3 text-sm"
+                          onChange={(event) =>
+                            setOperatorDrafts((current) => ({
+                              ...current,
+                              [store.id]: event.target.value,
+                            }))
+                          }
+                          value={operatorDrafts[store.id] ?? ""}
+                        >
+                          <option value="">운영자 추가 선택</option>
+                          {directory.operators
+                            .filter(
+                              (operator) =>
+                                operator.assignable &&
+                                !store.operators.some(
+                                  (assigned) =>
+                                    assigned.userId === operator.id,
+                                ),
+                            )
+                            .map((operator) => (
+                              <option key={operator.id} value={operator.id}>
+                                {operator.displayName}
+                                {operator.roleCode === "owner"
+                                  ? " (소유자)"
+                                  : ""}
+                              </option>
+                            ))}
+                        </select>
+                        <button
+                          aria-label={`${store.name}에 운영자 추가 배정`}
+                          className="grid size-11 shrink-0 place-items-center bg-ink text-paper disabled:opacity-40"
+                          disabled={
+                            busyKey !== null || !operatorDrafts[store.id]
+                          }
+                          onClick={() => void assignAdditionalOperator(store)}
+                          type="button"
+                        >
+                          <UserPlus size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-black">직원 배치</h4>
+                      <p className="mt-1 text-xs leading-5 text-muted">
+                        이 매장에서 실제 업무를 처리할 직원만 개별 배치합니다.
+                      </p>
+                      <div className="mt-4 space-y-2">
+                        {store.employees.map((employee) => (
+                          <div
+                            className="flex items-center justify-between border border-line px-3 py-3"
+                            key={employee.membershipId}
+                          >
+                            <span className="text-sm font-bold">
+                              {employee.displayName}
+                            </span>
+                            <button
+                              aria-label={`${employee.displayName} 배치 해제`}
+                              className="flex items-center gap-1 text-xs font-bold text-red-700 disabled:opacity-40"
+                              disabled={busyKey !== null}
+                              onClick={() =>
+                                void removeEmployee(store, employee)
+                              }
+                              type="button"
+                            >
+                              <UserMinus size={14} /> 해제
+                            </button>
+                          </div>
+                        ))}
+                        {store.employees.length === 0 && (
+                          <div className="border border-dashed border-line px-3 py-6 text-center text-xs text-muted">
+                            배치된 직원이 없습니다.
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <select
+                          aria-label={`${store.name}에 배치할 직원`}
+                          className="min-w-0 flex-1 border border-line bg-paper px-3 py-3 text-sm"
+                          onChange={(event) =>
+                            setEmployeeDrafts((current) => ({
+                              ...current,
+                              [store.id]: event.target.value,
+                            }))
+                          }
+                          value={employeeDrafts[store.id] ?? ""}
+                        >
+                          <option value="">직원 선택</option>
+                          {availableEmployees.map((employee) => (
+                            <option key={employee.id} value={employee.id}>
+                              {employee.displayName}
+                              {employee.reportsToOperatorId &&
+                              employee.reportsToOperatorId !== store.operatorId
+                                ? " (담당 운영자 변경)"
+                                : ""}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          aria-label={`${store.name}에 직원 배치`}
+                          className="grid size-11 shrink-0 place-items-center bg-ink text-paper disabled:opacity-40"
+                          disabled={
+                            busyKey !== null || !employeeDrafts[store.id]
+                          }
+                          onClick={() => void assignEmployee(store)}
+                          type="button"
+                        >
+                          <UserPlus size={16} />
+                        </button>
+                      </div>
+                      {directory.employees.length === 0 && (
+                        <p className="mt-3 text-xs text-amber-800">
+                          <Link className="underline" href="/admin/owner/members">
+                            회원·권한
+                          </Link>
+                          에서 직원 계정을 먼저 지정해 주세요.
+                        </p>
                       )}
                     </div>
-                    <div className="mt-3 flex gap-2">
-                      <select
-                        aria-label={`${store.name}에 배치할 직원`}
-                        className="min-w-0 flex-1 border border-line bg-paper px-3 py-3 text-sm"
-                        onChange={(event) =>
-                          setEmployeeDrafts((current) => ({
-                            ...current,
-                            [store.id]: event.target.value,
-                          }))
-                        }
-                        value={employeeDrafts[store.id] ?? ""}
-                      >
-                        <option value="">직원 선택</option>
-                        {availableEmployees.map((employee) => (
-                          <option key={employee.id} value={employee.id}>
-                            {employee.displayName}
-                            {employee.reportsToOperatorId &&
-                            employee.reportsToOperatorId !== store.operatorId
-                              ? " (담당 운영자 변경)"
-                              : ""}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        aria-label={`${store.name}에 직원 배치`}
-                        className="grid size-11 shrink-0 place-items-center bg-ink text-paper disabled:opacity-40"
-                        disabled={
-                          busyKey !== null || !employeeDrafts[store.id]
-                        }
-                        onClick={() => void assignEmployee(store)}
-                        type="button"
-                      >
-                        <UserPlus size={16} />
-                      </button>
-                    </div>
-                    {directory.employees.length === 0 && (
-                      <p className="mt-3 text-xs text-amber-800">
-                        <Link className="underline" href="/admin/owner/members">
-                          회원·권한
-                        </Link>
-                        에서 직원 계정을 먼저 지정해 주세요.
-                      </p>
-                    )}
                   </div>
                 </div>
               </article>

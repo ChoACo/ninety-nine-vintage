@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { OperatorStoreScopeSelector } from "@/components/admin/operator/OperatorStoreScopeSelector";
 
 interface OperatorNavItem {
   exact: boolean;
@@ -153,26 +154,29 @@ export default function OperatorLayout({
         </Link>
       </nav>
       <p className="mb-2 text-[10px] font-black tracking-[.12em] text-muted">운영 탭</p>
-      <nav
-        aria-label="운영자 대분류"
-        className="flex max-w-full gap-2 overflow-x-auto whitespace-nowrap border-b border-ink pb-3 text-xs font-black [scrollbar-width:none]"
-      >
-        {navigation.map((group) => {
-          const active = activeGroup?.key === group.key;
-          return (
-            <Link
-              aria-current={active ? "page" : undefined}
-              className={active
-                ? "bg-ink px-4 py-3 text-paper"
-                : "border border-line px-4 py-3 text-muted"}
-              href={group.href}
-              key={group.key}
-            >
-              {group.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-ink pb-3">
+        <nav
+          aria-label="운영자 대분류"
+          className="flex max-w-full gap-2 overflow-x-auto whitespace-nowrap text-xs font-black [scrollbar-width:none]"
+        >
+          {navigation.map((group) => {
+            const active = activeGroup?.key === group.key;
+            return (
+              <Link
+                aria-current={active ? "page" : undefined}
+                className={active
+                  ? "bg-ink px-4 py-3 text-paper"
+                  : "border border-line px-4 py-3 text-muted"}
+                href={group.href}
+                key={group.key}
+              >
+                {group.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <OperatorStoreScopeSelector />
+      </div>
 
       {activeGroup && activeGroup.items.length > 0 && (
         <nav

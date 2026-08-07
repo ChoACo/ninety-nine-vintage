@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface TokenUsageData {
   totalTokens: number;
@@ -36,11 +37,17 @@ export function TokenUsageGauge() {
   useEffect(() => {
     void (async () => {
       try {
+        const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
+        if (!session) {
+          setNotice("소유자 계정으로 로그인해 주세요.");
+          return;
+        }
         const response = await fetch("/api/admin/owner/token-usage", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
           cache: "no-store",
         });
-        const payload = await response.json() as TokenUsageData & { error?: string };
-        if (!response.ok) throw new Error(payload.error ?? "토큰 사용량을 불러오지 못했습니다.");
+        const payload = await response.json() as TokenUsageData & { error?: string; message?: string };
+        if (!response.ok) throw new Error(payload.message ?? payload.error ?? "토큰 사용량을 불러오지 못했습니다.");
         setData(payload);
       } catch (error) {
         setNotice(error instanceof Error ? error.message : "토큰 사용량을 불러오지 못했습니다.");

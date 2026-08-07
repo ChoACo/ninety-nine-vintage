@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, CircleStop, ClipboardCheck, Edit3, FileSpreadsheet,
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useOperatorStoreScope } from "@/store/useOperatorStoreScope";
 import {
   discardUnpersistedProductImages,
   uploadProductImages,
@@ -199,6 +200,7 @@ export function OperatorProductsConsole({
   view = "active",
 }: Readonly<{ view?: ProductConsoleView }>) {
   const requestedSaleType = requestedSingleSaleType();
+  const storeScope = useOperatorStoreScope((state) => state.scope);
   const [token, setToken] = useState<string | null>(null);
   const [stores, setStores] = useState<Store[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -342,7 +344,12 @@ export function OperatorProductsConsole({
   }, [load]);
 
   const workspaceProducts = useMemo(() => {
+    const scopedStoreId =
+      storeScope.scope === "store" ? storeScope.storeId : null;
     return products.filter((product) => {
+      if (scopedStoreId !== null && product.store_id !== scopedStoreId) {
+        return false;
+      }
       if (view === "active") {
         return product.status === "active"
           && product.sale_type === filter.saleType;
@@ -351,7 +358,14 @@ export function OperatorProductsConsole({
       const scheduled = isScheduledProduct(product, productReferenceNow);
       return registrationStage === "scheduled" ? scheduled : !scheduled;
     });
-  }, [filter.saleType, productReferenceNow, products, registrationStage, view]);
+  }, [
+    filter.saleType,
+    productReferenceNow,
+    products,
+    registrationStage,
+    storeScope,
+    view,
+  ]);
   const visibleProducts = useMemo(() => {
     const query = filter.search.trim().toLowerCase();
     return workspaceProducts.filter((product) =>
@@ -414,6 +428,15 @@ export function OperatorProductsConsole({
     : permissions.canCreate;
 
   const update = (key: keyof FormState, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const scopedStores = useMemo(() => {
+    if (storeScope.scope === "store" && storeScope.storeId) {
+      const scoped = stores.filter(
+        (store) => store.id === storeScope.storeId,
+      );
+      return scoped.length > 0 ? scoped : stores;
+    }
+    return stores;
+  }, [storeScope, stores]);
   const clearSingleImages = () => {
     singleImagesRef.current.forEach((image) =>
       URL.revokeObjectURL(image.previewUrl),
@@ -430,8 +453,8 @@ export function OperatorProductsConsole({
     setSingleCreateOpen(false);
     setPublicationMode("next-day-10");
     setForm((current) => {
-      const storeId = current.storeId || stores[0]?.id || "";
-      const canPublish = stores.find((store) => store.id === storeId)?.canPublish === true;
+      const storeId = current.storeId || scopedStores[0]?.id || "";
+      const canPublish = scopedStores.find((store) => store.id === storeId)?.canPublish === true;
       return { ...emptyForm, storeId, status: canPublish ? "active" : "pending" };
     });
   };
@@ -447,9 +470,9 @@ export function OperatorProductsConsole({
     setEditingUpdatedAt(null);
     setSingleCreateOpen(keepOpen);
     setForm((current) => {
-      const storeId = current.storeId || stores[0]?.id || "";
+      const storeId = current.storeId || scopedStores[0]?.id || "";
       const canPublish =
-        stores.find((store) => store.id === storeId)?.canPublish === true;
+        scopedStores.find((store) => store.id === storeId)?.canPublish === true;
       return {
         ...emptyForm,
         saleType,
@@ -1263,9 +1286,9 @@ export function OperatorProductsConsole({
           setForm((current) => ({
             ...current,
             storeId,
-            status: stores.find((store) => store.id === storeId)?.canPublish === true ? current.status : "pending",
+            status: scopedStores.find((store) => store.id === storeId)?.canPublish === true ? current.status : "pending",
           }));
-        }} required value={form.storeId}>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</SelectInput>
+        }} required value={form.storeId}>{scopedStores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</SelectInput>
         {editingId ? <div className="flex flex-col gap-2 sm:flex-row"><SelectInput aria-label="판매 방식" className="flex-1" disabled={!saleSetupEditable} onChange={(event) => update("saleType", event.target.value)} value={form.saleType}><option value="fixed">즉시구매</option><option value="auction">경매</option></SelectInput><TextInput aria-label="가격" className="w-full sm:w-40" disabled={!saleSetupEditable} min="1" onChange={(event) => update("price", event.target.value)} placeholder="가격" required type="number" value={form.price} /></div> : form.saleType === "fixed" ? <TextInput aria-label="즉시구매 가격" min="1" onChange={(event) => update("price", event.target.value)} placeholder="즉시구매 가격" required type="number" value={form.price} /> : null}
         <TextArea aria-label="상품 설명" className="min-h-24 sm:col-span-2" disabled={!productFieldsEditable} onChange={(event) => update("description", event.target.value)} placeholder={editingId ? "상품 설명" : "상품 설명 (선택)"} required={Boolean(editingId)} value={form.description} />
 

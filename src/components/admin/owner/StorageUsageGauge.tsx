@@ -79,13 +79,13 @@ export function StorageUsageGauge() {
           headers: { Authorization: `Bearer ${session.access_token}` },
           cache: "no-store",
         });
-        const payload = await response.json() as StorageUsageData & { error?: string };
+        const payload = await response.json() as StorageUsageData & { error?: string; message?: string };
         if (!response.ok) {
-          throw new Error("스토리지 연동 인증 키를 확인해 주세요");
+          throw new Error(payload.message ?? payload.error ?? "스토리지 연동 인증 키를 확인해 주세요");
         }
         setData(payload);
-      } catch {
-        setNotice("스토리지 연동 인증 키를 확인해 주세요");
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : "스토리지 연동 인증 키를 확인해 주세요");
       }
     })();
   }, []);

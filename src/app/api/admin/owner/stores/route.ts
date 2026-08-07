@@ -184,6 +184,51 @@ export async function PATCH(request: Request) {
       return ownerAccessJsonResponse({ result: data });
     }
 
+    if (action === "operator_assign" || action === "operator_remove") {
+      const storeId = readUuid(body.storeId);
+      const operatorId = readUuid(body.operatorId);
+      const expectedStoreVersion = readVersion(body.expectedStoreVersion);
+      const expectedMembershipVersion =
+        body.expectedMembershipVersion === null ||
+        body.expectedMembershipVersion === undefined
+          ? null
+          : readVersion(body.expectedMembershipVersion);
+      if (
+        !storeId ||
+        !operatorId ||
+        expectedStoreVersion === null ||
+        (body.expectedMembershipVersion !== null &&
+          body.expectedMembershipVersion !== undefined &&
+          expectedMembershipVersion === null)
+      ) {
+        return ownerAccessJsonResponse(
+          {
+            error: "invalid_operator_placement",
+            message: "운영자 배치 정보를 확인해 주세요.",
+          },
+          400,
+        );
+      }
+
+      const { data, error } = await access.userClient.rpc(
+        "set_owner_store_operator",
+        {
+          p_store_id: storeId,
+          p_operator_id: operatorId,
+          p_active: action === "operator_assign",
+          p_expected_store_version: expectedStoreVersion,
+          p_expected_membership_version: expectedMembershipVersion,
+          p_idempotency_key: idempotencyKey,
+          p_reason:
+            action === "operator_assign"
+              ? "관리자 센터에서 운영자 배치"
+              : "관리자 센터에서 운영자 배치 해제",
+        },
+      );
+      if (error) return rpcError(error, "operator_placement_failed");
+      return ownerAccessJsonResponse({ result: data });
+    }
+
     return ownerAccessJsonResponse(
       { error: "unsupported_action", message: "지원하지 않는 작업입니다." },
       400,

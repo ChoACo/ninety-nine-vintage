@@ -8,7 +8,8 @@ import type { ProductEnhancementStatus } from "@/lib/ai/productEnhancement";
 
 export interface TokenUsageLogInput {
   provider?: string;
-  model: string;
+  model: string | null;
+  attemptedModels: readonly string[];
   endpoint?: string;
   usage: OpenRouterUsage;
   status?: ProductEnhancementStatus;
@@ -30,6 +31,7 @@ export async function logTokenUsage(input: TokenUsageLogInput): Promise<boolean>
     await rawClient(createSupabasePublicClient()).from("ai_token_usage_logs").insert({
       provider: input.provider ?? "openrouter",
       model: input.model,
+      attempted_models: [...input.attemptedModels],
       endpoint: input.endpoint ?? "chat/completions",
       prompt_tokens: input.usage.prompt_tokens,
       completion_tokens: input.usage.completion_tokens,

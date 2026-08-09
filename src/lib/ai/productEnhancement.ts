@@ -28,6 +28,7 @@ export interface AiEnhancementMeta {
   provider: "openrouter";
   model: string | null;
   attempts: number;
+  attemptedModels: string[];
   fallbackReason: string | null;
   usageLogged: boolean;
 }
@@ -94,6 +95,7 @@ export async function requestProductEnhancement({
       provider: "openrouter",
       model: null,
       attempts: 0,
+      attemptedModels: [],
       fallbackReason,
       usageLogged: false,
     },
@@ -112,22 +114,21 @@ export async function requestProductEnhancement({
       ai?: AiEnhancementMeta;
       error?: string;
     } | null;
-    if (response.ok && payload?.enhancement) {
-      const status = payload.status === "success"
-        || payload.status === "partial_fallback"
-        || payload.status === "fallback"
-        ? payload.status
-        : "success";
+    const status = payload?.status;
+    const ai = payload?.ai;
+    const validStatus = status === "success" || status === "partial_fallback" || status === "fallback";
+    const validMeta = ai?.provider === "openrouter" &&
+      (typeof ai.model === "string" || ai.model === null) &&
+      Number.isSafeInteger(ai.attempts) && ai.attempts >= 0 &&
+      Array.isArray(ai.attemptedModels) &&
+      ai.attemptedModels.every((model) => typeof model === "string") &&
+      (typeof ai.fallbackReason === "string" || ai.fallbackReason === null) &&
+      typeof ai.usageLogged === "boolean";
+    if (response.ok && payload?.enhancement && validStatus && validMeta && ai) {
       return {
         status,
         enhancement: payload.enhancement,
-        ai: payload.ai ?? {
-          provider: "openrouter",
-          model: null,
-          attempts: 0,
-          fallbackReason: null,
-          usageLogged: false,
-        },
+        ai,
       };
     }
     // 네트워크·쿼타·인식 오류는 등록을 막지 않고 기존 입력값을 유지합니다.

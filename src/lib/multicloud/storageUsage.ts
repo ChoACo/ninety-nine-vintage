@@ -51,14 +51,7 @@ export async function getStorageUsageSummary(): Promise<StorageUsageSummary> {
   const { admin } = createSupabaseServerClients();
   const rpc = rawAdminClient(admin);
 
-  const { data, error } = await rpc.rpc("multi_provider_records_exec", {
-    query_text: `select storage_provider_id,
-                        coalesce(sum(coalesce(pg_column_size(payload), 0)), 0)::bigint as total_bytes,
-                        count(*)::bigint as record_count
-                 from public.multi_provider_records
-                 group by storage_provider_id`,
-    params: [],
-  });
+  const { data, error } = await rpc.rpc("get_multicloud_storage_usage", {});
 
   const rows = (error ? [] : Array.isArray(data) ? data as Array<Record<string, unknown>> : []) as Array<Record<string, unknown>>;
   const aggregate = new Map<string, AggregateRow>();

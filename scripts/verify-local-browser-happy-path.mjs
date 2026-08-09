@@ -310,18 +310,23 @@ try {
   const detailState = await evaluate(
     client,
     `(() => {
-      const panel = document.querySelector(".mobile-detail-cta");
+      const bidHref = ${JSON.stringify(`${auctionHref}/bid`)};
+      const bidLink = [...document.querySelectorAll("a[href]")]
+        .find((element) => element.getAttribute("href") === bidHref);
       return {
         text: document.body.innerText,
-        cartDisabled: [...(panel?.querySelectorAll("button") ?? [])]
-          .some((button) => button.innerText.trim() === "장바구니" && button.disabled),
-        bidEnabled: [...(panel?.querySelectorAll("button") ?? [])]
-          .some((button) => button.innerText.trim() === "입찰하기" && !button.disabled),
+        hasCartAction: [...document.querySelectorAll("button, a")]
+          .some((element) => element.innerText.trim() === "장바구니"),
+        bidHref: bidLink?.getAttribute("href") ?? null,
       };
     })()`,
   );
-  assert.equal(detailState.cartDisabled, true);
-  assert.equal(detailState.bidEnabled, true);
+  assert.equal(detailState.hasCartAction, false, "Auction detail must not expose a cart action");
+  assert.equal(
+    detailState.bidHref,
+    `${auctionHref}/bid`,
+    "Auction detail must expose the canonical bid link",
+  );
 
   await navigate(client, `${baseUrl}/cart`);
   await waitForExpression(

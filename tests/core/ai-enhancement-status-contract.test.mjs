@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import {
   isAiEnhancementApplied,
@@ -9,6 +10,15 @@ import {
 
 const root = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, root), "utf8");
+
+test("actual model router executes primary fallback and all-model failure paths", () => {
+  const result = spawnSync(process.execPath, [
+    "--conditions=react-server",
+    "tests/integration/verify-ai-model-router.mjs",
+  ], { cwd: new URL("../../", import.meta.url), encoding: "utf8" });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /PASS AI model router execution paths/);
+});
 
 const ENHANCEMENT = {
   enhancedTitle: "보정 상품명",
@@ -26,7 +36,14 @@ const META = (
   attempts = 1,
   fallbackReason = null,
   usageLogged = true,
-) => ({ provider: "openrouter", model, attempts, fallbackReason, usageLogged });
+) => ({
+  provider: "openrouter",
+  model,
+  attempts,
+  attemptedModels: model ? [model] : [],
+  fallbackReason,
+  usageLogged,
+});
 
 function makeFile() {
   return new File([new Uint8Array([1])], "item.jpg", { type: "image/jpeg" });
@@ -149,6 +166,49 @@ test("client maps network failure to failed and never throws", async () => {
   }
 });
 
+test("client never promotes a missing or unknown status to success", async () => {
+  for (const status of [undefined, "completed"]) {
+    const restore = withFetch(async () => Response.json({
+      ...(status ? { status } : {}),
+      enhancement: ENHANCEMENT,
+      ai: META(),
+    }));
+    try {
+      const result = await requestProductEnhancement({
+        accessToken: "token",
+        images: [makeFile()],
+        source: { title: "원본" },
+        storeId: "00000000-0000-4000-8000-000000000000",
+      });
+      assert.equal(result.status, "failed");
+      assert.equal(result.enhancement, null);
+      assert.equal(isAiEnhancementApplied(result.status), false);
+    } finally {
+      restore();
+    }
+  }
+});
+
+test("client rejects malformed AI metadata", async () => {
+  const restore = withFetch(async () => Response.json({
+    status: "success",
+    enhancement: ENHANCEMENT,
+    ai: { ...META(), attemptedModels: "not-an-array" },
+  }));
+  try {
+    const result = await requestProductEnhancement({
+      accessToken: "token",
+      images: [makeFile()],
+      source: { title: "원본" },
+      storeId: "00000000-0000-4000-8000-000000000000",
+    });
+    assert.equal(result.status, "failed");
+    assert.equal(result.enhancement, null);
+  } finally {
+    restore();
+  }
+});
+
 test("processQuickRegistrationAI propagates the result envelope", async () => {
   const restore = withFetch(async () => Response.json({
     status: "success",
@@ -170,12 +230,13 @@ test("processQuickRegistrationAI propagates the result envelope", async () => {
 });
 
 test("static AI status contract is consistent across router, enhancer, tracker and migration", async () => {
-  const [router, enhancer, tracker, shared, migration, route] = await Promise.all([
+  const [router, enhancer, tracker, shared, migration, usageMigration, route] = await Promise.all([
     source("src/lib/ai/aiModelRouter.ts"),
     source("src/lib/ai/GeminiProductEnhancer.server.ts"),
     source("src/lib/ai/tokenTracker.ts"),
     source("src/lib/ai/productEnhancement.ts"),
     source("supabase/migrations/20260808120000_add_ai_usage_status_column.sql"),
+    source("supabase/migrations/20260809042244_clarify_ai_usage_attempts.sql"),
     source("src/app/api/admin/operator/products/enhance/route.ts"),
   ]);
   assert.match(shared, /ProductEnhancementStatus =/);
@@ -183,6 +244,7 @@ test("static AI status contract is consistent across router, enhancer, tracker a
   assert.match(shared, /isAiEnhancementApplied/);
   assert.match(router, /export const PRIMARY_MODEL = "google\/gemini-3.5-flash"/);
   assert.match(router, /attemptedModels/);
+  assert.match(router, /attemptedModelIds/);
   assert.match(router, /fallbackReason/);
   assert.match(router, /modelsTried/);
   assert.match(enhancer, /usedFallbackModel/);
@@ -192,5 +254,7 @@ test("static AI status contract is consistent across router, enhancer, tracker a
   assert.match(tracker, /row\.status !== "success" && row\.status !== "partial_fallback"/);
   assert.match(migration, /status TEXT NOT NULL DEFAULT 'success'/);
   assert.match(migration, /IN \('success', 'partial_fallback', 'fallback', 'failed'\)/);
+  assert.match(usageMigration, /alter column model drop not null/);
+  assert.match(usageMigration, /attempted_models text\[\]/);
   assert.match(route, /commerceJson\(result\)/);
 });

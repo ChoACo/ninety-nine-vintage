@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { processExcelWithAI } from "../../src/lib/ai/productEnhancement.ts";
+import { cleanupExpiredStorageRecords } from "../../src/lib/multicloud/cleanup.ts";
 
 const root = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, root), "utf8");
@@ -34,6 +35,7 @@ test("Excel AI enhancement limits concurrency and isolates failed rows", async (
         provider: "openrouter",
         model: "google/gemini-3.5-flash",
         attempts: 1,
+        attemptedModels: ["google/gemini-3.5-flash"],
         fallbackReason: null,
         usageLogged: true,
       },
@@ -103,8 +105,8 @@ test("Gemini route is server authenticated and keeps a safe fallback boundary", 
   assert.match(tokenTracker, /Promise<boolean>/);
 });
 
-test("multi-provider pool encodes capacity routing, exact reads, circuit breaking, and file-first TTL", async () => {
-  const [contracts, router, cleanup, adapters, productService, factory, migration] = await Promise.all([
+test("multi-provider reference code stays isolated while runtime registers only evidenced storage providers", async () => {
+  const [contracts, router, cleanup, adapters, productService, factory, migration, retirement] = await Promise.all([
     source("src/lib/multicloud/contracts.ts"),
     source("src/lib/multicloud/MultiProviderRouter.ts"),
     source("src/lib/multicloud/BatchCleanupScheduler.ts"),
@@ -112,6 +114,7 @@ test("multi-provider pool encodes capacity routing, exact reads, circuit breakin
     source("src/lib/multicloud/ProductService.ts"),
     source("src/lib/multicloud/factory.ts"),
     source("supabase/migrations/20260804000000_create_multi_provider_records.sql"),
+    source("supabase/migrations/20260809041957_retire_multicloud_raw_sql_executor.sql"),
   ]);
   assert.match(contracts, /interface StorageAdapter/);
   assert.match(contracts, /interface DatabaseAdapter/);
@@ -126,12 +129,38 @@ test("multi-provider pool encodes capacity routing, exact reads, circuit breakin
   assert.match(adapters, /class PostgresDatabaseAdapter/);
   assert.match(productService, /this\.ttlDays \* 86_400_000/);
   assert.match(factory, /new SupabaseStorageAdapter\("supabase"/);
-  assert.match(factory, /new PostgresDatabaseAdapter\("supabase"/);
-  assert.match(factory, /new MultiProviderRouter\(storages, databases\)/);
-  assert.match(factory, /multi_provider_records_exec/);
+  assert.match(factory, /getConfiguredStorageAdapters/);
+  assert.match(factory, /R2_ACCOUNT_ID/);
+  assert.doesNotMatch(factory, /S3CompatibleStorageAdapter|GcsStorageAdapter|multi_provider_records_exec/);
   assert.match(migration, /create table if not exists public\.multi_provider_records/);
   assert.match(migration, /multi_provider_records_exec/);
   assert.match(migration, /revoke all on table[\s\S]*multi_provider_records/);
+  assert.match(retirement, /drop function if exists app_private\.multi_provider_records_exec/);
+  assert.match(retirement, /get_multicloud_storage_usage/);
+  assert.match(retirement, /grant execute[\s\S]*to service_role/);
+});
+
+test("storage cleanup deletes objects before locators and preserves failures for retry", async () => {
+  const events = [];
+  const adapters = new Map([
+    ["supabase", {
+      id: "supabase",
+      delete: async (key) => events.push(`object:${key}`),
+    }],
+  ]);
+  const report = await cleanupExpiredStorageRecords([
+    { id: "row-1", storage_provider_id: "supabase", storage_key: "products/one" },
+    { id: "row-2", storage_provider_id: "r2", storage_key: "products/two" },
+  ], adapters, async (id) => events.push(`locator:${id}`));
+
+  assert.deepEqual(events, ["object:products/one", "locator:row-1"]);
+  assert.equal(report.scanned, 2);
+  assert.equal(report.deleted, 1);
+  assert.deepEqual(report.failed, [{
+    id: "row-2",
+    providerId: "r2",
+    reason: "storage_provider_not_configured",
+  }]);
 });
 
 test("storage usage gauge exposes provider capacity and an active rollover target", async () => {
@@ -144,9 +173,8 @@ test("storage usage gauge exposes provider capacity and an active rollover targe
     source("supabase/migrations/20260804020000_add_product_ai_metadata.sql"),
     source(".env.example"),
   ]);
-  assert.match(service, /multi_provider_records_exec/);
+  assert.match(service, /get_multicloud_storage_usage/);
   assert.match(service, /storage_provider_id/);
-  assert.match(service, /pg_column_size/);
   assert.match(service, /totalUsedBytes/);
   assert.match(service, /rolloverThreshold/);
   assert.match(service, /activeProviderId/);

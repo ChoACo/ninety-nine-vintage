@@ -146,7 +146,7 @@ ${untrustedSource}`;
     let totalAttempts = 0;
     let usage = emptyUsage;
     let lastError: Error | null = null;
-    let lastModelAttempted: string = PRIMARY_MODEL;
+    const attemptedModels: string[] = [];
 
     for (let round = 0; round < 3; round++) {
       let result: RouteCompletionResult | null = null;
@@ -166,7 +166,7 @@ ${untrustedSource}`;
           temperature: 0.3,
         });
         totalAttempts += result.attemptedModels;
-        lastModelAttempted = result.usedModel;
+        attemptedModels.push(...result.attemptedModelIds);
         usage = {
           prompt_tokens: usage.prompt_tokens + result.usage.prompt_tokens,
           completion_tokens: usage.completion_tokens + result.usage.completion_tokens,
@@ -183,6 +183,7 @@ ${untrustedSource}`;
           : "success";
         const usageLogged = await logTokenUsage({
           model: result.usedModel,
+          attemptedModels,
           usage,
           status,
         });
@@ -192,6 +193,7 @@ ${untrustedSource}`;
           ai: this.meta({
             model: result.usedModel,
             attempts: totalAttempts,
+            attemptedModels,
             fallbackReason: usedFallbackModel
               ? result.fallbackReason ?? lastError?.message ?? "primary model failed"
               : null,
@@ -202,10 +204,13 @@ ${untrustedSource}`;
         if (error instanceof DOMException && error.name === "AbortError") throw error;
         lastError = error instanceof Error ? error : new Error(String(error));
         const modelsTried = (lastError as Error & { modelsTried?: number }).modelsTried ?? 0;
+        const failedModelIds = (lastError as Error & { attemptedModelIds?: string[] }).attemptedModelIds ?? [];
+        attemptedModels.push(...failedModelIds);
         if (!result) totalAttempts += modelsTried;
         if (round >= 2) {
           const usageLogged = await logTokenUsage({
-            model: lastModelAttempted,
+            model: null,
+            attemptedModels,
             usage,
             status: "fallback",
           });
@@ -215,6 +220,7 @@ ${untrustedSource}`;
             ai: this.meta({
               model: null,
               attempts: totalAttempts,
+              attemptedModels,
               fallbackReason: lastError.message,
               usageLogged,
             }),
@@ -226,9 +232,10 @@ ${untrustedSource}`;
     throw new Error("enhance: unreachable");
   }
 
-  private meta({ model, attempts, fallbackReason, usageLogged }: {
+  private meta({ model, attempts, attemptedModels, fallbackReason, usageLogged }: {
     model: string | null;
     attempts: number;
+    attemptedModels: readonly string[];
     fallbackReason: string | null;
     usageLogged: boolean;
   }): AiEnhancementMeta {
@@ -236,6 +243,7 @@ ${untrustedSource}`;
       provider: "openrouter",
       model,
       attempts,
+      attemptedModels: [...attemptedModels],
       fallbackReason,
       usageLogged,
     };

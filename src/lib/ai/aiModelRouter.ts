@@ -45,6 +45,7 @@ export interface RouteCompletionResult {
   usedModel: string;
   usage: OpenRouterUsage;
   attemptedModels: number;
+  attemptedModelIds: string[];
   fallbackReason: string | null;
 }
 
@@ -59,10 +60,12 @@ export async function routeCompletion(
 
   let lastError: Error | null = null;
   let attempted = 0;
+  const attemptedModelIds: string[] = [];
 
   for (let index = 0; index < MODELS.length; index += 1) {
     const model = MODELS[index];
     attempted += 1;
+    attemptedModelIds.push(model);
     try {
       const response = await fetch(OR_API, {
         method: "POST",
@@ -92,6 +95,7 @@ export async function routeCompletion(
         usedModel: model,
         usage: data.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
         attemptedModels: attempted,
+        attemptedModelIds: [...attemptedModelIds],
         fallbackReason: lastError?.message ?? null,
       };
     } catch (error) {
@@ -102,6 +106,6 @@ export async function routeCompletion(
 
   throw Object.assign(
     lastError ?? new Error("모든 모델 시도가 실패했습니다."),
-    { modelsTried: attempted },
+    { modelsTried: attempted, attemptedModelIds: [...attemptedModelIds] },
   );
 }

@@ -2322,10 +2322,12 @@ export type Database = {
           created_at: string
           delivery_completed_at: string | null
           fulfillment_center_id: string
+          fulfillment_group_id: string | null
           id: string
           member_id: string
           packed_at: string | null
           packed_by: string | null
+          processing_store_id: string | null
           settlement_method: string
           shipped_at: string | null
           shipped_by: string | null
@@ -2334,6 +2336,9 @@ export type Database = {
           shipping_fee_waiver_id: string | null
           status: string
           tracking_number: string | null
+          unit_kind: string | null
+          unit_snapshot: Json
+          unit_store_id: string | null
           updated_at: string
           version: number
         }
@@ -2347,10 +2352,12 @@ export type Database = {
           created_at?: string
           delivery_completed_at?: string | null
           fulfillment_center_id: string
+          fulfillment_group_id?: string | null
           id?: string
           member_id: string
           packed_at?: string | null
           packed_by?: string | null
+          processing_store_id?: string | null
           settlement_method: string
           shipped_at?: string | null
           shipped_by?: string | null
@@ -2359,6 +2366,9 @@ export type Database = {
           shipping_fee_waiver_id?: string | null
           status?: string
           tracking_number?: string | null
+          unit_kind?: string | null
+          unit_snapshot?: Json
+          unit_store_id?: string | null
           updated_at?: string
           version?: number
         }
@@ -2372,10 +2382,12 @@ export type Database = {
           created_at?: string
           delivery_completed_at?: string | null
           fulfillment_center_id?: string
+          fulfillment_group_id?: string | null
           id?: string
           member_id?: string
           packed_at?: string | null
           packed_by?: string | null
+          processing_store_id?: string | null
           settlement_method?: string
           shipped_at?: string | null
           shipped_by?: string | null
@@ -2384,6 +2396,9 @@ export type Database = {
           shipping_fee_waiver_id?: string | null
           status?: string
           tracking_number?: string | null
+          unit_kind?: string | null
+          unit_snapshot?: Json
+          unit_store_id?: string | null
           updated_at?: string
           version?: number
         }
@@ -2410,6 +2425,20 @@ export type Database = {
             referencedColumns: ["id", "business_id"]
           },
           {
+            foreignKeyName: "inventory_shipments_fulfillment_group_id_fkey"
+            columns: ["fulfillment_group_id"]
+            isOneToOne: false
+            referencedRelation: "store_fulfillment_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_shipments_processing_store_id_fkey"
+            columns: ["processing_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inventory_shipments_shipping_credit_ledger_id_fkey"
             columns: ["shipping_credit_ledger_id"]
             isOneToOne: false
@@ -2421,6 +2450,13 @@ export type Database = {
             columns: ["shipping_fee_payment_id"]
             isOneToOne: false
             referencedRelation: "shipping_fee_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_shipments_unit_store_id_fkey"
+            columns: ["unit_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
           {

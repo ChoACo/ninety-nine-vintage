@@ -316,6 +316,7 @@ test("public shop surfaces expose shopper controls while admin links remain sess
   );
   assert.match(authStatus, /label: "직원센터"/);
   assert.match(authStatus, /aria-label="로그아웃"/);
+  assert.match(authStatus, /window\.location\.assign\(`\$\{basePath\}\/account\/login`\)/);
   for (const source of [authStatus, accountPage]) {
     assert.doesNotMatch(source, /\/api\/account\/session/);
   }

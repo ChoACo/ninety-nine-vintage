@@ -59,7 +59,9 @@ export function OwnerPlatformConsole() {
       const accessToken = data.session?.access_token ?? null;
       setToken(accessToken);
       if (accessToken) return load(accessToken);
-    }).catch(() => setNotice("로그인 세션을 확인하지 못했습니다."));
+    }).catch((error: unknown) => setNotice(
+      error instanceof Error ? error.message : "플랫폼 설정을 불러오지 못했습니다.",
+    ));
   }, [load]);
 
   const selectedGroup = useMemo(

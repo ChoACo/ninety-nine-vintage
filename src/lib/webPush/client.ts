@@ -153,7 +153,10 @@ export async function syncExistingWebPush(accessToken: string) {
 
 export async function disableWebPush(accessToken: string) {
   if (!("serviceWorker" in navigator)) return;
-  const registration = await navigator.serviceWorker.getRegistration("/");
+  const registration = await Promise.race([
+    navigator.serviceWorker.getRegistration("/"),
+    new Promise<undefined>((resolve) => window.setTimeout(resolve, 1_000)),
+  ]);
   const subscription = await registration?.pushManager.getSubscription();
   if (!subscription) return;
 
@@ -164,8 +167,12 @@ export async function disableWebPush(accessToken: string) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ endpoint: subscription.endpoint }),
+    signal: AbortSignal.timeout(2_000),
   }).catch(() => undefined);
-  await subscription.unsubscribe().catch(() => false);
+  await Promise.race([
+    subscription.unsubscribe().catch(() => false),
+    new Promise<false>((resolve) => window.setTimeout(() => resolve(false), 1_000)),
+  ]);
 }
 
 export async function showTestWebPushNotification() {

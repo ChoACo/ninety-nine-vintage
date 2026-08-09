@@ -8,8 +8,10 @@ import {
   createSupabaseServerClients,
 } from "@/lib/supabase/server";
 
-type LocalTestRole = "member" | "operator" | "owner";
+type LocalTestRole = "band_member" | "employee" | "member" | "operator" | "owner";
 type LocalTestAccountSlot =
+  | "band-member"
+  | "employee-primary"
   | "member-primary"
   | "operator-primary"
   | "operator-secondary"
@@ -19,6 +21,16 @@ const TEST_ACCOUNTS: Record<
   LocalTestAccountSlot,
   { displayName: string; email: string; role: LocalTestRole }
 > = {
+  "band-member": {
+    displayName: "로컬 테스트 밴드회원",
+    email: "local.band-member@ninety-nine.test",
+    role: "band_member",
+  },
+  "employee-primary": {
+    displayName: "로컬 테스트 직원",
+    email: "local.employee@ninety-nine.test",
+    role: "employee",
+  },
   "member-primary": {
     displayName: "로컬 테스트 회원",
     email: "local.member.admin-1@ninety-nine.test",
@@ -85,6 +97,8 @@ function isManagedLocalTestAccount(
 
 function readAccountSlot(value: unknown): LocalTestAccountSlot | null {
   if (
+    value === "band-member" ||
+    value === "employee-primary" ||
     value === "member-primary" ||
     value === "operator-primary" ||
     value === "operator-secondary" ||
@@ -178,9 +192,23 @@ export async function POST(request: Request) {
       created = true;
     }
 
+    let reportsToOperatorId: string | null = null;
+    if (role === "employee") {
+      const operator = await findTestAccount(
+        TEST_ACCOUNTS["operator-primary"].email,
+        listed.data.users,
+      );
+      if (!operator) return response({ error: "employee_operator_required" }, 409);
+      reportsToOperatorId = operator.id;
+    }
+
     const { error: roleError } = await admin
       .from("account_access_roles")
-      .upsert({ role_code: role, user_id: user.id }, { onConflict: "user_id" });
+      .upsert({
+        reports_to_operator_id: reportsToOperatorId,
+        role_code: role,
+        user_id: user.id,
+      }, { onConflict: "user_id" });
     if (roleError) {
       if (created) await admin.auth.admin.deleteUser(user.id);
       return response({ error: "role_setup_failed" }, 503);
@@ -225,6 +253,40 @@ export async function POST(request: Request) {
       if (membershipError) {
         if (created) await admin.auth.admin.deleteUser(user.id);
         return response({ error: "operator_store_setup_failed" }, 503);
+      }
+    }
+
+    if (role === "employee" && reportsToOperatorId) {
+      const { data: operatorMembership, error: operatorMembershipError } = await admin
+        .from("store_memberships")
+        .select("business_id, store_id")
+        .eq("user_id", reportsToOperatorId)
+        .eq("membership_role", "operator")
+        .eq("status", "active")
+        .maybeSingle();
+      if (operatorMembershipError || !operatorMembership) {
+        if (created) await admin.auth.admin.deleteUser(user.id);
+        return response({ error: "employee_store_setup_failed" }, 503);
+      }
+      const { error: employeeMembershipError } = await admin
+        .from("store_memberships")
+        .upsert({
+          business_id: operatorMembership.business_id,
+          confirm_payments: false,
+          create_shipments: false,
+          manage_products: false,
+          manage_staff: false,
+          membership_role: "employee",
+          prepare_orders: true,
+          publish_products: false,
+          status: "active",
+          store_id: operatorMembership.store_id,
+          user_id: user.id,
+          view_reports: false,
+        }, { onConflict: "store_id,user_id" });
+      if (employeeMembershipError) {
+        if (created) await admin.auth.admin.deleteUser(user.id);
+        return response({ error: "employee_store_setup_failed" }, 503);
       }
     }
 

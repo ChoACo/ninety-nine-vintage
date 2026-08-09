@@ -26,6 +26,10 @@ test("local test accounts stay dormant unless the isolated local-test launcher e
   assert.match(launcher, /LOCAL_TEST_ACCOUNTS_ENABLED: "true"/);
   assert.match(envExample, /LOCAL_TEST_ACCOUNTS_ENABLED=false/);
   assert.match(route, /canUseLocalTestAccounts\(\)/);
+  assert.match(route, /"band-member"/);
+  assert.match(route, /"employee-primary"/);
+  assert.match(route, /reports_to_operator_id: reportsToOperatorId/);
+  assert.match(route, /membership_role: "employee"/);
   assert.match(route, /local_test_account: true/);
   assert.match(route, /account_access_roles/);
   assert.match(route, /member-primary/);

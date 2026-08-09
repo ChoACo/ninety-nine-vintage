@@ -738,6 +738,112 @@ export type Database = {
         }
         Relationships: []
       }
+      commerce_payment_confirmation_request_events: {
+        Row: {
+          actor_user_id: string | null
+          event_kind: string
+          id: number
+          metadata: Json
+          occurred_at: string
+          request_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          event_kind: string
+          id?: never
+          metadata?: Json
+          occurred_at?: string
+          request_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          event_kind?: string
+          id?: never
+          metadata?: Json
+          occurred_at?: string
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_payment_confirmation_request_events_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_payment_confirmation_request_events_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_payment_confirmation_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_payment_confirmation_requests: {
+        Row: {
+          first_requested_at: string
+          id: string
+          last_requested_at: string
+          member_id: string
+          order_id: string
+          reminder_count: number
+          resolution: string | null
+          resolved_at: string | null
+          status: string
+          transfer_id: string
+          version: number
+        }
+        Insert: {
+          first_requested_at?: string
+          id?: string
+          last_requested_at?: string
+          member_id: string
+          order_id: string
+          reminder_count?: number
+          resolution?: string | null
+          resolved_at?: string | null
+          status?: string
+          transfer_id: string
+          version?: number
+        }
+        Update: {
+          first_requested_at?: string
+          id?: string
+          last_requested_at?: string
+          member_id?: string
+          order_id?: string
+          reminder_count?: number
+          resolution?: string | null
+          resolved_at?: string | null
+          status?: string
+          transfer_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_payment_confirmation_requests_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_payment_confirmation_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_payment_confirmation_requests_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: true
+            referencedRelation: "commerce_order_transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_shipment_events: {
         Row: {
           actor_kind: string
@@ -7452,6 +7558,21 @@ export type Database = {
           last_seen_at: string
         }[]
       }
+      get_owner_payment_confirmation_queue: {
+        Args: never
+        Returns: {
+          buyer_display_name: string
+          elapsed_seconds: number
+          expected_amount: number
+          first_requested_at: string
+          last_requested_at: string
+          order_id: string
+          reminder_count: number
+          request_id: string
+          request_version: number
+          transfer_status: string
+        }[]
+      }
       get_owner_store_management: { Args: never; Returns: Json }
       get_owner_store_platform_management: { Args: never; Returns: Json }
       get_owner_withdrawn_member_retention: {
@@ -8601,6 +8722,10 @@ export type Database = {
           p_settlement_method: string
           p_shipping_fee_amount: number
         }
+        Returns: Json
+      }
+      request_commerce_payment_confirmation: {
+        Args: { p_idempotency_key: string; p_order_id: string }
         Returns: Json
       }
       request_inventory_shipment: {

@@ -41,6 +41,17 @@ interface Order {
   commerce_order_items?: OrderItem[];
   transfer?: Transfer | null;
   legacyPaymentHistory?: LegacyPaymentHistory | null;
+  paymentConfirmation?: {
+    eligibleAt: string | null;
+    canRequest: boolean;
+    request: {
+      id: string;
+      status: "open" | "resolved";
+      first_requested_at: string;
+      last_requested_at: string;
+      reminder_count: number;
+    } | null;
+  };
 }
 
 const statusLabels: Record<string, string> = {
@@ -104,6 +115,57 @@ function OrderProductCard({ basePath, item, surface }: { basePath: "" | "/m"; it
 export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?: "" | "/m"; surface?: "desktop" | "mobile" }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [confirmationBusyOrderId, setConfirmationBusyOrderId] = useState<string | null>(null);
+  const [confirmationNotice, setConfirmationNotice] = useState("");
+
+  const requestPaymentConfirmation = async (orderId: string) => {
+    if (confirmationBusyOrderId) return;
+    setConfirmationBusyOrderId(orderId);
+    setConfirmationNotice("");
+    try {
+      const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
+      if (!session) throw new Error("로그인 상태를 확인해 주세요.");
+      const response = await fetch(`/api/orders/${orderId}/payment-confirmation-request`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        request?: {
+          id: string;
+          status: "open" | "resolved";
+          firstRequestedAt: string;
+          lastRequestedAt: string;
+          reminderCount: number;
+        };
+      };
+      if (!response.ok) throw new Error(payload.error ?? "입금 확인 요청을 보내지 못했습니다.");
+      if (!payload.request) throw new Error("입금 확인 요청 결과를 확인하지 못했습니다.");
+      setOrders((current) => current.map((order) => order.id === orderId ? {
+        ...order,
+        paymentConfirmation: {
+          eligibleAt: order.paymentConfirmation?.eligibleAt ?? null,
+          canRequest: true,
+          request: {
+            id: payload.request!.id,
+            status: payload.request!.status,
+            first_requested_at: payload.request!.firstRequestedAt,
+            last_requested_at: payload.request!.lastRequestedAt,
+            reminder_count: payload.request!.reminderCount,
+          },
+        },
+      } : order));
+      setConfirmationNotice("소유자에게 입금 확인을 요청했습니다.");
+    } catch (error) {
+      setConfirmationNotice(error instanceof Error ? error.message : "입금 확인 요청을 보내지 못했습니다.");
+    } finally {
+      setConfirmationBusyOrderId(null);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -235,6 +297,7 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
         </Link>
       </div>
       <div className="divide-y divide-line border-y border-line">
+        {confirmationNotice && <p className="py-3 text-xs font-bold" role="status">{confirmationNotice}</p>}
         {orders.map((order) => (
             <article className="py-5" key={order.id}>
               <div className={`flex gap-3 ${surface === "desktop" ? "flex-row items-center justify-between gap-4" : "flex-col"}`}>
@@ -269,6 +332,24 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
                   과거 외부 결제 기록 · {order.legacyPaymentHistory.paymentId} · {order.legacyPaymentHistory.providerStatus ?? order.legacyPaymentHistory.paymentStatus}
                 </p>
               )}
+              {order.status === "awaiting_payment" &&
+                order.paymentConfirmation?.canRequest && (
+                  <div className="mt-3 flex items-center justify-between gap-3 border border-line px-3 py-3 text-[11px]">
+                    <span>
+                      {order.paymentConfirmation.request?.status === "open"
+                        ? `입금 확인 요청됨 · 재알림 ${order.paymentConfirmation.request.reminder_count}회`
+                        : "12시간 이상 확인되지 않았다면 소유자에게 확인을 요청할 수 있습니다."}
+                    </span>
+                    <button
+                      className="shrink-0 bg-ink px-3 py-2 font-bold text-paper disabled:opacity-50"
+                      disabled={confirmationBusyOrderId === order.id}
+                      onClick={() => void requestPaymentConfirmation(order.id)}
+                      type="button"
+                    >
+                      {order.paymentConfirmation.request?.status === "open" ? "다시 알림" : "결제 확인 요청하기"}
+                    </button>
+                  </div>
+                )}
             </article>
         ))}
       </div>

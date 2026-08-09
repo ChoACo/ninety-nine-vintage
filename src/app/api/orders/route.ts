@@ -30,15 +30,46 @@ export async function GET(request: Request) {
   if (legacyProviderPaymentError) {
     return commerceJson({ error: "orders_unavailable" }, 503);
   }
+  const { data: confirmationRequests, error: confirmationRequestError } =
+    orderIds.length === 0
+      ? { data: [], error: null }
+      : await auth.user
+          .from("commerce_payment_confirmation_requests")
+          .select("id, order_id, status, first_requested_at, last_requested_at, reminder_count")
+          .in("order_id", orderIds);
+  if (confirmationRequestError) {
+    return commerceJson({ error: "orders_unavailable" }, 503);
+  }
   const transferByOrder = new Map((transfers ?? []).map((transfer) => [transfer.order_id, transfer]));
   const legacyProviderPaymentByOrder = new Map(
     (legacyProviderPayments ?? [])
       .filter((payment) => Boolean(payment.commerce_order_id))
       .map((payment) => [payment.commerce_order_id, payment]),
   );
+  const confirmationRequestByOrder = new Map(
+    (confirmationRequests ?? []).map((confirmationRequest) => [
+      confirmationRequest.order_id,
+      confirmationRequest,
+    ]),
+  );
   return commerceJson({ orders: (orders ?? []).map((order) => ({
     ...order,
     transfer: transferByOrder.get(order.id) ?? null,
+    paymentConfirmation: (() => {
+      const transfer = transferByOrder.get(order.id);
+      const confirmationRequest = confirmationRequestByOrder.get(order.id) ?? null;
+      const eligibleAt = transfer?.requested_at
+        ? new Date(Date.parse(transfer.requested_at) + 12 * 60 * 60 * 1000).toISOString()
+        : null;
+      return {
+        eligibleAt,
+        canRequest: Boolean(
+          eligibleAt && Date.now() >= Date.parse(eligibleAt) &&
+          ["awaiting_transfer", "partially_paid"].includes(transfer?.status ?? ""),
+        ),
+        request: confirmationRequest,
+      };
+    })(),
     legacyPaymentHistory: (() => {
       const payment = legacyProviderPaymentByOrder.get(order.id);
       if (!payment) return null;

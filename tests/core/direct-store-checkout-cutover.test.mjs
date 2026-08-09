@@ -7,7 +7,7 @@ const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 test("direct-store checkout retires the legacy center-dependent triggers", async () => {
   const [cutover, inventoryV2] = await Promise.all([
-    source("supabase/migrations/20260809103227_retire_legacy_central_checkout_triggers.sql"),
+    source("supabase/migrations/20260809103554_retire_legacy_central_checkout_triggers.sql"),
     source("supabase/migrations/20260722084550_add_unified_inventory_fulfillment_v2.sql"),
   ]);
 

@@ -1,13 +1,20 @@
 import "server-only";
 
-import { routeCompletion } from "@/lib/ai/aiModelRouter";
+import { PRIMARY_MODEL, routeCompletion } from "@/lib/ai/aiModelRouter";
+import type {
+  OpenRouterUsage,
+  RouteCompletionResult,
+} from "@/lib/ai/aiModelRouter";
 import {
   BATCH_CLOTHING_CATEGORIES,
   getBatchClothingCategory,
 } from "@/lib/import/categoryIds";
 import type {
+  AiEnhancementMeta,
   ProductEnhancement,
+  ProductEnhancementResult,
   ProductEnhancementSource,
+  ProductEnhancementStatus,
   ProductGender,
 } from "@/lib/ai/productEnhancement";
 import { logTokenUsage } from "@/lib/ai/tokenTracker";
@@ -88,7 +95,7 @@ export class GeminiProductEnhancer {
   async enhance(
     source: ProductEnhancementSource,
     images: readonly File[],
-  ): Promise<ProductEnhancement> {
+  ): Promise<ProductEnhancementResult> {
     if (images.length === 0) throw new Error("분석할 상품 사진이 없습니다.");
     const selectedImages = images.slice(0, 2);
     if (selectedImages.some((image) => image.size <= 0 || image.size > MAX_IMAGE_BYTES)) {
@@ -131,10 +138,20 @@ ${untrustedSource}`;
       },
     })));
 
-    let attempt = 0;
-    while (attempt < 3) {
+    const emptyUsage: OpenRouterUsage = {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+    };
+    let totalAttempts = 0;
+    let usage = emptyUsage;
+    let lastError: Error | null = null;
+    let lastModelAttempted: string = PRIMARY_MODEL;
+
+    for (let round = 0; round < 3; round++) {
+      let result: RouteCompletionResult | null = null;
       try {
-        const result = await routeCompletion({
+        result = await routeCompletion({
           messages: [
             { role: "user", content: [systemPrompt, ...imageParts] },
           ],
@@ -148,24 +165,79 @@ ${untrustedSource}`;
           max_tokens: 1500,
           temperature: 0.3,
         });
-
-        logTokenUsage({ model: result.usedModel, usage: result.usage }).catch(() => {
-          console.error("[product-enhancement] failed to log token usage");
-        });
+        totalAttempts += result.attemptedModels;
+        lastModelAttempted = result.usedModel;
+        usage = {
+          prompt_tokens: usage.prompt_tokens + result.usage.prompt_tokens,
+          completion_tokens: usage.completion_tokens + result.usage.completion_tokens,
+          total_tokens: usage.total_tokens + result.usage.total_tokens,
+        };
 
         const text = result.response.choices[0]?.message?.content;
         if (!text) throw new Error("AI가 분석 결과를 반환하지 않았습니다.");
         const parsed = JSON.parse(text) as GeminiRawEnhancement;
-        return normalizeResponse(parsed, source);
+
+        const usedFallbackModel = result.usedModel !== PRIMARY_MODEL;
+        const status: ProductEnhancementStatus = usedFallbackModel
+          ? "partial_fallback"
+          : "success";
+        const usageLogged = await logTokenUsage({
+          model: result.usedModel,
+          usage,
+          status,
+        });
+        return {
+          status,
+          enhancement: normalizeResponse(parsed, source),
+          ai: this.meta({
+            model: result.usedModel,
+            attempts: totalAttempts,
+            fallbackReason: usedFallbackModel
+              ? result.fallbackReason ?? lastError?.message ?? "primary model failed"
+              : null,
+            usageLogged,
+          }),
+        };
       } catch (error) {
-        attempt++;
-        if (attempt >= 3) {
-          console.error("[product-enhancement] All attempts failed, returning fallback:", error);
-          return normalizeResponse({}, source);
+        if (error instanceof DOMException && error.name === "AbortError") throw error;
+        lastError = error instanceof Error ? error : new Error(String(error));
+        const modelsTried = (lastError as Error & { modelsTried?: number }).modelsTried ?? 0;
+        if (!result) totalAttempts += modelsTried;
+        if (round >= 2) {
+          const usageLogged = await logTokenUsage({
+            model: lastModelAttempted,
+            usage,
+            status: "fallback",
+          });
+          return {
+            status: "fallback",
+            enhancement: normalizeResponse({}, source),
+            ai: this.meta({
+              model: null,
+              attempts: totalAttempts,
+              fallbackReason: lastError.message,
+              usageLogged,
+            }),
+          };
         }
-        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, round)));
       }
     }
-    return normalizeResponse({}, source);
+    throw new Error("enhance: unreachable");
+  }
+
+  private meta({ model, attempts, fallbackReason, usageLogged }: {
+    model: string | null;
+    attempts: number;
+    fallbackReason: string | null;
+    usageLogged: boolean;
+  }): AiEnhancementMeta {
+    return {
+      provider: "openrouter",
+      model,
+      attempts,
+      fallbackReason,
+      usageLogged,
+    };
   }
 }

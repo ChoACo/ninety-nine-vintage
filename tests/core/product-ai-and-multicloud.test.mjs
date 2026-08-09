@@ -17,8 +17,9 @@ test("Excel AI enhancement limits concurrency and isolates failed rows", async (
     maximumActive = Math.max(maximumActive, active);
     await new Promise((resolve) => setTimeout(resolve, 5));
     active -= 1;
-    if (current === 3) return Response.json({ error: "quota" }, { status: 429 });
+    if (current === 3) return Response.json({ error: "quota", status: "failed" }, { status: 429 });
     return Response.json({
+      status: "success",
       enhancement: {
         enhancedTitle: `보정 ${current}`,
         brand: "빈티지",
@@ -28,6 +29,13 @@ test("Excel AI enhancement limits concurrency and isolates failed rows", async (
         sizeLabel: "",
         refinedDescription: "보정 설명",
         hashtags: ["#빈티지"],
+      },
+      ai: {
+        provider: "openrouter",
+        model: "google/gemini-3.5-flash",
+        attempts: 1,
+        fallbackReason: null,
+        usageLogged: true,
       },
     });
   };
@@ -41,7 +49,11 @@ test("Excel AI enhancement limits concurrency and isolates failed rows", async (
     }));
     const results = await processExcelWithAI(items, "token", "00000000-0000-4000-8000-000000000000", { concurrency: 5 });
     assert.equal(results.length, 12);
+    assert.equal(results[3].status, "failed");
     assert.equal(results[3].enhancement, null);
+    assert.equal(results[3].ai.fallbackReason, "quota");
+    assert.equal(results[0].status, "success");
+    assert.equal(results[0].enhancement?.enhancedTitle, "보정 0");
     assert.ok(maximumActive <= 5);
     assert.ok(maximumActive > 1);
   } finally {
@@ -50,15 +62,18 @@ test("Excel AI enhancement limits concurrency and isolates failed rows", async (
 });
 
 test("Gemini route is server authenticated and keeps a safe fallback boundary", async () => {
-  const [route, enhancer, consoleSource, modal, quotaMigration] = await Promise.all([
+  const [route, enhancer, consoleSource, modal, quotaMigration, statusMigration, tokenTracker] = await Promise.all([
     source("src/app/api/admin/operator/products/enhance/route.ts"),
     source("src/lib/ai/GeminiProductEnhancer.server.ts"),
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
     source("src/components/admin/operator/OperatorXlsxImportModal.tsx"),
     source("supabase/migrations/20260803151227_reserve_gemini_product_enhancement_daily_quota.sql"),
+    source("supabase/migrations/20260808120000_add_ai_usage_status_column.sql"),
+    source("src/lib/ai/tokenTracker.ts"),
   ]);
   assert.match(route, /authenticateStaffRequest\(request, true\)/);
   assert.match(route, /product_enhancement_unavailable/);
+  assert.match(route, /status:\s*"failed"/);
   assert.match(enhancer, /RESPONSE_JSON_SCHEMA/);
   assert.match(enhancer, /routeCompletion/);
   assert.match(enhancer, /aiModelRouter/);
@@ -74,6 +89,18 @@ test("Gemini route is server authenticated and keeps a safe fallback boundary", 
   assert.match(quotaMigration, /where usage\.request_count < 300/);
   assert.match(quotaMigration, /role\.role_code in \('owner', 'operator'\)/);
   assert.match(quotaMigration, /revoke all on table[\s\S]*from public, anon, authenticated/);
+  // Step 5: AI 결과 상태 계약 (success / partial_fallback / fallback / failed)
+  assert.match(enhancer, /"partial_fallback"/);
+  assert.match(enhancer, /status: "fallback"/);
+  assert.match(enhancer, /usageLogged/);
+  assert.match(enhancer, /attemptedModels/);
+  assert.match(enhancer, /logTokenUsage/);
+  assert.match(consoleSource, /isAiEnhancementApplied/);
+  assert.match(modal, /isAiEnhancementApplied/);
+  assert.match(statusMigration, /ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'success'/);
+  assert.match(statusMigration, /IN \('success', 'partial_fallback', 'fallback', 'failed'\)/);
+  assert.match(tokenTracker, /status:\s*input\.status \?\? "success"/);
+  assert.match(tokenTracker, /Promise<boolean>/);
 });
 
 test("multi-provider pool encodes capacity routing, exact reads, circuit breaking, and file-first TTL", async () => {

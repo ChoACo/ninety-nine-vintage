@@ -25,6 +25,7 @@ import {
 } from "@/lib/import/batchAuction";
 import { getBatchClothingCategory } from "@/lib/import/categoryIds";
 import {
+  isAiEnhancementApplied,
   processExcelWithAI,
   type ProductEnhancement,
 } from "@/lib/ai/productEnhancement";
@@ -276,14 +277,22 @@ export function OperatorXlsxImportModal({
         onProgress: (completed, total) => setAiProgress({ completed, total }),
       });
       const next = new Map<number, ProductEnhancement>();
-      results.forEach(({ rowNumber, enhancement }) => {
-        if (enhancement) next.set(rowNumber, enhancement);
+      let notAppliedCount = 0;
+      results.forEach(({ rowNumber, status, enhancement }) => {
+        if (isAiEnhancementApplied(status) && enhancement) {
+          next.set(rowNumber, enhancement);
+        } else {
+          notAppliedCount += 1;
+        }
       });
       setAiEnhancements(next);
       if (next.size === 0) {
         setError("AI 분석을 완료하지 못해 모든 기존 입력값을 유지했습니다. 잠시 후 다시 시도해 주세요.");
       } else {
         setConfirmed(false);
+        if (notAppliedCount > 0) {
+          setError(`${notAppliedCount}개 상품은 AI 분석을 완료하지 못해 기존 입력값을 유지했습니다.`);
+        }
       }
     } finally {
       setIsEnhancing(false);

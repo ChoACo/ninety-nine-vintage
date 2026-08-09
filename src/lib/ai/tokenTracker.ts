@@ -3,12 +3,15 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabasePublicClient } from "@/lib/supabase/server";
 import type { OpenRouterUsage } from "@/lib/ai/aiModelRouter";
+import { PRIMARY_MODEL } from "@/lib/ai/aiModelRouter";
+import type { ProductEnhancementStatus } from "@/lib/ai/productEnhancement";
 
 export interface TokenUsageLogInput {
   provider?: string;
   model: string;
   endpoint?: string;
   usage: OpenRouterUsage;
+  status?: ProductEnhancementStatus;
 }
 
 function rawClient(client: SupabaseClient) {
@@ -22,7 +25,7 @@ function rawClient(client: SupabaseClient) {
   };
 }
 
-export async function logTokenUsage(input: TokenUsageLogInput): Promise<void> {
+export async function logTokenUsage(input: TokenUsageLogInput): Promise<boolean> {
   try {
     await rawClient(createSupabasePublicClient()).from("ai_token_usage_logs").insert({
       provider: input.provider ?? "openrouter",
@@ -31,9 +34,12 @@ export async function logTokenUsage(input: TokenUsageLogInput): Promise<void> {
       prompt_tokens: input.usage.prompt_tokens,
       completion_tokens: input.usage.completion_tokens,
       total_tokens: input.usage.total_tokens,
+      status: input.status ?? "success",
     }).throwOnError();
-  } catch {
-    console.error("[token-tracker] failed to log token usage");
+    return true;
+  } catch (error) {
+    console.error("[token-tracker] failed to log token usage", error);
+    return false;
   }
 }
 
@@ -55,7 +61,7 @@ export async function getMonthlyTokenUsage(): Promise<MonthlyTokenUsage> {
   try {
     const { data, error } = await rawClient(createSupabasePublicClient())
       .from("ai_token_usage_logs")
-      .select("prompt_tokens, completion_tokens, model")
+      .select("prompt_tokens, completion_tokens, model, status")
       .gte("created_at", monthStart);
 
     if (error || !data) {
@@ -65,11 +71,11 @@ export async function getMonthlyTokenUsage(): Promise<MonthlyTokenUsage> {
         total_tokens: 0,
         primary_model_calls: 0,
         fallback_model_calls: 0,
-        primary_model: "google/gemini-3.5-flash",
+        primary_model: PRIMARY_MODEL,
       };
     }
 
-    const primaryModel = "google/gemini-3.5-flash";
+    const primaryModel = PRIMARY_MODEL;
     let totalPrompt = 0;
     let totalCompletion = 0;
     let primaryCalls = 0;
@@ -80,6 +86,8 @@ export async function getMonthlyTokenUsage(): Promise<MonthlyTokenUsage> {
       const completionTokens = typeof row.completion_tokens === "number" ? row.completion_tokens : 0;
       totalPrompt += promptTokens;
       totalCompletion += completionTokens;
+      // fallback/failed 상태의 요청은 소모 토큰에는 포함하되 정상 호출 수로 세지 않습니다.
+      if (row.status !== "success" && row.status !== "partial_fallback") continue;
       if (typeof row.model === "string" && row.model === primaryModel) {
         primaryCalls += 1;
       } else {
@@ -102,7 +110,7 @@ export async function getMonthlyTokenUsage(): Promise<MonthlyTokenUsage> {
       total_tokens: 0,
       primary_model_calls: 0,
       fallback_model_calls: 0,
-      primary_model: "google/gemini-3.5-flash",
+      primary_model: PRIMARY_MODEL,
     };
   }
 }

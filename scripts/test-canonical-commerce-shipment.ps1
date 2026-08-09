@@ -26,7 +26,10 @@ try {
     'supabase/migrations/20260722060000_add_canonical_commerce_shipments.sql',
     'supabase/migrations/20260722070000_activate_canonical_commerce_shipments.sql',
     'tests/sql/canonical-commerce-shipment/10-contract.sql',
-    'tests/sql/canonical-commerce-shipment/20-concurrency.sql'
+    'tests/sql/canonical-commerce-shipment/20-concurrency.sql',
+    'supabase/migrations/20260808000000_retire_commerce_shipment_writes.sql',
+    'tests/sql/canonical-commerce-shipment/30-retire-writes.sql',
+    'tests/sql/canonical-commerce-shipment/40-legacy-compat-contract.sql'
   ) | ForEach-Object { Invoke-SqlFile $_ }
   Write-Host '[canonical-commerce-shipment] PostgreSQL 17 contracts passed'
 }

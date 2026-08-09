@@ -29,14 +29,14 @@ export async function POST(request: Request) {
   }
 
   const formData = await request.formData().catch(() => null);
-  if (!formData) return commerceJson({ error: "invalid_form_data" }, 400);
+  if (!formData) return commerceJson({ error: "invalid_form_data", status: "failed" }, 400);
   const source = parseSource(formData.get("source"));
   const storeId = formData.get("storeId");
   const images = formData.getAll("images").filter(
     (entry): entry is File => entry instanceof File,
   ).slice(0, 2);
   if (!source || typeof storeId !== "string" || !/^[0-9a-f-]{36}$/i.test(storeId) || images.length === 0) {
-    return commerceJson({ error: "invalid_enhancement_input" }, 400);
+    return commerceJson({ error: "invalid_enhancement_input", status: "failed" }, 400);
   }
 
   // 공급자 한도(10K RPD)보다 낮은 서비스 자체 300건/일 경계를 DB에서 원자적으로 예약합니다.
@@ -59,6 +59,7 @@ export async function POST(request: Request) {
     console.error("[product-enhancement] quota reservation failed", quotaError);
     return commerceJson({
       error: "product_enhancement_quota_unavailable",
+      status: "failed",
       message: "AI 일일 사용량을 확인하지 못해 기존 입력값을 유지합니다.",
     }, 503);
   }
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
   if (!quota.allowed) {
     return commerceJson({
       error: "product_enhancement_daily_limit_reached",
+      status: "failed",
       message: quota.daily_limit === null
         ? "서비스 전체 AI 자동 보정 한도에 도달했습니다."
         : `오늘 이 센터의 AI 자동 보정 ${quota.daily_limit}건을 모두 사용했습니다.`,
@@ -76,13 +78,14 @@ export async function POST(request: Request) {
 
   try {
     const enhancer = new GeminiProductEnhancer();
-    const enhancement = await enhancer.enhance(source, images);
-    return commerceJson({ enhancement });
+    const result = await enhancer.enhance(source, images);
+    return commerceJson(result);
   } catch (error) {
     // 구체적인 SDK/키/쿼타 오류를 클라이언트에 노출하지 않습니다.
     console.error("[product-enhancement] Gemini request failed", error);
     return commerceJson({
       error: "product_enhancement_unavailable",
+      status: "failed",
       message: "AI 분석을 완료하지 못해 기존 입력값을 유지합니다.",
     }, 503);
   }

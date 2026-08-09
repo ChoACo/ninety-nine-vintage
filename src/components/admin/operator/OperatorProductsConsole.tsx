@@ -28,6 +28,7 @@ import {
 } from "@/components/admin/operator/OperatorXlsxImportModal";
 import { getNextAuctionDeadline } from "@/utils/formatters";
 import {
+  isAiEnhancementApplied,
   processQuickRegistrationAI,
   type ProductEnhancement,
 } from "@/lib/ai/productEnhancement";
@@ -517,7 +518,7 @@ export function OperatorProductsConsole({
     setQuickAiPreview(null);
     setNotice("");
     try {
-      const enhancement = await processQuickRegistrationAI(
+      const result = await processQuickRegistrationAI(
         singleImages.slice(0, 2).map((image) => image.file),
         {
           title: form.title,
@@ -529,6 +530,9 @@ export function OperatorProductsConsole({
         form.storeId,
         controller.signal,
       );
+      const enhancement = isAiEnhancementApplied(result.status)
+        ? result.enhancement
+        : null;
       if (!enhancement) {
         setNotice("AI 분석을 완료하지 못해 기존 입력값을 유지했습니다. 잠시 후 다시 시도해 주세요.");
         return;

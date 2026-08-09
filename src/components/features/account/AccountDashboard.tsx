@@ -70,25 +70,6 @@ interface LegacyAuctionWin {
   storage_class: "small" | "large";
   storage_expires_at: string | null;
 }
-interface LegacyCommerceOrderItem {
-  id: string;
-  product_id: string;
-  unit_price: number;
-  payment_status: string;
-  paid_at: string | null;
-  storage_expires_at: string | null;
-  products?: ProductSummary | null;
-}
-interface LegacyCommerceOrder {
-  id: string;
-  status: string;
-  commerce_order_items?: LegacyCommerceOrderItem[];
-}
-interface LegacyEligibleOrder {
-  id: string;
-  items: LegacyCommerceOrderItem[];
-  storageExpiresAt: string;
-}
 interface ShipmentPayment {
   id?: string;
   expected_amount?: number;
@@ -135,6 +116,25 @@ interface InventoryShipment {
 }
 interface ShipmentsPayload {
   shipments?: InventoryShipment[];
+}
+interface LegacyEligibleOrderItem {
+  orderItemId: string;
+  productId: string;
+  title: string;
+  imageUrl: string;
+  storageExpiresAt: string | null;
+}
+interface LegacyEligibleOrder {
+  sourceKind: "canonical_commerce";
+  sourceId: string;
+  status: string;
+  requestEligible: boolean;
+  requestBlockReason: string | null;
+  storageExpiresAt: string | null;
+  items: LegacyEligibleOrderItem[];
+}
+interface LegacyEligibleOrdersPayload {
+  orders?: LegacyEligibleOrder[];
 }
 interface ItemManualRefund {
   id: string;
@@ -198,14 +198,6 @@ export type AccountDashboardView =
   | "refunds"
   | "saved";
 
-function shipmentIsLegacy(shipment: ShipmentResponse): shipment is ShipmentResponse & {
-  shipping_request_id: string;
-  order_id: string;
-} {
-  return typeof shipment.shipping_request_id === "string" &&
-    typeof shipment.order_id === "string";
-}
-
 function refundKey(refund: ManualRefund) {
   return `${refund.refundKind}:${refund.id}`;
 }
@@ -234,6 +226,8 @@ function AccountDashboardForSession({
     "빈티지 피플";
   const [storage, setStorage] = useState<InventoryItem[]>([]);
   const [shipments, setShipments] = useState<InventoryShipment[]>([]);
+  const [legacyEligibleOrders, setLegacyEligibleOrders] = useState<LegacyEligibleOrder[]>([]);
+  const [selectedOrderId, setSelectedOrderId] = useState("");
   const [refunds, setRefunds] = useState<ManualRefund[]>([]);
   const [liked, setLiked] = useState<ProductSummary[]>([]);
   const [credits, setCredits] = useState(0);
@@ -247,9 +241,7 @@ function AccountDashboardForSession({
   const [legacyAuctionWins, setLegacyAuctionWins] = useState<LegacyAuctionWin[]>([]);
   const [deadlineEnforcementExempt, setDeadlineEnforcementExempt] = useState(false);
   const [rememberedDepositorName, setRememberedDepositorName] = useState<string | null>(null);
-  const [orders, setOrders] = useState<LegacyCommerceOrder[]>([]);
   const [selectedInventoryItemIds, setSelectedInventoryItemIds] = useState<string[]>([]);
-  const [selectedOrderId, setSelectedOrderId] = useState("");
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [addressForm, setAddressForm] = useState({
     label: "집",
@@ -295,7 +287,7 @@ function AccountDashboardForSession({
           creditResponse,
           wishlistResponse,
           addressResponse,
-          ordersResponse,
+          legacyOrdersResponse,
         ] = await Promise.all([
           fetch("/api/account/storage", { headers, cache: "no-store" }),
           fetch("/api/account/shipments", { headers, cache: "no-store" }),
@@ -303,7 +295,7 @@ function AccountDashboardForSession({
           fetch("/api/shipping/credits", { headers, cache: "no-store" }),
           fetch("/api/wishlist", { headers, cache: "no-store" }),
           fetch("/api/account/addresses", { headers, cache: "no-store" }),
-          fetch("/api/orders", { headers, cache: "no-store" }),
+          fetch("/api/account/legacy-eligible-orders", { headers, cache: "no-store" }),
         ]);
         const storageData = storageResponse.ok
           ? await storageResponse.json() as StoragePayload
@@ -327,9 +319,9 @@ function AccountDashboardForSession({
         const addressData = addressResponse.ok
           ? await addressResponse.json() as { addresses?: Address[] }
           : {};
-        const ordersData = ordersResponse.ok
-          ? await ordersResponse.json() as { orders?: LegacyCommerceOrder[] }
-          : { orders: [] };
+        const legacyOrdersData = legacyOrdersResponse.ok
+          ? await legacyOrdersResponse.json() as LegacyEligibleOrdersPayload
+          : {};
         const ids = wishlistData.productIds ?? [];
         const [auctionResponse, fixedResponse] = ids.length > 0
           ? await Promise.all([
@@ -370,10 +362,10 @@ function AccountDashboardForSession({
               creditData.rememberedDepositorName ??
               "",
           );
-          setOrders(ordersData.orders ?? []);
           setSelectedInventoryItemIds([]);
-          setSelectedOrderId("");
           setShipments(shipmentData.shipments ?? []);
+          setLegacyEligibleOrders(legacyOrdersData.orders ?? []);
+          setSelectedOrderId("");
           setRefunds(refundData.refunds ?? []);
           setCredits(Number(creditData.credits ?? 0));
           setCreditPayments(creditData.payments ?? []);
@@ -393,7 +385,7 @@ function AccountDashboardForSession({
             creditResponse,
             wishlistResponse,
             addressResponse,
-            ordersResponse,
+            legacyOrdersResponse,
           ].filter((response) => !response.ok).length +
             [auctionResponse, fixedResponse].filter((response) => response && !response.ok).length;
           if (unavailableCount > 0) {
@@ -416,45 +408,20 @@ function AccountDashboardForSession({
     };
   }, [token, view]);
 
-  const itemSelectedCommerceOrderItemIds = useMemo(
-    () => new Set(
-      storage
-        .filter((item) => item.sourceKind === "commerce" && item.itemSelectedShipmentsEnabled)
-        .map((item) => item.sourceReference),
-    ),
-    [storage],
-  );
   const v2Storage = useMemo(
     () => storage.filter((item) => item.rolloutEnabled),
     [storage],
   );
-  const legacyEligibleOrders = useMemo<LegacyEligibleOrder[]>(() => {
-    if (now === 0) return [];
-    return orders.flatMap((order) => {
-      const items = order.commerce_order_items ?? [];
-      const expirationTimes = items.map((item) =>
-        item.storage_expires_at ? Date.parse(item.storage_expires_at) : Number.NaN
-      );
-      if (
-        order.status !== "paid" ||
-        items.length === 0 ||
-        !items.every((item) => item.payment_status === "paid") ||
-        items.some((item) => itemSelectedCommerceOrderItemIds.has(item.id)) ||
-        expirationTimes.some((expiresAt) => !Number.isFinite(expiresAt) || expiresAt <= now)
-      ) {
-        return [];
-      }
-      return [{
-        id: order.id,
-        items,
-        storageExpiresAt: new Date(Math.min(...expirationTimes)).toISOString(),
-      }];
-    });
-  }, [itemSelectedCommerceOrderItemIds, now, orders]);
-  const selectedLegacyOrder = legacyEligibleOrders.find((order) => order.id === selectedOrderId) ?? null;
-  const legacyEligibleItemCount = legacyEligibleOrders.reduce(
-    (count, order) => count + order.items.length,
-    0,
+  const selectedLegacyOrder = useMemo(
+    () => legacyEligibleOrders.find((order) => order.sourceId === selectedOrderId) ?? null,
+    [legacyEligibleOrders, selectedOrderId],
+  );
+  const legacyEligibleItemCount = useMemo(
+    () => legacyEligibleOrders.reduce(
+      (count, order) => count + order.items.length,
+      0,
+    ),
+    [legacyEligibleOrders],
   );
   const pendingAuctionWins = useMemo(
     () => legacyAuctionWins.filter((win) => !win.is_payment_settled),
@@ -694,45 +661,47 @@ function AccountDashboardForSession({
       setShippingMessage("배송 크레딧이 없어 배송을 신청할 수 없습니다. 먼저 배송 크레딧을 결제해 주세요.");
       return;
     }
+    const useV2 = selectedShippingMode === "v2";
     if (
       !token ||
       !selectedAddressId ||
-      !selectedShippingMode
+      (!useV2 && selectedShippingMode !== "legacy")
     ) {
       setShippingMessage(
-        "배송 신청 상품 또는 기존 주문과 배송지를 선택해 주세요.",
+        "배송 신청 상품과 배송지를 선택해 주세요.",
       );
       return;
     }
-    const useV2 = selectedShippingMode === "v2";
     const selectedIds = [...selectedInventoryItemIds].sort();
-    const selectedSubject = useV2
-      ? selectedIds.join(",")
-      : selectedLegacyOrder?.id ?? "";
-    const idempotencyScope = `${useV2 ? "v2" : "legacy"}:${selectedSubject}:${selectedAddressId}:${applyShippingCredit ? "shipping_credit" : "manual_transfer"}`;
+    const idempotencyScope = useV2
+      ? `v2:${selectedIds.join(",")}:${selectedAddressId}:${applyShippingCredit ? "shipping_credit" : "manual_transfer"}`
+      : `legacy:${selectedLegacyOrder?.sourceId}:${selectedAddressId}:${applyShippingCredit ? "shipping_credit" : "manual_transfer"}`;
     const idempotencyKey =
       shippingRequestKeys.current.get(idempotencyScope) ?? crypto.randomUUID();
     shippingRequestKeys.current.set(idempotencyScope, idempotencyKey);
-    const response = await fetch("/api/shipping/requests", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+    const response = await fetch(
+      useV2 ? "/api/shipping/requests" : "/api/shipping/requests/legacy-order",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(useV2
+          ? {
+              inventoryItemIds: selectedIds,
+              addressId: selectedAddressId,
+              applyShippingCredit,
+              idempotencyKey,
+            }
+          : {
+              orderId: selectedLegacyOrder?.sourceId,
+              addressId: selectedAddressId,
+              applyShippingCredit,
+              idempotencyKey,
+            }),
       },
-      body: JSON.stringify(useV2
-        ? {
-            inventoryItemIds: selectedIds,
-            addressId: selectedAddressId,
-            applyShippingCredit,
-            idempotencyKey,
-          }
-        : {
-            orderId: selectedLegacyOrder?.id,
-            addressId: selectedAddressId,
-            applyShippingCredit,
-            idempotencyKey,
-          }),
-    });
+    );
     const payload = (await response.json()) as {
       error?: string;
       message?: string;
@@ -744,13 +713,6 @@ function AccountDashboardForSession({
       );
       return;
     }
-    if (
-      !useV2 &&
-      (!shipmentIsLegacy(payload.shipment) || payload.shipment.order_id !== selectedLegacyOrder?.id)
-    ) {
-      setShippingMessage("배송 요청 결과의 주문 정보를 확인하지 못했습니다.");
-      return;
-    }
     shippingRequestKeys.current.delete(idempotencyScope);
     const shipment = payload.shipment;
     if (useV2) {
@@ -759,7 +721,7 @@ function AccountDashboardForSession({
         : item));
       setSelectedInventoryItemIds([]);
     } else {
-      setOrders((current) => current.filter((order) => order.id !== selectedLegacyOrder?.id));
+      setLegacyEligibleOrders((current) => current.filter((order) => order.sourceId !== selectedLegacyOrder?.sourceId));
       setSelectedOrderId("");
     }
     const requestedItems: InventoryShipmentItem[] = useV2
@@ -771,9 +733,9 @@ function AccountDashboardForSession({
         }))
       : (selectedLegacyOrder?.items ?? []).map((item) => ({
           inventoryItemId: null,
-          productId: item.product_id,
-          title: item.products?.title ?? item.product_id,
-          imageUrl: item.products?.image_urls?.[0] ?? "",
+          productId: item.productId,
+          title: item.title,
+          imageUrl: item.imageUrl,
         }));
     setShipments((current) => [{
       id: shipment.shipment_id,
@@ -801,7 +763,7 @@ function AccountDashboardForSession({
     const accountNumber = payment?.accountNumberSnapshot ?? payment?.account_number_snapshot;
     setShippingMessage(
       payment && typeof expectedAmount === "number" && Number.isSafeInteger(expectedAmount) && bankName && accountNumber
-        ? `배송 신청${shipment.shipping_request_id ? ` ${shipment.shipping_request_id}` : ""}을 접수했습니다. ${expectedAmount.toLocaleString("ko-KR")}원 · ${bankName} ${accountNumber}로 입금해 주세요.`
+        ? `배송 신청을 접수했습니다. ${expectedAmount.toLocaleString("ko-KR")}원 · ${bankName} ${accountNumber}로 입금해 주세요.`
         : shipment.settlement_method === "waiver"
           ? "배송 신청을 접수했습니다. 보유한 무료 배송 권한이 자동 적용되었습니다."
           : shipment.settlement_method === "shipping_credit"
@@ -1144,8 +1106,8 @@ function AccountDashboardForSession({
           </div>
           <div className="divide-y divide-line border-y border-line">
             {v2Storage.length === 0 &&
-              legacyEligibleOrders.length === 0 &&
-              settledLegacyAuctionWins.length === 0 && (
+              settledLegacyAuctionWins.length === 0 &&
+              legacyEligibleOrders.length === 0 && (
                 <p className="py-12 text-center text-sm text-muted">
                   결제 완료 후 보관 상품이 표시됩니다.
                 </p>
@@ -1161,10 +1123,10 @@ function AccountDashboardForSession({
                     <input
                       checked={allRequestEligibleSelected}
                       onChange={(event) => {
-                        setSelectedOrderId("");
                         setSelectedInventoryItemIds(event.target.checked
                           ? requestEligibleItems.map((item) => item.id)
                           : []);
+                        setSelectedOrderId("");
                       }}
                       type="checkbox"
                     />
@@ -1184,10 +1146,10 @@ function AccountDashboardForSession({
                             checked={isSelected}
                             disabled={disabled}
                             onChange={(event) => {
-                              if (event.target.checked) setSelectedOrderId("");
                               setSelectedInventoryItemIds((current) => event.target.checked
                                 ? [...current, item.id]
                                 : current.filter((id) => id !== item.id));
+                              setSelectedOrderId("");
                             }}
                             type="checkbox"
                           />
@@ -1221,41 +1183,44 @@ function AccountDashboardForSession({
               <div>
                 <div className="bg-surface px-3 py-3">
                   <p className="text-xs font-bold">기존 주문 전체 배송</p>
-                  <p className="mt-1 text-[11px] text-muted">전환 전 매장의 결제 완료 상품은 주문 한 건 전체를 선택합니다.</p>
+                  <p className="mt-1 text-[11px] text-muted">전환 전 결제 완료 상품은 주문 단위로 전체 배송을 신청할 수 있습니다.</p>
                 </div>
                 {visibleLegacyEligibleOrders.map((order) => (
-                  <label className="block cursor-pointer px-1 py-5" key={order.id}>
+                  <label className="block cursor-pointer px-1 py-5" key={order.sourceId}>
                     <span className="flex items-start gap-3">
                       <input
-                        aria-label={`주문 ${order.id} 배송 선택`}
-                        checked={selectedOrderId === order.id}
+                        aria-label={`주문 ${order.sourceId} 배송 선택`}
+                        checked={selectedOrderId === order.sourceId}
                         name="legacy-shipping-order"
                         onChange={() => {
                           setSelectedInventoryItemIds([]);
-                          setSelectedOrderId(order.id);
+                          setSelectedOrderId(order.sourceId);
                         }}
                         type="radio"
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block break-all text-sm font-bold">주문 {order.id}</span>
+                        <span className="block break-all text-sm font-bold">주문 {order.sourceId}</span>
                         <span className="mt-1 block text-[11px] text-muted">
-                          상품 {order.items.length}개 전체 · 보관 만료 {new Date(order.storageExpiresAt).toLocaleDateString("ko-KR")}
+                          상품 {order.items.length}개 전체 · 보관 만료{" "}
+                          {order.storageExpiresAt
+                            ? new Date(order.storageExpiresAt).toLocaleDateString("ko-KR")
+                            : "-"}
                         </span>
                       </span>
                     </span>
                     <span className={`mt-4 grid gap-3 ${surface === "desktop" ? "grid-cols-2" : "grid-cols-1"}`}>
                       {order.items.map((item) => (
-                        <span className="flex min-w-0 items-center gap-3 border border-line p-3" key={item.id}>
+                        <span className="flex min-w-0 items-center gap-3 border border-line p-3" key={item.orderItemId}>
                           <CatalogImage
                             alt=""
                             className="size-12 shrink-0 object-cover"
                             sizes="48px"
-                            src={item.products?.image_urls?.[0] ?? ""}
+                            src={item.imageUrl}
                           />
                           <span className="min-w-0">
-                            <span className="block truncate text-xs font-bold">{item.products?.title ?? item.product_id}</span>
+                            <span className="block truncate text-xs font-bold">{item.title}</span>
                             <span className="mt-1 block text-[10px] text-muted">
-                              결제 완료 · {item.products?.storage_class === "large" ? "대형 1주" : "소형 2주"} 보관
+                              결제 완료 · 주문 전체 배송
                             </span>
                           </span>
                         </span>
@@ -1306,7 +1271,7 @@ function AccountDashboardForSession({
             </h2>
             <p className="text-xs font-bold">{selectedShippingMode === "legacy" ? "기존 주문 전체 배송 신청" : "선택 상품 배송 신청"}</p>
             <p className="mt-2 text-[11px] leading-5 text-muted">
-              전환 완료 상품은 부분 선택할 수 있고, 전환 전 상품은 기존 주문 한 건 전체로 신청합니다. 두 방식 중 한 번에 하나에만 집중할 수 있습니다.
+              전환 완료 상품은 부분 선택해서, 전환 전 상품은 기존 주문 전체 단위로 신청합니다. 두 방식을 동시에 선택해서 신청할 수는 없습니다.
             </p>
             <p className="mt-3 text-[11px] font-bold text-muted">
               {selectedShippingMode === "v2"

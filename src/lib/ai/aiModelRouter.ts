@@ -2,9 +2,11 @@ import "server-only";
 
 const OR_API = "https://openrouter.ai/api/v1/chat/completions";
 
+export const PRIMARY_MODEL = "google/gemini-3.5-flash";
+
 const MODELS = [
   // Primary
-  "google/gemini-3.5-flash",
+  PRIMARY_MODEL,
   // Fallbacks
   "nvidia/nemotron-nano-12b-v2-vl:free",
   "qwen/qwen3-vl-8b-instruct",
@@ -42,6 +44,8 @@ export interface RouteCompletionResult {
   response: OpenRouterCompletionResponse;
   usedModel: string;
   usage: OpenRouterUsage;
+  attemptedModels: number;
+  fallbackReason: string | null;
 }
 
 const RETRYABLE_STATUS_CODES = new Set([401, 402, 408, 429, 500, 502, 503, 504]);
@@ -54,9 +58,11 @@ export async function routeCompletion(
   if (!apiKey) throw new Error("OPENROUTER_API_KEY가 설정되지 않았습니다.");
 
   let lastError: Error | null = null;
+  let attempted = 0;
 
   for (let index = 0; index < MODELS.length; index += 1) {
     const model = MODELS[index];
+    attempted += 1;
     try {
       const response = await fetch(OR_API, {
         method: "POST",
@@ -85,6 +91,8 @@ export async function routeCompletion(
         response: data,
         usedModel: model,
         usage: data.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+        attemptedModels: attempted,
+        fallbackReason: lastError?.message ?? null,
       };
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") throw error;
@@ -92,5 +100,8 @@ export async function routeCompletion(
     }
   }
 
-  throw lastError ?? new Error("모든 모델 시도가 실패했습니다.");
+  throw Object.assign(
+    lastError ?? new Error("모든 모델 시도가 실패했습니다."),
+    { modelsTried: attempted },
+  );
 }

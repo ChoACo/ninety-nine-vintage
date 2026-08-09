@@ -1,14 +1,8 @@
 import { authenticateMemberCommerceRequest, commerceJson } from "@/lib/commerce/server";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const LEGACY_BODY_KEYS = [
+const LEGACY_ORDER_BODY_KEYS = [
   "orderId",
-  "addressId",
-  "applyShippingCredit",
-  "idempotencyKey",
-] as const;
-const V2_BODY_KEYS = [
-  "inventoryItemIds",
   "addressId",
   "applyShippingCredit",
   "idempotencyKey",
@@ -59,7 +53,7 @@ function isShipmentPayment(value: unknown): value is Record<string, unknown> {
     value.account_number_snapshot.trim().length > 0;
 }
 
-function isV2ShipmentResult(value: unknown): value is Record<string, unknown> {
+function isShipmentResult(value: unknown): value is Record<string, unknown> {
   if (!isRecord(value) || !hasExactKeys(value, [
     "shipment_id",
     "status",
@@ -122,95 +116,31 @@ export async function POST(request: Request) {
   if (!auth.ok) return auth.response;
 
   const body = await request.json().catch(() => null);
-  if (!isRecord(body)) {
-    return commerceJson(
-      { error: "invalid_shipping_request", message: "배송 요청 내용을 확인해 주세요." },
-      422,
-    );
-  }
-
-  const legacyMode = hasExactKeys(body, LEGACY_BODY_KEYS);
-  const v2Mode = hasExactKeys(body, V2_BODY_KEYS);
-  if (legacyMode) {
-    return commerceJson(
-      {
-        error: "order_shipping_retired",
-        message: "기존 주문 전체 배송 신청은 중단되었습니다. 보관 중인 상품을 선택해 배송을 신청해 주세요.",
-      },
-      410,
-    );
-  }
   if (
-    !v2Mode ||
+    !isRecord(body) ||
+    !hasExactKeys(body, LEGACY_ORDER_BODY_KEYS) ||
+    !isUuid(body.orderId) ||
     !isUuid(body.addressId) ||
     typeof body.applyShippingCredit !== "boolean" ||
     !isUuid(body.idempotencyKey)
   ) {
     return commerceJson(
-      { error: "invalid_shipping_request", message: "선택 상품과 배송지, 요청 키를 확인해 주세요." },
-      422,
-    );
-  }
-
-  if (!body.applyShippingCredit) {
-    return commerceJson(
-      {
-        error: "shipping_credit_required",
-        message: "배송 크레딧이 있어야 배송을 신청할 수 있습니다.",
-      },
-      403,
-    );
-  }
-  const { data: account, error: accountError } = await auth.admin
-    .from("member_accounts")
-    .select("shipping_credit_count")
-    .eq("member_id", auth.userId)
-    .maybeSingle();
-  if (
-    accountError ||
-    !account ||
-    !Number.isSafeInteger(account.shipping_credit_count) ||
-    account.shipping_credit_count < 1
-  ) {
-    return commerceJson(
-      {
-        error: "shipping_credit_required",
-        message: "배송 크레딧이 없어 배송을 신청할 수 없습니다. 먼저 배송 크레딧을 결제해 주세요.",
-      },
-      403,
-    );
-  }
-
-  const settlement = "shipping_credit";
-
-  const inventoryItemIds = body.inventoryItemIds;
-  if (
-    !Array.isArray(inventoryItemIds) ||
-    inventoryItemIds.length < 1 ||
-    inventoryItemIds.length > 100 ||
-    !inventoryItemIds.every(isUuid) ||
-    new Set(inventoryItemIds).size !== inventoryItemIds.length
-  ) {
-    return commerceJson(
-      { error: "invalid_shipping_request", message: "선택 상품을 중복 없이 최대 100개까지 선택해 주세요." },
+      { error: "invalid_shipping_request", message: "기존 주문과 배송지, 요청 키를 확인해 주세요." },
       422,
     );
   }
 
   const { data, error } = await (auth.user as unknown as RpcClient).rpc(
-    "request_inventory_shipment",
+    "request_legacy_order_shipment",
     {
-      p_inventory_item_ids: [...inventoryItemIds].sort(),
+      p_order_id: body.orderId,
       p_address_id: body.addressId,
-      p_settlement_method: settlement,
-      p_shipping_fee_amount: null,
-      p_bank_name_snapshot: null,
-      p_account_number_snapshot: null,
+      p_apply_shipping_credit: body.applyShippingCredit,
       p_idempotency_key: body.idempotencyKey,
     },
   );
   if (error) return rpcFailure(error);
-  if (!isV2ShipmentResult(data)) {
+  if (!isShipmentResult(data)) {
     return commerceJson({ error: "shipping_request_unavailable" }, 503);
   }
   return commerceJson({ shipment: data }, data.idempotent_replay ? 200 : 201);

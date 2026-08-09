@@ -109,9 +109,8 @@ test("buyer shipping API keeps exact legacy and v2 paths and requires a shipping
   assert.match(memberRoute, /\.from\("member_accounts"\)/);
   assert.match(memberRoute, /shipping_credit_required/);
   assert.match(memberRoute, /const settlement = "shipping_credit"/);
-  assert.match(memberRoute, /"request_commerce_order_shipment"/);
-  assert.match(memberRoute, /p_member_id:\s*auth\.userId/);
-  assert.match(memberRoute, /p_order_id:\s*body\.orderId/);
+  assert.doesNotMatch(memberRoute, /"request_commerce_order_shipment"/);
+  assert.doesNotMatch(memberRoute, /p_order_id:\s*body\.orderId/);
   assert.match(memberRoute, /p_inventory_item_ids:\s*\[\.\.\.inventoryItemIds\]\.sort\(\)/);
   assert.match(memberRoute, /inventoryItemIds\.length\s*>\s*100/);
   assert.match(memberRoute, /new Set\(inventoryItemIds\)\.size\s*!==\s*inventoryItemIds\.length/);
@@ -122,6 +121,8 @@ test("buyer shipping API keeps exact legacy and v2 paths and requires a shipping
   assert.match(memberRoute, /V2_BODY_KEYS/);
   assert.match(memberRoute, /hasExactKeys\(body,\s*LEGACY_BODY_KEYS\)/);
   assert.match(memberRoute, /hasExactKeys\(body,\s*V2_BODY_KEYS\)/);
+  assert.match(memberRoute, /"order_shipping_retired"/);
+  assert.match(memberRoute, /410/);
   assert.doesNotMatch(memberRoute, /request_product_shipping/);
   assert.doesNotMatch(memberRoute, /\.from\("shipping_fee_payments"\)/);
 
@@ -139,6 +140,18 @@ test("buyer shipping API keeps exact legacy and v2 paths and requires a shipping
 
   assert.match(hiddenTestRoute, /test_member_shipping_retired/);
   assert.match(hiddenTestRoute, /410/);
+});
+
+test("legacy orderId buyer and owner tracking writer paths are retired with 410", async () => {
+  const [memberRoute, ownerTrackingRoute] = await Promise.all([
+    source("src/app/api/shipping/requests/route.ts"),
+    source("src/app/api/admin/owner/shipping/[id]/route.ts"),
+  ]);
+
+  assert.doesNotMatch(memberRoute, /correct_commerce_shipment_tracking/);
+  assert.match(ownerTrackingRoute, /"legacy_shipment_retired"/);
+  assert.match(ownerTrackingRoute, /410/);
+  assert.doesNotMatch(ownerTrackingRoute, /correct_commerce_shipment_tracking/);
 });
 
 test("current operator shipping uses v2 CAS packing and exact unfulfilled-item gate", async () => {
@@ -180,33 +193,38 @@ test("current operator shipping uses v2 CAS packing and exact unfulfilled-item g
   assert.match(operator, /action\s*===\s*"ship"/);
 });
 
-test("customer UI supports mixed per-business rollout while keeping each request single-mode", async () => {
+test("customer UI keeps v2 and legacy-compat shipping surfaces mutually exclusive", async () => {
   const account = await source("src/components/features/account/AccountDashboard.tsx");
 
   assert.match(account, /selectedInventoryItemIds/);
+  // FIX 1: the legacy eligible-order read is restored through the compat
+  // endpoint; the retired /api/orders fetch itself stays removed.
   assert.match(account, /selectedOrderId/);
-  assert.match(account, /fetch\("\/api\/orders"/);
+  assert.match(account, /fetch\("\/api\/account\/legacy-eligible-orders"/);
+  assert.match(account, /\/api\/shipping\/requests\/legacy-order"/);
+  assert.doesNotMatch(account, /fetch\("\/api\/orders"/);
   assert.match(account, /legacyAuctionWins/);
-  assert.match(account, /itemSelectedCommerceOrderItemIds/);
-  assert.match(account, /items\.some\(\(item\)\s*=>\s*itemSelectedCommerceOrderItemIds\.has\(item\.id\)\)/);
+  assert.doesNotMatch(account, /itemSelectedCommerceOrderItemIds/);
   assert.match(account, /storage\.filter\(\(item\)\s*=>\s*item\.rolloutEnabled\)/);
-  assert.match(account, /item\.itemSelectedShipmentsEnabled/);
+  assert.match(account, /itemSelectedShipmentsEnabled/);
   assert.match(account, /selectedShippingMode/);
   assert.match(account, /const selectedIds\s*=\s*\[\.\.\.selectedInventoryItemIds\]\.sort\(\)/);
   assert.match(account, /inventoryItemIds:\s*selectedIds/);
-  assert.match(account, /orderId:\s*selectedLegacyOrder\?\.id/);
-  assert.match(account, /body:\s*JSON\.stringify\(useV2/);
+  assert.match(account, /orderId:\s*selectedLegacyOrder\?\.sourceId/);
+  assert.match(account, /const useV2\s*=\s*selectedShippingMode\s*===\s*"v2"/);
+  assert.match(account, /useV2\s*\?\s*"\/api\/shipping\/requests"\s*:\s*"\/api\/shipping\/requests\/legacy-order"/);
   assert.match(account, /requestEligibleItems\.map\(\(item\)\s*=>\s*item\.id\)/);
   assert.match(account, /disabled=\{disabled\}/);
   assert.match(account, /결제 완료 상품은 매장 출고 전에도 선택할 수 있으며, 서로 다른 매장 상품도 한 번에 신청할 수 있습니다/);
-  assert.match(account, /전환 전 매장의 결제 완료 상품은 주문 한 건 전체를 선택합니다/);
+  assert.match(account, /전환 전 결제 완료 상품은 주문 단위로 전체 배송을 신청할 수 있습니다/);
   assert.match(account, /setSelectedOrderId\(""\)/);
   assert.match(account, /setSelectedInventoryItemIds\(\[\]\)/);
+  assert.match(account, /setSelectedOrderId\(order\.sourceId\)/);
   assert.match(account, /선택 상품 배송 신청/);
-  assert.match(account, /shipment\.trackingNumber\s*&&\s*shipment\.courier/);
-  assert.match(account, /배송조회/);
   assert.match(account, /기존 주문 전체 배송 신청/);
   assert.match(account, /선택 주문 전체 배송 신청/);
+  assert.match(account, /shipment\.trackingNumber\s*&&\s*shipment\.courier/);
+  assert.match(account, /배송조회/);
 });
 
 test("retired browser repositories no longer expose legacy shipping mutations", async () => {

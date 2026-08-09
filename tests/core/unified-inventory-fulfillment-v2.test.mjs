@@ -825,7 +825,7 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
   assert.match(shippingRoute, /\.from\("member_accounts"\)/);
   assert.match(shippingRoute, /shipping_credit_required/);
   assert.match(shippingRoute, /const settlement = "shipping_credit"/);
-  assert.match(shippingRoute, /"request_commerce_order_shipment"/);
+  assert.doesNotMatch(shippingRoute, /"request_commerce_order_shipment"/);
   assert.match(refundRoute, /"get_my_manual_refunds"/);
   assert.match(refundRoute, /shippingFeeRefunds/);
   assert.doesNotMatch(refundRoute, /internalNote|evidencePaths|account_ciphertext|account_fingerprint/);
@@ -848,7 +848,7 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
 
   assert.match(dashboard, /배송 가능 상품 전체 선택/);
   assert.match(dashboard, /requestBlockReason/);
-  assert.match(dashboard, /itemSelectedCommerceOrderItemIds/);
+  assert.doesNotMatch(dashboard, /itemSelectedCommerceOrderItemIds/);
   assert.match(dashboard, /v2Storage/);
   assert.match(dashboard, /legacyAuctionWins/);
   assert.match(dashboard, /pendingAuctionWins/);
@@ -860,8 +860,8 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
   assert.match(dashboard, /serverTime=\{paymentServerTime\}/);
   assert.match(dashboard, /기존 결제 완료 낙찰품/);
   assert.doesNotMatch(dashboard, /기존 낙찰 보관 현황/);
-  assert.match(dashboard, /fetch\("\/api\/orders"/);
-  assert.match(dashboard, /orderId:\s*selectedLegacyOrder\?\.id/);
+  assert.doesNotMatch(dashboard, /fetch\("\/api\/orders"/);
+  assert.doesNotMatch(dashboard, /orderId:\s*selectedLegacyOrder\?\.id/);
   assert.doesNotMatch(dashboard, /physicalStatus|locationKind|exceptionPublicReason|lineStatus/);
   assert.match(dashboard, /서로 다른 매장 상품도 한 번에 신청/);
   assert.match(dashboard, /상품 상세보기/);

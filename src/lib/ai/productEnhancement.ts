@@ -11,6 +11,37 @@ export interface ProductEnhancement {
   hashtags: string[];
 }
 
+/**
+ * AI 보정 요청의 최종 결과 상태 계약입니다.
+ * - success: 1차 모델이 유효한 보정 결과를 반환했습니다.
+ * - partial_fallback: 일부 시도가 실패했지만 이후 모델이 유효한 결과를 반환했습니다.
+ * - fallback: 모든 모델 시도가 실패해 원본 입력값으로 진행합니다 (정상 AI 성공으로 기록하지 않음).
+ * - failed: 파이프라인 자체가 결과를 만들지 못했습니다 (잘못된 입력·쿼타·네트워크).
+ */
+export type ProductEnhancementStatus =
+  | "success"
+  | "partial_fallback"
+  | "fallback"
+  | "failed";
+
+export interface AiEnhancementMeta {
+  provider: "openrouter";
+  model: string | null;
+  attempts: number;
+  fallbackReason: string | null;
+  usageLogged: boolean;
+}
+
+export interface ProductEnhancementResult {
+  status: ProductEnhancementStatus;
+  enhancement: ProductEnhancement | null;
+  ai: AiEnhancementMeta;
+}
+
+export function isAiEnhancementApplied(status: ProductEnhancementStatus): boolean {
+  return status === "success" || status === "partial_fallback";
+}
+
 export interface ProductEnhancementSource {
   title: string;
   description?: string;
@@ -26,7 +57,9 @@ export interface ExcelEnhancementItem {
 }
 
 export interface ExcelEnhancementResult {
+  status: ProductEnhancementStatus;
   enhancement: ProductEnhancement | null;
+  ai: AiEnhancementMeta;
   rowNumber: number;
 }
 
@@ -40,7 +73,7 @@ interface EnhanceRequestOptions {
 
 /**
  * 사진은 최대 두 장만 전송합니다. API 키는 브라우저에 두지 않고 인증된
- * 서버 Route Handler가 Gemini를 호출합니다.
+ * 서버 Route Handler가 모델(OpenRouter 경유 Gemini)을 호출합니다.
  */
 export async function requestProductEnhancement({
   accessToken,
@@ -48,11 +81,23 @@ export async function requestProductEnhancement({
   source,
   storeId,
   signal,
-}: EnhanceRequestOptions): Promise<ProductEnhancement | null> {
+}: EnhanceRequestOptions): Promise<ProductEnhancementResult> {
   const formData = new FormData();
   formData.set("source", JSON.stringify(source));
   formData.set("storeId", storeId);
   images.slice(0, 2).forEach((image) => formData.append("images", image));
+
+  const failedResult = (fallbackReason: string | null): ProductEnhancementResult => ({
+    status: "failed",
+    enhancement: null,
+    ai: {
+      provider: "openrouter",
+      model: null,
+      attempts: 0,
+      fallbackReason,
+      usageLogged: false,
+    },
+  });
 
   try {
     const response = await fetch("/api/admin/operator/products/enhance", {
@@ -62,12 +107,33 @@ export async function requestProductEnhancement({
       signal,
     });
     const payload = await response.json().catch(() => null) as {
-      enhancement?: ProductEnhancement;
+      status?: ProductEnhancementStatus;
+      enhancement?: ProductEnhancement | null;
+      ai?: AiEnhancementMeta;
+      error?: string;
     } | null;
-    return response.ok ? payload?.enhancement ?? null : null;
-  } catch {
+    if (response.ok && payload?.enhancement) {
+      const status = payload.status === "success"
+        || payload.status === "partial_fallback"
+        || payload.status === "fallback"
+        ? payload.status
+        : "success";
+      return {
+        status,
+        enhancement: payload.enhancement,
+        ai: payload.ai ?? {
+          provider: "openrouter",
+          model: null,
+          attempts: 0,
+          fallbackReason: null,
+          usageLogged: false,
+        },
+      };
+    }
     // 네트워크·쿼타·인식 오류는 등록을 막지 않고 기존 입력값을 유지합니다.
-    return null;
+    return failedResult(payload?.error ?? null);
+  } catch {
+    return failedResult("network_error");
   }
 }
 
@@ -106,14 +172,14 @@ export async function processExcelWithAI(
       const index = cursor++;
       if (index >= items.length) return;
       const item = items[index];
-      const enhancement = await requestProductEnhancement({
+      const result = await requestProductEnhancement({
         accessToken,
         images: item.images,
         source: item.source,
         storeId,
         signal: options.signal,
       });
-      results[index] = { enhancement, rowNumber: item.rowNumber };
+      results[index] = { ...result, rowNumber: item.rowNumber };
       completed += 1;
       options.onProgress?.(completed, items.length);
     }

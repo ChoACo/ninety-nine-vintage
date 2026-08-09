@@ -3654,6 +3654,127 @@ export type Database = {
           },
         ]
       }
+      onboarding_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          last_message_at: string | null
+          last_message_preview: string | null
+          member_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          member_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          member_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_conversations_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_faq_entries: {
+        Row: {
+          answer: string
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          id: string
+          is_approved: boolean
+          question: string
+          sort_order: number
+        }
+        Insert: {
+          answer: string
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          is_approved?: boolean
+          question: string
+          sort_order?: number
+        }
+        Update: {
+          answer?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          is_approved?: boolean
+          question?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_faq_entries_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_messages: {
+        Row: {
+          body: string
+          client_nonce: string
+          conversation_id: string
+          created_at: string
+          id: string
+          sender_id: string
+        }
+        Insert: {
+          body: string
+          client_nonce: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          sender_id: string
+        }
+        Update: {
+          body?: string
+          client_nonce?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       operator_accounts: {
         Row: {
           auth_user_id: string | null
@@ -9316,6 +9437,14 @@ export type Database = {
         Args: { p_reason: string; p_request_id: string }
         Returns: undefined
       }
+      send_onboarding_message: {
+        Args: {
+          p_body: string
+          p_client_nonce: string
+          p_conversation_id: string
+        }
+        Returns: Json
+      }
       set_active_operator_store_scope: {
         Args: { p_access_mode: string; p_store_id: string }
         Returns: Json
@@ -9421,6 +9550,10 @@ export type Database = {
           p_shipment_id: string
           p_tracking_number: string
         }
+        Returns: Json
+      }
+      start_onboarding_conversation: {
+        Args: { p_body: string; p_client_nonce: string }
         Returns: Json
       }
       start_product_inquiry: {

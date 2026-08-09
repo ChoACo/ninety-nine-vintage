@@ -64,7 +64,7 @@ export async function GET(request: Request) {
     .select(
       "id, member_id, assigned_staff_id, store_id, status, subject, conversation_type, product_id, last_message_at, last_message_preview, last_sender_id, created_at",
     )
-    .in("conversation_type", ["general", "internal"])
+    .in("conversation_type", ["general", "product", "internal"])
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
   const { data: conversations, error } =
@@ -175,7 +175,7 @@ export async function POST(request: Request) {
   if (
     !authorizedConversation ||
     authorizedConversation.assigned_staff_id !== auth.effectiveOperatorId ||
-    !["general", "internal"].includes(authorizedConversation.conversation_type)
+    !["general", "product", "internal"].includes(authorizedConversation.conversation_type)
   ) {
     return commerceJson({ error: "담당 매장 상담만 답변할 수 있습니다." }, 403);
   }
@@ -192,7 +192,7 @@ export async function POST(request: Request) {
     .single();
   if (error) {
     return commerceJson(
-      { error: "message_send_failed", message: error.message },
+      { error: "message_send_failed", message: "답변을 보내지 못했습니다. 같은 내용으로 다시 시도해 주세요." },
       error.code === "42501" ? 403 : 409,
     );
   }

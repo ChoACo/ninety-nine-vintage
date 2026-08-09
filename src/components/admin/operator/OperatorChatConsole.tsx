@@ -17,7 +17,7 @@ interface Conversation {
   id: string;
   member_id: string;
   store_id: string | null;
-  conversation_type: "general" | "internal";
+  conversation_type: "general" | "product" | "internal";
   status: string;
   subject: string | null;
   last_message_at: string | null;
@@ -327,7 +327,7 @@ export function OperatorChatConsole({
                 <Store size={11} />
                 {conversation.conversation_type === "internal"
                   ? "내부 운영 대화"
-                  : storeName(conversation.store_id)}
+                  : conversation.conversation_type === "product" ? `상품 문의 · ${storeName(conversation.store_id)}` : storeName(conversation.store_id)}
               </span>
               <span className="mt-2 block truncate text-[11px] opacity-70">
                 {conversation.last_message_preview || "새 상담"}
@@ -354,7 +354,9 @@ export function OperatorChatConsole({
             {selectedConversation
               ? selectedConversation.conversation_type === "internal"
                 ? "직원과 담당 운영자의 내부 운영 대화"
-                : `${storeName(selectedConversation.store_id)} · 회원의 상품 및 주문 문의`
+                : selectedConversation.conversation_type === "product"
+                  ? `${storeName(selectedConversation.store_id)} · 상품 정보가 연결된 문의`
+                  : `${storeName(selectedConversation.store_id)} · 회원의 일반 및 주문 문의`
               : "회원 보관함의 채팅하기 버튼으로도 바로 연결할 수 있습니다."}
           </p>
         </div>

@@ -41,7 +41,23 @@ export async function GET(request: Request) {
         503,
       );
     }
-    return commerceJson({ conversation, messages: messages ?? [] });
+    const { data: peerReads, error: peerReadError } = await auth.admin
+      .from("support_reads")
+      .select("last_read_at")
+      .eq("conversation_id", conversationId)
+      .neq("user_id", auth.userId)
+      .order("last_read_at", { ascending: false })
+      .limit(1);
+    if (peerReadError) {
+      return commerceJson({ error: "chat_unavailable" }, 503);
+    }
+    return commerceJson({
+      conversation: {
+        ...conversation,
+        peer_read_at: peerReads?.[0]?.last_read_at ?? null,
+      },
+      messages: messages ?? [],
+    });
   }
 
   const [storeResult, conversationResult] = await Promise.all([
@@ -54,7 +70,7 @@ export async function GET(request: Request) {
       .from("support_conversations")
       .select("*")
       .eq("member_id", auth.userId)
-      .eq("conversation_type", "general")
+      .in("conversation_type", ["general", "product"])
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false }),
   ]);
@@ -72,9 +88,31 @@ export async function GET(request: Request) {
     );
   }
 
+  const conversationIds = (conversationResult.data ?? []).map(({ id }) => id);
+  const { data: peerReads, error: peerReadError } = conversationIds.length
+    ? await auth.admin
+        .from("support_reads")
+        .select("conversation_id,last_read_at")
+        .in("conversation_id", conversationIds)
+        .neq("user_id", auth.userId)
+    : { data: [], error: null };
+  if (peerReadError) {
+    return commerceJson({ error: "chat_unavailable" }, 503);
+  }
+  const peerReadByConversation = new Map<string, string>();
+  for (const read of peerReads ?? []) {
+    const current = peerReadByConversation.get(read.conversation_id);
+    if (!current || read.last_read_at > current) {
+      peerReadByConversation.set(read.conversation_id, read.last_read_at);
+    }
+  }
+
   return commerceJson({
     stores: storeResult.data ?? [],
-    conversations: conversationResult.data ?? [],
+    conversations: (conversationResult.data ?? []).map((conversation) => ({
+      ...conversation,
+      peer_read_at: peerReadByConversation.get(conversation.id) ?? null,
+    })),
   });
 }
 
@@ -130,8 +168,8 @@ export async function POST(request: Request) {
     if (error || !conversation) {
       return commerceJson(
         {
-          error: "product_inquiry_failed",
-          message: error?.message ?? "상품 문의를 보내지 못했습니다.",
+          error: "inquiry_unavailable",
+          message: error?.code === "42501" ? "이 상품에는 문의를 보낼 수 없습니다." : "상품 문의를 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
         },
         error?.code === "42501" ? 403 : 409,
       );
@@ -150,7 +188,7 @@ export async function POST(request: Request) {
       return commerceJson(
         {
           error: "conversation_create_failed",
-          message: error.message,
+          message: "상담방을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.",
         },
         error.code === "42501" ? 403 : 409,
       );
@@ -175,7 +213,7 @@ export async function POST(request: Request) {
     return commerceJson(
       {
         error: "message_send_failed",
-        message: error.message || "메시지를 보내지 못했습니다.",
+        message: "메시지를 보내지 못했습니다. 같은 내용으로 다시 시도해 주세요.",
       },
       error.code === "42501" ? 403 : 409,
     );

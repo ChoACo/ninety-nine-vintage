@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Clock3, Database, Settings, ShieldCheck, Store, UsersRound } from "lucide-react";
+import { Building2, Clock3, Database, MessageSquareText, Settings, ShieldCheck, Store, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -113,6 +113,7 @@ export function OwnerDashboard({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/owner/stores"><Building2 size={18} /> 센터(매장)·인력 배치</Link>
         <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/owner/members"><UsersRound size={18} /> 회원·운영자·직원 권한</Link>
+        <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/owner/onboarding"><MessageSquareText size={18} /> 입점 전용 상담</Link>
         <Link className="flex items-center gap-3 border border-ink p-5 text-sm font-bold" href="/admin/operator"><Settings size={18} /> 운영자 실무 화면 확인</Link>
       </div>
     </div>

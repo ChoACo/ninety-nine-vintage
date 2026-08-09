@@ -123,7 +123,7 @@ test("employees can handle only their assigned store chats and receive role-corr
   );
   assert.match(migration, /\/admin\/employee\/inquiries/);
   assert.match(operatorRoute, /auth\.effectiveOperatorId/);
-  assert.match(operatorRoute, /\.in\("conversation_type", \["general", "internal"\]\)/);
+  assert.match(operatorRoute, /\.in\("conversation_type", \["general", "product", "internal"\]\)/);
   assert.match(employeePage, /basePath="\/admin\/employee\/inquiries"/);
   assert.match(unreadRoute, /roleCode === "employee"/);
   assert.match(unreadRoute, /\/admin\/employee\/inquiries\?conversationId=/);

@@ -10,6 +10,7 @@ const links = [
   { exact: false, href: "/admin/owner/payments", label: "입금 확인" },
   { exact: false, href: "/admin/owner/members", label: "회원·권한" },
   { exact: false, href: "/admin/owner/refunds", label: "환불 승인" },
+  { exact: false, href: "/admin/owner/onboarding", label: "입점 상담" },
 ] as const;
 
 export default function OwnerLayout({

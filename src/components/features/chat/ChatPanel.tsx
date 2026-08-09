@@ -12,6 +12,7 @@ import {
   type FormEvent,
 } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { OnboardingChatPanel } from "@/components/features/chat/OnboardingChatPanel";
 
 interface ChatStore {
   id: string;
@@ -37,6 +38,8 @@ interface ChatConversation {
   last_message_preview: string | null;
   conversation_type: string;
   subject: string | null;
+  last_sender_id: string | null;
+  peer_read_at: string | null;
 }
 
 interface ChatPanelProps {
@@ -65,6 +68,7 @@ export function ChatPanel({
   const [userId, setUserId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [retryMessage, setRetryMessage] = useState<{ body: string; clientNonce: string } | null>(null);
 
   const markRead = useCallback(
     async (conversationId: string, accessToken: string) => {
@@ -203,9 +207,11 @@ export function ChatPanel({
     }
   };
 
-  const send = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!message.trim() || !token || !selectedStoreId || busy) return;
+  const send = async (event?: FormEvent<HTMLFormElement>, retry: { body: string; clientNonce: string } | null = null) => {
+    event?.preventDefault();
+    const outgoing = retry?.body ?? message.trim();
+    if (!outgoing || !token || !selectedStoreId || busy) return;
+    const clientNonce = retry?.clientNonce ?? crypto.randomUUID();
     setBusy(true);
     setNotice("");
     try {
@@ -218,8 +224,8 @@ export function ChatPanel({
         body: JSON.stringify({
           conversationId: conversation?.id,
           storeId: selectedStoreId,
-          body: message,
-          clientNonce: crypto.randomUUID(),
+          body: outgoing,
+          clientNonce,
         }),
       });
       const payload = (await response.json().catch(() => null)) as {
@@ -230,14 +236,34 @@ export function ChatPanel({
       }
       setMessages((current) => [...current, payload.message as ChatMessage]);
       setMessage("");
+      setRetryMessage(null);
       await loadIndex();
     } catch (error) {
+      setRetryMessage({ body: outgoing, clientNonce });
       setNotice(
         error instanceof Error ? error.message : "메시지를 보내지 못했습니다.",
       );
     } finally {
       setBusy(false);
     }
+  };
+
+  const responseStatus = (thread: ChatConversation | null) => {
+    if (!thread || thread.conversation_type !== "product") return null;
+    return thread.last_sender_id === userId ? "답변 대기" : "답변 도착";
+  };
+
+  const peerReadStatus = (thread: ChatConversation | null) => {
+    if (
+      !thread ||
+      thread.last_sender_id !== userId ||
+      !thread.last_message_at
+    ) {
+      return null;
+    }
+    return thread.peer_read_at && thread.peer_read_at >= thread.last_message_at
+      ? "상대 읽음"
+      : "전송됨";
   };
 
   return (
@@ -292,6 +318,11 @@ export function ChatPanel({
                   <span className="mt-1 block truncate text-[10px] opacity-60">
                     {thread?.last_message_preview ?? "새 상담 시작"}
                   </span>
+                  {responseStatus(thread ?? null) && (
+                    <span className="mt-1 block text-[9px] font-bold opacity-70">
+                      {responseStatus(thread ?? null)} · {peerReadStatus(thread ?? null) ?? "내가 읽음"}
+                    </span>
+                  )}
                 </span>
                 <ChevronRight className="shrink-0 opacity-50" size={14} />
               </button>
@@ -303,6 +334,7 @@ export function ChatPanel({
             </p>
           )}
         </div>
+        <div className="mt-4"><OnboardingChatPanel /></div>
       </aside>
 
       <section className="flex min-w-0 flex-col">
@@ -318,6 +350,11 @@ export function ChatPanel({
           <p className="mt-2 text-[11px] text-muted">
             상품 문의를 보내면 상품 정보도 이 매장 상담방에 함께 표시됩니다.
           </p>
+          {responseStatus(conversation) && (
+            <p className="mt-2 text-[10px] font-bold text-muted">
+              {selectedStore?.name} · {responseStatus(conversation)} · {peerReadStatus(conversation) ?? "내가 읽음"}
+            </p>
+          )}
         </div>
 
         <div
@@ -386,9 +423,7 @@ export function ChatPanel({
             </article>
           ))}
           {notice && (
-            <p className="text-xs font-bold text-red-700" role="alert">
-              {notice}
-            </p>
+            <div className="flex items-center justify-between gap-3 text-xs font-bold text-red-700" role="alert"><span>{notice}</span>{retryMessage && <button className="shrink-0 underline" disabled={busy} onClick={() => void send(undefined, retryMessage)} type="button">같은 내용 재전송</button>}</div>
           )}
         </div>
 

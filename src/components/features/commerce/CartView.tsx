@@ -37,7 +37,14 @@ interface ShippingCharge {
   mode: "per_store" | "per_group";
   groupId: string | null;
   groupName: string | null;
+  unitKind: "store" | "fulfillment_group";
+  unitName: string;
+  billingStoreId: string;
+  billingStoreName: string;
   amount: number;
+  productSubtotal: number;
+  productIds: string[];
+  products: Array<{ id: string; title: string; amount: number }>;
   storeIds: string[];
   storeNames: string[];
 }
@@ -1129,13 +1136,17 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
               <div className="mt-3 space-y-2 border border-line bg-paper p-3 text-[11px]">
                 <p className="font-bold">배송비 {shippingCharges.length}건</p>
                 {shippingCharges.map((charge) => (
-                  <div className="flex items-start justify-between gap-3" key={charge.chargeKey}>
-                    <span className="text-muted">
-                      {charge.mode === "per_group"
-                        ? `${charge.groupName || "출고 그룹"} · ${charge.storeNames.join(", ")}`
-                        : charge.storeNames.join(", ")}
-                    </span>
-                    <strong className="shrink-0 font-mono">{Number(charge.amount).toLocaleString("ko-KR")}원</strong>
+                  <div className="border-t border-line pt-2 first:border-t-0 first:pt-0" key={charge.chargeKey}>
+                    <div className="flex items-start justify-between gap-3">
+                      <span>
+                        <strong className="block">{charge.unitName}</strong>
+                        <span className="text-muted">{charge.storeNames.join(", ")} · 처리 {charge.billingStoreName}</span>
+                      </span>
+                      <strong className="shrink-0 font-mono">{Number(charge.amount).toLocaleString("ko-KR")}원</strong>
+                    </div>
+                    <p className="mt-1 text-muted">
+                      {charge.products.map((product) => product.title).join(" · ")} · 상품 {Number(charge.productSubtotal).toLocaleString("ko-KR")}원
+                    </p>
                   </div>
                 ))}
               </div>

@@ -7,14 +7,23 @@ import { createSupabaseServerClients } from "@/lib/supabase/server";
 import { mapPublishedProduct } from "@/services/products";
 
 type ShippingQuote = {
+  productSubtotal: number;
   shippingFee: number;
+  total: number;
   chargeCount: number;
   charges: Array<{
     chargeKey: string;
     mode: "per_store" | "per_group";
     groupId: string | null;
     groupName: string | null;
+    unitKind: "store" | "fulfillment_group";
+    unitName: string;
+    billingStoreId: string;
+    billingStoreName: string;
     amount: number;
+    productSubtotal: number;
+    productIds: string[];
+    products: Array<{ id: string; title: string; amount: number }>;
     storeIds: string[];
     storeNames: string[];
   }>;
@@ -70,7 +79,19 @@ export async function GET(request: Request) {
   }
   const quote = quoteResult.data as ShippingQuote;
   const shippingFee = Number(quote.shippingFee);
-  if (!Number.isSafeInteger(shippingFee) || shippingFee < 1) {
+  const chargesAreValid = Array.isArray(quote.charges) && quote.charges.length > 0 &&
+    quote.charges.every((charge) =>
+      charge && typeof charge.chargeKey === "string" &&
+      (charge.unitKind === "store" || charge.unitKind === "fulfillment_group") &&
+      typeof charge.unitName === "string" && Boolean(charge.unitName.trim()) &&
+      typeof charge.billingStoreName === "string" && Boolean(charge.billingStoreName.trim()) &&
+      Number.isSafeInteger(Number(charge.amount)) && Number(charge.amount) > 0 &&
+      Number.isSafeInteger(Number(charge.productSubtotal)) && Number(charge.productSubtotal) > 0 &&
+      Array.isArray(charge.storeIds) && charge.storeIds.length > 0 &&
+      Array.isArray(charge.productIds) && charge.productIds.length > 0 &&
+      Array.isArray(charge.products) && charge.products.length === charge.productIds.length,
+    );
+  if (!Number.isSafeInteger(shippingFee) || shippingFee < 1 || !chargesAreValid) {
     return commerceJson({ error: "shipping_fee_unavailable" }, 503);
   }
   const reservationByProduct = new Map(
@@ -100,6 +121,7 @@ export async function GET(request: Request) {
     serverTime: reservations[0]?.server_time ?? null,
     shippingFee,
     shippingCharges: Array.isArray(quote.charges) ? quote.charges : [],
+    quoteTotal: Number(quote.total),
     staleProductIds: ids.filter((id) => !liveIds.includes(id)),
   });
 }

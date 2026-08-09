@@ -5,7 +5,7 @@ import test from "node:test";
 const source = async (path) => readFile(new URL(`../../${path}`, import.meta.url), "utf8");
 
 test("storage routing is Supabase then R2 then disabled Google Drive and fails closed", async () => {
-  const [migration, router, factory, drive, r2, cron, vercel] = await Promise.all([
+  const [migration, router, factory, drive, r2, cron, vercel, schedule] = await Promise.all([
     source("supabase/migrations/20260809181917_enforce_fail_closed_storage_routing.sql"),
     source("src/lib/multicloud/MultiProviderRouter.ts"),
     source("src/lib/multicloud/factory.ts"),
@@ -13,6 +13,7 @@ test("storage routing is Supabase then R2 then disabled Google Drive and fails c
     source("src/lib/multicloud/r2.ts"),
     source("src/app/api/cron/storage-policy/route.ts"),
     source("vercel.json"),
+    source("supabase/migrations/20260810100000_schedule_storage_policy_probe.sql"),
   ]);
   assert.match(migration, /values\('supabase',1,true/i);
   assert.match(migration, /\('r2',2,false/i);
@@ -35,7 +36,8 @@ test("storage routing is Supabase then R2 then disabled Google Drive and fails c
   assert.match(migration, /storage_routing_events/);
   assert.match(cron, /update_storage_provider_runtime_state/);
   assert.match(cron, /set_storage_active_provider/);
-  assert.match(vercel, /api\/cron\/storage-policy/);
+  assert.doesNotMatch(vercel, /api\/cron\/storage-policy/);
+  assert.match(schedule, /17 \*\/6 \* \* \*/);
 });
 
 test("object byte usage is exact, old unknown rows block rollover, and cleanup stays object first", async () => {

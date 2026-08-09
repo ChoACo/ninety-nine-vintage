@@ -11,15 +11,21 @@ type ProviderState = {
 type Policy = { activeProviderId: string; version: number; providers: ProviderState[] };
 
 export async function GET(request: Request) {
-  if (process.env.NODE_ENV === "production"
-    && request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return NextResponse.json({ error: "Supabase configuration missing" }, { status: 500 });
   const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   const rpc = admin as unknown as { rpc(name: string, args?: Record<string, unknown>): Promise<{ data: unknown; error: { message: string } | null }> };
+  if (process.env.NODE_ENV === "production") {
+    const authorization = request.headers.get("authorization")?.trim() ?? "";
+    const provided = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+    const verified = provided
+      ? await rpc.rpc("verify_web_push_dispatch_secret", { p_secret: provided })
+      : { data: false, error: null };
+    if (verified.error || verified.data !== true) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
   const initial = await rpc.rpc("get_storage_routing_policy");
   if (initial.error || !initial.data) return NextResponse.json({ error: "storage_policy_unavailable" }, { status: 503 });
   const policy = initial.data as Policy;

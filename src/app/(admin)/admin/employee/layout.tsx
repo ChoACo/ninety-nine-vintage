@@ -4,10 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
-  ["/admin/employee", "업무 현황"],
-  ["/admin/employee/inquiries", "담당 문의"],
-  ["/admin/employee/fulfillment", "출고·보관"],
-  ["/admin/employee/parcels", "택배·송장"],
+  ["/admin/employee", "오늘의 작업"],
+  ["/admin/employee/fulfillment", "입출고·보관"],
+  ["/admin/employee/parcels", "소포·송장"],
+  ["/admin/employee/inquiries", "문의"],
 ] as const;
 
 export default function EmployeeLayout({

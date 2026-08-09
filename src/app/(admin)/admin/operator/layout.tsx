@@ -24,12 +24,6 @@ const mainNavigationItem = {
 
 const navigation: readonly OperatorNavGroup[] = [
   {
-    href: "/admin/operator/platform",
-    items: [{ exact: true, href: "/admin/operator/platform", label: "등급·정산계좌" }],
-    key: "platform",
-    label: "센터 설정",
-  },
-  {
     href: "/admin/operator/products",
     items: [
       {
@@ -42,26 +36,31 @@ const navigation: readonly OperatorNavGroup[] = [
         href: "/admin/operator/products/registration",
         label: "상품 등록",
       },
+      {
+        exact: false,
+        href: "/admin/operator/products/past",
+        label: "지난 상품",
+      },
     ],
-    key: "products",
-    label: "상품",
+    key: "sales",
+    label: "판매",
   },
   {
-    href: "/admin/operator/winners",
+    href: "/admin/operator/orders",
     items: [
+      {
+        exact: false,
+        href: "/admin/operator/orders",
+        label: "주문 상태",
+      },
       {
         exact: false,
         href: "/admin/operator/winners",
         label: "낙찰된 회원",
       },
-      {
-        exact: false,
-        href: "/admin/operator/chat",
-        label: "회원 채팅",
-      },
     ],
-    key: "orders",
-    label: "판매 회원",
+    key: "payments",
+    label: "결제 상태",
   },
   {
     href: "/admin/operator/fulfillment",
@@ -76,13 +75,6 @@ const navigation: readonly OperatorNavGroup[] = [
         href: "/admin/operator/storage",
         label: "회원 보관함",
       },
-    ],
-    key: "fulfillment",
-    label: "출고·보관",
-  },
-  {
-    href: "/admin/operator/shipping",
-    items: [
       {
         exact: true,
         href: "/admin/operator/shipping",
@@ -98,26 +90,38 @@ const navigation: readonly OperatorNavGroup[] = [
         href: "/admin/operator/shipping/history",
         label: "지난 택배 기록",
       },
-    ],
-    key: "shipping",
-    label: "택배",
-  },
-  {
-    href: "/admin/operator/products/past",
-    items: [
-      {
-        exact: false,
-        href: "/admin/operator/products/past",
-        label: "지난 상품",
-      },
       {
         exact: false,
         href: "/admin/operator/exceptions",
-        label: "예외",
+        label: "출고 예외",
       },
     ],
-    key: "records",
-    label: "기록",
+    key: "fulfillment",
+    label: "준비·배송",
+  },
+  {
+    href: "/admin/operator/chat",
+    items: [
+      {
+        exact: false,
+        href: "/admin/operator/chat",
+        label: "회원 채팅",
+      },
+    ],
+    key: "inquiries",
+    label: "문의",
+  },
+  {
+    href: "/admin/operator",
+    items: [],
+    key: "settlements",
+    label: "매출·정산",
+  },
+  {
+    href: "/admin/operator/platform",
+    items: [{ exact: true, href: "/admin/operator/platform", label: "등급·정산계좌" }],
+    key: "settings",
+    label: "매장 설정",
   },
 ] as const;
 

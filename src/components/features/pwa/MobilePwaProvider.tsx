@@ -302,14 +302,15 @@ export function MobilePwaProvider({ children }: { children: ReactNode }) {
   const testPush = useCallback(async () => {
     setPushError(null);
     try {
-      await showTestWebPushNotification();
+      if (!session) throw new Error("로그인 후 시험 알림을 보낼 수 있습니다.");
+      await showTestWebPushNotification(session.access_token);
     } catch (error) {
       setPushError(
         error instanceof Error ? error.message : "시험 알림을 표시하지 못했습니다.",
       );
       throw error;
     }
-  }, []);
+  }, [session]);
 
   const value = useMemo(
     () => ({

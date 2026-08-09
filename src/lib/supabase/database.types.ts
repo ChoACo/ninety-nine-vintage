@@ -9000,6 +9000,7 @@ export type Database = {
         Args: { p_at?: string }
         Returns: number
       }
+      queue_test_web_push_notification: { Args: never; Returns: Json }
       quote_commerce_shipping_fee: {
         Args: { p_product_ids: string[] }
         Returns: Json

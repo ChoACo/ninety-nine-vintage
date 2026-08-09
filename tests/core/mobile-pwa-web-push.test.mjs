@@ -81,10 +81,35 @@ test("push subscription endpoints are authenticated and rebound to the current u
   assert.match(client, /getWebPushClientMode/);
   assert.match(client, /return isIosMobile\(\) \? null : "browser"/);
   assert.match(client, /clientMode,/);
-  assert.match(client, /showTestWebPushNotification/);
+  assert.match(client, /showTestWebPushNotification\(accessToken: string\)/);
+  assert.match(client, /fetch\("\/api\/push\/test"/);
+  assert.doesNotMatch(client, /registration\.showNotification\("NINETY-NINE 시험 알림"/);
   assert.match(client, /disableWebPush/);
   assert.match(client, /subscription\.unsubscribe/);
   assert.match(authStatus, /await disableWebPush\(session\.access_token\)/);
+});
+
+test("test notifications use the same durable inbox and outbox as real events", async () => {
+  const [migration, route, provider] = await Promise.all([
+    source(
+      "supabase/migrations/20260809174600_route_test_notifications_through_outbox.sql",
+    ),
+    source("src/app/api/push/test/route.ts"),
+    source("src/components/features/pwa/MobilePwaProvider.tsx"),
+  ]);
+
+  assert.match(migration, /insert into public\.notifications/);
+  assert.match(migration, /kind = 'web_push_test'/);
+  assert.match(migration, /interval '30 seconds'/);
+  assert.match(migration, /customer_inventory_items_notify_store_sale/);
+  assert.match(migration, /'sale_created'/);
+  assert.match(migration, /when 'chat_message' then '새 메시지를 확인해 주세요.'/);
+  assert.match(migration, /when 'payment_verification_requested' then '새 입금 확인 업무를 확인해 주세요.'/);
+  assert.match(migration, /when 'shipment_tracking_registered' then '새 배송 상태를 확인해 주세요.'/);
+  assert.match(migration, /grant execute on function public\.queue_test_web_push_notification\(\)[\s\S]*to authenticated/);
+  assert.match(route, /authenticateCommerceRequest\(request, true\)/);
+  assert.match(route, /queue_test_web_push_notification/);
+  assert.match(provider, /showTestWebPushNotification\(session\.access_token\)/);
 });
 
 test("notification consent is stored per user and all categories default enabled", async () => {

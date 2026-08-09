@@ -1,29 +1,66 @@
 "use client";
 
 import {
+  Bell,
   CreditCard,
-  Gavel,
-  Heart,
-  MapPin,
   PackageCheck,
-  ReceiptText,
   RotateCcw,
   Settings,
-  Truck,
 } from "lucide-react";
 import Link from "next/link";
+
 import { useSimpleMode } from "@/components/features/accessibility/SimpleModeProvider";
 
 const tasks = [
-  ["결제하기", "결제할 상품과 입금 상태 확인", "/m/account/payments", CreditCard, true],
-  ["주문 내역", "구매 상품과 처리 상태 확인", "/m/account/orders", ReceiptText, true],
-  ["배송 신청·현황", "배송 신청부터 발송까지 확인", "/m/account/shipping", Truck, true],
-  ["보관 상품", "보관 기한과 묶음 배송 확인", "/m/account/storage", PackageCheck, true],
-  ["입찰 현황", "최고 입찰과 재입찰 확인", "/m/account/bids", Gavel, true],
-  ["배송지", "수령 주소 등록과 선택", "/m/account/addresses", MapPin, false],
-  ["찜 목록", "저장한 상품 다시 보기", "/m/account/saved", Heart, false],
-  ["환불", "환불 상태와 계좌 등록", "/m/account/refunds", RotateCcw, false],
-  ["설정", "간편모드와 모바일 알림 설정", "/m/account/settings", Settings, false],
+  [
+    "주문·결제",
+    "/m/account/payments",
+    CreditCard,
+    [
+      ["결제하기", "/m/account/payments"],
+      ["주문 내역", "/m/account/orders"],
+      ["입찰 현황", "/m/account/bids"],
+    ],
+    true,
+  ],
+  [
+    "보관·배송",
+    "/m/account/storage",
+    PackageCheck,
+    [
+      ["보관 상품", "/m/account/storage"],
+      ["배송 신청·현황", "/m/account/shipping"],
+      ["배송지", "/m/account/addresses"],
+    ],
+    true,
+  ],
+  [
+    "취소·환불",
+    "/m/account/refunds",
+    RotateCcw,
+    [["환불 상태·계좌", "/m/account/refunds"]],
+    true,
+  ],
+  [
+    "채팅·알림",
+    "/m/chat",
+    Bell,
+    [
+      ["문의 채팅", "/m/chat"],
+      ["알림 설정", "/m/account/settings"],
+    ],
+    true,
+  ],
+  [
+    "계정",
+    "/m/account/settings",
+    Settings,
+    [
+      ["계정·화면 설정", "/m/account/settings"],
+      ["찜 목록", "/m/account/saved"],
+    ],
+    true,
+  ],
 ] as const;
 
 export function MobileAccountTaskGrid() {
@@ -34,29 +71,31 @@ export function MobileAccountTaskGrid() {
 
   return (
     <nav
-      aria-label="내 정보 업무"
+      aria-label="내 정보 핵심 업무"
       className={`mt-5 grid gap-px border border-line bg-line ${
-        simpleMode.enabled ? "grid-cols-1" : "grid-cols-2"
+        simpleMode.enabled ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"
       }`}
     >
-      {visibleTasks.map(([label, description, href, Icon]) => (
-        <Link
-          className={`bg-paper p-5 transition-colors active:bg-surface ${
-            simpleMode.enabled ? "flex min-h-24 items-center gap-5" : "min-h-36"
-          }`}
-          href={href}
-          key={href}
-        >
-          <Icon className="shrink-0" size={simpleMode.enabled ? 28 : 19} />
-          <span>
-            <span className={`block font-black ${simpleMode.enabled ? "text-lg" : "mt-7 text-sm"}`}>
+      {visibleTasks.map(([label, href, Icon, links]) => (
+        <section className="bg-paper p-5" key={href}>
+          <Link className="flex items-center gap-3" href={href}>
+            <Icon className="shrink-0" size={simpleMode.enabled ? 28 : 20} />
+            <span className={simpleMode.enabled ? "text-lg font-black" : "text-sm font-black"}>
               {label}
             </span>
-            <span className={`mt-2 block leading-5 text-muted ${simpleMode.enabled ? "text-sm" : "text-[10px]"}`}>
-              {description}
-            </span>
-          </span>
-        </Link>
+          </Link>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {links.map(([linkLabel, linkHref]) => (
+              <Link
+                className="border border-line px-3 py-2 text-[10px] font-bold"
+                href={linkHref}
+                key={linkHref}
+              >
+                {linkLabel}
+              </Link>
+            ))}
+          </div>
+        </section>
       ))}
     </nav>
   );

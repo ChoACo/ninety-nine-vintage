@@ -175,23 +175,14 @@ export async function disableWebPush(accessToken: string) {
   ]);
 }
 
-export async function showTestWebPushNotification() {
+export async function showTestWebPushNotification(accessToken: string) {
   const clientMode = getWebPushClientMode();
   if (!clientMode || Notification.permission !== "granted") {
     throw new Error("먼저 모바일 시스템 알림을 켜 주세요.");
   }
-  const registration = await registerMobileServiceWorker();
-  const options: NotificationOptions & {
-    renotify?: boolean;
-    vibrate?: number[];
-  } = {
-    body: "상태창에 이 알림이 보이면 모바일 알림 설정이 정상입니다.",
-    icon: "/pwa-icon-192.png",
-    badge: "/pwa-icon-192.png",
-    tag: "ninety-nine-test",
-    renotify: true,
-    vibrate: [200, 100, 200],
-    data: { url: "/m/account/settings" },
-  };
-  await registration.showNotification("NINETY-NINE 시험 알림", options);
+  const response = await fetch("/api/push/test", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error(await readApiError(response));
 }

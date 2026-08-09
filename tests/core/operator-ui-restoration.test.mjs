@@ -61,7 +61,7 @@ test("operator center uses major and minor navigation with separated shipping wo
   assert.match(layout, /aria-label="운영자 상단 탭"/);
   assert.match(layout, />운영 탭<\/p>/);
   assert.match(layout, /aria-label=\{`\$\{activeGroup\.label\} 소분류`\}/);
-  for (const label of ["메인", "상품", "센터 설정", "판매 회원", "출고·보관", "기록", "택배"]) {
+  for (const label of ["메인", "판매", "결제 상태", "준비·배송", "문의", "매출·정산", "매장 설정"]) {
     assert.match(layout, new RegExp(`label:\\s*"${label}"`));
   }
   for (const label of [
@@ -71,7 +71,7 @@ test("operator center uses major and minor navigation with separated shipping wo
     "출고·보관",
     "회원 보관함",
     "지난 상품",
-    "예외",
+    "출고 예외",
     "택배 요청",
     "택배 발송 완료",
     "지난 택배 기록",
@@ -79,10 +79,7 @@ test("operator center uses major and minor navigation with separated shipping wo
     assert.match(layout, new RegExp(`label:\\s*"${label}"`));
   }
   assert.match(dashboard, />\s*메인\s*</);
-  assert.ok(
-    layout.indexOf('label: "택배"') < layout.indexOf('label: "기록"'),
-    "택배 대분류는 기록 대분류보다 앞에 있어야 합니다.",
-  );
+  assert.ok(layout.indexOf('label: "준비·배송"') > -1);
   assert.match(requestPage, /<OperatorShippingConsole\s*\/>/);
   assert.match(completedPage, /<OperatorShippingConsole view="completed"\s*\/>/);
   assert.match(historyPage, /<OperatorShippingConsole view="history"\s*\/>/);

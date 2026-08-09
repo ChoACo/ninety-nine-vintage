@@ -17,7 +17,7 @@ test("Owner dashboard removes shop status cards and links center(store) manageme
   ]);
 
   assert.match(layout, /href:\s*"\/admin\/owner\/stores"/);
-  assert.match(layout, /센터\(매장\) 관리/);
+  assert.match(layout, /매장·권한/);
   assert.match(dashboard, /센터\(매장\)·인력 배치/);
   assert.doesNotMatch(dashboard, /숍별 운영 현황|숍 운영자/);
   assert.match(page, /OwnerStoreManagementConsole/);

@@ -159,7 +159,7 @@ test("only the owner confirms shared payments while operators retain fulfillment
   assert.match(ownerLayout, /환불 승인/);
   assert.doesNotMatch(ownerLayout, /배송·결제/);
   assert.doesNotMatch(operatorLayout, /label:\s*"주문·입금"/);
-  assert.match(operatorLayout, /label:\s*"택배"/);
+  assert.match(operatorLayout, /label:\s*"준비·배송"/);
 });
 
 test("checkout quotes shipping by store or fulfillment group and snapshots each charge", async () => {

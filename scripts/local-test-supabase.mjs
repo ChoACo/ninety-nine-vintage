@@ -178,6 +178,41 @@ after insert on auth.users
 for each row execute function public.attach_local_test_account_identity();
 `;
 
+const localBrowserProductMigration = `-- Generated only for the disposable local browser test database.
+begin;
+
+insert into public.products (
+  title, description, publish_at, closes_at, status,
+  starting_price, current_price, image_urls, thumbnail_urls,
+  sale_type, store_id
+)
+select
+  '로컬 브라우저 검증 경매',
+  '격리된 로컬 테스트 상품',
+  clock_timestamp() - interval '1 hour',
+  clock_timestamp() + interval '1 day',
+  'active',
+  10000,
+  10000,
+  array['https://example.com/local-test-product.jpg'],
+  array['https://example.com/local-test-product-thumb.jpg'],
+  'auction',
+  stores.id
+from public.stores as stores
+where stores.is_active
+order by stores.created_at, stores.id
+limit 1;
+
+-- Auction scheduling normalizes newly inserted rows to the next KST release
+-- slot. This disposable fixture must be visible regardless of the test clock.
+set local session_replication_role = replica;
+update public.products
+set publish_at = clock_timestamp() - interval '1 hour',
+    closes_at = clock_timestamp() + interval '1 day'
+where title = '로컬 브라우저 검증 경매';
+commit;
+`;
+
 export async function prepareLocalTestSupabase() {
   // This fixed Temp folder contains only generated local-test files.
   await rm(localTestRoot, { recursive: true, force: true });
@@ -232,6 +267,10 @@ export async function prepareLocalTestSupabase() {
   await writeFile(
     path.join(localMigrations, "20260724000000_allow_local_test_account_roles.sql"),
     localTestAccountRoleMigration,
+  );
+  await writeFile(
+    path.join(localMigrations, "99999999999999_seed_local_browser_product.sql"),
+    localBrowserProductMigration,
   );
 }
 

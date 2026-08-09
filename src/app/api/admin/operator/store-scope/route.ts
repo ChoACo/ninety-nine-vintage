@@ -49,7 +49,6 @@ export async function GET(request: Request) {
     const { data: rows, error: storeError } = await auth.user
       .from("stores")
       .select("id, name, slug")
-      .eq("is_active", true)
       .order("name");
     if (storeError) {
       return commerceJson({ error: "store_scope_unavailable" }, 503);
@@ -76,7 +75,6 @@ export async function GET(request: Request) {
       const { data: rows, error: storeError } = await auth.user
         .from("stores")
         .select("id, name, slug")
-        .eq("is_active", true)
         .in("id", storeIds)
         .order("name");
       if (storeError) {

@@ -76,6 +76,9 @@ test("local test accounts stay dormant unless the isolated local-test launcher e
   assert.match(localDatabase, /old\.raw_app_meta_data ->> 'local_test_account'/);
   assert.match(localDatabase, /bank_name = '로컬 테스트 은행'/);
   assert.match(localDatabase, /account_number = '000-0000-0000'/);
+  assert.match(localDatabase, /99999999999999_seed_local_browser_product\.sql/);
+  assert.match(localDatabase, /로컬 브라우저 검증 경매/);
+  assert.match(localDatabase, /begin;[\s\S]*set local session_replication_role = replica[\s\S]*commit;/);
   assert.match(auth, /local_test_account === true/);
   assert.match(login, /canUseLocalTestAccounts\(\)/);
 });

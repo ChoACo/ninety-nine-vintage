@@ -55,7 +55,20 @@ test("operator store scope API reads and writes the preference", async () => {
   assert.match(route, /expectedMode = auth\.roleCode === "owner" \? "owner_support" : "assigned"/);
   assert.match(route, /from\("store_memberships"\)[\s\S]{0,220}eq\("status", "active"\)/);
   assert.match(route, /eq\("membership_role", "operator"\)/);
+  assert.doesNotMatch(route, /\.eq\("is_active", true\)/);
   assert.match(route, /commerceJson\(\{ scope, stores \}\)/);
+});
+
+test("operator store reads stay within the public column grant", async () => {
+  const [scopeRoute, productsRoute] = await Promise.all([
+    source("src/app/api/admin/operator/store-scope/route.ts"),
+    source("src/app/api/admin/operator/products/route.ts"),
+  ]);
+  for (const route of [scopeRoute, productsRoute]) {
+    assert.doesNotMatch(route, /\.eq\("is_active", true\)/);
+  }
+  assert.match(productsRoute, /\.select\("id, name, slug"\)/);
+  assert.doesNotMatch(productsRoute, /operator_id, is_active/);
 });
 
 test("current operator workspace requires one expiring store and removes all-store execution", async () => {

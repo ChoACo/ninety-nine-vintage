@@ -70,8 +70,7 @@ export async function GET(request: Request) {
     .map(([storeId]) => storeId);
   let storeQuery = user
     .from("stores")
-    .select("id, name, slug, operator_id, is_active")
-    .eq("is_active", true)
+    .select("id, name, slug")
     .eq("id", auth.selectedStoreId);
   if (auth.roleCode !== "owner") {
     if (manageableStoreIds.length === 0) {

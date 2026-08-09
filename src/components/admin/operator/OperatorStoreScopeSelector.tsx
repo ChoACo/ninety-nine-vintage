@@ -5,12 +5,22 @@ import { useEffect } from "react";
 import { useOperatorStoreScope } from "@/store/useOperatorStoreScope";
 
 export function OperatorStoreScopeSelector() {
-  const { scope, stores, loaded, busy, load, select } =
+  const { scope, stores, loaded, busy, error, load, select } =
     useOperatorStoreScope();
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!scope.active || !scope.expiresAt) return;
+    const delay = Math.max(
+      0,
+      new Date(scope.expiresAt).getTime() - new Date().getTime(),
+    );
+    const timeout = window.setTimeout(() => void load(), delay + 50);
+    return () => window.clearTimeout(timeout);
+  }, [load, scope.active, scope.expiresAt]);
 
   if (!loaded) {
     return (
@@ -20,18 +30,31 @@ export function OperatorStoreScopeSelector() {
     );
   }
 
-  const savedStoreId =
-    scope.scope === "store" ? scope.storeId ?? null : null;
+  if (error) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-red-700">
+        <span>{error}</span>
+        <button className="font-bold underline" disabled={busy} onClick={() => void load()} type="button">
+          다시 시도
+        </button>
+      </div>
+    );
+  }
+
+  const savedStoreId = scope.active ? scope.storeId : null;
   const savedStoreAvailable =
     savedStoreId !== null && stores.some((store) => store.id === savedStoreId);
-  const value = savedStoreAvailable ? savedStoreId : "all";
+  const value = savedStoreAvailable ? savedStoreId : "";
 
-  const onChange = (nextValue: string) => {
-    const next =
-      nextValue === "all"
-        ? { scope: "all" as const, storeId: null }
-        : { scope: "store" as const, storeId: nextValue };
-    void select(next);
+  const onChange = async (nextValue: string) => {
+    if (!nextValue) return;
+    const next = {
+      active: true,
+      accessMode: scope.accessMode,
+      storeId: nextValue,
+      expiresAt: null,
+    };
+    if (await select(next)) window.location.reload();
   };
 
   return (
@@ -42,10 +65,10 @@ export function OperatorStoreScopeSelector() {
         aria-label="운영자 센터 범위"
         className="border border-line bg-paper px-3 py-2 text-xs"
         disabled={busy}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => void onChange(event.target.value)}
         value={value}
       >
-        <option value="all">전체 센터</option>
+        <option disabled value="">센터를 선택하세요</option>
         {stores.map((store) => (
           <option key={store.id} value={store.id}>
             {store.name}

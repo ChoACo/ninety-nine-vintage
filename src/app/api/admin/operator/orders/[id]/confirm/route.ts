@@ -1,7 +1,7 @@
-import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   await params;
   return commerceJson({

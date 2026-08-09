@@ -1,4 +1,4 @@
-import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOperatorStoreRequest, commerceJson, verifyOperatorProductScope } from "@/lib/commerce/server";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -15,7 +15,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
     return commerceJson({ error: "forbidden" }, 403);
@@ -25,6 +25,8 @@ export async function POST(
   if (!UUID_PATTERN.test(id)) {
     return commerceJson({ error: "invalid_product_id" }, 400);
   }
+  const scopeError = await verifyOperatorProductScope(auth.user, auth.selectedStoreId, id);
+  if (scopeError) return scopeError;
 
   const { data: paymentMode, error: paymentModeError } = await auth.admin.rpc(
     "get_payment_runtime_mode_for_service",

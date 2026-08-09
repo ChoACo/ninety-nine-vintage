@@ -19,7 +19,7 @@ test("operator revenue is summarized on the dashboard and retains a guarded deta
   assert.match(dashboard, /\/api\/admin\/operator\/revenue\?from=/);
   assert.match(dashboard, /이번 달 순매출/);
   assert.match(dashboard, /store\.netSales/);
-  assert.match(route, /authenticateStaffRequest\(request\)/);
+  assert.match(route, /authenticateOperatorStoreRequest\(request\)/);
   assert.match(route, /auth\.user as unknown as RpcClient/);
   assert.match(route, /"get_store_financial_report"/);
   assert.match(route, /p_from:\s*from,\s*p_to:\s*to/);

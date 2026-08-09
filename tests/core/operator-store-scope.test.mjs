@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const rootUrl = new URL("../../", import.meta.url);
@@ -49,8 +51,50 @@ test("operator store scope API reads and writes the preference", async () => {
   const route = await source("src/app/api/admin/operator/store-scope/route.ts");
   assert.match(route, /authenticateStaffRequest/);
   assert.match(route, /get_operator_store_scope/);
-  assert.match(route, /set_operator_store_scope/);
+  assert.match(route, /set_active_operator_store_scope/);
+  assert.match(route, /expectedMode = auth\.roleCode === "owner" \? "owner_support" : "assigned"/);
   assert.match(route, /from\("store_memberships"\)[\s\S]{0,220}eq\("status", "active"\)/);
   assert.match(route, /eq\("membership_role", "operator"\)/);
   assert.match(route, /commerceJson\(\{ scope, stores \}\)/);
+});
+
+test("current operator workspace requires one expiring store and removes all-store execution", async () => {
+  const [migration, server, route, selector] = await Promise.all([
+    source("supabase/migrations/20260809161500_require_expiring_operator_store_scope.sql"),
+    source("src/lib/commerce/server.ts"),
+    source("src/app/api/admin/operator/products/route.ts"),
+    source("src/components/admin/operator/OperatorStoreScopeSelector.tsx"),
+  ]);
+
+  assert.match(migration, /delete from public\.operator_store_scope_preferences[\s\S]*selected_store_id is null/i);
+  assert.match(migration, /alter column selected_store_id set not null/i);
+  assert.match(migration, /access_mode in \('assigned', 'owner_support'\)/i);
+  assert.match(migration, /expires_at timestamptz not null[\s\S]*interval '30 minutes'/i);
+  assert.match(migration, /membership_role = 'operator'[\s\S]*membership\.status = 'active'/i);
+  assert.match(migration, /operator_scope_allows_store[\s\S]*scope\.expires_at > clock_timestamp\(\)/i);
+  assert.match(migration, /has_exact_store_or_group_permission[\s\S]*operator_scope_allows_store/i);
+  assert.match(migration, /revoke all on function public\.set_operator_store_scope\(text, uuid\)[\s\S]*authenticated/i);
+  assert.match(server, /authenticateOperatorStoreRequest[\s\S]*require_active_operator_store_scope/);
+  assert.match(route, /authenticateOperatorStoreRequest\(request/);
+  assert.match(route, /eq\("id", auth\.selectedStoreId\)/);
+  assert.match(route, /storeId !== auth\.selectedStoreId/);
+  assert.doesNotMatch(selector, /전체 센터/);
+});
+
+test("every operator API except scope selection requires the active selected store", async () => {
+  const apiRoot = fileURLToPath(new URL("src/app/api/admin/operator/", rootUrl));
+  const entries = await readdir(apiRoot, { recursive: true, withFileTypes: true });
+  const routeFiles = entries
+    .filter((entry) => entry.isFile() && entry.name === "route.ts")
+    .map((entry) => path.join(entry.parentPath, entry.name));
+
+  for (const routeFile of routeFiles) {
+    const route = await readFile(routeFile, "utf8");
+    if (routeFile.replaceAll("\\", "/").endsWith("/store-scope/route.ts")) {
+      assert.match(route, /authenticateStaffRequest/);
+    } else {
+      assert.match(route, /authenticateOperatorStoreRequest/, routeFile);
+      assert.doesNotMatch(route, /authenticateStaffRequest/, routeFile);
+    }
+  }
 });

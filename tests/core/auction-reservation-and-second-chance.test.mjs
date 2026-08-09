@@ -335,7 +335,7 @@ test("operator second chance is role, store, deadline, audit, and payment-mode c
     /grant execute on function public\.operator_process_second_chance\(uuid\)\s+to authenticated/i,
   );
 
-  assert.match(route, /authenticateStaffRequest\(request, true\)/);
+  assert.match(route, /authenticateOperatorStoreRequest\(request, true\)/);
   assert.match(
     route,
     /auth\.roleCode !== "owner" && auth\.roleCode !== "operator"/,

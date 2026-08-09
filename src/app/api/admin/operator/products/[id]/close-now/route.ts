@@ -1,6 +1,7 @@
 import {
-  authenticateStaffRequest,
+  authenticateOperatorStoreRequest,
   commerceJson,
+  verifyOperatorProductScope,
 } from "@/lib/commerce/server";
 
 const UUID_PATTERN =
@@ -10,7 +11,7 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner") {
     return commerceJson(
@@ -36,6 +37,8 @@ export async function POST(
       400,
     );
   }
+  const scopeError = await verifyOperatorProductScope(auth.user, auth.selectedStoreId, id);
+  if (scopeError) return scopeError;
 
   const { data, error } = await auth.user
     .rpc("owner_close_auction_now", {

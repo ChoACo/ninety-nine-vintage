@@ -3226,20 +3226,26 @@ export type Database = {
       }
       operator_store_scope_preferences: {
         Row: {
+          access_mode: string
           created_at: string
-          selected_store_id: string | null
+          expires_at: string
+          selected_store_id: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          access_mode?: string
           created_at?: string
-          selected_store_id?: string | null
+          expires_at?: string
+          selected_store_id: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          access_mode?: string
           created_at?: string
-          selected_store_id?: string | null
+          expires_at?: string
+          selected_store_id?: string
           updated_at?: string
           user_id?: string
         }
@@ -8671,6 +8677,7 @@ export type Database = {
           used: number
         }[]
       }
+      require_active_operator_store_scope: { Args: never; Returns: string }
       resolve_inventory_exception: {
         Args: {
           p_case_id: string
@@ -8807,6 +8814,10 @@ export type Database = {
       set_my_initial_nickname: { Args: { p_nickname: string }; Returns: string }
       set_operator_store_scope: {
         Args: { p_scope: string; p_store_id?: string }
+        Returns: Json
+      }
+      set_active_operator_store_scope: {
+        Args: { p_access_mode: string; p_store_id: string }
         Returns: Json
       }
       set_owner_store_employee: {

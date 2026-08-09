@@ -1,4 +1,4 @@
-import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
 import { getCatalogImageUrl } from "@/lib/images";
 
 const HISTORY_PAGE_SIZE = 100;
@@ -617,7 +617,7 @@ function parseOrderItems(
 }
 
 export async function GET(request: Request) {
-  const auth = await authenticateStaffRequest(request);
+  const auth = await authenticateOperatorStoreRequest(request);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
     return commerceJson({ error: "forbidden" }, 403);

@@ -1,5 +1,5 @@
 import {
-  authenticateStaffRequest,
+  authenticateOperatorStoreRequest,
   commerceJson,
 } from "@/lib/commerce/server";
 
@@ -11,7 +11,7 @@ function isUuid(value: string | null | undefined): value is string {
 }
 
 export async function GET(request: Request) {
-  const auth = await authenticateStaffRequest(request);
+  const auth = await authenticateOperatorStoreRequest(request);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner" && !auth.effectiveOperatorId) {
     return commerceJson(
@@ -108,7 +108,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   if (auth.roleCode === "owner") {
     return commerceJson({ error: "owner_chat_read_only" }, 403);

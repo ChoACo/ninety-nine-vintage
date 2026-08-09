@@ -1,10 +1,10 @@
-import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
 import { encryptAccountNumber, maskAccountNumber, normalizeAccountNumber } from "@/lib/settlement/payoutAccount.server";
 
 type RpcClient = { rpc: (name: string,args?: Record<string,unknown>) => Promise<{data:unknown;error:{code?:string;message?:string}|null}> };
 
 export async function GET(request: Request) {
-  const auth=await authenticateStaffRequest(request);
+  const auth=await authenticateOperatorStoreRequest(request);
   if (!auth.ok) return auth.response;
   if (!['owner','operator'].includes(auth.roleCode)) return commerceJson({error:'forbidden'},403);
   const {data,error}=await (auth.user as unknown as RpcClient).rpc('get_operator_store_platform_management');
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth=await authenticateStaffRequest(request,true);
+  const auth=await authenticateOperatorStoreRequest(request,true);
   if (!auth.ok) return auth.response;
   if (!['owner','operator'].includes(auth.roleCode)) return commerceJson({error:'forbidden'},403);
   const body=await request.json().catch(()=>null) as Record<string,unknown>|null;

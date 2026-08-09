@@ -160,7 +160,7 @@ test("current operator shipping uses v2 CAS packing and exact unfulfilled-item g
     source("src/components/admin/operator/OperatorShippingConsole.tsx"),
   ]);
 
-  assert.match(operatorRoute, /authenticateStaffRequest\(request,\s*true\)/);
+  assert.match(operatorRoute, /authenticateOperatorStoreRequest\(request,\s*true\)/);
   assert.match(operatorRoute, /auth\.user as unknown as RpcClient/);
   assert.match(operatorRoute, /"get_inventory_shipment_queue"/);
   assert.match(operatorRoute, /"pack_inventory_shipment"/);

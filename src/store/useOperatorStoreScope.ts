@@ -4,8 +4,10 @@ import { create } from "zustand";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export interface OperatorStoreScope {
-  scope: "all" | "store";
+  active: boolean;
+  accessMode: "assigned" | "owner_support";
   storeId: string | null;
+  expiresAt: string | null;
 }
 
 export interface ScopeStore {
@@ -19,8 +21,9 @@ interface OperatorStoreScopeState {
   stores: ScopeStore[];
   loaded: boolean;
   busy: boolean;
+  error: string | null;
   load: () => Promise<void>;
-  select: (next: OperatorStoreScope) => Promise<void>;
+  select: (next: OperatorStoreScope) => Promise<boolean>;
 }
 
 async function fetchWithToken(
@@ -53,37 +56,51 @@ async function fetchWithToken(
 
 export const useOperatorStoreScope = create<OperatorStoreScopeState>(
   (set, get) => ({
-    scope: { scope: "all", storeId: null },
+    scope: { active: false, accessMode: "assigned", storeId: null, expiresAt: null },
     stores: [],
     loaded: false,
     busy: false,
+    error: null,
     load: async () => {
-      if (get().loaded) return;
+      if (get().busy) return;
+      set({ busy: true, error: null });
       try {
         const { ok, payload } = await fetchWithToken();
         if (ok) {
           set({
-            scope: payload.scope ?? { scope: "all", storeId: null },
+            scope: payload.scope ?? { active: false, accessMode: "assigned", storeId: null, expiresAt: null },
             stores: payload.stores ?? [],
             loaded: true,
+            busy: false,
           });
+        } else {
+          set({ loaded: true, busy: false, error: payload.error ?? "센터 범위를 불러오지 못했습니다." });
         }
-      } catch {
-        set({ loaded: true });
+      } catch (error) {
+        set({
+          loaded: true,
+          busy: false,
+          error: error instanceof Error ? error.message : "센터 범위를 불러오지 못했습니다.",
+        });
       }
     },
     select: async (next) => {
-      if (get().busy) return;
-      set({ busy: true });
+      if (get().busy) return false;
+      set({ busy: true, error: null });
       try {
         const { ok, payload } = await fetchWithToken({
           method: "POST",
-          body: JSON.stringify(next),
+          body: JSON.stringify({ storeId: next.storeId, accessMode: next.accessMode }),
         });
         if (!ok) {
           throw new Error(payload.error ?? "센터 범위를 저장하지 못했습니다.");
         }
-        set({ scope: next });
+        if (!payload.scope) throw new Error("센터 범위 응답을 확인하지 못했습니다.");
+        set({ scope: payload.scope, error: null });
+        return true;
+      } catch (error) {
+        set({ error: error instanceof Error ? error.message : "센터 범위를 저장하지 못했습니다." });
+        return false;
       } finally {
         set({ busy: false });
       }

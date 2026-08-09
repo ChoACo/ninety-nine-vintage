@@ -1,14 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
-  authenticateStaffRequest,
+  authenticateOperatorStoreRequest,
   commerceJson,
   normalizeIds,
 } from "@/lib/commerce/server";
 import { getCatalogImageUrl } from "@/lib/images";
 
 export async function GET(request: Request) {
-  const auth = await authenticateStaffRequest(request);
+  const auth = await authenticateOperatorStoreRequest(request);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
     return commerceJson({ error: "past_products_forbidden" }, 403);
@@ -33,7 +33,8 @@ export async function GET(request: Request) {
   let storeQuery = admin
     .from("stores")
     .select("id, name, slug, operator_id")
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .eq("id", auth.selectedStoreId);
   if (allowedStoreIds) {
     if (allowedStoreIds.length === 0) {
       return commerceJson({
@@ -121,7 +122,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   const body = (await request.json().catch(() => null)) as Record<
     string,
@@ -136,6 +137,15 @@ export async function POST(request: Request) {
         : "";
   if (productIds.length === 0 || productIds.length > 200 || !action) {
     return commerceJson({ error: "상품과 작업을 확인해 주세요." }, 400);
+  }
+  const { data: scopedProducts, error: scopeError } = await auth.user
+    .from("products")
+    .select("id")
+    .in("id", productIds)
+    .eq("store_id", auth.selectedStoreId);
+  if (scopeError) return commerceJson({ error: "past_products_unavailable" }, 503);
+  if ((scopedProducts ?? []).length !== productIds.length) {
+    return commerceJson({ error: "operator_store_scope_mismatch" }, 403);
   }
   const { data, error } = await auth.user
     .rpc("manage_past_auction_products", {

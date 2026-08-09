@@ -1,4 +1,4 @@
-import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
 import {
   canonicalizeManualTransferText,
   MANUAL_TRANSFER_DEPOSITOR_NAME_MAX_LENGTH,
@@ -84,7 +84,7 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ kind: string; id: string }> },
 ) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
 
   const contentLength = Number(request.headers.get("content-length") ?? "0");

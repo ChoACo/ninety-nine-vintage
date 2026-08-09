@@ -1,4 +1,4 @@
-import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EXCEPTION_KINDS = new Set([
@@ -85,7 +85,7 @@ function rpcFailure(error: RpcError) {
 }
 
 export async function GET(request: Request) {
-  const auth = await authenticateStaffRequest(request);
+  const auth = await authenticateOperatorStoreRequest(request);
   if (!auth.ok) return auth.response;
   const page = parsePage(request);
   if (!page) return commerceJson({ error: "invalid_exception_query", message: "조회 범위를 확인해 주세요." }, 422);
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   const body = await request.json().catch(() => null) as unknown;
   if (!isRecord(body) || typeof body.action !== "string") return commerceJson({ error: "invalid_exception_request", message: "상품 예외 작업을 확인해 주세요." }, 422);

@@ -1,6 +1,6 @@
 import { GeminiProductEnhancer } from "@/lib/ai/GeminiProductEnhancer.server";
 import type { ProductEnhancementSource } from "@/lib/ai/productEnhancement";
-import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
 
 export const runtime = "nodejs";
 
@@ -22,7 +22,7 @@ function parseSource(value: FormDataEntryValue | null): ProductEnhancementSource
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
     return commerceJson({ error: "operator_products_forbidden" }, 403);
@@ -32,6 +32,9 @@ export async function POST(request: Request) {
   if (!formData) return commerceJson({ error: "invalid_form_data", status: "failed" }, 400);
   const source = parseSource(formData.get("source"));
   const storeId = formData.get("storeId");
+  if (storeId !== auth.selectedStoreId) {
+    return commerceJson({ error: "operator_store_scope_mismatch" }, 403);
+  }
   const images = formData.getAll("images").filter(
     (entry): entry is File => entry instanceof File,
   ).slice(0, 2);

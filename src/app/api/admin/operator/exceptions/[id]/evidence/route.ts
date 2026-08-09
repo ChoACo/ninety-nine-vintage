@@ -1,4 +1,4 @@
-import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -100,7 +100,7 @@ async function signedEvidence(admin: SupabaseClient<Database>, exceptionCase: Au
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await authenticateStaffRequest(request);
+  const auth = await authenticateOperatorStoreRequest(request);
   if (!auth.ok) return auth.response;
   const { id } = await params;
   if (!isUuid(id)) return commerceJson({ error: "invalid_evidence_request", message: "예외 건을 확인해 주세요." }, 422);
@@ -112,7 +112,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   const { id } = await params;
   if (!isUuid(id)) return commerceJson({ error: "invalid_evidence_request", message: "예외 건을 확인해 주세요." }, 422);

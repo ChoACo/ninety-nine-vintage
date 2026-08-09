@@ -1,4 +1,4 @@
-import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
 import { normalizeProductBrand } from "@/lib/catalog/brand";
 import {
   getNextAuctionDeadline,
@@ -32,7 +32,7 @@ function images(value: unknown) {
 }
 
 export async function GET(request: Request) {
-  const auth = await authenticateStaffRequest(request);
+  const auth = await authenticateOperatorStoreRequest(request);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
     return commerceJson({ error: "operator_products_forbidden" }, 403);
@@ -44,7 +44,8 @@ export async function GET(request: Request) {
       .from("store_memberships")
       .select("store_id, manage_products, publish_products")
       .eq("user_id", auth.userId)
-      .eq("status", "active");
+      .eq("status", "active")
+      .eq("store_id", auth.selectedStoreId);
     if (membershipResult.error) {
       return commerceJson({ error: "operator_products_unavailable" }, 503);
     }
@@ -63,7 +64,8 @@ export async function GET(request: Request) {
   let storeQuery = user
     .from("stores")
     .select("id, name, slug, operator_id, is_active")
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .eq("id", auth.selectedStoreId);
   if (auth.roleCode !== "owner") {
     if (manageableStoreIds.length === 0) {
       return commerceJson({
@@ -110,7 +112,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
     return commerceJson({ error: "operator_products_forbidden" }, 403);
@@ -159,7 +161,7 @@ export async function POST(request: Request) {
       ? FIXED_PRODUCT_OPEN_UNTIL
       : getNextAuctionDeadline(publishAt).toISOString()
     : text(body?.closesAt, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
-  if (!title || title.length > 160 || (!singleRegistration && !description) || description.length > 10000 || !normalizedBrand || !storeId || imageUrls.length === 0 || thumbnailUrls.length !== imageUrls.length || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
+  if (!title || title.length > 160 || (!singleRegistration && !description) || description.length > 10000 || !normalizedBrand || !storeId || storeId !== auth.selectedStoreId || imageUrls.length === 0 || thumbnailUrls.length !== imageUrls.length || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
     return commerceJson({ error: "상품 입력값을 확인해 주세요." }, 400);
   }
   const { data: canManageStore, error: permissionError } = await auth.user.rpc(

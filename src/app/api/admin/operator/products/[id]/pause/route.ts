@@ -1,6 +1,7 @@
 import {
-  authenticateStaffRequest,
+  authenticateOperatorStoreRequest,
   commerceJson,
+  verifyOperatorProductScope,
 } from "@/lib/commerce/server";
 
 interface RpcClient {
@@ -25,7 +26,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
     return commerceJson({ error: "operator_products_forbidden" }, 403);
@@ -38,6 +39,8 @@ export async function POST(
     return commerceJson({ error: "expected_updated_at_required" }, 400);
   }
   const { id } = await params;
+  const scopeError = await verifyOperatorProductScope(auth.user, auth.selectedStoreId, id);
+  if (scopeError) return scopeError;
   const { data, error } = await (auth.user as unknown as RpcClient).rpc(
     "pause_managed_product",
     {

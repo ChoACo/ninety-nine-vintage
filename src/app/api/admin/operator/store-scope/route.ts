@@ -10,6 +10,25 @@ type RpcClient = {
   }>;
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isScope(value: unknown): value is {
+  active: boolean;
+  accessMode: "assigned" | "owner_support";
+  storeId: string | null;
+  expiresAt: string | null;
+} {
+  if (!isRecord(value) || Object.keys(value).length !== 4) return false;
+  return typeof value.active === "boolean" &&
+    (value.accessMode === "assigned" || value.accessMode === "owner_support") &&
+    (value.storeId === null || (typeof value.storeId === "string" && UUID_PATTERN.test(value.storeId))) &&
+    (value.expiresAt === null || (typeof value.expiresAt === "string" && Number.isFinite(Date.parse(value.expiresAt))));
+}
+
 export async function GET(request: Request) {
   const auth = await authenticateStaffRequest(request);
   if (!auth.ok) return auth.response;
@@ -18,10 +37,10 @@ export async function GET(request: Request) {
   }
   const rpc = auth.user as unknown as RpcClient;
   const { data: scope, error } = await rpc.rpc("get_operator_store_scope");
-  if (error) {
+  if (error || !isScope(scope)) {
     return commerceJson(
-      { error: error.message ?? "store_scope_unavailable" },
-      error.code === "42501" ? 403 : 503,
+      { error: error?.message ?? "store_scope_unavailable" },
+      error?.code === "42501" ? 403 : 503,
     );
   }
 
@@ -70,6 +89,10 @@ export async function GET(request: Request) {
       }));
     }
   }
+  const expectedMode = auth.roleCode === "owner" ? "owner_support" : "assigned";
+  if (scope.accessMode !== expectedMode) {
+    return commerceJson({ error: "store_scope_unavailable" }, 503);
+  }
   return commerceJson({ scope, stores });
 }
 
@@ -79,31 +102,30 @@ export async function POST(request: Request) {
   if (!["owner", "operator"].includes(auth.roleCode)) {
     return commerceJson({ error: "forbidden" }, 403);
   }
-  const body = (await request.json().catch(() => null)) as Record<
-    string,
-    unknown
-  > | null;
-  const scope =
-    typeof body?.scope === "string" && body.scope !== "all"
-      ? "store"
-      : "all";
-  const storeId =
-    scope === "store" && typeof body?.storeId === "string"
-      ? body.storeId
-      : null;
+  const body = await request.json().catch(() => null) as unknown;
+  const expectedMode = auth.roleCode === "owner" ? "owner_support" : "assigned";
+  if (!isRecord(body) || Object.keys(body).some((key) => !["storeId", "accessMode"].includes(key)) ||
+    typeof body.storeId !== "string" || !UUID_PATTERN.test(body.storeId) ||
+    body.accessMode !== expectedMode) {
+    return commerceJson({
+      error: "invalid_operator_store_scope",
+      message: "접근 방식과 센터를 다시 선택해 주세요.",
+    }, 422);
+  }
   const rpc = auth.user as unknown as RpcClient;
-  const { data, error } = await rpc.rpc("set_operator_store_scope", {
-    p_scope: scope,
-    p_store_id: storeId,
+  const { data, error } = await rpc.rpc("set_active_operator_store_scope", {
+    p_store_id: body.storeId,
+    p_access_mode: body.accessMode,
   });
-  if (error) {
+  if (error || !isScope(data) || data.active !== true || data.storeId !== body.storeId ||
+    data.accessMode !== expectedMode) {
     return commerceJson(
-      { error: error.message ?? "store_scope_update_failed" },
-      error.code === "42501"
+      { error: error?.message ?? "store_scope_update_failed" },
+      error?.code === "42501"
         ? 403
-        : error.code === "P0002"
+        : error?.code === "P0002"
           ? 404
-          : error.code === "22023"
+          : error?.code === "22023"
             ? 422
             : 503,
     );

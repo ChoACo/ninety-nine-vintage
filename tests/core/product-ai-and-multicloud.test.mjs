@@ -73,7 +73,7 @@ test("Gemini route is server authenticated and keeps a safe fallback boundary", 
     source("supabase/migrations/20260808120000_add_ai_usage_status_column.sql"),
     source("src/lib/ai/tokenTracker.ts"),
   ]);
-  assert.match(route, /authenticateStaffRequest\(request, true\)/);
+  assert.match(route, /authenticateOperatorStoreRequest\(request, true\)/);
   assert.match(route, /product_enhancement_unavailable/);
   assert.match(route, /status:\s*"failed"/);
   assert.match(enhancer, /RESPONSE_JSON_SCHEMA/);

@@ -1,10 +1,12 @@
-import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOperatorStoreRequest, commerceJson, verifyOperatorProductScope } from "@/lib/commerce/server";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
 
   const { id } = await params;
+  const scopeError = await verifyOperatorProductScope(auth.user, auth.selectedStoreId, id);
+  if (scopeError) return scopeError;
   const { data, error } = await auth.user
     .rpc("publish_pending_products_now", { p_product_ids: [id] })
     .single();

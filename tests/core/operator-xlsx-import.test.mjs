@@ -150,7 +150,7 @@ test("operator XLSX UI validates products, supports per-product deletion, and re
   assert.doesNotMatch(dashboard, /href="\/admin\/operator\/products\?import=xlsx"/);
   assert.doesNotMatch(dashboard, /엑셀 일괄 등록/);
 
-  assert.match(bulkRoute, /authenticateStaffRequest\(request, true\)/);
+  assert.match(bulkRoute, /authenticateOperatorStoreRequest\(request, true\)/);
   assert.match(bulkRoute, /auth\.user[\s\S]*\.from\("products"\)[\s\S]*\.insert/);
   assert.doesNotMatch(bulkRoute, /auth\.admin[\s\S]*\.from\("products"\)[\s\S]*\.insert/);
   assert.match(bulkRoute, /p_permission:\s*"manage_products"/);

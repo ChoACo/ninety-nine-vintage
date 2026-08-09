@@ -691,7 +691,7 @@ test("payment API remains strict but mutations and navigation are owner-only", a
   assert.match(queueRoute, /auth\.roleCode !== "owner"/);
   assert.match(queueRoute, /auth\.user as unknown as RpcClient/);
   assert.doesNotMatch(queueRoute, /export\s+async\s+function\s+POST/);
-  assert.match(confirmRoute, /authenticateStaffRequest\(request,\s*true\)/);
+  assert.match(confirmRoute, /authenticateOperatorStoreRequest\(request,\s*true\)/);
   assert.match(confirmRoute, /"confirm_unified_manual_payment_v2"/);
   assert.match(confirmRoute, /p_payment_kind:\s*kind/);
   assert.match(confirmRoute, /p_payment_id:\s*id/);
@@ -903,7 +903,7 @@ test("operator exceptions use private signed evidence while Owner alone reveals 
   assert.match(evidenceRoute, /BUCKET\s*=\s*"inventory-exception-evidence"/);
   assert.match(evidenceRoute, /public:\s*false/);
   assert.match(evidenceRoute, /MAX_FILE_SIZE\s*=\s*5\s*\*\s*1024\s*\*\s*1024/);
-  assert.match(evidenceRoute, /authenticateStaffRequest\(request,\s*true\)/);
+  assert.match(evidenceRoute, /authenticateOperatorStoreRequest\(request,\s*true\)/);
   assert.match(evidenceRoute, /get_inventory_exception_queue/);
   assert.match(evidenceRoute, /append_inventory_exception_evidence/);
   assert.match(evidenceRoute, /upsert:\s*false/);

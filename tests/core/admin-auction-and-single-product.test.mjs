@@ -17,7 +17,7 @@ test("owner product feed exposes an audited immediate auction close and winner a
   assert.match(consoleSource, /즉시 마감·낙찰 확정/);
   assert.match(consoleSource, /permissions\.canCloseAuctions/);
   assert.match(consoleSource, /\/close-now/);
-  assert.match(closeRoute, /authenticateStaffRequest\(request,\s*true\)/);
+  assert.match(closeRoute, /authenticateOperatorStoreRequest\(request,\s*true\)/);
   assert.match(closeRoute, /auth\.roleCode !== "owner"/);
   assert.match(closeRoute, /auth\.user[\s\S]*\.rpc\("owner_close_auction_now"/);
   assert.doesNotMatch(closeRoute, /auth\.admin[\s\S]*\.from\("products"\)/);

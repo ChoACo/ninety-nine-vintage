@@ -231,3 +231,51 @@ export async function authenticateStaffRequest(request: Request, mutation = fals
       : auth.userId,
   };
 }
+
+export async function authenticateOperatorStoreRequest(
+  request: Request,
+  mutation = false,
+) {
+  const auth = await authenticateStaffRequest(request, mutation);
+  if (!auth.ok) return auth;
+  if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
+    return {
+      ok: false as const,
+      response: commerceJson({
+        error: "operator_store_forbidden",
+        message: "운영자 센터 접근 권한이 없습니다.",
+      }, 403),
+    };
+  }
+  const { data, error } = await auth.user.rpc("require_active_operator_store_scope");
+  if (error || typeof data !== "string") {
+    return {
+      ok: false as const,
+      response: commerceJson({
+        error: "operator_store_scope_required",
+        message: "센터를 다시 선택해 주세요.",
+      }, error?.code === "42501" ? 428 : 503),
+    };
+  }
+  return { ...auth, selectedStoreId: data };
+}
+
+export async function verifyOperatorProductScope(
+  user: SupabaseClient<Database>,
+  selectedStoreId: string,
+  productId: string,
+): Promise<Response | null> {
+  const { data, error } = await user
+    .from("products")
+    .select("id, store_id")
+    .eq("id", productId)
+    .maybeSingle();
+  if (error) {
+    return commerceJson({ error: "product_scope_unavailable" }, 503);
+  }
+  if (!data) return commerceJson({ error: "product_not_found" }, 404);
+  if (data.store_id !== selectedStoreId) {
+    return commerceJson({ error: "operator_store_scope_mismatch" }, 403);
+  }
+  return null;
+}

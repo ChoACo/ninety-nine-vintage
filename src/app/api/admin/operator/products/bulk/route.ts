@@ -1,4 +1,4 @@
-import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { normalizeProductBrand } from "@/lib/catalog/brand";
 
@@ -89,7 +89,7 @@ function normalizeProduct(body: Record<string, unknown>, userId: string): Produc
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   const body = await request.json().catch(() => null) as { products?: unknown } | null;
   if (!Array.isArray(body?.products) || body.products.length === 0 || body.products.length > 200) {
@@ -102,6 +102,9 @@ export async function POST(request: Request) {
   if (rows.some((row) => !row)) return commerceJson({ error: "일괄등록 상품 입력값을 확인해 주세요." }, 400);
 
   const storeIds = [...new Set(rows.map((row) => (row as ProductInsert).store_id).filter((id): id is string => typeof id === "string"))];
+  if (storeIds.length !== 1 || storeIds[0] !== auth.selectedStoreId) {
+    return commerceJson({ error: "operator_store_scope_mismatch" }, 403);
+  }
   const permissionResults = await Promise.all(storeIds.map((storeId) => auth.user.rpc(
     "has_store_permission",
     { p_store_id: storeId, p_permission: "manage_products" },

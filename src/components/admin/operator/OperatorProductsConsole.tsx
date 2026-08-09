@@ -346,7 +346,7 @@ export function OperatorProductsConsole({
 
   const workspaceProducts = useMemo(() => {
     const scopedStoreId =
-      storeScope.scope === "store" ? storeScope.storeId : null;
+      storeScope.active ? storeScope.storeId : null;
     return products.filter((product) => {
       if (scopedStoreId !== null && product.store_id !== scopedStoreId) {
         return false;
@@ -430,13 +430,13 @@ export function OperatorProductsConsole({
 
   const update = (key: keyof FormState, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const scopedStores = useMemo(() => {
-    if (storeScope.scope === "store" && storeScope.storeId) {
+    if (storeScope.active && storeScope.storeId) {
       const scoped = stores.filter(
         (store) => store.id === storeScope.storeId,
       );
-      return scoped.length > 0 ? scoped : stores;
+      return scoped;
     }
-    return stores;
+    return [];
   }, [storeScope, stores]);
   const clearSingleImages = () => {
     singleImagesRef.current.forEach((image) =>

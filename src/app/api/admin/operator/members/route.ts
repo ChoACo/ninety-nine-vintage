@@ -1,4 +1,4 @@
-import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
 
 type RpcClient = {
   rpc: (name: string, args?: Record<string, unknown>) => Promise<{
@@ -12,7 +12,7 @@ function errorMessage(error: { message?: string } | null, fallback: string) {
 }
 
 export async function GET(request: Request) {
-  const auth = await authenticateStaffRequest(request);
+  const auth = await authenticateOperatorStoreRequest(request);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "operator") return commerceJson({ error: "forbidden" }, 403);
   const url = new URL(request.url);
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   return commerceJson({
     error: "operator_member_mutation_forbidden",

@@ -1,5 +1,5 @@
 import { normalizeProductBrand } from "@/lib/catalog/brand";
-import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOperatorStoreRequest, commerceJson, verifyOperatorProductScope } from "@/lib/commerce/server";
 
 const MAX_PRODUCT_PRICE = 1_000_000_000;
 const MAX_BID_INCREMENT = 100_000_000;
@@ -94,9 +94,11 @@ function storagePathFromProductImageUrl(publicUrl: string, productId: string): s
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   const { id } = await params;
+  const scopeError = await verifyOperatorProductScope(auth.user, auth.selectedStoreId, id);
+  if (scopeError) return scopeError;
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   if (!body) return commerceJson({ error: "invalid_request" }, 400);
 
@@ -110,6 +112,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .maybeSingle();
   if (lookupError) return commerceJson({ error: "product_unavailable" }, 503);
   if (!product) return commerceJson({ error: "product_not_found" }, 404);
+  if (product.store_id !== auth.selectedStoreId) {
+    return commerceJson({ error: "operator_store_scope_mismatch" }, 403);
+  }
   if (new Date(product.updated_at).getTime() !== new Date(expectedUpdatedAt).getTime()) {
     return commerceJson({ error: "stale_product" }, 409);
   }
@@ -155,6 +160,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const storeId = hasOwn(body, "storeId") ? requiredText(body.storeId, 64) : product.store_id;
   if (!storeId) return commerceJson({ error: "스토어를 선택해 주세요." }, 400);
+  if (storeId !== auth.selectedStoreId) {
+    return commerceJson({ error: "operator_store_scope_mismatch" }, 403);
+  }
   const saleType = hasOwn(body, "saleType") ? body.saleType : product.sale_type;
   if (saleType !== "auction" && saleType !== "fixed") {
     return commerceJson({ error: "판매 방식을 확인해 주세요." }, 400);
@@ -232,9 +240,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await authenticateStaffRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true);
   if (!auth.ok) return auth.response;
   const { id } = await params;
+  const scopeError = await verifyOperatorProductScope(auth.user, auth.selectedStoreId, id);
+  if (scopeError) return scopeError;
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const expectedUpdatedAt = validTimestampVersion(body?.expectedUpdatedAt);
   if (!expectedUpdatedAt) return commerceJson({ error: "expected_updated_at_required" }, 400);

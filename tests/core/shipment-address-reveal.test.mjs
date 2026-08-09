@@ -25,7 +25,7 @@ test("shipment address reveal is append-only, private, audited, and short-lived"
 test("address API accepts only a reason and idempotency key and validates its RPC result", async () => {
   const route = await source("src/app/api/admin/operator/shipping/[id]/address/route.ts");
 
-  assert.match(route, /authenticateStaffRequest\(request, true\)/);
+  assert.match(route, /authenticateOperatorStoreRequest\(request, true\)/);
   assert.match(route, /!\["reason", "idempotencyKey"\]\.includes\(key\)/);
   assert.match(route, /reveal_inventory_shipment_address/);
   assert.match(route, /data\.shipmentId !== id/);

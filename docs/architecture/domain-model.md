@@ -10,8 +10,9 @@ Business
 Member ── Cart ── Product(origin Store)
 Member ── Order/auction payment ── PaymentLedger(manual transfer)
 Paid source ── CustomerInventoryItem ── InventoryItemFulfillment(origin Store)
-CustomerInventoryItem ── InventoryShipmentItem ── InventoryShipment
-InventoryShipment ── ShipmentStoreWork(origin Store)
+Order ── ShippingAllocation(store | fulfillment_group)
+ShippingAllocation ── InventoryShipmentItem ── InventoryShipment
+InventoryShipment ── ShipmentStoreWork(origin Store, processing Store)
 CustomerInventoryItem ── InventoryExceptionCase ── ManualRefund
 StoreFinancialEntry ── origin Store | shared shipping revenue
 ```
@@ -26,10 +27,11 @@ StoreFinancialEntry ── origin Store | shared shipping revenue
 - `PaymentLedger`: 수동 입금 예정액, 누적액, 입금자명, 확인·취소·정정 이력을 보존한다.
 - `CustomerInventoryItem`: 결제 확정으로 정확히 한 번 생성되는 상품별 고객 보관 권리다.
 - `InventoryItemFulfillment`: 원등록 매장의 준비·보관·배송 요청 포함·출고 상태와 append-only 사건을 보존한다.
-- `InventoryShipment`: 고객이 고른 여러 보관 상품의 배송 요청이다. 매장 경계를 넘을 수 있고 송장 하나를 가진다.
+- `ShippingAllocation`: 주문 시점의 단독 매장 또는 통합 물류 그룹, 포함 상품, 배송비, 처리 매장과 대표 정산 매장을 고정한 불변 배송 단위다.
+- `InventoryShipment`: 배송 단위 하나에 대응하는 배송 요청이며 송장 하나를 가진다. 서로 다른 배송 단위를 합치지 않는다.
 - `ShipmentStoreWork`: 배송 요청에서 특정 원등록 매장이 자기 상품에 수행하는 출고 작업이다.
 - `InventoryExceptionCase`: 분실, 오프라인 판매, 추가 확인, 환불 필요 같은 상품별 보류 사건이다.
-- `StoreFinancialEntry`: 상품 결제·취소·환불은 원등록 매장, 배송비는 사업체 공용 계정에 남기는 불변 원장이다.
+- `StoreFinancialEntry`: 상품 결제·취소·환불은 원등록 매장, 배송비는 주문 스냅샷의 청구 매장에 남기는 불변 원장이다.
 
 ## 호환성 필드
 

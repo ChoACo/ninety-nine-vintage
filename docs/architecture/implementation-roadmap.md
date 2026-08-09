@@ -1,6 +1,6 @@
 # 구현 로드맵
 
-> 역사 기록: 중앙 집하 P1 항목은 폐기된 시안이다. 현재 센터는 매장과 동일하며 별도 중앙 입고·주소·경로 화면을 운영하지 않는다. 현재 기준은 `product-principles.md`를 따른다.
+> 역사 기록: 아래 P0~P2 내용은 과거 구현 경위이며 현재 실행 계획이 아니다. 중앙 집하와 PortOne 보존·재활성화 전제는 폐기됐다. 현재 실행 계획은 `center-commerce-fulfillment-rebuild.md`와 `product-principles.md`를 따른다.
 
 ## 작업 원칙
 

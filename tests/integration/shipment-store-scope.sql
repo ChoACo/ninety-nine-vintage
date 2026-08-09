@@ -130,6 +130,8 @@ do $$
 declare
   v_queue jsonb := public.get_inventory_shipment_queue(false, 10, 0);
   v_shipment jsonb;
+  v_reveal jsonb;
+  v_replay jsonb;
 begin
   if jsonb_array_length(v_queue -> 'shipments') <> 1 then
     raise exception 'scoped queue must return exactly one authorized shipment';
@@ -141,8 +143,41 @@ begin
   then
     raise exception 'shipment queue exposed unmasked delivery data';
   end if;
+
+  v_reveal := public.reveal_inventory_shipment_address(
+    '76000000-0000-4000-8000-000000000001',
+    '송장 출력 검증',
+    '78000000-0000-4000-8000-000000000001'
+  );
+  if v_reveal -> 'address' ->> 'address' <> '서울시 실제 주소'
+    or (v_reveal ->> 'idempotentReplay')::boolean
+  then
+    raise exception 'authorized address reveal returned an invalid result';
+  end if;
+
+  v_replay := public.reveal_inventory_shipment_address(
+    '76000000-0000-4000-8000-000000000001',
+    '송장 출력 검증',
+    '78000000-0000-4000-8000-000000000001'
+  );
+  if not (v_replay ->> 'idempotentReplay')::boolean
+    or v_replay ->> 'accessEventId' <> v_reveal ->> 'accessEventId'
+  then
+    raise exception 'address reveal replay was not idempotent';
+  end if;
 end;
 $$;
 
 reset role;
+do $$
+begin
+  if (
+    select count(*)
+    from public.inventory_shipment_address_access_events
+    where idempotency_key = '78000000-0000-4000-8000-000000000001'
+  ) <> 1 then
+    raise exception 'address reveal did not write exactly one audit event';
+  end if;
+end;
+$$;
 rollback;

@@ -14,6 +14,7 @@ import { CatalogImage } from "@/components/ui/CatalogImage";
 
 type ShipmentAction = "pack" | "ship" | "tracking_update" | "tracking_delete";
 type ShippingForm = { courier: string; trackingNumber: string; note: string };
+type AddressReveal = { address: AddressSnapshot; expiresAt: string };
 type ShippingConsoleView = "requests" | "completed" | "history";
 
 interface StoreWork {
@@ -272,6 +273,8 @@ export function OperatorShippingConsole({
   const includeShipped = view !== "requests";
   const [offset, setOffset] = useState(0);
   const [forms, setForms] = useState<Record<string, ShippingForm>>({});
+  const [addressReasons, setAddressReasons] = useState<Record<string, string>>({});
+  const [addressReveals, setAddressReveals] = useState<Record<string, AddressReveal>>({});
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
 
@@ -330,6 +333,53 @@ export function OperatorShippingConsole({
       ...current,
       [shipmentId]: { ...(current[shipmentId] ?? { courier: "", trackingNumber: "", note: "" }), [field]: value },
     }));
+  };
+
+  const revealAddress = async (shipment: InventoryShipment) => {
+    if (!token || busyKey) return;
+    const reason = (addressReasons[shipment.id] ?? "").trim();
+    if (reason.length < 3) {
+      setNotice("배송정보 열람 사유를 3자 이상 입력해 주세요.");
+      return;
+    }
+    const key = `address:${shipment.id}`;
+    setBusyKey(key);
+    setNotice("");
+    try {
+      const response = await fetch(`/api/admin/operator/shipping/${shipment.id}/address`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason, idempotencyKey: crypto.randomUUID() }),
+      });
+      const payload = await response.json().catch(() => null) as unknown;
+      const reveal = isRecord(payload) && isRecord(payload.reveal) ? payload.reveal : null;
+      if (!response.ok || !reveal || reveal.shipmentId !== shipment.id ||
+        !isAddressSnapshot(reveal.address) || typeof reveal.expiresAt !== "string" ||
+        !Number.isFinite(Date.parse(reveal.expiresAt))) {
+        const message = isRecord(payload) && typeof payload.message === "string"
+          ? payload.message
+          : "배송정보 열람 결과를 검증하지 못했습니다.";
+        throw new Error(message);
+      }
+      setAddressReveals((current) => ({
+        ...current,
+        [shipment.id]: { address: reveal.address as unknown as AddressSnapshot, expiresAt: reveal.expiresAt as string },
+      }));
+      setAddressReasons((current) => ({ ...current, [shipment.id]: "" }));
+      const revealedExpiresAt = reveal.expiresAt as string;
+      window.setTimeout(() => {
+        setAddressReveals((current) => {
+          if (current[shipment.id]?.expiresAt !== revealedExpiresAt) return current;
+          const next = { ...current };
+          delete next[shipment.id];
+          return next;
+        });
+      }, 5 * 60 * 1000);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "배송정보를 열람하지 못했습니다.");
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   const mutateShipment = async (shipment: InventoryShipment, action: ShipmentAction) => {
@@ -537,6 +587,7 @@ export function OperatorShippingConsole({
             trackingNumber: shipment.trackingNumber ?? "",
             note: "",
           };
+          const addressReveal = addressReveals[shipment.id];
           return (
             <article className="border-b border-line px-4 py-5 last:border-b-0 sm:px-5" key={shipment.id}>
               <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
@@ -550,14 +601,51 @@ export function OperatorShippingConsole({
               </div>
 
               <div className="mt-5 border-t border-line pt-4">
-                <p className="text-xs font-bold">배송지</p>
-                <p className="mt-2 text-xs leading-5">
-                  {shipment.addressSnapshot.recipientName} · {shipment.addressSnapshot.phone}
-                </p>
-                <p className="text-xs leading-5 text-muted">
-                  {shipment.addressSnapshot.postalCode ? `[${shipment.addressSnapshot.postalCode}] ` : ""}
-                  {shipment.addressSnapshot.address}
-                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-bold">배송지 {addressReveal ? "(원문 임시 열람)" : "(마스킹)"}</p>
+                  {addressReveal && (
+                    <button className="text-[10px] font-bold underline" onClick={() => setAddressReveals((current) => {
+                      const next = { ...current };
+                      delete next[shipment.id];
+                      return next;
+                    })} type="button">원문 닫기</button>
+                  )}
+                </div>
+                {addressReveal ? (
+                  <>
+                    <p className="mt-2 text-xs leading-5">{addressReveal.address.recipientName} · {addressReveal.address.phone}</p>
+                    <p className="text-xs leading-5 text-muted">
+                      {addressReveal.address.postalCode ? `[${addressReveal.address.postalCode}] ` : ""}
+                      {addressReveal.address.address}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-2 text-xs leading-5">{shipment.addressSnapshot.recipientName} · {shipment.addressSnapshot.phone}</p>
+                    <p className="text-xs leading-5 text-muted">
+                      {shipment.addressSnapshot.postalCode ? `[${shipment.addressSnapshot.postalCode}] ` : ""}
+                      {shipment.addressSnapshot.address}
+                    </p>
+                  </>
+                )}
+                {!addressReveal && (
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      className="min-w-0 flex-1 border border-line bg-white px-3 py-2 text-xs"
+                      maxLength={500}
+                      onChange={(event) => setAddressReasons((current) => ({ ...current, [shipment.id]: event.target.value }))}
+                      placeholder="열람 사유 (예: 송장 출력)"
+                      type="text"
+                      value={addressReasons[shipment.id] ?? ""}
+                    />
+                    <button
+                      className="border border-ink px-3 py-2 text-xs font-bold disabled:opacity-40"
+                      disabled={busyKey !== null || (addressReasons[shipment.id] ?? "").trim().length < 3}
+                      onClick={() => void revealAddress(shipment)}
+                      type="button"
+                    >{busyKey === `address:${shipment.id}` ? "열람 중" : "원문 5분 열람"}</button>
+                  </div>
+                )}
               </div>
 
               <div className="mt-5 border-t border-line pt-4">

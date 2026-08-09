@@ -39,11 +39,11 @@ async function saveAddress(request: Request, addressId: string | null) {
   }
   const { data, error } = await auth.user
     .rpc("upsert_my_shipping_address", {
-      p_id: addressId,
+      p_id: addressId ?? crypto.randomUUID(),
       p_label: body.label.trim(),
       p_recipient_name: body.recipientName.trim(),
       p_phone: body.phone.trim(),
-      p_postal_code: postalCode || null,
+      p_postal_code: postalCode || undefined,
       p_address: body.address.trim(),
       p_is_default: Boolean(body.isDefault),
     })

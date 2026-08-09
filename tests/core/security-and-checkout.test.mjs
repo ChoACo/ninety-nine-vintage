@@ -90,7 +90,7 @@ test("the former entry gate is absent while live auctions keep their authoritati
     readFile(new URL("src/lib/featureFlags.ts", rootUrl), "utf8"),
     readFile(new URL("src/app/(shop)/page.tsx", rootUrl), "utf8"),
     readFile(new URL("src/app/(shop)/layout.tsx", rootUrl), "utf8"),
-    readFile(new URL("src/middleware.ts", rootUrl), "utf8"),
+    readFile(new URL("src/proxy.ts", rootUrl), "utf8"),
     readFile(new URL("src/app/(shop)/stores/[slug]/page.tsx", rootUrl), "utf8"),
     readFile(new URL("src/services/stores.ts", rootUrl), "utf8"),
     readFile(new URL("src/components/features/auction/AuctionFeedGrid.tsx", rootUrl), "utf8"),

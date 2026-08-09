@@ -14,8 +14,11 @@ begin
   if exists (
     select 1
     from public.store_memberships as memberships
+    join public.account_access_roles as roles
+      on roles.user_id = memberships.user_id
     where memberships.membership_role = 'operator'
       and memberships.status = 'active'
+      and roles.role_code = 'operator'
     group by memberships.user_id
     having count(distinct memberships.store_id) > 1
   ) then
@@ -30,7 +33,6 @@ begin
     join public.account_access_roles as roles
       on roles.user_id = stores.operator_id
     where roles.role_code = 'operator'
-       or (roles.role_code = 'owner' and coalesce(roles.grade_level, 99) = 0)
     group by stores.operator_id
     having count(*) > 1
   ) then
@@ -60,55 +62,62 @@ begin
 end;
 $$;
 
--- One active operator membership per user enforces operator -> one store.
--- There is intentionally no store-side uniqueness constraint: one store may
--- have multiple active operator memberships.
-create unique index if not exists store_memberships_one_active_operator_per_user_idx
-  on public.store_memberships (user_id)
-  where membership_role = 'operator' and status = 'active';
+-- A regular operator may have one active store. Grade-zero owners may retain
+-- active operator memberships for multiple stores because they supervise the
+-- whole business. A trigger is used because an index predicate cannot consult
+-- account_access_roles. The advisory lock closes concurrent assignment races.
+drop index if exists public.store_memberships_one_active_operator_per_user_idx;
+
+create or replace function public.enforce_single_active_operator_store()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.membership_role = 'operator'
+    and new.status = 'active'
+    and exists (
+      select 1
+      from public.account_access_roles as roles
+      where roles.user_id = new.user_id
+        and roles.role_code = 'operator'
+    )
+  then
+    perform pg_catalog.pg_advisory_xact_lock(
+      pg_catalog.hashtextextended(new.user_id::text, 0)
+    );
+
+    if exists (
+      select 1
+      from public.store_memberships as memberships
+      where memberships.user_id = new.user_id
+        and memberships.store_id <> new.store_id
+        and memberships.membership_role = 'operator'
+        and memberships.status = 'active'
+    ) then
+      raise exception using
+        errcode = '23505',
+        message = '운영자는 하나의 센터에만 활성 배정할 수 있습니다.';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.enforce_single_active_operator_store() from public;
+
+drop trigger if exists store_memberships_enforce_single_active_operator_store
+on public.store_memberships;
+create trigger store_memberships_enforce_single_active_operator_store
+before insert or update of user_id, store_id, membership_role, status
+on public.store_memberships
+for each row execute function public.enforce_single_active_operator_store();
 
 create index if not exists store_memberships_active_operator_store_idx
   on public.store_memberships (store_id, user_id)
   where membership_role = 'operator' and status = 'active';
-
--- Preserve every existing representative assignment as an explicit operator
--- membership. Grade-zero owners are included so legacy Owner-assigned stores
--- can use the same operator-center scope in a later application stage.
-insert into public.store_memberships (
-  business_id,
-  store_id,
-  user_id,
-  membership_role,
-  status,
-  manage_products,
-  publish_products,
-  prepare_orders,
-  confirm_payments,
-  receive_at_center,
-  create_shipments,
-  manage_staff,
-  view_reports
-)
-select
-  stores.business_id,
-  stores.id,
-  stores.operator_id,
-  'operator',
-  'active',
-  true,
-  true,
-  true,
-  true,
-  false,
-  false,
-  true,
-  true
-from public.stores as stores
-join public.account_access_roles as roles
-  on roles.user_id = stores.operator_id
-where roles.role_code = 'operator'
-   or (roles.role_code = 'owner' and coalesce(roles.grade_level, 99) = 0)
-on conflict (store_id, user_id) do nothing;
 
 -- Replace the legacy one-to-one validation with:
 --   * operator/grade-zero owner role validation;
@@ -205,5 +214,23 @@ $$;
 
 revoke all on function public.validate_store_membership()
 from public, anon, authenticated, service_role;
+
+-- Preserve every existing representative assignment as an explicit operator
+-- membership after installing the multi-operator-aware validator. Grade-zero
+-- owners are included so Owner-assigned stores share the same scope model.
+insert into public.store_memberships (
+  business_id, store_id, user_id, membership_role, status,
+  manage_products, publish_products, prepare_orders, confirm_payments,
+  receive_at_center, create_shipments, manage_staff, view_reports
+)
+select
+  stores.business_id, stores.id, stores.operator_id, 'operator', 'active',
+  true, true, true, true, false, false, true, true
+from public.stores as stores
+join public.account_access_roles as roles
+  on roles.user_id = stores.operator_id
+where roles.role_code = 'operator'
+   or (roles.role_code = 'owner' and coalesce(roles.grade_level, 99) = 0)
+on conflict (store_id, user_id) do nothing;
 
 commit;

@@ -4,6 +4,36 @@
 대상: `ninety-nine-homepage` 현재 `main` + 사용자 미커밋 작업  
 감사 성격: 로컬 읽기 전용 감사. 이 보고서 외 코드·마이그레이션·설정은 수정하지 않음.
 
+## 0. 순차 조치 결과 (2026-08-09)
+
+이 아래의 본문은 최초 감사 당시 증거를 보존한다. 이후
+`codex/code-foundation-remediation-20260809`에서 우선순위 순으로 조치했고,
+현재 로컬 결합 상태는 **주요 P1/P2 조치와 실행 검증을 통과한 상태**다.
+
+| 최초 항목 | 현재 판정 | 완료 증거 |
+| --- | --- | --- |
+| lockfile 취약점 5건 | `VERIFIED` | `npm audit --omit=dev`: 0건 |
+| storage locator 선삭제 | `VERIFIED` | 객체 삭제 성공 후 locator 삭제, 실패 locator 재시도 보존 테스트 통과 |
+| 미연결 multicloud/임의 SQL RPC | `VERIFIED` | Supabase + 조건부 R2만 등록, 임의 SQL executor 제거, 전용 사용량 RPC로 교체 |
+| AI 상태·fallback·사용량 귀속 | `VERIFIED` | 실제 router 실패 주입 테스트 및 296개 core test 통과 |
+| 브라우저 smoke 회귀 | `VERIFIED` | `/home → /auction/[id] → 상세 → /cart` 통과 |
+| Next.js middleware 폐기 | `VERIFIED` | `src/proxy.ts` 이전 및 경고 없는 production build 통과 |
+| 배송 PostgreSQL 계약 | `VERIFIED_LOCAL` | PostgreSQL 17의 00/10/20/30/40 전체 체인 통과 |
+| migration/type 기반 | `VERIFIED_LOCAL` | 전체 로컬 DB reset 통과, 실제 schema에서 database types 재생성 |
+
+추가로 전체 DB reset에서 드러난 두 역사 마이그레이션 충돌을 수정했다. 채팅
+호환 함수 수리는 이미 정규화된 본문에도 안전하게 재실행되며, 일반 운영자는 한
+센터에만 활성 배정되도록 advisory lock 기반으로 직렬화하되 최고 등급 소유자는
+여러 센터를 총괄할 수 있다.
+
+최종 검증: core test 296/296, ESLint, TypeScript, production build, 로컬 API/SSR,
+실제 브라우저 smoke, 전체 Supabase migration reset, PostgreSQL 17 배송 SQL suite가
+모두 통과했다.
+
+남은 범위는 P3 구조 개선(대형 UI 분리, 보조 스크립트 분류·정리)과 운영 증거다.
+운영 DB migration parity, 운영 RLS/trigger, 배포 환경변수, 실제 객체와 트래픽은
+계속 `PRODUCTION_UNVERIFIED`이며 이번 로컬 조치로 운영 준비 완료를 주장하지 않는다.
+
 ## 1. 최종 판정
 
 현재 결합 상태는 **기본 앱 실행은 가능하지만 승인 전 조치가 필요한 상태**다.

@@ -42,14 +42,11 @@ function getTrustedClientIp(request: NextRequest): string | null {
 }
 
 function shouldSkip(pathname: string): boolean {
-  return (
-    pathname.startsWith("/_next/") ||
-    pathname.startsWith("/assets/") ||
-    /\.(?:avif|css|gif|ico|jpe?g|js|map|png|svg|webp|woff2?|xml|txt|json)$/i.test(pathname) ||
-    SKIPPED_PATHS.some(
-      (path) => pathname === path || pathname.startsWith(`${path}/`),
-    )
-  );
+  return (pathname.startsWith("/_next/") ||
+  pathname.startsWith("/assets/") ||
+  /\.(?:avif|css|gif|ico|jpe?g|js|map|png|svg|webp|woff2?|xml|txt|json)$/i.test(pathname) || SKIPPED_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  ));
 }
 
 async function isBlockedIp(ipAddress: string): Promise<boolean> {
@@ -145,7 +142,7 @@ function expireLegacyUiModeCookie(request: NextRequest, response: NextResponse):
   return response;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const canonicalRedirect = canonicalHostRedirect(request);
   if (canonicalRedirect) return canonicalRedirect;
 

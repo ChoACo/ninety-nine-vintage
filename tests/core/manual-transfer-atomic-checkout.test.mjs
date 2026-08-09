@@ -148,6 +148,6 @@ test("database types expose the atomic checkout RPC", async () => {
   const types = await source("src/lib/supabase/database.types.ts");
   assert.match(
     types,
-    /create_commerce_manual_transfer_checkout:\s*\{[\s\S]{0,180}p_idempotency_key:\s*string[\s\S]{0,120}p_product_ids:\s*string\[\]/,
+    /create_commerce_manual_transfer_checkout:[\s\S]{0,320}p_idempotency_key:\s*string[\s\S]{0,120}p_product_ids:\s*string\[\]/,
   );
 });

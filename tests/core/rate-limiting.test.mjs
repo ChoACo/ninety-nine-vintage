@@ -31,8 +31,8 @@ test("bid and cart routes enforce rate limiting before the database call", async
   assert.match(cartRoute, /if \(!rateLimit\.ok\) return rateLimit\.response;/);
 });
 
-test("middleware only calls the IP-block RPC for API paths", async () => {
-  const middleware = await source("src/middleware.ts");
+test("proxy only calls the IP-block RPC for API paths", async () => {
+  const middleware = await source("src/proxy.ts");
 
   assert.match(
     middleware,

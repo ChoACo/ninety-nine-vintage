@@ -66,7 +66,7 @@ test("dark palette uses layered non-black surfaces with readable contrast", asyn
 test("legacy fixed light surfaces and status notices have dark palette coverage", async () => {
   const [css, middleware, home, storePage, gallery, ticker] = await Promise.all([
     source("src/app/globals.css"),
-    source("src/middleware.ts"),
+    source("src/proxy.ts"),
     source("src/app/(shop)/home/page.tsx"),
     source("src/app/(shop)/stores/[slug]/page.tsx"),
     source("src/components/features/auction/AuctionGalleryModal.tsx"),

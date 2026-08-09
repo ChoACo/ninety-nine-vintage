@@ -11,7 +11,7 @@ test("the public domain has one canonical www origin", async () => {
     readFile(new URL("src/app/sitemap.ts", rootUrl), "utf8"),
     readFile(new URL("src/app/robots.ts", rootUrl), "utf8"),
     readFile(new URL("README.md", rootUrl), "utf8"),
-    readFile(new URL("src/middleware.ts", rootUrl), "utf8"),
+    readFile(new URL("src/proxy.ts", rootUrl), "utf8"),
   ]);
 
   assert.match(layout, new RegExp(canonicalOrigin.replaceAll(".", "\\.")));

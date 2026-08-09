@@ -45,25 +45,22 @@ begin
   )
   into v_definition;
 
-  if position(
-    'update public.payment_orders' || chr(10) ||
-    '  set expected_amount = (v_order ->> ''total'')::bigint' || chr(10) ||
-    '  where commerce_order_id = v_prepared.commerce_order_id'
-    in v_definition
-  ) = 0 then
+  if position('where commerce_order_id = v_prepared.commerce_order_id' in v_definition) > 0 then
+    v_definition := replace(
+      v_definition,
+      'update public.payment_orders' || chr(10),
+      'update public.payment_orders as orders' || chr(10)
+    );
+    v_definition := replace(
+      v_definition,
+      'where commerce_order_id = v_prepared.commerce_order_id',
+      'where orders.commerce_order_id = v_prepared.commerce_order_id'
+    );
+    execute v_definition;
+  elsif position('where orders.commerce_order_id = v_prepared.commerce_order_id' in v_definition) = 0 then
     raise exception
-      'prepare_commerce_portone_checkout no longer contains the expected ambiguous update';
+      'prepare_commerce_portone_checkout contains neither the legacy nor qualified update';
   end if;
-
-  execute replace(
-    v_definition,
-    'update public.payment_orders' || chr(10) ||
-    '  set expected_amount = (v_order ->> ''total'')::bigint' || chr(10) ||
-    '  where commerce_order_id = v_prepared.commerce_order_id',
-    'update public.payment_orders as orders' || chr(10) ||
-    '  set expected_amount = (v_order ->> ''total'')::bigint' || chr(10) ||
-    '  where orders.commerce_order_id = v_prepared.commerce_order_id'
-  );
 end;
 $repair$;
 

@@ -54,9 +54,9 @@ test("path conversion is reversible, loop-safe, and leaves excluded surfaces alo
   }
 });
 
-test("middleware enforces device routing, expires legacy choices, and keeps rollout controls", async () => {
+test("proxy enforces device routing, expires legacy choices, and keeps rollout controls", async () => {
   const [middleware, flags, footer, mobileHeader, mobileSettings] = await Promise.all([
-    source("src/middleware.ts"),
+    source("src/proxy.ts"),
     source("src/lib/featureFlags.ts"),
     source("src/components/layout/PcFooter.tsx"),
     source("src/components/mobile/MobileSiteHeader.tsx"),

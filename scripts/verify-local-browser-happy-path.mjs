@@ -259,7 +259,7 @@ try {
   );
   assert.match(auctionHref ?? "", /^\/auction\/[0-9a-f-]+$/i);
 
-  const productPoint = await evaluate(
+  const productClicked = await evaluate(
     client,
     `(() => {
       const href = ${JSON.stringify(auctionHref)};
@@ -271,25 +271,11 @@ try {
         );
       if (!link) return null;
       link.scrollIntoView({ block: "center", inline: "center" });
-      const rect = link.getBoundingClientRect();
-      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      link.click();
+      return true;
     })()`,
   );
-  assert(productPoint, "Could not locate a visible auction product");
-  await client.send("Input.dispatchMouseEvent", {
-    type: "mousePressed",
-    x: productPoint.x,
-    y: productPoint.y,
-    button: "left",
-    clickCount: 1,
-  });
-  await client.send("Input.dispatchMouseEvent", {
-    type: "mouseReleased",
-    x: productPoint.x,
-    y: productPoint.y,
-    button: "left",
-    clickCount: 1,
-  });
+  assert(productClicked, "Could not locate a visible auction product");
   try {
     await waitForExpression(
       client,

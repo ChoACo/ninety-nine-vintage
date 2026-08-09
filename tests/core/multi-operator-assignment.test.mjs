@@ -9,12 +9,12 @@ const migrationPath = new URL(
 
 const source = () => readFile(migrationPath, "utf8");
 
-test("operator memberships allow many operators per store but one store per operator", async () => {
+test("operator memberships allow owners across stores but one store per regular operator", async () => {
   const migration = await source();
 
   assert.match(
     migration,
-    /create\s+unique\s+index\s+if\s+not\s+exists\s+store_memberships_one_active_operator_per_user_idx[\s\S]{0,240}on\s+public\.store_memberships\s*\(user_id\)[\s\S]{0,180}membership_role\s*=\s*'operator'\s+and\s+status\s*=\s*'active'/i,
+    /create\s+or\s+replace\s+function\s+public\.enforce_single_active_operator_store[\s\S]{0,1400}roles\.role_code\s*=\s*'operator'[\s\S]{0,1400}pg_advisory_xact_lock[\s\S]{0,1400}memberships\.store_id\s*<>\s*new\.store_id/i,
   );
   assert.match(
     migration,

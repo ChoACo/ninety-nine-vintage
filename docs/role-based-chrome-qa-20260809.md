@@ -41,7 +41,7 @@
 - 재현: 로그인 상태에서 로그아웃 버튼 선택 후 현재 화면과 역할 링크가 남을 수 있음.
 - 원인: push 구독 해제와 두 로그아웃 요청 완료 뒤 명시적 이동이 없고, Service Worker 조회·해제가 지연되면 흐름이 끝나지 않았다.
 - 조치: push 정리를 시간 제한형 best-effort로 만들고, 인증 로그아웃도 최대 대기시간 뒤 로그인 화면으로 이동하도록 보강했다.
-- 완료 조건: 코어 계약, production build 및 배포 후 실제 로그아웃 이동 통과.
+- 재검증: 알림·공개 캐시 안내를 닫은 실제 클릭 순서에서 `/account/login` 이동을 확인했다.
 
 ### QA-05 · P2 · 배포 식별 경로 부재
 
@@ -90,11 +90,13 @@ Supabase Advisor에는 기존의 INFO 수준 RLS-no-policy 및 unused-index 항�
 
 ## 배포 결과
 
-- 배포 커밋: 배포 후 기록
-- Vercel production deployment: 배포 후 기록
-- `/BUILD_ID`: 배포 후 기록
-- apex → www: 배포 후 기록
-- 운영 최종 smoke: 배포 후 기록
+- 배포 커밋: `ac4dd5a3bef157c01ccf98897c6183e665e6be20`
+- Vercel production deployment: `dpl_HvX3LmmDjfdgWay62Ns8ijxY614x` (`ninety-nine-vintage-ksm6o6wq1-choa-co.vercel.app`)
+- `/BUILD_ID`: 배포 커밋 전체 SHA 반환, `no-store`
+- apex → www: 308 Permanent Redirect
+- 운영 최종 smoke: `/home`, `/api/products`, `/api/site/status` 200; 모바일 `/m/home`과 소유자 플랫폼 Chrome 콘솔 오류 없음
+
+배포 전 구버전 모바일 bundle에서 한 차례 React hydration 오류가 관찰됐으나, 새 production 배포의 깨끗한 모바일 Chrome 탭에서는 재현되지 않았다.
 
 ## 남은 경계
 

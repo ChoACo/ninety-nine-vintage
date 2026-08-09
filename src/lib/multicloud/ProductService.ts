@@ -35,6 +35,7 @@ export class ProductService {
         id: input.id,
         storageProviderId: stored.providerId,
         storageKey: stored.key,
+        sizeBytes: stored.sizeBytes,
         dbProviderId,
         createdAt: now,
         expiresAt: new Date(now.getTime() + this.ttlDays * 86_400_000),

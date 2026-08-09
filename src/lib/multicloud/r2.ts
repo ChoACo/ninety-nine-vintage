@@ -9,6 +9,8 @@ export class CloudflareR2Adapter implements StorageAdapter {
     private readonly accessKeyId: string,
     private readonly secretAccessKey: string,
     private readonly publicUrlDomain?: string,
+    private readonly analyticsApiToken?: string,
+    private readonly capacityBytes = 0,
   ) {}
 
   private async signAndSend(method: string, key: string, body?: Uint8Array, contentType?: string) {
@@ -71,11 +73,25 @@ export class CloudflareR2Adapter implements StorageAdapter {
   }
 
   async getUsageStats(): Promise<UsageStats> {
-    const capacityBytes = Number(process.env.MULTICLOUD_R2_CAPACITY_BYTES ?? "10737418240"); // Default 10GB
-    return {
-      capacityBytes,
-      usedBytes: 0, // This would require querying Cloudflare Analytics API, but for routing, returning 0 or mock is acceptable if Supabase drives the usage, OR we track it via db.
-      measuredAt: new Date(),
-    };
+    if (!this.analyticsApiToken || this.capacityBytes <= 0) throw new Error("r2_usage_unknown");
+    const endDate = new Date();
+    const startDate = new Date(endDate.getTime() - 86_400_000);
+    const query = `query R2Storage($accountTag: string!, $startDate: Time, $endDate: Time, $bucketName: string) {
+      viewer { accounts(filter: { accountTag: $accountTag }) { r2StorageAdaptiveGroups(limit: 1,
+        filter: { datetime_geq: $startDate, datetime_leq: $endDate, bucketName: $bucketName },
+        orderBy: [datetime_DESC]) { max { payloadSize metadataSize } dimensions { datetime } } } } }`;
+    const response = await fetch("https://api.cloudflare.com/client/v4/graphql", {
+      method: "POST", headers: { Authorization: `Bearer ${this.analyticsApiToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query, variables: { accountTag: this.accountId, startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(), bucketName: this.bucket } }), cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`r2_usage_error:${response.status}`);
+    const result = await response.json() as { data?: { viewer?: { accounts?: Array<{
+      r2StorageAdaptiveGroups?: Array<{ max?: { payloadSize?: number; metadataSize?: number } }>
+    }> } }; errors?: unknown[] };
+    const metric = result.data?.viewer?.accounts?.[0]?.r2StorageAdaptiveGroups?.[0]?.max;
+    const usedBytes = Number(metric?.payloadSize) + Number(metric?.metadataSize);
+    if (result.errors?.length || !Number.isSafeInteger(usedBytes) || usedBytes < 0) throw new Error("r2_usage_unknown");
+    return { capacityBytes: this.capacityBytes, usedBytes, measuredAt: endDate, verified: true };
   }
 }

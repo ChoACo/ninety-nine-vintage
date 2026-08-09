@@ -4,6 +4,7 @@ export interface UsageStats {
   capacityBytes: number;
   usedBytes: number;
   measuredAt: Date;
+  verified: boolean;
 }
 
 export interface StoredObject {
@@ -31,6 +32,7 @@ export interface UnifiedRecord<T = Record<string, unknown>> {
   id: string;
   storageProviderId: string;
   storageKey: string;
+  sizeBytes: number;
   dbProviderId: string;
   createdAt: Date;
   expiresAt: Date;

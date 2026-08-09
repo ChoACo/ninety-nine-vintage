@@ -3482,6 +3482,7 @@ export type Database = {
           db_provider_id: string
           expires_at: string
           id: string
+          object_size_bytes: number | null
           payload: Json
           storage_key: string
           storage_provider_id: string
@@ -3491,6 +3492,7 @@ export type Database = {
           db_provider_id: string
           expires_at: string
           id: string
+          object_size_bytes?: number | null
           payload: Json
           storage_key: string
           storage_provider_id: string
@@ -3500,6 +3502,7 @@ export type Database = {
           db_provider_id?: string
           expires_at?: string
           id?: string
+          object_size_bytes?: number | null
           payload?: Json
           storage_key?: string
           storage_provider_id?: string
@@ -5611,6 +5614,126 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      storage_provider_runtime_states: {
+        Row: {
+          canary_rollback_verified_at: string | null
+          canary_verified_at: string | null
+          capacity_bytes: number
+          credentials_verified_at: string | null
+          enabled: boolean
+          last_error: string | null
+          priority: number
+          provider_id: string
+          restore_threshold: number
+          safe_threshold: number
+          updated_at: string
+          usage_bytes: number | null
+          usage_measured_at: string | null
+          version: number
+        }
+        Insert: {
+          canary_rollback_verified_at?: string | null
+          canary_verified_at?: string | null
+          capacity_bytes: number
+          credentials_verified_at?: string | null
+          enabled?: boolean
+          last_error?: string | null
+          priority: number
+          provider_id: string
+          restore_threshold?: number
+          safe_threshold?: number
+          updated_at?: string
+          usage_bytes?: number | null
+          usage_measured_at?: string | null
+          version?: number
+        }
+        Update: {
+          canary_rollback_verified_at?: string | null
+          canary_verified_at?: string | null
+          capacity_bytes?: number
+          credentials_verified_at?: string | null
+          enabled?: boolean
+          last_error?: string | null
+          priority?: number
+          provider_id?: string
+          restore_threshold?: number
+          safe_threshold?: number
+          updated_at?: string
+          usage_bytes?: number | null
+          usage_measured_at?: string | null
+          version?: number
+        }
+        Relationships: []
+      }
+      storage_routing_events: {
+        Row: {
+          id: string
+          next_provider_id: string
+          occurred_at: string
+          policy_version: number
+          previous_provider_id: string
+          reason: string
+        }
+        Insert: {
+          id?: string
+          next_provider_id: string
+          occurred_at?: string
+          policy_version: number
+          previous_provider_id: string
+          reason: string
+        }
+        Update: {
+          id?: string
+          next_provider_id?: string
+          occurred_at?: string
+          policy_version?: number
+          previous_provider_id?: string
+          reason?: string
+        }
+        Relationships: []
+      }
+      storage_routing_policy: {
+        Row: {
+          active_provider_id: string
+          changed_at: string
+          changed_by: string | null
+          reason: string
+          singleton: boolean
+          version: number
+        }
+        Insert: {
+          active_provider_id: string
+          changed_at?: string
+          changed_by?: string | null
+          reason: string
+          singleton?: boolean
+          version?: number
+        }
+        Update: {
+          active_provider_id?: string
+          changed_at?: string
+          changed_by?: string | null
+          reason?: string
+          singleton?: boolean
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_routing_policy_active_provider_id_fkey"
+            columns: ["active_provider_id"]
+            isOneToOne: false
+            referencedRelation: "storage_provider_runtime_states"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "storage_routing_policy_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       store_automation_upload_events: {
         Row: {
@@ -7836,6 +7959,7 @@ export type Database = {
           record_count: number
           storage_provider_id: string
           total_bytes: number
+          usage_known: boolean
         }[]
       }
       get_my_cart_reservations: {
@@ -8419,6 +8543,7 @@ export type Database = {
           warning_count: number
         }[]
       }
+      get_storage_routing_policy: { Args: never; Returns: Json }
       get_store_daily_entitlements: {
         Args: { p_store_id: string }
         Returns: Json
@@ -9673,6 +9798,14 @@ export type Database = {
         Args: { p_message: string; p_status: string }
         Returns: Json
       }
+      set_storage_active_provider: {
+        Args: {
+          p_expected_version: number
+          p_provider_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       set_store_membership_access: {
         Args: {
           p_expected_version: number
@@ -9940,6 +10073,21 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      update_storage_provider_runtime_state: {
+        Args: {
+          p_canary_verified_at: string
+          p_capacity_bytes: number
+          p_credentials_verified_at: string
+          p_enabled: boolean
+          p_expected_version: number
+          p_last_error: string
+          p_provider_id: string
+          p_rollback_verified_at: string
+          p_usage_bytes: number
+          p_usage_measured_at: string
+        }
+        Returns: Json
       }
       upsert_daily_revenue: {
         Args: {

@@ -118,7 +118,10 @@ test("multi-provider reference code stays isolated while runtime registers only 
   ]);
   assert.match(contracts, /interface StorageAdapter/);
   assert.match(contracts, /interface DatabaseAdapter/);
-  assert.match(router, /projected \/ usage\.capacityBytes >= this\.capacityThreshold/);
+  assert.match(router, /!activeUsage\.verified/);
+  assert.match(router, /this\.restoreThreshold/);
+  assert.match(router, /this\.storages\[activeIndex \+ 1\]/);
+  assert.doesNotMatch(router, /storageCircuit|storageCursor/);
   assert.match(router, /storageProviderId/);
   assert.match(router, /dbProviderId/);
   assert.match(router, /CircuitBreaker/);

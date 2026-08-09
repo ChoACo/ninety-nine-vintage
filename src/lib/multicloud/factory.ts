@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { SupabaseStorageAdapter } from "@/lib/multicloud/adapters";
 import type { StorageAdapter, UsageStats } from "@/lib/multicloud/contracts";
 import { CloudflareR2Adapter } from "@/lib/multicloud/r2";
+import { GoogleDriveStorageAdapter } from "@/lib/multicloud/googleDrive";
 
 const PRODUCT_IMAGE_BUCKET = "product-images";
 
@@ -11,16 +12,18 @@ function readConfiguredBucket() {
   return process.env.MULTICLOUD_PRODUCT_IMAGE_BUCKET?.trim() || PRODUCT_IMAGE_BUCKET;
 }
 
-function supabaseUsageProbe(admin: SupabaseClient) {
+function trackedUsageProbe(admin: SupabaseClient, providerId: string, capacityBytes: number) {
   return async (): Promise<UsageStats> => {
-    const { data, error } = await admin.storage.from(readConfiguredBucket()).list("", { limit: 1 });
+    const { data, error } = await (admin as unknown as { rpc(name: string): Promise<{ data: unknown; error: Error | null }> })
+      .rpc("get_multicloud_storage_usage");
     if (error) throw error;
+    const row = Array.isArray(data) ? data.find((candidate) => candidate
+      && typeof candidate === "object" && (candidate as Record<string, unknown>).storage_provider_id === providerId) as Record<string, unknown> | undefined : undefined;
     return {
-      capacityBytes: Number(process.env.MULTICLOUD_SUPABASE_CAPACITY_BYTES ?? "107374182400"),
-      // This probe is used only for adapter health. Authoritative usage is reported
-      // by the purpose-specific database aggregate in storageUsage.ts.
-      usedBytes: data?.length ?? 0,
+      capacityBytes,
+      usedBytes: Number(row?.total_bytes ?? 0),
       measuredAt: new Date(),
+      verified: row?.usage_known === true,
     };
   };
 }
@@ -32,13 +35,17 @@ function supabaseUsageProbe(admin: SupabaseClient) {
 export function getConfiguredStorageAdapters(admin: SupabaseClient): ReadonlyMap<string, StorageAdapter> {
   const bucket = readConfiguredBucket();
   const adapters: StorageAdapter[] = [
-    new SupabaseStorageAdapter("supabase", bucket, admin, supabaseUsageProbe(admin)),
+    new SupabaseStorageAdapter("supabase", bucket, admin, trackedUsageProbe(admin, "supabase",
+      Number(process.env.MULTICLOUD_SUPABASE_CAPACITY_BYTES ?? "1073741824"))),
   ];
 
   if (
     process.env.R2_ACCOUNT_ID &&
     process.env.R2_ACCESS_KEY_ID &&
-    process.env.R2_SECRET_ACCESS_KEY
+    process.env.R2_SECRET_ACCESS_KEY &&
+    process.env.CLOUDFLARE_API_TOKEN &&
+    process.env.R2_CANARY_VERIFIED_AT &&
+    process.env.R2_ROLLBACK_VERIFIED_AT
   ) {
     adapters.push(new CloudflareR2Adapter(
       "r2",
@@ -47,6 +54,23 @@ export function getConfiguredStorageAdapters(admin: SupabaseClient): ReadonlyMap
       process.env.R2_ACCESS_KEY_ID,
       process.env.R2_SECRET_ACCESS_KEY,
       process.env.R2_PUBLIC_DOMAIN,
+      process.env.CLOUDFLARE_API_TOKEN,
+      Number(process.env.MULTICLOUD_R2_CAPACITY_BYTES ?? "10737418240"),
+    ));
+  }
+
+  if (adapters.some((adapter) => adapter.id === "r2")
+    && process.env.GOOGLE_DRIVE_STORAGE_ENABLED === "true"
+    && process.env.GOOGLE_DRIVE_ACCESS_TOKEN
+    && process.env.GOOGLE_DRIVE_ACCESS_TOKEN_EXPIRES_AT
+    && process.env.GOOGLE_DRIVE_FOLDER_ID
+    && process.env.GOOGLE_DRIVE_CANARY_VERIFIED_AT
+    && process.env.GOOGLE_DRIVE_ROLLBACK_VERIFIED_AT) {
+    adapters.push(new GoogleDriveStorageAdapter(
+      "google_drive", process.env.GOOGLE_DRIVE_ACCESS_TOKEN,
+      new Date(process.env.GOOGLE_DRIVE_ACCESS_TOKEN_EXPIRES_AT),
+      process.env.GOOGLE_DRIVE_FOLDER_ID,
+      Number(process.env.MULTICLOUD_GOOGLE_DRIVE_CAPACITY_BYTES ?? String(3 * 1024 ** 4)),
     ));
   }
 

@@ -1,5 +1,4 @@
 import {
-  isQuotaError,
   ProviderUnavailableError,
   type DatabaseAdapter,
   type StorageAdapter,
@@ -33,9 +32,7 @@ class CircuitBreaker {
 }
 
 export class MultiProviderRouter<T = Record<string, unknown>> {
-  private storageCursor = 0;
   private databaseCursor = 0;
-  private readonly storageCircuit = new CircuitBreaker();
   private readonly databaseCircuit = new CircuitBreaker();
   private readonly storageById: Map<string, StorageAdapter>;
   private readonly databaseById: Map<string, DatabaseAdapter<T>>;
@@ -44,6 +41,8 @@ export class MultiProviderRouter<T = Record<string, unknown>> {
     readonly storages: readonly StorageAdapter[],
     readonly databases: readonly DatabaseAdapter<T>[],
     private readonly capacityThreshold = 0.9,
+    private activeStorageProviderId = storages[0]?.id,
+    private readonly restoreThreshold = 0.4,
   ) {
     if (storages.length === 0 || databases.length === 0) {
       throw new Error("스토리지와 DB 프로바이더를 각각 한 개 이상 등록해야 합니다.");
@@ -59,31 +58,38 @@ export class MultiProviderRouter<T = Record<string, unknown>> {
     return providers.map((_, index) => providers[(cursor + index) % providers.length]);
   }
 
-  /** 90% 미만이면서 회로가 닫힌 스토리지를 라운드로빈으로 선택합니다. */
+  /** 정책 순서를 지키며 검증된 용량 경계에서만 신규 쓰기 대상을 변경합니다. */
   async upload(input: StorageUploadInput): Promise<StoredObject> {
-    const candidates = this.rotated(this.storages, this.storageCursor);
-    const errors: unknown[] = [];
-    for (const provider of candidates) {
-      if (!this.storageCircuit.canRequest(provider.id)) continue;
-      try {
-        const usage = await provider.getUsageStats();
-        const projected = usage.usedBytes + input.body.byteLength;
-        if (usage.capacityBytes <= 0 || projected / usage.capacityBytes >= this.capacityThreshold) {
-          continue;
-        }
-        const stored = await provider.upload(input);
-        this.storageCircuit.success(provider.id);
-        this.storageCursor = (this.storages.indexOf(provider) + 1) % this.storages.length;
+    const activeIndex = this.storages.findIndex((provider) => provider.id === this.activeStorageProviderId);
+    if (activeIndex < 0) throw new ProviderUnavailableError("활성 스토리지 공급자가 등록되지 않았습니다.", this.activeStorageProviderId);
+
+    for (const preferred of this.storages.slice(0, activeIndex)) {
+      const usage = await preferred.getUsageStats();
+      if (usage.verified && usage.capacityBytes > 0
+        && (usage.usedBytes + input.body.byteLength) / usage.capacityBytes <= this.restoreThreshold) {
+        const stored = await preferred.upload(input);
+        this.activeStorageProviderId = preferred.id;
         return stored;
-      } catch (error) {
-        errors.push(error);
-        this.storageCircuit.failure(provider.id);
-        if (!isQuotaError(error)) {
-          // 네트워크/점검 장애도 다음 프로바이더로 즉시 우회합니다.
-        }
       }
     }
-    throw new AggregateError(errors, "사용 가능한 스토리지 프로바이더가 없습니다.");
+
+    const active = this.storages[activeIndex];
+    const activeUsage = await active.getUsageStats();
+    if (!activeUsage.verified) return active.upload(input);
+    const projectedRatio = activeUsage.capacityBytes > 0
+      ? (activeUsage.usedBytes + input.body.byteLength) / activeUsage.capacityBytes : Number.POSITIVE_INFINITY;
+    if (projectedRatio < this.capacityThreshold) return active.upload(input);
+
+    const next = this.storages[activeIndex + 1];
+    if (!next) throw new ProviderUnavailableError("스토리지 안전 임계치에 도달했고 다음 공급자가 없습니다.", active.id);
+    const nextUsage = await next.getUsageStats();
+    if (!nextUsage.verified || nextUsage.capacityBytes <= 0
+      || (nextUsage.usedBytes + input.body.byteLength) / nextUsage.capacityBytes >= this.capacityThreshold) {
+      throw new ProviderUnavailableError("다음 스토리지 공급자의 사용량 또는 canary가 검증되지 않았습니다.", next.id);
+    }
+    const stored = await next.upload(input);
+    this.activeStorageProviderId = next.id;
+    return stored;
   }
 
   /** 실제 선택된 DB ID를 레코드에 기록한 뒤 저장합니다. */

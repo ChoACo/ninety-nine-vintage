@@ -128,6 +128,7 @@ interface UnifiedRecordRow {
   id: string;
   storage_provider_id: string;
   storage_key: string;
+  object_size_bytes: number | null;
   db_provider_id: string;
   created_at: string | Date;
   expires_at: string | Date;
@@ -139,6 +140,7 @@ function fromRow<T>(row: UnifiedRecordRow): UnifiedRecord<T> {
     id: row.id,
     storageProviderId: row.storage_provider_id,
     storageKey: row.storage_key,
+    sizeBytes: row.object_size_bytes ?? 0,
     dbProviderId: row.db_provider_id,
     createdAt: new Date(row.created_at),
     expiresAt: new Date(row.expires_at),
@@ -157,10 +159,10 @@ export class PostgresDatabaseAdapter<T = Record<string, unknown>> implements Dat
   async insert(record: UnifiedRecord<T>) {
     await this.sql.query(
       `insert into multi_provider_records
-       (id, storage_provider_id, storage_key, db_provider_id, created_at, expires_at, payload)
-       values ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
-      [record.id, record.storageProviderId, record.storageKey, record.dbProviderId,
-        record.createdAt.toISOString(), record.expiresAt.toISOString(), JSON.stringify(record.payload)],
+       (id, storage_provider_id, storage_key, object_size_bytes, db_provider_id, created_at, expires_at, payload)
+       values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+      [record.id, record.storageProviderId, record.storageKey, record.sizeBytes,
+        record.dbProviderId, record.createdAt.toISOString(), record.expiresAt.toISOString(), JSON.stringify(record.payload)],
     );
   }
 

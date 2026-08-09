@@ -29,10 +29,6 @@ interface ProductResponse {
   products?: Product[];
 }
 
-interface PastProductResponse {
-  paymentMode?: "manual_transfer" | "portone" | null;
-}
-
 function productStatusLabel(status: string) {
   if (status === "pending") return "초안";
   if (status === "active") return "공개 중";
@@ -49,9 +45,6 @@ export function OperatorConsole({
   const [shipping, setShipping] = useState(0);
   const [netRevenue, setNetRevenue] = useState(0);
   const [canMutate, setCanMutate] = useState(false);
-  const [paymentMode, setPaymentMode] = useState<
-    "manual_transfer" | "portone" | null
-  >(null);
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
@@ -68,16 +61,11 @@ export function OperatorConsole({
         const monthStart = `${today.slice(0, 7)}-01`;
         const [
           productResponse,
-          pastProductResponse,
           orderResponse,
           shippingResponse,
           revenueResponse,
         ] = await Promise.all([
           fetch("/api/admin/operator/products", { headers, cache: "no-store" }),
-          fetch("/api/admin/operator/products/past", {
-            headers,
-            cache: "no-store",
-          }),
           fetch("/api/admin/operator/orders?summary=1", {
             headers,
             cache: "no-store",
@@ -92,8 +80,6 @@ export function OperatorConsole({
           ),
         ]);
         const productData = await productResponse.json() as ProductResponse;
-        const pastProductData =
-          await pastProductResponse.json() as PastProductResponse;
         const orderData = await orderResponse.json() as {
           error?: string;
           activeCount?: number;
@@ -114,9 +100,6 @@ export function OperatorConsole({
         }
         setProducts(productData.products ?? []);
         setCanMutate(productData.permissions?.canMutate === true);
-        setPaymentMode(
-          pastProductResponse.ok ? (pastProductData.paymentMode ?? null) : null,
-        );
         setOrders(orderData.activeCount ?? 0);
         setShipping(shippingData.requests?.length ?? 0);
         setNetRevenue(
@@ -218,7 +201,6 @@ export function OperatorConsole({
                   {productStatusLabel(product.status)}
                 </span>
                 {canMutate &&
-                  paymentMode === "manual_transfer" &&
                   product.sale_type === "auction" &&
                   product.status === "closed" && (
                     <OperatorSecondChanceButton
@@ -226,14 +208,6 @@ export function OperatorConsole({
                       productId={product.id}
                       productTitle={product.title}
                     />
-                  )}
-                {canMutate &&
-                  paymentMode === "portone" &&
-                  product.sale_type === "auction" &&
-                  product.status === "closed" && (
-                    <span className="text-[10px] font-bold text-muted">
-                      계좌이체 모드에서 사용
-                    </span>
                   )}
               </div>
             ))}

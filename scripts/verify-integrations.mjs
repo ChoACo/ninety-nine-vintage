@@ -37,25 +37,6 @@ const serviceKey = publicOnly
 const kakaoClientId = publicOnly ? "" : required("KAKAO_REST_API_KEY");
 if (!publicOnly) required("KAKAO_CLIENT_SECRET");
 const kakaoRedirectUri = publicOnly ? "" : required("KAKAO_OIDC_REDIRECT_URI");
-const portOneSecret = publicOnly ? "" : required("PORTONE_API_SECRET");
-if (!publicOnly) required("PORTONE_WEBHOOK_SECRET");
-const portOneStoreId = publicOnly
-  ? ""
-  : required("PORTONE_STORE_ID", ["VITE_PORTONE_STORE_ID"]);
-const portOneChannelKey = publicOnly ? "" : required("VITE_PORTONE_CHANNEL_KEY");
-const portOneChannelMode = publicOnly ? "" : required("PORTONE_CHANNEL_MODE");
-if (!publicOnly) {
-  record(
-    "portone:public-identifiers",
-    portOneStoreId.startsWith("store-") && portOneChannelKey.startsWith("channel-key-"),
-    "format checked",
-  );
-  record(
-    "portone:channel-mode",
-    portOneChannelMode === "TEST" || portOneChannelMode === "LIVE",
-    "must be explicitly TEST or LIVE",
-  );
-}
 
 async function checkRest(name, path, init = {}) {
   try {
@@ -99,11 +80,6 @@ if (supabaseUrl && (serviceKey || publishableKey)) {
   });
   if (!publicOnly) {
     await checkRest(
-      "supabase:payment-mode-rpc",
-      "/rest/v1/rpc/get_payment_runtime_mode_for_service",
-      { method: "POST", body: "{}" },
-    );
-    await checkRest(
       "supabase:manual-transfer-account-rpc",
       "/rest/v1/rpc/get_manual_transfer_account_for_service",
       { method: "POST", body: "{}" },
@@ -138,26 +114,6 @@ if (supabaseUrl && publishableKey) {
   });
   record("supabase:realtime-auction-bids", realtimeResult.ok, realtimeResult.detail);
   client.realtime.disconnect();
-}
-
-if (portOneSecret) {
-  try {
-    const response = await fetch(
-      `https://api.portone.io/payments/integration-health-${Date.now()}`,
-      {
-        headers: { Authorization: `PortOne ${portOneSecret}` },
-        signal: AbortSignal.timeout(10_000),
-      },
-    );
-    const accepted = response.status !== 401 && response.status !== 403;
-    record("portone:api-credential", accepted, `HTTP ${response.status}`);
-  } catch (error) {
-    record(
-      "portone:api-credential",
-      false,
-      error instanceof Error ? error.name : "request failed",
-    );
-  }
 }
 
 if (kakaoClientId && kakaoRedirectUri) {

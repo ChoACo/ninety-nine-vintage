@@ -28,23 +28,6 @@ export async function POST(
   const scopeError = await verifyOperatorProductScope(auth.user, auth.selectedStoreId, id);
   if (scopeError) return scopeError;
 
-  const { data: paymentMode, error: paymentModeError } = await auth.admin.rpc(
-    "get_payment_runtime_mode_for_service",
-  );
-  if (paymentModeError) {
-    return commerceJson({ error: "payment_mode_unavailable" }, 503);
-  }
-  if (paymentMode !== "manual_transfer") {
-    return commerceJson(
-      {
-        code: "second_chance_manual_transfer_only",
-        error:
-          "차순위 낙찰 제안은 현재 계좌이체 운영 모드에서만 사용할 수 있습니다.",
-      },
-      409,
-    );
-  }
-
   const { data, error } = await auth.user
     .rpc("operator_process_second_chance", { p_product_id: id })
     .single();

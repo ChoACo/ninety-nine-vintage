@@ -3,15 +3,17 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 import { parseSupabaseMigrationList } from "../../scripts/migration-list-parser.mjs";
 
+const retiredProviderApi = () => {
+  throw new Error("retired provider API is unavailable");
+};
+const createPortOnePaymentId = retiredProviderApi;
+const invokePortOneProductPayment = retiredProviderApi;
+const preparedPaymentAction = retiredProviderApi;
+
 import {
   resolveKakaoPostLoginReturnTo,
   safeSameOriginReturnTo,
 } from "../../src/lib/kakao/returnTo.ts";
-import { createPortOnePaymentId } from "../../src/lib/portone/paymentId.ts";
-import {
-  invokePortOneProductPayment,
-  preparedPaymentAction,
-} from "../../src/lib/portone/paymentInvocation.ts";
 import {
   consumeFixedPurchaseIntent,
   rememberFixedPurchaseIntent,
@@ -345,7 +347,7 @@ test("public shop surfaces expose shopper controls while admin links remain sess
   assert.match(storePage, /엄선된 숍 · 숍 소개/);
 });
 
-test("PortOne payment IDs are deterministic, provider-safe, and bounded", () => {
+test.skip("retired provider payment ID behavior", () => {
   const paymentId = createPortOnePaymentId(
     "fdaba7b1-988d-4ccb-b547-ad723cedd865",
     1_725_000_000_000,
@@ -357,7 +359,7 @@ test("PortOne payment IDs are deterministic, provider-safe, and bounded", () => 
   assert.ok(paymentId.length <= 40);
 });
 
-test("PortOne payment IDs retain entropy when product IDs contain no ASCII alphanumerics", () => {
+test.skip("retired provider payment ID entropy", () => {
   const paymentId = createPortOnePaymentId(
     "상품-하나",
     0,
@@ -368,7 +370,7 @@ test("PortOne payment IDs retain entropy when product IDs contain no ASCII alpha
   assert.match(paymentId, /^[A-Za-z0-9]+$/);
 });
 
-test("PortOne checkout invokes the SDK once with only the server-prepared payment contract", async () => {
+test.skip("retired provider SDK invocation", async () => {
   const requests = [];
   const prepared = {
     storeId: "store-test123",
@@ -405,7 +407,7 @@ test("PortOne checkout invokes the SDK once with only the server-prepared paymen
   assert.deepEqual(result, { paymentId: prepared.paymentId });
 });
 
-test("PortOne state policy never reopens the SDK while payment approval is pending", () => {
+test.skip("retired provider state policy", () => {
   assert.equal(
     preparedPaymentAction({
       paymentStatus: "대기중",
@@ -448,7 +450,7 @@ test("PortOne state policy never reopens the SDK while payment approval is pendi
   );
 });
 
-test("payment completion fences cart cleanup to the same authenticated session", async () => {
+test.skip("retired provider completion page", async () => {
   const source = await readFile(
     new URL("src/app/(shop)/payment/complete/page.tsx", rootUrl),
     "utf8",
@@ -658,7 +660,7 @@ test("commerce toolbar counts appear only for the resolved current owner", async
   );
 });
 
-test("manual transfer is the only live checkout mode while PortOne stays archived", async () => {
+test.skip("superseded archived-provider contract", async () => {
   const [
     ownerRoute,
     cartRoute,
@@ -737,11 +739,10 @@ test("manual transfer is the only live checkout mode while PortOne stays archive
 
 test("checkout payment-mode handshake accepts only an exact current mode", () => {
   assert.equal(readCommercePaymentMode("manual_transfer"), "manual_transfer");
-  assert.equal(readCommercePaymentMode("portone"), "portone");
+  assert.equal(readCommercePaymentMode("portone"), null);
   assert.equal(readCommercePaymentMode("PORTONE"), null);
   assert.equal(readCommercePaymentMode(undefined), null);
-  assert.equal(paymentModeMatches("portone", "portone"), true);
-  assert.equal(paymentModeMatches("portone", "manual_transfer"), false);
+  assert.equal(paymentModeMatches("manual_transfer", "manual_transfer"), true);
 });
 
 test("catalog inputs are bounded before entering PostgREST filter syntax", () => {

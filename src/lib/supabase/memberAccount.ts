@@ -3,7 +3,7 @@ import { getSupabaseBrowserClient } from "./client";
 
 export type WonProductShippingStatus = "ready" | "requested" | "shipped";
 export type ProductPaymentStatus = "대기중" | "가상계좌발급" | "결제완료";
-export type ActivePaymentMode = "manual_transfer" | "portone";
+export type ActivePaymentMode = "manual_transfer";
 export type ManualTransferStatus =
   | "awaiting_manual_transfer"
   | "confirmed"
@@ -307,10 +307,7 @@ function toWonProduct(row: WonProductRow): MemberWonProduct {
   if (paymentDueAt !== null && !Number.isFinite(Date.parse(paymentDueAt))) {
     throw new MemberAccountError("계좌이체 마감 시각이 올바르지 않습니다.");
   }
-  if (
-    row.active_payment_mode !== "manual_transfer" &&
-    row.active_payment_mode !== "portone"
-  ) {
+  if (row.active_payment_mode !== "manual_transfer") {
     throw new MemberAccountError("결제 운영 모드가 올바르지 않습니다.");
   }
 

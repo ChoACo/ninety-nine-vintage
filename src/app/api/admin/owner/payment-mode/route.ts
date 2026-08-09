@@ -15,14 +15,12 @@ async function readRuntime(
     return {
       activeMode: ACTIVE_COMMERCE_PAYMENT_MODE,
       bankConfigured: true,
-      portoneArchived: true,
       updatedAt: account.updatedAt,
     } as const;
   } catch {
     return {
       activeMode: ACTIVE_COMMERCE_PAYMENT_MODE,
       bankConfigured: false,
-      portoneArchived: true,
       updatedAt: null,
     } as const;
   }
@@ -42,12 +40,6 @@ export async function PATCH(request: Request) {
     const access = await authenticateOwnerAccessRequest(request);
     const body = await readSmallJsonBody(request);
     const mode = body.mode;
-    if (mode === "portone") {
-      return ownerAccessJsonResponse(
-        { error: "portone_archived", activeMode: ACTIVE_COMMERCE_PAYMENT_MODE },
-        409,
-      );
-    }
     if (mode !== ACTIVE_COMMERCE_PAYMENT_MODE) {
       return ownerAccessJsonResponse({ error: "invalid_payment_mode" }, 400);
     }

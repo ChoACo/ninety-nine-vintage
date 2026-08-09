@@ -760,7 +760,7 @@ test("advanced V2 shipping-fee receipts remain unconfirmed until the shared CAS 
   assert.match(migration, /grant\s+execute\s+on\s+function[\s\S]*?public\.confirm_unified_manual_payment_v2/i);
 });
 
-test("buyer purchase surfaces use manual transfer and keep PortOne as legacy history only", async () => {
+test("buyer purchase surfaces use manual transfer and expose legacy history read-only", async () => {
   const [cart, settlement, combinedPayment, history] = await Promise.all([
     source("src/components/features/commerce/CartView.tsx"),
     source("src/components/features/auction/detail/SettlementActions.tsx"),
@@ -780,8 +780,8 @@ test("buyer purchase surfaces use manual transfer and keep PortOne as legacy his
   assert.match(combinedPayment, /총액을 한 번만 입금/);
   assert.match(combinedPayment, /입금자명/);
   assert.doesNotMatch(settlement, /PG 카드 결제는[\s\S]{0,80}운영자가 활성화한 이후 제공됩니다/);
-  assert.match(history, /과거 PortOne 테스트 기록/);
-  assert.match(history, /결제 재개는 중단/);
+  assert.match(history, /과거 외부 결제 기록/);
+  assert.doesNotMatch(history, /결제 재개|가상계좌/);
 });
 
 test("buyer inventory, shipment, and refund interfaces expose only scoped public state", async () => {

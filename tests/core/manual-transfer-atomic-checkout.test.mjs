@@ -100,10 +100,8 @@ test("auction blackout permits only the exact fixed inventory close used by chec
 test("checkout API uses only the atomic manual-transfer RPC", async () => {
   const route = await source("src/app/api/orders/checkout/route.ts");
   const start = route.indexOf("async function checkoutWithManualTransfer");
-  const end = route.indexOf("async function checkoutWithPortOne", start);
   assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
-  const manualCheckout = route.slice(start, end);
+  const manualCheckout = route.slice(start);
 
   assert.match(
     manualCheckout,

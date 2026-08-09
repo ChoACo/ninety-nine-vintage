@@ -1,12 +1,5 @@
 import { authenticateMemberRlsRequest, commerceJson } from "@/lib/commerce/server";
 import { getCatalogImageUrl } from "@/lib/images";
-import { isPortOnePayMethod, isValidPaymentId } from "@/lib/portone/server";
-
-const RETRYABLE_PORTONE_STATUSES = new Set([
-  "READY",
-  "FAILED",
-  "CANCELLED",
-]);
 
 export async function GET(request: Request) {
   // Order history is an owner-scoped read and should keep working with the
@@ -25,68 +18,35 @@ export async function GET(request: Request) {
     ? { data: [], error: null }
     : await auth.user.from("commerce_order_transfers").select("*").in("order_id", orderIds);
   if (transferError) return commerceJson({ error: "orders_unavailable" }, 503);
-  const { data: portonePayments, error: portonePaymentError } =
+  const { data: legacyProviderPayments, error: legacyProviderPaymentError } =
     orderIds.length === 0
       ? { data: [], error: null }
       : await auth.user
           .from("payment_orders")
           .select(
-            "commerce_order_id, buyer_id, payment_id, payment_status, portone_status, requested_method, payment_method, expected_amount, currency, vbank_num, vbank_bank, vbank_due, paid_at",
+            "commerce_order_id, payment_id, payment_status, portone_status, paid_at",
           )
           .in("commerce_order_id", orderIds);
-  if (portonePaymentError) {
+  if (legacyProviderPaymentError) {
     return commerceJson({ error: "orders_unavailable" }, 503);
   }
   const transferByOrder = new Map((transfers ?? []).map((transfer) => [transfer.order_id, transfer]));
-  const portonePaymentByOrder = new Map(
-    (portonePayments ?? [])
+  const legacyProviderPaymentByOrder = new Map(
+    (legacyProviderPayments ?? [])
       .filter((payment) => Boolean(payment.commerce_order_id))
       .map((payment) => [payment.commerce_order_id, payment]),
   );
   return commerceJson({ orders: (orders ?? []).map((order) => ({
     ...order,
     transfer: transferByOrder.get(order.id) ?? null,
-    portonePayment: (() => {
-      const payment = portonePaymentByOrder.get(order.id);
+    legacyPaymentHistory: (() => {
+      const payment = legacyProviderPaymentByOrder.get(order.id);
       if (!payment) return null;
-      const orderItems = order.commerce_order_items ?? [];
-      const productIds = orderItems.map((item) => item.product_id);
-      const itemsAreRecoverable =
-        orderItems.length > 0 &&
-        orderItems.length <= 50 &&
-        new Set(productIds).size === orderItems.length &&
-        orderItems.every(
-          (item) =>
-            item.payment_status === "awaiting_payment" &&
-            Number.isSafeInteger(item.unit_price) &&
-            item.unit_price > 0 &&
-            Boolean(item.products),
-        );
       return {
+        paymentId: payment.payment_id,
         paymentStatus: payment.payment_status,
-        portoneStatus: payment.portone_status,
-        requestedMethod: payment.requested_method,
-        paymentMethod: payment.payment_method,
-        canResume:
-          order.status === "awaiting_payment" &&
-          payment.buyer_id === auth.userId &&
-          payment.paid_at === null &&
-          payment.expected_amount === order.total &&
-          payment.currency === "KRW" &&
-          isValidPaymentId(payment.payment_id) &&
-          isPortOnePayMethod(payment.requested_method) &&
-          itemsAreRecoverable &&
-          (payment.portone_status === null ||
-            RETRYABLE_PORTONE_STATUSES.has(payment.portone_status)),
-        virtualAccount:
-          payment.portone_status === "VIRTUAL_ACCOUNT_ISSUED" &&
-          payment.vbank_num
-            ? {
-                accountNumber: payment.vbank_num,
-                bank: payment.vbank_bank,
-                dueAt: payment.vbank_due,
-              }
-            : null,
+        providerStatus: payment.portone_status,
+        paidAt: payment.paid_at,
       };
     })(),
     commerce_order_items: order.commerce_order_items?.map((item) => item.products ? {

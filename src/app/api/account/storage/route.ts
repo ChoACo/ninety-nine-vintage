@@ -84,7 +84,7 @@ interface LegacyAuctionWinRow {
   purchase_offer_status: string | null;
   payment_due_at: string | null;
   is_payment_settled: boolean;
-  active_payment_mode: "manual_transfer" | "portone";
+  active_payment_mode: "manual_transfer";
   shipping_status: string;
 }
 
@@ -99,7 +99,7 @@ function isLegacyAuctionWin(value: unknown): value is LegacyAuctionWinRow {
     isNullableText(value.purchase_offer_status) &&
     isTimestamp(value.payment_due_at) &&
     typeof value.is_payment_settled === "boolean" &&
-    (value.active_payment_mode === "manual_transfer" || value.active_payment_mode === "portone") &&
+    value.active_payment_mode === "manual_transfer" &&
     typeof value.shipping_status === "string";
 }
 

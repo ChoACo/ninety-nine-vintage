@@ -13,7 +13,6 @@ import {
 
 const SKIPPED_PATHS = [
   "/api/security/session",
-  "/api/webhook/portone",
   "/favicon.ico",
   "/robots.txt",
   "/sitemap.xml",

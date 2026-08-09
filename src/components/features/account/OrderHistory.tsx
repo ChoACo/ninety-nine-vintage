@@ -26,17 +26,11 @@ interface Transfer {
   status: string;
 }
 
-interface PortOnePayment {
+interface LegacyPaymentHistory {
+  paymentId: string;
   paymentStatus: string;
-  portoneStatus: string | null;
-  requestedMethod: string;
-  paymentMethod: string | null;
-  canResume: boolean;
-  virtualAccount: {
-    accountNumber: string;
-    bank: string | null;
-    dueAt: string | null;
-  } | null;
+  providerStatus: string | null;
+  paidAt: string | null;
 }
 
 interface Order {
@@ -46,7 +40,7 @@ interface Order {
   created_at: string;
   commerce_order_items?: OrderItem[];
   transfer?: Transfer | null;
-  portonePayment?: PortOnePayment | null;
+  legacyPaymentHistory?: LegacyPaymentHistory | null;
 }
 
 const statusLabels: Record<string, string> = {
@@ -58,20 +52,7 @@ const statusLabels: Record<string, string> = {
 };
 
 function statusLabel(order: Order): string {
-  if (order.status === "awaiting_payment" && order.portonePayment) {
-    return order.portonePayment.virtualAccount
-      ? "가상계좌 입금 대기"
-      : "결제 대기";
-  }
   return statusLabels[order.status] ?? "상태 확인 중";
-}
-
-function formatDueAt(value: string | null): string | null {
-  if (!value) return null;
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp)
-    ? new Date(timestamp).toLocaleString("ko-KR")
-    : null;
 }
 
 function OrderProductCard({ basePath, item, surface }: { basePath: "" | "/m"; item: OrderItem; surface: "desktop" | "mobile" }) {
@@ -254,10 +235,7 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
         </Link>
       </div>
       <div className="divide-y divide-line border-y border-line">
-        {orders.map((order) => {
-          const virtualAccount = order.portonePayment?.virtualAccount ?? null;
-          const dueAt = formatDueAt(virtualAccount?.dueAt ?? null);
-          return (
+        {orders.map((order) => (
             <article className="py-5" key={order.id}>
               <div className={`flex gap-3 ${surface === "desktop" ? "flex-row items-center justify-between gap-4" : "flex-col"}`}>
                 <div className="min-w-0">
@@ -286,23 +264,13 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
                   확인 후 상품이 보관함으로 이동하며, 보관 기간은 매장 보관 시작일부터 계산됩니다.
                 </p>
               )}
-              {order.status === "awaiting_payment" && virtualAccount && (
-                <p className="mt-4 border border-blue-200 bg-blue-50 px-3 py-3 text-[11px] leading-5 text-blue-900">
-                  가상계좌 · {virtualAccount.bank ? `${virtualAccount.bank} ` : ""}
-                  {virtualAccount.accountNumber}로 입금해 주세요.
-                  {dueAt ? ` 입금 기한은 ${dueAt}입니다.` : ""} 입금 확인 후
-                  상품이 보관함으로 이동하며, 보관 기간은 매장 보관 시작일부터 계산됩니다.
-                </p>
-              )}
-              {order.portonePayment?.canResume && (
+              {order.legacyPaymentHistory && (
                 <p className="mt-4 border border-line bg-surface px-3 py-3 text-[11px] leading-5 text-muted">
-                  이 주문은 과거 PortOne 테스트 기록입니다. 결제 재개는 중단되어
-                  있으며 추가 처리가 필요하면 운영자에게 문의해 주세요.
+                  과거 외부 결제 기록 · {order.legacyPaymentHistory.paymentId} · {order.legacyPaymentHistory.providerStatus ?? order.legacyPaymentHistory.paymentStatus}
                 </p>
               )}
             </article>
-          );
-        })}
+        ))}
       </div>
     </section>
   );

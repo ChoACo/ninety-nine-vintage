@@ -65,7 +65,7 @@ interface LegacyAuctionWin {
   purchase_offer_status: string | null;
   payment_due_at: string | null;
   is_payment_settled: boolean;
-  active_payment_mode: "manual_transfer" | "portone";
+  active_payment_mode: "manual_transfer";
   shipping_status: string;
   storage_class: "small" | "large";
   storage_expires_at: string | null;

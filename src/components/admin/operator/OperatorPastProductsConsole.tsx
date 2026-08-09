@@ -35,9 +35,6 @@ export function OperatorPastProductsConsole() {
   const [products, setProducts] = useState<PastProduct[]>([]);
   const [closedAuctions, setClosedAuctions] = useState<ClosedAuction[]>([]);
   const [canProcessSecondChance, setCanProcessSecondChance] = useState(false);
-  const [paymentMode, setPaymentMode] = useState<
-    "manual_transfer" | "portone" | null
-  >(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -55,7 +52,6 @@ export function OperatorPastProductsConsole() {
         canProcessSecondChance?: boolean;
         closedAuctions?: ClosedAuction[];
         error?: string;
-        paymentMode?: "manual_transfer" | "portone" | null;
         products?: PastProduct[];
       };
       if (!response.ok)
@@ -63,7 +59,6 @@ export function OperatorPastProductsConsole() {
       setProducts(payload.products ?? []);
       setClosedAuctions(payload.closedAuctions ?? []);
       setCanProcessSecondChance(payload.canProcessSecondChance === true);
-      setPaymentMode(payload.paymentMode ?? null);
       setSelected((current) =>
         current.filter((id) =>
           (payload.products ?? []).some((product) => product.id === id),
@@ -181,12 +176,6 @@ export function OperatorPastProductsConsole() {
             시 서버가 담당 숍, 원 낙찰자의 결제 기한, 중복 제안과 감사 원장을
             다시 검증합니다.
           </p>
-          {paymentMode === "portone" && (
-            <StatusNotice className="mt-3">
-              현재 PortOne 운영 모드입니다. 차순위 낙찰 수락·결제 경로는
-              계좌이체 전용이므로 운영 모드를 바꾸기 전에는 제안할 수 없습니다.
-            </StatusNotice>
-          )}
         </div>
         <div className="divide-y divide-line border-y border-line">
           {closedAuctions.map((product) => (
@@ -211,7 +200,7 @@ export function OperatorPastProductsConsole() {
                   마감 {expiryLabel(product.closes_at)}
                 </span>
               </span>
-              {canProcessSecondChance && paymentMode === "manual_transfer" ? (
+              {canProcessSecondChance ? (
                 <OperatorSecondChanceButton
                   onNotice={setNotice}
                   productId={product.id}
@@ -219,9 +208,7 @@ export function OperatorPastProductsConsole() {
                 />
               ) : (
                 <span className="text-[10px] font-bold text-muted">
-                  {paymentMode === "portone"
-                    ? "계좌이체 모드에서 사용"
-                    : "처리 권한 없음"}
+                  처리 권한 없음
                 </span>
               )}
             </article>

@@ -533,15 +533,6 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           clearStoredCheckoutRequest();
         }
 
-        const requestedResumeOrder = new URLSearchParams(
-          window.location.search,
-        ).get("resumeOrder");
-        if (requestedResumeOrder) {
-          setMessageKind("error");
-          setMessage(
-            "PortOne 테스트 결제 재개는 중단되었습니다. 내 주문에서 기존 주문 상태를 확인해 주세요.",
-          );
-        }
         if (!isCurrent()) return;
         setAccess("member");
         const response = await fetch("/api/cart", {

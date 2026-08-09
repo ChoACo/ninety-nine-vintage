@@ -61,7 +61,7 @@ export async function GET(request: Request) {
     });
   }
   const now = new Date().toISOString();
-  const [pastResult, closedResult, paymentModeResult] = await Promise.all([
+  const [pastResult, closedResult] = await Promise.all([
     auth.admin
       .from("products")
       .select("*, stores(id, name, slug)")
@@ -79,16 +79,12 @@ export async function GET(request: Request) {
       .eq("status", "closed")
       .in("store_id", storeIds)
       .order("closes_at", { ascending: false }),
-    auth.admin.rpc("get_payment_runtime_mode_for_service"),
   ]);
   if (pastResult.error) {
     return commerceJson({ error: "past_products_unavailable" }, 503);
   }
   if (closedResult.error) {
     return commerceJson({ error: "closed_auctions_unavailable" }, 503);
-  }
-  if (paymentModeResult.error) {
-    return commerceJson({ error: "payment_mode_unavailable" }, 503);
   }
   return commerceJson({
     stores: stores ?? [],
@@ -112,12 +108,7 @@ export async function GET(request: Request) {
     })),
     canProcessSecondChance:
       auth.roleCode === "owner" || auth.roleCode === "operator",
-    paymentMode:
-      paymentModeResult.data === "manual_transfer"
-        ? "manual_transfer"
-        : paymentModeResult.data === "portone"
-          ? "portone"
-          : null,
+    paymentMode: "manual_transfer",
   });
 }
 

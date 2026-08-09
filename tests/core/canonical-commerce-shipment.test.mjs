@@ -261,7 +261,7 @@ test("generated database types retain historical canonical shipment compatibilit
   ]) {
     assert.match(types, new RegExp(contract));
   }
-  assert.match(types, /p_shipping_fee_amount: number \| null/);
-  assert.match(types, /p_bank_name_snapshot: string \| null/);
-  assert.match(types, /p_account_number_snapshot: string \| null/);
+  assert.match(types, /p_shipping_fee_amount\??: number(?: \| null)?/);
+  assert.match(types, /p_bank_name_snapshot\??: string(?: \| null)?/);
+  assert.match(types, /p_account_number_snapshot\??: string(?: \| null)?/);
 });

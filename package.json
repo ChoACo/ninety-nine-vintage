@@ -17,7 +17,6 @@
     "verify:central-fulfillment-intake-db": "node scripts/verify-local-central-fulfillment-intake-postgres.mjs",
     "verify:canonical-shipment-db:docker": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-canonical-commerce-shipment.ps1",
     "verify:store-membership-db": "node scripts/verify-local-store-membership-postgres.mjs",
-    "verify:checkout-browser": "node scripts/verify-local-checkout-browser.mjs",
     "verify:integrations": "node scripts/verify-integrations.mjs",
     "verify:local": "node scripts/verify-local-happy-path.mjs",
     "verify:migrations": "node scripts/verify-migration-parity.mjs",
@@ -32,8 +31,6 @@
   },
   "dependencies": {
     "@google/generative-ai": "0.24.1",
-    "@portone/browser-sdk": "0.1.9",
-    "@portone/server-sdk": "0.19.0",
     "@supabase/supabase-js": "2.110.6",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.2",

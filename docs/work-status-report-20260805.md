@@ -7,7 +7,7 @@
 
 - 프로젝트: NINETY-NINE VINTAGE — 멀티센터 빈티지 커머스 단일 운영 코드베이스
 - 스택: Next.js(App Router) + Supabase(DB·인증·Realtime) + Cloudflare Workers(OpenNext)
-- 결제: 수동 계좌이체 단일 활성. PortOne은 비활성 보존 어댑터
+- 결제: 수동 계좌이체 단일 활성. 외부 결제 실행 코드는 폐기되고 과거 식별자만 읽기 전용 보존
 - 공개 주소: `https://www.ninety-nine-vintage.store`
 
 ## 2. 저장소 상태

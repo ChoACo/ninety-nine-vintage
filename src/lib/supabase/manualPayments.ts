@@ -5,7 +5,7 @@ import { getSupabaseBrowserClient } from "./client";
 interface ManualBankAccountRow {
   bank_name: string | null;
   account_number: string | null;
-  active_mode: "manual_transfer" | "portone";
+  active_mode: "manual_transfer";
   configured: boolean;
   updated_at: string | null;
 }
@@ -48,7 +48,7 @@ interface BegunManualTransferRow {
 export interface ManualBankAccount {
   bankName: string;
   accountNumber: string;
-  activeMode: "manual_transfer" | "portone";
+  activeMode: "manual_transfer";
   configured: boolean;
   updatedAt: string | null;
 }

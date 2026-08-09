@@ -348,18 +348,12 @@ test("operator second chance is role, store, deadline, audit, and payment-mode c
     route,
     /auth\.admin\s*\.?\s*rpc\("operator_process_second_chance"/,
   );
-  assert.match(
-    route,
-    /auth\.admin\.rpc\([\s\S]*"get_payment_runtime_mode_for_service"/,
-  );
-  assert.match(route, /paymentMode !== "manual_transfer"/);
-  assert.match(route, /second_chance_manual_transfer_only/);
+  assert.doesNotMatch(route, /get_payment_runtime_mode_for_service|portone/i);
   assert.match(
     consoleSource,
-    /canMutate &&\s*paymentMode === "manual_transfer" &&\s*product\.sale_type === "auction" &&\s*product\.status === "closed"/,
+    /canMutate &&\s*product\.sale_type === "auction" &&\s*product\.status === "closed"/,
   );
-  assert.match(consoleSource, /\/api\/admin\/operator\/products\/past/);
-  assert.match(consoleSource, /paymentMode === "portone"/);
+  assert.doesNotMatch(consoleSource, /paymentMode|portone/i);
   assert.match(consoleSource, /<OperatorSecondChanceButton/);
   assert.match(
     pastRoute,
@@ -369,7 +363,7 @@ test("operator second chance is role, store, deadline, audit, and payment-mode c
   assert.match(pastRoute, /closedAuctions:/);
   assert.match(pastConsole, /closedAuctions\.map/);
   assert.match(pastConsole, /최근 8개 제한 없이/);
-  assert.match(pastConsole, /paymentMode === "manual_transfer"/);
+  assert.doesNotMatch(pastConsole, /paymentMode|portone/i);
   assert.match(pastConsole, /<OperatorSecondChanceButton/);
   assert.doesNotMatch(pastConsole, /closedAuctions\.slice\(/);
   assert.match(

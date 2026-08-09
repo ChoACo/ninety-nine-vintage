@@ -44,6 +44,14 @@ interface Store {
     planCode: string;
     productDailyLimit: number | null;
     productsCreated: number;
+    immediateDailyLimit?: number;
+    immediatePublished?: number;
+    scheduledDailyLimit?: number;
+    scheduledPublished?: number;
+    pendingInventoryLimit?: number;
+    pendingInventoryUsed?: number;
+    automationRollingLimit?: number;
+    automationRollingUsed?: number;
   } | null;
 }
 interface Product {
@@ -1220,7 +1228,7 @@ export function OperatorProductsConsole({
         {!editingId && (
           <section className="border border-line bg-paper p-4 sm:col-span-2">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-              <div><p className="text-xs font-black">1. 상품 사진 선택</p><p className="mt-1 text-[11px] text-muted">최대 15장 · 표시된 순서대로 저장{quickAiBusy ? " · AI 분석 중…" : ""}</p>{selectedEntitlements && <p className="mt-1 text-[10px] font-bold text-muted">AI {selectedEntitlements.aiUsed}/{selectedEntitlements.aiDailyLimit ?? "전체 한도"} · 상품 {selectedEntitlements.productsCreated}/{selectedEntitlements.productDailyLimit ?? "무제한"}</p>}</div>
+              <div><p className="text-xs font-black">1. 상품 사진 선택</p><p className="mt-1 text-[11px] text-muted">최대 15장 · 표시된 순서대로 저장{quickAiBusy ? " · AI 분석 중…" : ""}</p>{selectedEntitlements && <p className="mt-1 text-[10px] font-bold text-muted">AI {selectedEntitlements.aiUsed}/{selectedEntitlements.aiDailyLimit ?? "전체 한도"} · 즉시 공개 {selectedEntitlements.immediatePublished ?? 0}/{selectedEntitlements.immediateDailyLimit ?? 30} · 예약 공개 {selectedEntitlements.scheduledPublished ?? 0}/{selectedEntitlements.scheduledDailyLimit ?? 40} · 초안·예약 대기 {selectedEntitlements.pendingInventoryUsed ?? selectedEntitlements.productsCreated}/{selectedEntitlements.pendingInventoryLimit ?? selectedEntitlements.productDailyLimit ?? 100}</p>}</div>
               <div className="flex flex-wrap gap-2">
                 <Button disabled={!token || !form.storeId || singleImages.length === 0 || quickAiBusy} onClick={() => void runQuickAi()} type="button" variant="primary"><Sparkles size={15} /> {quickAiBusy ? "AI 분석 중" : "AI 자동 보정"}</Button>
                 <label className="inline-flex cursor-pointer items-center justify-center gap-2 border border-ink px-4 py-3 text-xs font-bold">

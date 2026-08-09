@@ -5612,24 +5612,78 @@ export type Database = {
         }
         Relationships: []
       }
+      store_automation_upload_events: {
+        Row: {
+          actor_user_id: string
+          automation_client_id: string
+          automation_version: string
+          created_at: string
+          id: string
+          idempotency_key: string
+          item_count: number
+          store_id: string
+        }
+        Insert: {
+          actor_user_id: string
+          automation_client_id: string
+          automation_version: string
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          item_count: number
+          store_id: string
+        }
+        Update: {
+          actor_user_id?: string
+          automation_client_id?: string
+          automation_version?: string
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          item_count?: number
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_automation_upload_events_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_automation_upload_events_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_daily_usage: {
         Row: {
           ai_request_count: number
+          immediate_publish_count: number
           product_create_count: number
+          scheduled_publish_count: number
           store_id: string
           updated_at: string
           usage_date: string
         }
         Insert: {
           ai_request_count?: number
+          immediate_publish_count?: number
           product_create_count?: number
+          scheduled_publish_count?: number
           store_id: string
           updated_at?: string
           usage_date: string
         }
         Update: {
           ai_request_count?: number
+          immediate_publish_count?: number
           product_create_count?: number
+          scheduled_publish_count?: number
           store_id?: string
           updated_at?: string
           usage_date?: string
@@ -6398,9 +6452,76 @@ export type Database = {
           },
         ]
       }
+      store_service_subscription_audits: {
+        Row: {
+          action: string
+          actor_user_id: string
+          automation_client_id: string | null
+          automation_version: string | null
+          created_at: string
+          effective_at: string | null
+          id: string
+          next_billing_at: string | null
+          previous_plan_code: string | null
+          reason: string | null
+          requested_plan_code: string | null
+          resulting_plan_code: string | null
+          store_id: string
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          automation_client_id?: string | null
+          automation_version?: string | null
+          created_at?: string
+          effective_at?: string | null
+          id?: string
+          next_billing_at?: string | null
+          previous_plan_code?: string | null
+          reason?: string | null
+          requested_plan_code?: string | null
+          resulting_plan_code?: string | null
+          store_id: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          automation_client_id?: string | null
+          automation_version?: string | null
+          created_at?: string
+          effective_at?: string | null
+          id?: string
+          next_billing_at?: string | null
+          previous_plan_code?: string | null
+          reason?: string | null
+          requested_plan_code?: string | null
+          resulting_plan_code?: string | null
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_service_subscription_audits_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_service_subscription_audits_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_service_subscriptions: {
         Row: {
           approved_by: string | null
+          automation_client_id: string | null
+          automation_enabled: boolean
+          automation_linked_at: string | null
+          automation_version: string | null
           billing_anchor_day: number | null
           created_at: string
           grace_until: string | null
@@ -6416,6 +6537,10 @@ export type Database = {
         }
         Insert: {
           approved_by?: string | null
+          automation_client_id?: string | null
+          automation_enabled?: boolean
+          automation_linked_at?: string | null
+          automation_version?: string | null
           billing_anchor_day?: number | null
           created_at?: string
           grace_until?: string | null
@@ -6431,6 +6556,10 @@ export type Database = {
         }
         Update: {
           approved_by?: string | null
+          automation_client_id?: string | null
+          automation_enabled?: boolean
+          automation_linked_at?: string | null
+          automation_version?: string | null
           billing_anchor_day?: number | null
           created_at?: string
           grace_until?: string | null
@@ -7243,6 +7372,16 @@ export type Database = {
           p_is_default: boolean
           p_name: string
           p_postal_code: string
+        }
+        Returns: Json
+      }
+      configure_owner_store_automation: {
+        Args: {
+          p_client_id: string
+          p_enabled: boolean
+          p_expected_version: number
+          p_store_id: string
+          p_version: string
         }
         Returns: Json
       }
@@ -9122,6 +9261,14 @@ export type Database = {
         Returns: Json
       }
       refresh_inventory_delivery_history: { Args: never; Returns: Json }
+      reject_owner_store_service_plan: {
+        Args: {
+          p_expected_version: number
+          p_reason: string
+          p_store_id: string
+        }
+        Returns: Json
+      }
       release_buyer_inventory_shipment_items: {
         Args: {
           p_expected_work_version: number
@@ -9311,6 +9458,16 @@ export type Database = {
           global_used: number
           used: number
         }[]
+      }
+      reserve_store_automation_upload: {
+        Args: {
+          p_automation_client_id: string
+          p_automation_version: string
+          p_idempotency_key: string
+          p_item_count: number
+          p_store_id: string
+        }
+        Returns: Json
       }
       resolve_inventory_exception: {
         Args: {

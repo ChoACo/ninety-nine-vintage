@@ -42,13 +42,27 @@ export async function POST(request: Request) {
       p_representative_store_id: body.shippingChargeMode === "per_group" ? body.representativeStoreId : null,
       p_expected_version: Number.isSafeInteger(body.expectedVersion) ? body.expectedVersion : null,
     })
-    : body.action === "approve_plan"
+      : body.action === "approve_plan"
       ? await rpc.rpc("approve_owner_store_service_plan", {
         p_store_id: body.storeId,
         p_plan_code: body.planCode,
         p_start_at: body.startAt,
         p_expected_version: body.expectedVersion,
       })
+      : body.action === "reject_plan"
+        ? await rpc.rpc("reject_owner_store_service_plan", {
+          p_store_id: body.storeId,
+          p_reason: body.reason,
+          p_expected_version: body.expectedVersion,
+        })
+      : body.action === "configure_automation"
+        ? await rpc.rpc("configure_owner_store_automation", {
+          p_store_id: body.storeId,
+          p_enabled: body.enabled,
+          p_client_id: body.clientId,
+          p_version: body.version,
+          p_expected_version: body.expectedVersion,
+        })
       : body.action === "create_settlements"
         ? await rpc.rpc("create_owner_settlement_batches", {
           p_settlement_date: body.settlementDate,

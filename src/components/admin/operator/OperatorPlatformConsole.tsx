@@ -13,6 +13,10 @@ type Store = {
   monthlyFee: number;
   aiUsed: number;
   productsCreated: number;
+  totalSettlementSales: number;
+  weeklySales: number;
+  nextSettlementEstimate: number;
+  paidTotal: number;
   payoutAccount: {
     bankName: string;
     accountHolder: string;
@@ -24,6 +28,13 @@ type Store = {
     settlementDate: string;
     payoutAmount: number;
     status: string;
+  }>;
+  settlementEntries: Array<{
+    id: string;
+    kind: string;
+    amount: number;
+    eligibleAt: string;
+    batchId: string | null;
   }>;
 };
 
@@ -105,10 +116,27 @@ export function OperatorPlatformConsole() {
             <button className="bg-ink p-2 text-xs font-bold text-paper" onClick={() => void action({ action: "submit_payout_account", storeId: store.id, bankName: bank, accountHolder: holder, accountNumber: account })} type="button">정산계좌 제출</button>
           </div>
           {store.payoutAccount && <p className="mt-2 text-xs text-muted">{store.payoutAccount.bankName} {store.payoutAccount.accountNumberMasked} · {store.payoutAccount.status}</p>}
+          <div className="mt-5 grid gap-2 sm:grid-cols-4">
+            <p className="border border-line p-3 text-xs">총 정산 매출<br /><strong>{store.totalSettlementSales.toLocaleString("ko-KR")}원</strong></p>
+            <p className="border border-line p-3 text-xs">이번 주 매출<br /><strong>{store.weeklySales.toLocaleString("ko-KR")}원</strong></p>
+            <p className="border border-line p-3 text-xs">다음 정산 예정<br /><strong>{store.nextSettlementEstimate.toLocaleString("ko-KR")}원</strong></p>
+            <p className="border border-line p-3 text-xs">지급 완료<br /><strong>{store.paidTotal.toLocaleString("ko-KR")}원</strong></p>
+          </div>
           <div className="mt-5 space-y-2">
             <h3 className="text-xs font-black">정산 내역</h3>
             {store.settlements.length ? store.settlements.map((batch) => <div className="flex justify-between border-t border-line pt-2 text-xs" key={batch.id}><span>{batch.settlementDate} · {batch.status}</span><strong>{batch.payoutAmount.toLocaleString("ko-KR")}원</strong></div>) : <p className="text-xs text-muted">아직 정산 내역이 없습니다.</p>}
           </div>
+          <details className="mt-5 border-t border-line pt-3 text-xs">
+            <summary className="cursor-pointer font-black">상세 원장</summary>
+            <div className="mt-2 space-y-1">
+              {store.settlementEntries.length ? store.settlementEntries.map((entry) => (
+                <div className="flex justify-between gap-3" key={entry.id}>
+                  <span>{new Date(entry.eligibleAt).toLocaleString("ko-KR")} · {entry.kind}</span>
+                  <strong>{entry.amount.toLocaleString("ko-KR")}원</strong>
+                </div>
+              )) : <p className="text-muted">정산 원장이 없습니다.</p>}
+            </div>
+          </details>
         </section>
       ))}
     </div>

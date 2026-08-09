@@ -16,6 +16,7 @@ interface OrderItem {
     title: string;
     image_urls: string[];
     status: string;
+    sale_type: "fixed" | "auction";
   } | null;
 }
 
@@ -117,6 +118,31 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
   const [loaded, setLoaded] = useState(false);
   const [confirmationBusyOrderId, setConfirmationBusyOrderId] = useState<string | null>(null);
   const [confirmationNotice, setConfirmationNotice] = useState("");
+  const [cancellationByProduct, setCancellationByProduct] = useState<Record<string, string>>({});
+  const [cancellationBusyProductId, setCancellationBusyProductId] = useState<string | null>(null);
+
+  const requestCancellation = async (productId: string) => {
+    if (cancellationBusyProductId) return;
+    setCancellationBusyProductId(productId);
+    setConfirmationNotice("");
+    try {
+      const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
+      if (!session) throw new Error("로그인 상태를 확인해 주세요.");
+      const response = await fetch("/api/account/cancellations", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ productId, reasonCode: "buyer_changed_mind", reasonDetail: "구매자가 주문 내역에서 취소를 요청했습니다.", idempotencyKey: crypto.randomUUID() }),
+      });
+      const payload = await response.json() as { error?: string; cancellation?: { status?: string } };
+      if (!response.ok) throw new Error(payload.error ?? "취소 요청을 보내지 못했습니다.");
+      setCancellationByProduct((current) => ({ ...current, [productId]: payload.cancellation?.status ?? "requested_by_buyer" }));
+      setConfirmationNotice("판매 매장에 취소 요청을 보냈습니다. 수락 전까지 배송 처리가 중지됩니다.");
+    } catch (error) {
+      setConfirmationNotice(error instanceof Error ? error.message : "취소 요청을 보내지 못했습니다.");
+    } finally {
+      setCancellationBusyProductId(null);
+    }
+  };
 
   const requestPaymentConfirmation = async (orderId: string) => {
     if (confirmationBusyOrderId) return;
@@ -206,10 +232,10 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
 
       void (async () => {
         try {
-          const response = await fetch("/api/orders", {
-            headers: { Authorization: `Bearer ${nextAccessToken}` },
-            cache: "no-store",
-          });
+          const [response, cancellationResponse] = await Promise.all([
+            fetch("/api/orders", { headers: { Authorization: `Bearer ${nextAccessToken}` }, cache: "no-store" }),
+            fetch("/api/account/cancellations", { headers: { Authorization: `Bearer ${nextAccessToken}` }, cache: "no-store" }),
+          ]);
           if (response.ok) {
             const payload = (await response.json()) as { orders?: Order[] };
             if (
@@ -218,6 +244,10 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
               currentUserId === nextUserId
             ) {
               setOrders(payload.orders ?? []);
+              if (cancellationResponse.ok) {
+                const cancellationPayload = await cancellationResponse.json() as { cancellations?: Array<{ product_id: string; status: string }> };
+                setCancellationByProduct(Object.fromEntries((cancellationPayload.cancellations ?? []).map((item) => [item.product_id, item.status])));
+              }
             }
           }
         } catch {
@@ -316,7 +346,16 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
               </div>
               <div className="mt-4 flex flex-wrap gap-3">
                 {(order.commerce_order_items ?? []).map((item) => (
-                  <OrderProductCard basePath={basePath} item={item} key={item.id} surface={surface} />
+                  <div key={item.id}>
+                    <OrderProductCard basePath={basePath} item={item} surface={surface} />
+                    {item.products?.sale_type === "fixed" && item.payment_status === "paid" && (
+                      <button className="mt-2 w-full border border-line px-3 py-2 text-[11px] font-bold disabled:opacity-50"
+                        disabled={Boolean(cancellationByProduct[item.product_id]) || cancellationBusyProductId === item.product_id}
+                        onClick={() => void requestCancellation(item.product_id)} type="button">
+                        {cancellationByProduct[item.product_id] ? "취소 요청 처리 중" : cancellationBusyProductId === item.product_id ? "요청 중" : "취소 요청"}
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
               {order.status === "awaiting_payment" && order.transfer && (

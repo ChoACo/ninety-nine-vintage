@@ -332,6 +332,61 @@ export type Database = {
         }
         Relationships: []
       }
+      auction_store_cancellation_penalties: {
+        Row: {
+          adjusted_at: string | null
+          adjusted_by: string | null
+          adjustment_reason: string | null
+          applied_points: number
+          cancellation_request_id: string
+          created_at: string
+          default_points: number
+          store_id: string
+        }
+        Insert: {
+          adjusted_at?: string | null
+          adjusted_by?: string | null
+          adjustment_reason?: string | null
+          applied_points: number
+          cancellation_request_id: string
+          created_at?: string
+          default_points: number
+          store_id: string
+        }
+        Update: {
+          adjusted_at?: string | null
+          adjusted_by?: string | null
+          adjustment_reason?: string | null
+          applied_points?: number
+          cancellation_request_id?: string
+          created_at?: string
+          default_points?: number
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auction_store_cancellation_penalti_cancellation_request_id_fkey"
+            columns: ["cancellation_request_id"]
+            isOneToOne: true
+            referencedRelation: "commerce_cancellation_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auction_store_cancellation_penalties_adjusted_by_fkey"
+            columns: ["adjusted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auction_store_cancellation_penalties_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       businesses: {
         Row: {
           code: string
@@ -483,6 +538,186 @@ export type Database = {
             foreignKeyName: "commerce_buyer_accounts_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_cancellation_events: {
+        Row: {
+          actor_user_id: string | null
+          event_kind: string
+          from_status: string | null
+          id: number
+          idempotency_key: string
+          metadata: Json
+          occurred_at: string
+          reason: string | null
+          request_id: string
+          to_status: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          event_kind: string
+          from_status?: string | null
+          id?: never
+          idempotency_key: string
+          metadata?: Json
+          occurred_at?: string
+          reason?: string | null
+          request_id: string
+          to_status: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          event_kind?: string
+          from_status?: string | null
+          id?: never
+          idempotency_key?: string
+          metadata?: Json
+          occurred_at?: string
+          reason?: string | null
+          request_id?: string
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_cancellation_events_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_cancellation_events_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_cancellation_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_cancellation_requests: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          id: string
+          inventory_item_id: string | null
+          order_id: string | null
+          order_item_id: string | null
+          origin_store_id: string
+          product_id: string
+          reason_code: string
+          reason_detail: string
+          refund_amount: number | null
+          requested_by: string
+          requested_by_user_id: string
+          responded_at: string | null
+          responded_by: string | null
+          response_due_at: string
+          sale_type: string
+          status: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          id?: string
+          inventory_item_id?: string | null
+          order_id?: string | null
+          order_item_id?: string | null
+          origin_store_id: string
+          product_id: string
+          reason_code: string
+          reason_detail: string
+          refund_amount?: number | null
+          requested_by: string
+          requested_by_user_id: string
+          responded_at?: string | null
+          responded_by?: string | null
+          response_due_at: string
+          sale_type: string
+          status: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          id?: string
+          inventory_item_id?: string | null
+          order_id?: string | null
+          order_item_id?: string | null
+          origin_store_id?: string
+          product_id?: string
+          reason_code?: string
+          reason_detail?: string
+          refund_amount?: number | null
+          requested_by?: string
+          requested_by_user_id?: string
+          responded_at?: string | null
+          responded_by?: string | null
+          response_due_at?: string
+          sale_type?: string
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_cancellation_requests_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_cancellation_requests_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "customer_inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_cancellation_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_cancellation_requests_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_cancellation_requests_origin_store_id_fkey"
+            columns: ["origin_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_cancellation_requests_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_cancellation_requests_requested_by_user_id_fkey"
+            columns: ["requested_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_cancellation_requests_responded_by_fkey"
+            columns: ["responded_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -6604,6 +6839,15 @@ export type Database = {
           warning_count: number
         }[]
       }
+      adjust_auction_cancellation_penalty: {
+        Args: {
+          p_idempotency_key: string
+          p_points: number
+          p_reason: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
       adjust_member_shipping_credits: {
         Args: { p_delta: number; p_member_id: string }
         Returns: number
@@ -8530,6 +8774,7 @@ export type Database = {
         Args: { p_at?: string }
         Returns: number
       }
+      process_expired_commerce_cancellations: { Args: never; Returns: number }
       provision_owner_hidden_test_member: {
         Args: {
           p_actor_owner_id: string
@@ -8747,6 +8992,16 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      request_commerce_cancellation: {
+        Args: {
+          p_idempotency_key: string
+          p_product_id: string
+          p_reason_code: string
+          p_reason_detail: string
+          p_requested_by: string
+        }
+        Returns: Json
+      }
       request_commerce_order_shipment: {
         Args: {
           p_account_number_snapshot: string
@@ -8867,6 +9122,16 @@ export type Database = {
           p_internal_note: string
           p_public_reason: string
           p_resolution: string
+        }
+        Returns: Json
+      }
+      respond_commerce_cancellation: {
+        Args: {
+          p_accept: boolean
+          p_expected_version: number
+          p_idempotency_key: string
+          p_reason: string
+          p_request_id: string
         }
         Returns: Json
       }

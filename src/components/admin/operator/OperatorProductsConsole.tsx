@@ -91,7 +91,7 @@ type FormState = {
   inspectionNotes: string;
 };
 
-type PublicationMode = "now" | "next-day-10";
+type PublicationMode = "now" | "scheduled";
 
 interface SingleImage {
   file: File;
@@ -107,6 +107,7 @@ interface SingleRegistrationSnapshot {
   id: string;
   productId: string;
   publicationMode: PublicationMode;
+  scheduledHourKst: number;
 }
 
 interface SingleRegistrationJob {
@@ -215,7 +216,8 @@ export function OperatorProductsConsole({
   );
   const [singleImages, setSingleImages] = useState<SingleImage[]>([]);
   const [publicationMode, setPublicationMode] =
-    useState<PublicationMode>("next-day-10");
+    useState<PublicationMode>("scheduled");
+  const [scheduledHourKst, setScheduledHourKst] = useState(10);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingUpdatedAt, setEditingUpdatedAt] = useState<string | null>(null);
   const [permissions, setPermissions] = useState({
@@ -339,7 +341,17 @@ export function OperatorProductsConsole({
       try {
         const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
         setToken(session?.access_token ?? null);
-        if (session) await load(session.access_token);
+        if (session) {
+          await load(session.access_token);
+          const preferenceResponse = await fetch("/api/admin/operator/products/publication-preference", {
+            headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store",
+          });
+          if (preferenceResponse.ok) {
+            const payload = await preferenceResponse.json() as { preference?: { publicationMode?: PublicationMode; scheduledHourKst?: number } };
+            if (payload.preference?.publicationMode) setPublicationMode(payload.preference.publicationMode);
+            if (Number.isInteger(payload.preference?.scheduledHourKst)) setScheduledHourKst(payload.preference!.scheduledHourKst!);
+          }
+        }
       } catch (error) { setNotice(error instanceof Error ? error.message : "운영자 데이터를 불러오지 못했습니다."); }
     })();
   }, [load]);
@@ -452,7 +464,6 @@ export function OperatorProductsConsole({
     setEditingId(null);
     setEditingUpdatedAt(null);
     setSingleCreateOpen(false);
-    setPublicationMode("next-day-10");
     setForm((current) => {
       const storeId = current.storeId || scopedStores[0]?.id || "";
       const canPublish = scopedStores.find((store) => store.id === storeId)?.canPublish === true;
@@ -484,7 +495,6 @@ export function OperatorProductsConsole({
   };
 
   const startSingleCreate = (saleType: "fixed" | "auction") => {
-    setPublicationMode("next-day-10");
     setBlankSingleRegistration(saleType, true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -623,6 +633,7 @@ export function OperatorProductsConsole({
         bidIncrement: Number(snapshot.form.bidIncrement),
         storageClass: snapshot.form.storageClass,
         publicationMode: snapshot.publicationMode,
+        scheduledHourKst: snapshot.scheduledHourKst,
         imageUrls: uploaded.imageUrls,
         thumbnailUrls: uploaded.thumbnailUrls,
       };
@@ -645,8 +656,8 @@ export function OperatorProductsConsole({
         );
       }
       persisted = true;
-      let message = snapshot.publicationMode === "next-day-10"
-        ? `“${snapshot.form.title}” 단품 등록과 오전 10시 공개 예약을 완료했습니다.`
+      let message = snapshot.publicationMode === "scheduled"
+        ? `“${snapshot.form.title}” 단품 등록과 ${String(snapshot.scheduledHourKst).padStart(2, "0")}:00 공개 예약을 완료했습니다.`
         : `“${snapshot.form.title}” 단품 등록을 완료했습니다.`;
       if (snapshot.canPublishImmediately) {
         if (!payload.product?.id) {
@@ -728,6 +739,7 @@ export function OperatorProductsConsole({
         id: crypto.randomUUID(),
         productId: crypto.randomUUID(),
         publicationMode,
+        scheduledHourKst,
       };
       singleRegistrationSnapshotsRef.current.set(snapshot.id, snapshot);
       setSingleRegistrationJobs((current) => [
@@ -1159,7 +1171,7 @@ export function OperatorProductsConsole({
   };
   const singleRegistrationSubmitLabel = publicationMode === "now"
     ? `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 즉시 공개`
-    : `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 오전 10시 예약`;
+    : `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 ${String(scheduledHourKst).padStart(2, "0")}:00 예약`;
   const singleRegistrationDisabled =
     busy || !token || !productFieldsEditable || singleImages.length === 0;
 
@@ -1316,10 +1328,19 @@ export function OperatorProductsConsole({
             {form.saleType === "auction" ? <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">입찰 최소 단위는 1,000원으로 자동 적용됩니다.</div> : <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">즉시구매 상품은 입찰 단위를 사용하지 않습니다.</div>}
             <label className="text-xs font-bold sm:col-span-2">
               공개 시각
-              <SelectInput aria-label="단품 공개 시각" className="mt-2" onChange={(event) => setPublicationMode(event.target.value as PublicationMode)} value={publicationMode}>
-                <option value="next-day-10">다음 날 오전 10시 공개 (기본)</option>
+              <SelectInput aria-label="단품 공개 방식" className="mt-2" onChange={async (event) => {
+                const mode = event.target.value as PublicationMode; setPublicationMode(mode);
+                if (token) await fetch("/api/admin/operator/products/publication-preference", { method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ publicationMode: mode, scheduledHourKst }) });
+              }} value={publicationMode}>
+                <option value="scheduled">예약 공개 (기본)</option>
                 <option value="now">즉시 공개</option>
               </SelectInput>
+              {publicationMode === "scheduled" && <SelectInput aria-label="예약 공개 시간" className="mt-2" onChange={async (event) => {
+                const hour = Number(event.target.value); setScheduledHourKst(hour);
+                if (token) await fetch("/api/admin/operator/products/publication-preference", { method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ publicationMode, scheduledHourKst: hour }) });
+              }} value={String(scheduledHourKst)}>
+                {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, "0")}:00 (KST)</option>)}
+              </SelectInput>}
             </label>
           </>
         )}

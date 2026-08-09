@@ -31,6 +31,13 @@ function images(value: unknown) {
   return normalized.length === value.length ? normalized : [];
 }
 
+function nextKoreanScheduledHour(hour: number, now = new Date()) {
+  const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const target = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate(), hour - 9));
+  if (target.getTime() <= now.getTime()) target.setUTCDate(target.getUTCDate() + 1);
+  return target.toISOString();
+}
+
 export async function GET(request: Request) {
   const auth = await authenticateOperatorStoreRequest(request);
   if (!auth.ok) return auth.response;
@@ -146,22 +153,22 @@ export async function POST(request: Request) {
     : images(body.thumbnailUrls);
   const startingPrice = Number(body?.startingPrice);
   const fixedPrice = saleType === "fixed" ? Number(body?.fixedPrice ?? body?.startingPrice) : null;
-  const publicationMode = body?.publicationMode === "now"
-    ? "now"
-    : "next-day-10";
+  const publicationMode = body?.publicationMode === "now" ? "now" : "scheduled";
+  const scheduledHourKst = Number.isInteger(Number(body?.scheduledHourKst))
+    ? Number(body?.scheduledHourKst) : 10;
   const publishAt = singleRegistration
     ? publicationMode === "now"
       ? new Date().toISOString()
-      : new Date(
-          getRelativeKoreanDateTime(1, "10:00:00", new Date()),
-        ).toISOString()
+      : body?.publicationMode === "next-day-10"
+        ? new Date(getRelativeKoreanDateTime(1, "10:00:00", new Date())).toISOString()
+        : nextKoreanScheduledHour(scheduledHourKst)
     : text(body?.publishAt, new Date().toISOString());
   const closesAt = singleRegistration
     ? saleType === "fixed"
       ? FIXED_PRODUCT_OPEN_UNTIL
       : getNextAuctionDeadline(publishAt).toISOString()
     : text(body?.closesAt, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
-  if (!title || title.length > 160 || (!singleRegistration && !description) || description.length > 10000 || !normalizedBrand || !storeId || storeId !== auth.selectedStoreId || imageUrls.length === 0 || thumbnailUrls.length !== imageUrls.length || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
+  if (!title || title.length > 160 || (!singleRegistration && !description) || description.length > 10000 || !normalizedBrand || !storeId || storeId !== auth.selectedStoreId || imageUrls.length === 0 || thumbnailUrls.length !== imageUrls.length || !Number.isSafeInteger(startingPrice) || startingPrice <= 0 || scheduledHourKst < 0 || scheduledHourKst > 23 || (fixedPrice !== null && (!Number.isSafeInteger(fixedPrice) || fixedPrice <= 0))) {
     return commerceJson({ error: "상품 입력값을 확인해 주세요." }, 400);
   }
   const { data: canManageStore, error: permissionError } = await auth.user.rpc(

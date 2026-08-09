@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { AuctionPost, ProductSaleType } from "@/types/auction";
@@ -61,6 +62,7 @@ export interface ProductPayload {
   storeId?: string | null;
   storeName?: string;
   storeSlug?: string;
+  storeTier?: "premium" | "standard";
   soldAt?: string;
   soldPrice?: number;
   enhancedTitle?: string | null;
@@ -335,7 +337,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
     return () => window.clearInterval(refresh);
   }, [accountBidCapability, refreshAccountBids, saleType, showSoldOnly]);
 
-  const orderedProducts = useMemo(() => [...products].sort((left, right) => {
+  const orderedProducts = useMemo(() => { const ranked = [...products].sort((left, right) => {
     const leftDate = getKoreanFeedDateKey(left.publishAt);
     const rightDate = getKoreanFeedDateKey(right.publishAt);
     if (leftDate !== rightDate) return rightDate.localeCompare(leftDate);
@@ -344,8 +346,14 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
       for (const character of `${feedSeed}:${value}`) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
       return hash >>> 0;
     };
-    return score(left.id) - score(right.id);
-  }), [feedSeed, products]);
+    const leftScore = score(left.id) / (left.storeTier === "premium" ? 1.2 : 1);
+    const rightScore = score(right.id) / (right.storeTier === "premium" ? 1.2 : 1);
+    return leftScore - rightScore;
+  });
+    const top: ProductPayload[] = []; const deferred: ProductPayload[] = []; const counts = new Map<string,number>();
+    for (const product of ranked) { const store = product.storeId ?? `product:${product.id}`; const count = counts.get(store) ?? 0; if (top.length < 8 && count >= 2) deferred.push(product); else { top.push(product); if (top.length <= 8) counts.set(store,count+1); } }
+    return [...top,...deferred];
+  }, [feedSeed, products]);
 
   const cards = useMemo(() => orderedProducts.map((product) => {
     const bidHistory = parsePublicBidHistory(Array.isArray(product.bidHistory) ? product.bidHistory : []);
@@ -528,7 +536,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
       {error && <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {loading && <div className={`grid grid-cols-2 gap-y-8 ${surface === "desktop" ? "grid-cols-4 gap-x-5" : "gap-x-3 min-[700px]:grid-cols-3"}`}>{Array.from({ length: 12 }).map((_, index) => <div aria-hidden="true" className="aspect-[4/5] animate-pulse bg-surface" key={index} />)}</div>}
       {!loading && !error && visibleCards.length === 0 && <div className="grid min-h-64 place-items-center border border-dashed border-line px-6 text-center"><div><p className="text-sm font-bold">{showSoldOnly ? "판매 완료 상품이 없습니다." : "현재 조건에 맞는 상품이 없습니다."}</p><p className="mt-2 text-xs text-muted">{showSoldOnly ? "판매 중 상품 보기로 돌아갈 수 있습니다." : "필터를 초기화하거나 새로운 드롭을 기다려 주세요."}</p></div></div>}
-      {!loading && visibleCards.length > 0 && <><div className={`grid grid-cols-2 gap-y-9 ${surface === "desktop" ? "grid-cols-4 gap-x-5" : "gap-x-3 min-[700px]:grid-cols-3"}`}>{pagination.items.map((item) => showSoldOnly ? <SoldFeedCard basePath={basePath} brand={item.brand} id={item.id} imageUrl={item.imageUrl} key={item.id} saleType={item.saleType} soldAt={item.soldAt} soldPrice={item.soldPrice} surface={surface} title={item.title} /> : saleType === "auction" ? <AuctionFeedCard basePath={basePath} bidCapability={accountBidCapability} item={item} key={item.id} onBidPlaced={handleBidPlaced} participationState={bidStateByProduct.get(item.id)} surface={surface} /> : <AuctionCard basePath={basePath} item={item} key={item.id} surface={surface} />)}</div><nav aria-label="상품 페이지 이동" className="mt-8 flex items-center justify-center gap-2"><button className="h-10 border border-line px-4 text-xs font-bold disabled:opacity-35" disabled={pagination.page <= 1} onClick={() => setPage(pagination.page - 1)} type="button">이전</button>{Array.from({ length: pagination.pageCount }, (_, index) => index + 1).map((pageNumber) => <button aria-current={pageNumber === pagination.page ? "page" : undefined} aria-label={`${pageNumber}페이지`} className={`size-10 border font-mono text-xs font-bold ${pageNumber === pagination.page ? "border-ink bg-ink text-paper" : "border-line"}`} key={pageNumber} onClick={() => setPage(pageNumber)} type="button">{pageNumber}</button>)}<button className="h-10 border border-line px-4 text-xs font-bold disabled:opacity-35" disabled={pagination.page >= pagination.pageCount} onClick={() => setPage(pagination.page + 1)} type="button">다음</button></nav><p className="mt-3 text-center font-mono text-[10px] text-muted">{pagination.page} / {pagination.pageCount}페이지 · 페이지당 {AUCTION_FEED_PAGE_SIZE}개</p></>}
+      {!loading && visibleCards.length > 0 && <><div className={`grid grid-cols-2 gap-y-9 ${surface === "desktop" ? "grid-cols-4 gap-x-5" : "gap-x-3 min-[700px]:grid-cols-3"}`}>{pagination.items.map((item) => { const source = orderedProducts.find((product) => product.id === item.id); return <div key={item.id}>{showSoldOnly ? <SoldFeedCard basePath={basePath} brand={item.brand} id={item.id} imageUrl={item.imageUrl} saleType={item.saleType} soldAt={item.soldAt} soldPrice={item.soldPrice} surface={surface} title={item.title} /> : saleType === "auction" ? <AuctionFeedCard basePath={basePath} bidCapability={accountBidCapability} item={item} onBidPlaced={handleBidPlaced} participationState={bidStateByProduct.get(item.id)} surface={surface} /> : <AuctionCard basePath={basePath} item={item} surface={surface} />}{source?.storeName && <Link className="mt-2 inline-flex text-[10px] font-bold text-muted underline" href={`${basePath}/stores/${encodeURIComponent(source.storeSlug ?? source.storeId ?? "")}`}>센터 · {source.storeName}</Link>}</div>; })}</div><nav aria-label="상품 페이지 이동" className="mt-8 flex items-center justify-center gap-2"><button className="h-10 border border-line px-4 text-xs font-bold disabled:opacity-35" disabled={pagination.page <= 1} onClick={() => setPage(pagination.page - 1)} type="button">이전</button>{Array.from({ length: pagination.pageCount }, (_, index) => index + 1).map((pageNumber) => <button aria-current={pageNumber === pagination.page ? "page" : undefined} aria-label={`${pageNumber}페이지`} className={`size-10 border font-mono text-xs font-bold ${pageNumber === pagination.page ? "border-ink bg-ink text-paper" : "border-line"}`} key={pageNumber} onClick={() => setPage(pageNumber)} type="button">{pageNumber}</button>)}<button className="h-10 border border-line px-4 text-xs font-bold disabled:opacity-35" disabled={pagination.page >= pagination.pageCount} onClick={() => setPage(pagination.page + 1)} type="button">다음</button></nav><p className="mt-3 text-center font-mono text-[10px] text-muted">{pagination.page} / {pagination.pageCount}페이지 · 페이지당 {AUCTION_FEED_PAGE_SIZE}개</p></>}
     </section>
   );
 }

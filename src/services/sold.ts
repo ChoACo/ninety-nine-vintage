@@ -3,6 +3,7 @@ import "server-only";
 import { createSupabasePublicClient } from "@/lib/supabase/server";
 import { getCatalogImageUrl } from "@/lib/images";
 import type { Database } from "@/lib/supabase/database.types";
+import { isSoldFeedVisible } from "@/lib/catalog/soldVisibility";
 
 export const SOLD_PAGE_SIZE = 24;
 export type SoldProduct = Database["public"]["Functions"]["get_public_sold_product"]["Returns"][number];
@@ -26,7 +27,7 @@ export async function fetchSoldArchivePage(input: { before?: string; beforeId?: 
     p_brand_slug: input.brandSlug,
   });
   if (error) throw new Error("판매 완료 아카이브를 불러오지 못했습니다.");
-  const rows = (data ?? []).map(mapImages);
+  const rows = (data ?? []).filter((product) => isSoldFeedVisible(product.sold_at)).map(mapImages);
   return { products: rows.slice(0, limit), hasNext: rows.length > limit };
 }
 
@@ -39,5 +40,5 @@ export async function fetchSoldBrands(): Promise<SoldBrand[]> {
 export async function fetchSoldProduct(productId: string): Promise<SoldProduct | null> {
   const { data, error } = await createSupabasePublicClient().rpc("get_public_sold_product", { p_product_id: productId });
   if (error) throw new Error("판매 기록을 불러오지 못했습니다.");
-  return data?.[0] ? mapImages(data[0]) : null;
+  return data?.[0] && (data[0].sale_type !== "auction" || isSoldFeedVisible(data[0].sold_at)) ? mapImages(data[0]) : null;
 }

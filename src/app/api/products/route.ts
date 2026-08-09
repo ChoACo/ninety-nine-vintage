@@ -1,5 +1,6 @@
 import {
   fetchPublishedProducts,
+  fetchPublicPremiumStoreIds,
   fetchSoldFeedProducts,
 } from "@/services/products";
 import { getCatalogImageUrl } from "@/lib/images";
@@ -12,18 +13,19 @@ export async function GET(request: Request) {
   const saleType = searchParams.get("saleType") === "fixed" ? "fixed" : "auction";
   const soldOnly = searchParams.get("view") === "sold";
   try {
-    const products = soldOnly
-      ? await fetchSoldFeedProducts({ limit, offset, saleType })
-      : await fetchPublishedProducts({
+    const [products, premiumStoreIds] = await Promise.all([soldOnly
+      ? fetchSoldFeedProducts({ limit, offset, saleType })
+      : fetchPublishedProducts({
         limit,
         offset,
         saleType,
         search: searchParams.get("q") ?? "",
-      });
+      }), soldOnly ? Promise.resolve(new Set<string>()) : fetchPublicPremiumStoreIds()]);
     const hasMore = products.length === limit;
     return Response.json({
       products: products.map((product) => ({
         ...product,
+        storeTier: product.storeId && premiumStoreIds.has(product.storeId) ? "premium" : "standard",
         imageUrls: product.imageUrls.map((image) => getCatalogImageUrl(image)),
         thumbnailUrls: product.thumbnailUrls.map((image) => getCatalogImageUrl(image, 320)),
       })),

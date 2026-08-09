@@ -8,6 +8,7 @@ import {
   normalizeProductOffset,
 } from "@/lib/catalog/query";
 import { formatProductDisplayNumber } from "@/lib/productDisplayNumber";
+import { isSoldFeedVisible } from "@/lib/catalog/soldVisibility";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"] & {
   enhanced_title?: string | null;
@@ -184,7 +185,7 @@ export async function fetchSoldFeedProducts(input: {
   );
   if (error) throw new Error("판매 완료 상품을 불러오지 못했습니다.");
 
-  return (data ?? []).map((row) => ({
+  return (data ?? []).filter((row) => row.sale_type !== "auction" || isSoldFeedVisible(row.closes_at)).map((row) => ({
     antiSnipingBaseClosesAt: row.anti_sniping_base_closes_at,
     antiSnipingExtendedAt: row.anti_sniping_extended_at,
     antiSnipingExtensionCount: row.anti_sniping_extension_count,
@@ -222,6 +223,42 @@ export async function fetchSoldFeedProducts(input: {
     updatedAt: row.sold_at,
     enhancedTitle: null,
     hashtags: [],
+  }));
+}
+
+export async function fetchPublicPremiumStoreIds(): Promise<Set<string>> {
+  const { data, error } = await createSupabasePublicClient().rpc("get_public_premium_store_ids");
+  if (error) throw new Error("프리미엄 센터 정보를 불러오지 못했습니다.");
+  return new Set((data ?? []).map((row) => row.store_id));
+}
+
+export async function fetchStoreSoldFeedProducts(input: {
+  storeId: string;
+  saleType: ProductRow["sale_type"];
+  limit?: number;
+}): Promise<SoldFeedProduct[]> {
+  const { data, error } = await createSupabasePublicClient().rpc(
+    "get_public_store_sold_feed_products",
+    { p_store_id: input.storeId, p_sale_type: input.saleType, p_limit: normalizeProductLimit(input.limit ?? 24) },
+  );
+  if (error) throw new Error("매장 판매 완료 상품을 불러오지 못했습니다.");
+  return (data ?? []).filter((row) => row.sale_type !== "auction" || isSoldFeedVisible(row.closes_at)).map((row) => ({
+    antiSnipingBaseClosesAt: row.anti_sniping_base_closes_at,
+    antiSnipingExtendedAt: row.anti_sniping_extended_at,
+    antiSnipingExtensionCount: row.anti_sniping_extension_count,
+    bidHistory: row.bid_history,
+    bidIncrement: row.bid_increment,
+    bidLockedAt: row.bid_locked_at,
+    brand: row.brand, brandSlug: row.brand_slug, gender: "", category: row.category,
+    closesAt: row.closes_at, conditionGrade: "", currentPrice: row.current_price,
+    description: row.description, finalBidAmount: row.final_bid_amount, fixedPrice: row.fixed_price,
+    id: row.id, imageUrls: row.image_urls, inspectionNotes: [], measurements: {},
+    participantCount: row.participant_count, publishAt: row.publish_at,
+    saleType: row.sale_type === "fixed" ? "fixed" : "auction", sizeLabel: row.size_label,
+    soldAt: row.sold_at, soldPrice: row.sold_price, startingPrice: row.starting_price,
+    status: "closed", storageClass: "small", storeId: input.storeId, storeName: "", storeSlug: "",
+    thumbnailUrls: row.thumbnail_urls, title: row.title, updatedAt: row.sold_at,
+    enhancedTitle: null, hashtags: [],
   }));
 }
 

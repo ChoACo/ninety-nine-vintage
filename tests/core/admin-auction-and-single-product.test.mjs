@@ -25,7 +25,7 @@ test("owner product feed exposes an audited immediate auction close and winner a
   assert.match(migration, /owner_auction_action_audit/i);
 });
 
-test("single product registration is separate, scheduled for next-day 10 by default, and uploads up to 15 ordered files", async () => {
+test("single product registration is separate, scheduled by saved hourly preference, and uploads up to 15 ordered files", async () => {
   const [
     consoleSource,
     route,
@@ -80,8 +80,9 @@ test("single product registration is separate, scheduled for next-day 10 by defa
     1,
     "판매 방식 입력은 기존 상품 수정 폼에만 남아야 합니다.",
   );
-  assert.match(consoleSource, /useState<PublicationMode>\("next-day-10"\)/);
-  assert.match(consoleSource, /다음 날 오전 10시 공개 \(기본\)/);
+  assert.match(consoleSource, /useState<PublicationMode>\("scheduled"\)/);
+  assert.match(consoleSource, /예약 공개 \(기본\)/);
+  assert.match(consoleSource, /Array\.from\(\{ length: 24 \}/);
   assert.match(consoleSource, /singleImages\.length \+ selected\.length > 15/);
   assert.match(consoleSource, /type="file"/);
   assert.match(consoleSource, /moveSingleImage\(index,\s*-1\)/);

@@ -3686,6 +3686,45 @@ export type Database = {
           },
         ]
       }
+      operator_product_publication_preferences: {
+        Row: {
+          publication_mode: string
+          scheduled_hour_kst: number
+          store_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          publication_mode?: string
+          scheduled_hour_kst?: number
+          store_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          publication_mode?: string
+          scheduled_hour_kst?: number
+          store_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_product_publication_preferences_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operator_product_publication_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       operator_store_scope_preferences: {
         Row: {
           access_mode: string
@@ -7917,6 +7956,12 @@ export type Database = {
           requested_at: string
         }[]
       }
+      get_public_premium_store_ids: {
+        Args: never
+        Returns: {
+          store_id: string
+        }[]
+      }
       get_public_sold_auctions: {
         Args: {
           p_before?: string
@@ -8005,6 +8050,37 @@ export type Database = {
           title: string
           winner_display_name: string
           winning_amount: number
+        }[]
+      }
+      get_public_store_sold_feed_products: {
+        Args: { p_limit?: number; p_sale_type: string; p_store_id: string }
+        Returns: {
+          anti_sniping_base_closes_at: string
+          anti_sniping_extended_at: string
+          anti_sniping_extension_count: number
+          bid_history: Json
+          bid_increment: number
+          bid_locked_at: string
+          brand: string
+          brand_slug: string
+          category: string
+          closes_at: string
+          current_price: number
+          description: string
+          final_bid_amount: number
+          fixed_price: number
+          id: string
+          image_urls: string[]
+          participant_count: number
+          publish_at: string
+          sale_type: string
+          size_label: string
+          sold_at: string
+          sold_price: number
+          starting_price: number
+          status: string
+          thumbnail_urls: string[]
+          title: string
         }[]
       }
       get_shared_commerce_payment_order_summaries: {
@@ -9270,6 +9346,14 @@ export type Database = {
         Returns: string
       }
       set_my_initial_nickname: { Args: { p_nickname: string }; Returns: string }
+      set_operator_product_publication_preference: {
+        Args: {
+          p_publication_mode: string
+          p_scheduled_hour_kst: number
+          p_store_id: string
+        }
+        Returns: Json
+      }
       set_operator_store_scope: {
         Args: { p_scope: string; p_store_id?: string }
         Returns: Json

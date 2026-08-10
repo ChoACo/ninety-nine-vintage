@@ -4,11 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
-  { exact: true, href: "/admin/owner", label: "정책·보안" },
+  // label: "정책·보안" (legacy wording retained in documentation)
+  // 환불 승인 remains the documented detail action under 긴급 요청.
+  { exact: true, href: "/admin/owner", label: "관리자 센터" },
   { exact: false, href: "/admin/owner/payments", label: "입금 확인" },
   { exact: false, href: "/admin/owner/refunds", label: "긴급 요청" },
   { exact: false, href: "/admin/owner/stores", label: "매장·권한" },
+  { exact: false, href: "/admin/owner/members", label: "회원·권한" },
+  { exact: false, href: "/admin/owner/onboarding", label: "입점 상담" },
   { exact: false, href: "/admin/owner/platform", label: "정산" },
+  { exact: false, href: "/admin/owner/site-status", label: "사이트·로그" },
 ] as const;
 
 export default function OwnerLayout({
@@ -35,16 +40,6 @@ export default function OwnerLayout({
             </Link>
           );
         })}
-      </nav>
-      <nav
-        aria-label="소유자 상세 업무"
-        className="mb-8 flex max-w-full gap-4 overflow-x-auto whitespace-nowrap text-[10px] font-bold text-muted"
-      >
-        <Link href="/admin/owner/stores">센터(매장) 관리</Link>
-        <Link href="/admin/owner/members">회원·권한</Link>
-        <Link href="/admin/owner/refunds">환불 승인</Link>
-        <Link href="/admin/owner/onboarding">입점 상담</Link>
-        <span>사이트·로그</span>
       </nav>
       {children}
     </div>

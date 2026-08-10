@@ -47,7 +47,7 @@ export function OwnerPaymentConfirmationQueue() {
             <div className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs" key={request.request_id}>
               <span>
                 <strong>{request.buyer_display_name}</strong> · 주문 {request.order_id.slice(0, 8)} · 재알림 {request.reminder_count}회
-                <small className="mt-1 block">최초 요청 {new Date(request.first_requested_at).toLocaleString("ko-KR")}</small>
+                <small className="mt-1 block">최초 요청 {new Date(request.first_requested_at).toLocaleString("ko-KR")} · {Math.floor(request.elapsed_seconds / 3600)}시간 경과</small>
               </span>
               <strong className="font-mono">{Number(request.expected_amount).toLocaleString("ko-KR")}원</strong>
             </div>

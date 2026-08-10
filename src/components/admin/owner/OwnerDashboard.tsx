@@ -31,6 +31,7 @@ export function OwnerDashboard({
 }: Readonly<{ enableLocalTestMembers?: boolean }>) {
   const [data, setData] = useState<Overview | null>(null);
   const [notice, setNotice] = useState("");
+  const [loading, setLoading] = useState(true);
   const memberMode = useOwnerMemberMode();
 
   useEffect(() => {
@@ -50,6 +51,8 @@ export function OwnerDashboard({
         setData(payload);
       } catch (error) {
         setNotice(error instanceof Error ? error.message : "소유자 데이터를 불러오지 못했습니다.");
+      } finally {
+        setLoading(false);
       }
     })();
   }, []);
@@ -100,9 +103,9 @@ export function OwnerDashboard({
         </section>
       )}
       <div className="grid grid-cols-1 gap-px border border-line bg-line sm:grid-cols-3">
-        <div className="bg-paper p-6"><Store size={17} /><p className="mt-8 text-xs text-muted">운영 중인 센터(매장)</p><p className="mt-2 font-mono text-3xl font-bold">{stores.filter((store) => store.is_active).length}</p></div>
-        <div className="bg-paper p-6"><Database size={17} /><p className="mt-8 text-xs text-muted">결제 완료 거래</p><p className="mt-2 font-mono text-3xl font-bold">{paidTotal.toLocaleString("ko-KR")}원</p></div>
-        <div className="bg-ink p-6 text-paper"><p className="eyebrow text-zinc-400">감사 · 활동 기록</p><p className="mt-8 font-mono text-3xl font-bold">{data?.auditCount ?? 0}</p><p className="mt-2 text-xs text-zinc-400">감사 로그</p></div>
+        <div className="bg-paper p-6"><Store size={17} /><p className="mt-8 text-xs text-muted">운영 중인 센터(매장)</p><p className="mt-2 font-mono text-3xl font-bold">{loading ? "—" : stores.filter((store) => store.is_active).length}</p></div>
+        <div className="bg-paper p-6"><Database size={17} /><p className="mt-8 text-xs text-muted">결제 완료 거래 합계</p><p className="mt-2 font-mono text-3xl font-bold">{loading ? "—" : `${paidTotal.toLocaleString("ko-KR")}원`}</p></div>
+        <div className="bg-ink p-6 text-paper"><p className="eyebrow text-zinc-400">감사 · 활동 기록</p><p className="mt-8 font-mono text-3xl font-bold">{loading ? "—" : data?.auditCount ?? 0}</p><p className="mt-2 text-xs text-zinc-400">감사 로그</p></div>
       </div>
       <OwnerManualTransferAccountPanel />
       <div className="grid gap-4 md:grid-cols-2">

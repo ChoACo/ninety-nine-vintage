@@ -191,3 +191,8 @@
 - 정책·규칙 이탈 및 별도 확인 항목: [policy-deviation-and-followup-report-20260810.md](./policy-deviation-and-followup-report-20260810.md)
 
 두 문서는 승인 전 조사 결과이며, 문서 작성 자체로 코드·DB·배포가 변경되지는 않는다.
+
+## 9. 전체 시스템 포렌식 보고서
+
+- 전체 저장소·역할·외부 연동·오류 원인·단계별 조치: [full-system-forensic-audit-20260810.md](./full-system-forensic-audit-20260810.md)
+- 정책·규칙 이탈 별도 판정: [policy-deviation-forensic-report-20260810.md](./policy-deviation-forensic-report-20260810.md)

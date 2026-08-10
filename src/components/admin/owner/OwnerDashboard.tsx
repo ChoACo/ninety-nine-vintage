@@ -22,7 +22,7 @@ interface StoreRow {
 }
 interface Overview {
   stores?: StoreRow[];
-  orders?: Array<{ id: string; status: string; total: number }>;
+  paidTotal?: number;
   auditCount?: number;
 }
 
@@ -58,10 +58,7 @@ export function OwnerDashboard({
   }, []);
 
   const stores = data?.stores ?? [];
-  const orders = data?.orders ?? [];
-  const paidTotal = orders
-    .filter((order) => order.status === "paid" || order.status === "shipped")
-    .reduce((sum, order) => sum + Number(order.total), 0);
+  const paidTotal = Number(data?.paidTotal ?? 0);
 
   return (
     <div className="space-y-10">

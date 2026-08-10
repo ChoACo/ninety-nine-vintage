@@ -200,4 +200,5 @@
 ## 10. 포렌식 결과·단계별 기록
 
 - 1차 결과 보존본: [forensic-result-1-20260810.md](./forensic-result-1-20260810.md)
+- 2차 실제 운영 화면·연동 검증: [forensic-result-2-20260810.md](./forensic-result-2-20260810.md)
 - 단계별 실행·증거 기록표: [forensic-phase-plan-20260810.md](./forensic-phase-plan-20260810.md)

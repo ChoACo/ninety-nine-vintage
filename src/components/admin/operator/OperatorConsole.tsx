@@ -230,9 +230,9 @@ export function OperatorConsole({
             </Link>
             <Link
               className="flex gap-3 underline"
-              href="/admin/operator/payments"
+              href="/admin/operator/fulfillment"
             >
-              주문·입금 확인 업무 열기 <ArrowUpRight size={14} />
+              출고·배송 업무 열기 <ArrowUpRight size={14} />
             </Link>
             <Link
               className="flex gap-3 underline"

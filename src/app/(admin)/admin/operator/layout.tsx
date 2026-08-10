@@ -46,13 +46,8 @@ const navigation: readonly OperatorNavGroup[] = [
     label: "판매",
   },
   {
-    href: "/admin/operator/orders",
+    href: "/admin/operator/winners",
     items: [
-      {
-        exact: false,
-        href: "/admin/operator/orders",
-        label: "주문 상태",
-      },
       {
         exact: false,
         href: "/admin/operator/winners",

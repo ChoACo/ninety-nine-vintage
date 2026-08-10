@@ -196,3 +196,8 @@
 
 - 전체 저장소·역할·외부 연동·오류 원인·단계별 조치: [full-system-forensic-audit-20260810.md](./full-system-forensic-audit-20260810.md)
 - 정책·규칙 이탈 별도 판정: [policy-deviation-forensic-report-20260810.md](./policy-deviation-forensic-report-20260810.md)
+
+## 10. 포렌식 결과·단계별 기록
+
+- 1차 결과 보존본: [forensic-result-1-20260810.md](./forensic-result-1-20260810.md)
+- 단계별 실행·증거 기록표: [forensic-phase-plan-20260810.md](./forensic-phase-plan-20260810.md)

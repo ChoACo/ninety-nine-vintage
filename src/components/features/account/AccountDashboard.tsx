@@ -230,6 +230,7 @@ function AccountDashboardForSession({
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [refunds, setRefunds] = useState<ManualRefund[]>([]);
   const [liked, setLiked] = useState<ProductSummary[]>([]);
+  const [likedCount, setLikedCount] = useState(0);
   const [credits, setCredits] = useState(0);
   const [now, setNow] = useState(0);
   const [paymentServerTime, setPaymentServerTime] = useState<string | null>(null);
@@ -372,6 +373,7 @@ function AccountDashboardForSession({
           setCreditPayment(creditData.payments?.[0] ?? null);
           setApplyShippingCredit(Number(creditData.credits ?? 0) > 0);
           setLiked(allProducts.filter((product) => ids.includes(product.id)));
+          setLikedCount(ids.length);
           setAddresses(addressData.addresses ?? []);
           setSelectedAddressId(
             addressData.addresses?.find((address) => address.is_default)?.id ??
@@ -459,7 +461,7 @@ function AccountDashboardForSession({
     ],
     [
       "찜한 상품",
-      String(liked.length).padStart(2, "0"),
+      String(likedCount).padStart(2, "0"),
       "다시 보고 싶은 아이템",
       "#likes",
       Heart,
@@ -1642,7 +1644,7 @@ function AccountDashboardForSession({
               찜한 상품
             </h2>
           </div>
-          <span className="text-xs text-muted">{liked.length}개</span>
+          <span className="text-xs text-muted">{likedCount}개</span>
         </div>
         {liked.length === 0 ? (
           <div className="border border-dashed border-line py-16 text-center text-sm text-muted">

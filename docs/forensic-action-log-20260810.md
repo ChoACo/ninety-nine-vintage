@@ -76,6 +76,17 @@
 5. 실제 인증 세션에서 owner scope 선택, payment queue 12시간 필터, employee 업무, account member mode를 재검증한다.
 6. Vercel alias·BUILD_ID·migration parity·rollback 기준을 이 문서에 기록한다.
 
+## 5. 배포 증거
+
+- 1차 production 배포: Vercel `dpl_5W1jKm4mZ9wF86s4V94W9siiT9QC`, alias `https://www.ninety-nine-vintage.store`, BUILD_ID `89d4933...` 확인.
+- 최종 site-status 동적 redirect 보강 배포: Vercel `dpl_DZJ9feYC7YtAZkQYai56dCezoTPU`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`.
+- 최신 도메인 BUILD_ID: `91cbe69623e10704889f0d395c2f0ec8f67dcefb` (커밋 `91cbe69` 일치).
+- 최신 공개 smoke: `/home`, `/feed`, `/shop`, `/chat`, `/account`, `/cart`, 지정 owner/operator/employee URL 및 `/stores/dami-shop` 모두 HTTP 200.
+- 최신 비인증 API smoke: chat/cart/account/admin/cron/member-mode 지정 API 모두 HTTP 401.
+- `/admin/owner/site-status`: HTTP 404가 아니며, HTML 응답에 `/admin/owner` 307 redirect 신호가 포함됨.
+- Vercel inspect: production target `Ready`, `https://www.ninety-nine-vintage.store` alias 연결 확인.
+- rollback 기준: 직전 정상 deployment alias는 Vercel deployment history의 `dpl_5W1jKm4mZ9wF86s4V94W9siiT9QC`이며, 새 배포 이상 시 해당 deployment로 즉시 promote할 수 있다.
+
 ## 5. 판정 규칙
 
 - 코드·문서만 완료된 상태는 목표 완료로 표시하지 않는다.

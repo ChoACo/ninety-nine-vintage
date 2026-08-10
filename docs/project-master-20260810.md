@@ -184,3 +184,10 @@
 ## 7. 역사적 결정과 보존 경계
 
 과거 migration, 법적·회계적 이력, 호환 읽기는 삭제하지 않는다. 반면 실행 가능한 PortOne·중앙 물류 writer와 중복된 날짜별 상태 보고서는 현재 기준에서 제외한다. 상세 구현 인수인계와 이전 감사 결과는 이 통합 문서의 정책·검증·후속 계획에 흡수했다.
+
+## 8. 승인 전 전체 라우트 감사 문서
+
+- 전체 URL·코드 연결·오류·충돌·승인 후 단계 계획: [full-route-integrity-audit-20260810.md](./full-route-integrity-audit-20260810.md)
+- 정책·규칙 이탈 및 별도 확인 항목: [policy-deviation-and-followup-report-20260810.md](./policy-deviation-and-followup-report-20260810.md)
+
+두 문서는 승인 전 조사 결과이며, 문서 작성 자체로 코드·DB·배포가 변경되지는 않는다.

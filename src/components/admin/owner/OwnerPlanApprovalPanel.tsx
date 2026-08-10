@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { invalidateOwnerPlatform, loadOwnerPlatform } from "./ownerPlatformData";
 
 interface StorePlan {
   id: string;
@@ -18,13 +19,8 @@ export function OwnerPlanApprovalPanel() {
   const [notice, setNotice] = useState("");
 
   const load = async (accessToken: string) => {
-    const response = await fetch("/api/admin/owner/platform", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      cache: "no-store",
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error ?? "요금제 신청을 불러오지 못했습니다.");
-    setStores(payload.management?.stores ?? []);
+    const payload = await loadOwnerPlatform(accessToken);
+    setStores((payload.management?.stores ?? []) as StorePlan[]);
   };
 
   useEffect(() => {
@@ -44,7 +40,10 @@ export function OwnerPlanApprovalPanel() {
     });
     const payload = await response.json();
     setNotice(response.ok ? "요금제 결정을 기록했습니다." : payload.error ?? "처리하지 못했습니다.");
-    if (response.ok) await load(token);
+    if (response.ok) {
+      invalidateOwnerPlatform(token);
+      await load(token);
+    }
   };
 
   const pending = stores.filter((store) => store.subscriptionStatus === "pending_approval");

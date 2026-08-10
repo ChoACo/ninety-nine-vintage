@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { StatusNotice } from "@/components/ui/StatusNotice";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { invalidateOwnerPlatform, loadOwnerPlatform } from "./ownerPlatformData";
 
 interface StoreItem {
   aiUsed: number;
@@ -46,11 +47,7 @@ export function OwnerPlatformConsole() {
   const [settlementDate, setSettlementDate] = useState("");
 
   const load = useCallback(async (accessToken: string) => {
-    const response = await fetch("/api/admin/owner/platform", {
-      headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store",
-    });
-    const payload = await response.json() as { management?: Management; error?: string };
-    if (!response.ok) throw new Error(payload.error ?? "플랫폼 설정을 불러오지 못했습니다.");
+    const payload = await loadOwnerPlatform(accessToken) as { management?: Management; error?: string };
     setManagement(payload.management ?? emptyManagement);
   }, []);
 
@@ -95,7 +92,7 @@ export function OwnerPlatformConsole() {
       });
       const payload = await response.json() as { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "출고 그룹을 저장하지 못했습니다.");
-      await load(token); selectGroup(null);
+      invalidateOwnerPlatform(token); await load(token); selectGroup(null);
       setNotice("출고 그룹과 배송비 청구 방식을 저장했습니다.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "출고 그룹을 저장하지 못했습니다.");
@@ -109,7 +106,7 @@ export function OwnerPlatformConsole() {
       const response=await fetch("/api/admin/owner/platform",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify(body)});
       const payload=await response.json() as {error?:string};
       if(!response.ok) throw new Error(payload.error??"처리하지 못했습니다.");
-      await load(token); setNotice("소유자 작업을 반영했습니다."); return payload as {result?:{accountNumber?:string;bankName?:string;accountHolder?:string}};
+      invalidateOwnerPlatform(token); await load(token); setNotice("소유자 작업을 반영했습니다."); return payload as {result?:{accountNumber?:string;bankName?:string;accountHolder?:string}};
     } catch(error){setNotice(error instanceof Error?error.message:"처리하지 못했습니다.");}
     finally{setBusy(false);}
   };

@@ -18,8 +18,17 @@ export async function fetchActiveStores(): Promise<PublicStore[]> {
 }
 
 export async function fetchStoreBySlug(slug: string): Promise<PublicStore | null> {
-  const stores = await fetchActiveStores();
-  return stores.find((store) => store.slug === slug) ?? null;
+  const verifier = createSupabasePublicClient();
+  const { data, error } = await verifier
+    .from("stores")
+    .select("id, slug, name, description")
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (error) throw new Error("숍 정보를 불러오지 못했습니다.");
+  return data
+    ? { id: data.id, slug: data.slug, name: data.name, description: data.description }
+    : null;
 }
 
 export async function fetchStoreProducts(storeId: string, saleType?: "auction" | "fixed"): Promise<PublishedProduct[]> {

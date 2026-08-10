@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { EmployeeOwnerScopeBridge } from "@/components/admin/employee/EmployeeOwnerScopeBridge";
 
 const links = [
   ["/admin/employee", "오늘의 작업"],
@@ -16,6 +17,7 @@ export default function EmployeeLayout({
   const pathname = usePathname();
   return (
     <div>
+      <EmployeeOwnerScopeBridge />
       <nav aria-label="직원센터 메뉴" className="mb-8 flex max-w-full gap-5 overflow-x-auto whitespace-nowrap border-b border-line pb-4 text-xs font-bold">
         {links.map(([href, label], index) => {
           const active = index === 0 ? pathname === href : pathname.startsWith(href);

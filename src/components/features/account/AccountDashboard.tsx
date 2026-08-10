@@ -252,6 +252,7 @@ function AccountDashboardForSession({
     address: "",
   });
   const [shippingMessage, setShippingMessage] = useState("");
+  const [memberAccessRequired, setMemberAccessRequired] = useState(false);
   const [trackingShipment, setTrackingShipment] = useState<InventoryShipment | null>(null);
   const [showAllStorage, setShowAllStorage] = useState(false);
   const [creditQuantity, setCreditQuantity] = useState(1);
@@ -275,6 +276,7 @@ function AccountDashboardForSession({
     const load = async () => {
       if (!token) {
         setDataStatus("idle");
+        setMemberAccessRequired(false);
         return;
       }
       setDataStatus("loading");
@@ -298,6 +300,22 @@ function AccountDashboardForSession({
           fetch("/api/account/addresses", { headers, cache: "no-store" }),
           fetch("/api/account/legacy-eligible-orders", { headers, cache: "no-store" }),
         ]);
+        const problemPayloads = await Promise.all(
+          [
+            storageResponse,
+            shipmentResponse,
+            refundResponse,
+            creditResponse,
+            wishlistResponse,
+            addressResponse,
+            legacyOrdersResponse,
+          ].map(async (response) => response.ok
+            ? null
+            : await response.json().catch(() => null) as { code?: string; error?: string } | null),
+        );
+        const requiresMemberAccess = problemPayloads.some((payload) =>
+          payload?.code === "member_required" || payload?.error === "member_required",
+        );
         const storageData = storageResponse.ok
           ? await storageResponse.json() as StoragePayload
           : {};
@@ -390,7 +408,10 @@ function AccountDashboardForSession({
             legacyOrdersResponse,
           ].filter((response) => !response.ok).length +
             [auctionResponse, fixedResponse].filter((response) => response && !response.ok).length;
-          if (unavailableCount > 0) {
+          setMemberAccessRequired(requiresMemberAccess);
+          if (requiresMemberAccess) {
+            setNotice("현재 로그인한 계정은 경매 입찰용 회원 계정이 아닙니다. 소유자 센터에서 임시 회원 권한을 활성화한 뒤 다시 시도해 주세요.");
+          } else if (unavailableCount > 0) {
             setNotice("일부 계정 정보를 불러오지 못했습니다. 다른 메뉴는 계속 이용할 수 있습니다.");
           }
           setDataStatus("ready");
@@ -1011,7 +1032,7 @@ function AccountDashboardForSession({
           >
             <Icon size={17} />
             <p className={`text-xs text-muted ${surface === "desktop" ? "mt-8" : "mt-6"}`}>{label}</p>
-            <p className="mt-2 font-mono text-3xl font-bold">{value}</p>
+            <p className="mt-2 font-mono text-3xl font-bold">{memberAccessRequired ? "—" : value}</p>
             <p className="mt-2 text-[11px] text-muted group-hover:text-ink">
               {description}
             </p>

@@ -27,7 +27,7 @@ npm run verify:integrations -- --public-only
 - 활성 결제: 수동 계좌이체
 - 소셜 로그인: Kakao OIDC → Supabase 세션
 
-브라우저 공개값은 `NEXT_PUBLIC_*`, 서버 비밀값은 Cloudflare Worker secret으로 관리합니다. 실제 비밀값은 저장소에 커밋하지 않습니다. PortOne 소스는 향후 재검토용 비활성 어댑터이며 현재 결제 경로에서 실행되지 않습니다.
+브라우저 공개값은 `NEXT_PUBLIC_*`, 서버 비밀값은 Cloudflare Worker secret으로 관리합니다. 실제 비밀값은 저장소에 커밋하지 않습니다. 결제는 수동 계좌이체만 사용하며 PortOne 실행 경로는 폐기하고 필요한 역사 식별자만 읽기 전용으로 보존합니다.
 
 ## 로컬 테스트 계정
 

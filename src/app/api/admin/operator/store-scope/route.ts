@@ -46,9 +46,13 @@ export async function GET(request: Request) {
 
   let stores: Array<{ id: string; name: string; slug: string }> = [];
   if (auth.roleCode === "owner") {
-    const { data: rows, error: storeError } = await auth.user
+    // Owner support scope is an explicit server-authorized view. The user
+    // client is still subject to public RLS and can return an empty/error
+    // result even after the scope RPC has accepted the owner role.
+    const { data: rows, error: storeError } = await auth.admin
       .from("stores")
       .select("id, name, slug")
+      .eq("is_active", true)
       .order("name");
     if (storeError) {
       return commerceJson({ error: "store_scope_unavailable" }, 503);

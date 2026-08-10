@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface ConfirmationRequest {
@@ -19,29 +19,41 @@ export function OwnerPaymentConfirmationQueue() {
   const [requests, setRequests] = useState<ConfirmationRequest[]>([]);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    void (async () => {
-      const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
-      if (!session) return;
-      const response = await fetch("/api/admin/owner/payment-confirmation-requests", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-        cache: "no-store",
-      });
-      const payload = (await response.json()) as {
-        error?: string;
-        requests?: ConfirmationRequest[];
-      };
-      if (!response.ok) throw new Error(payload.error ?? "긴급 확인 요청을 불러오지 못했습니다.");
-      setRequests(payload.requests ?? []);
-    })().catch((cause) => setError(cause instanceof Error ? cause.message : "긴급 확인 요청을 불러오지 못했습니다."));
+  const loadQueue = useCallback(async () => {
+    setError("");
+    const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
+    if (!session) return;
+    const response = await fetch("/api/admin/owner/payment-confirmation-requests", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      cache: "no-store",
+    });
+    const payload = (await response.json()) as {
+      error?: string;
+      requests?: ConfirmationRequest[];
+    };
+    if (!response.ok) throw new Error(payload.error ?? "긴급 확인 요청을 불러오지 못했습니다.");
+    setRequests(payload.requests ?? []);
   }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadQueue().catch((cause) => setError(cause instanceof Error ? cause.message : "긴급 확인 요청을 불러오지 못했습니다."));
+    });
+  }, [loadQueue]);
 
   if (!error && requests.length === 0) return null;
   return (
     <section className="mb-8 border border-amber-300 bg-amber-50 p-5 text-amber-950">
       <p className="text-[10px] font-bold uppercase tracking-[0.18em]">긴급 입금 확인</p>
       <h2 className="mt-2 text-xl font-black">12시간 이상 대기 요청 {requests.length}건</h2>
-      {error ? <p className="mt-3 text-xs">{error}</p> : (
+      {error ? (
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+          <p>{error}</p>
+          <button className="border border-amber-700 px-3 py-1 font-bold" onClick={() => void loadQueue().catch((cause) => setError(cause instanceof Error ? cause.message : "긴급 확인 요청을 불러오지 못했습니다."))} type="button">
+            다시 시도
+          </button>
+        </div>
+      ) : (
         <div className="mt-4 divide-y divide-amber-200 border-y border-amber-200">
           {requests.map((request) => (
             <div className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs" key={request.request_id}>

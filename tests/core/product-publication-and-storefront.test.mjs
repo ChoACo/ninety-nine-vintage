@@ -36,6 +36,7 @@ test("store malls expose active, auction, sold, inquiry, and capped premium disc
     assert.match(source, /판매완료 상품/);
     assert.match(source, /센터 문의/);
   }
+  assert.match(desktopStore, /fetchStoreBySlug\(slug\)/);
   assert.match(feed, /storeTier === "premium" \? 1\.2 : 1/);
   assert.match(feed, /top\.length < 8 && count >= 2/);
   assert.match(feed, /센터 · \{source\.storeName\}/);

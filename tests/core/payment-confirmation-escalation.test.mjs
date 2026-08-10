@@ -5,8 +5,9 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 
 test("12-hour payment confirmation requests deduplicate, escalate, and never auto-confirm", async () => {
-  const [migration, memberRoute, orderHistory, ownerRoute, ownerQueue] = await Promise.all([
+  const [migration, cutoffMigration, memberRoute, orderHistory, ownerRoute, ownerQueue] = await Promise.all([
     readFile(new URL("supabase/migrations/20260809165948_add_payment_confirmation_escalation.sql", rootUrl), "utf8"),
+    readFile(new URL("supabase/migrations/20260810200000_limit_owner_payment_confirmation_queue_to_12_hours.sql", rootUrl), "utf8"),
     readFile(new URL("src/app/api/orders/[id]/payment-confirmation-request/route.ts", rootUrl), "utf8"),
     readFile(new URL("src/components/features/account/OrderHistory.tsx", rootUrl), "utf8"),
     readFile(new URL("src/app/api/admin/owner/payment-confirmation-requests/route.ts", rootUrl), "utf8"),
@@ -28,4 +29,12 @@ test("12-hour payment confirmation requests deduplicate, escalate, and never aut
   assert.match(orderHistory, /다시 알림/);
   assert.match(ownerRoute, /get_owner_payment_confirmation_queue/);
   assert.match(ownerQueue, /12시간 이상 대기 요청/);
+  assert.match(cutoffMigration, /12 hours/);
+});
+
+test("owner escalation queue is server-filtered at the 12-hour boundary", async () => {
+  const migration = await readFile(new URL("supabase/migrations/20260810200000_limit_owner_payment_confirmation_queue_to_12_hours.sql", rootUrl), "utf8");
+  assert.match(migration, /requests\.status = 'open'/i);
+  assert.match(migration, /requests\.first_requested_at <= clock_timestamp\(\) - interval '12 hours'/i);
+  assert.match(migration, /grant execute on function public\.get_owner_payment_confirmation_queue\(\)\s*to authenticated/i);
 });

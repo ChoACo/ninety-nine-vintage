@@ -174,14 +174,14 @@
 
 ## 6. 코드·설정 충돌 및 부족한 연결
 
-1. `.env.example`의 `MULTICLOUD_GCS_CAPACITY_BYTES`/`MULTICLOUD_S3_CAPACITY_BYTES`와 검증·코드의 R2/Google Drive 명칭이 일치하지 않는다.
-2. `README.md`는 PortOne을 “향후 재검토용 비활성 어댑터”로 설명하지만 목표 정책은 실행 경로 폐기·역사 읽기 보존이다.
+1. ~~`.env.example`의 `MULTICLOUD_GCS_CAPACITY_BYTES`/`MULTICLOUD_S3_CAPACITY_BYTES`와 검증·코드의 R2/Google Drive 명칭이 일치하지 않는다.~~ → 현재 `.env.example`은 `MULTICLOUD_R2_CAPACITY_BYTES`/`MULTICLOUD_GOOGLE_DRIVE_CAPACITY_BYTES`로 정렬되어 확인됨.
+2. ~~`README.md`는 PortOne을 “향후 재검토용 비활성 어댑터”로 설명하지만 목표 정책은 실행 경로 폐기·역사 읽기 보존이다.~~ → README를 실행 경로 폐기·역사 읽기 보존으로 정정함.
 3. `.env.example`에는 PortOne 환경변수가 남아 있어 폐기된 실행 경로와 운영 설정의 경계가 불명확하다.
 4. `vercel.json`은 storage-lifecycle cron만 선언한다. payment escalation, subscription accrual, push dispatch, cleanup의 실제 scheduler·secret·실행 증거가 분리되어 있다.
-5. `site-status`는 API/panel은 있으나 page route가 없다.
+5. ~~`site-status`는 API/panel은 있으나 page route가 없다.~~ → `src/app/(admin)/admin/owner/site-status/page.tsx`에서 owner dashboard로 redirect하는 유효한 진입점을 추가함.
 6. error boundary는 모든 서버·정책·인증 오류를 동일한 재시도 화면으로 합친다.
 7. 운영자 scope API가 access mode·membership·store read 오류를 모두 `store_scope_unavailable`로 축약한다.
-8. OwnerPaymentConfirmationQueue는 확인·취소·정정 동작과 재시도 연결이 없다.
+8. ~~OwnerPaymentConfirmationQueue는 확인·취소·정정 동작과 재시도 연결이 없다.~~ → 현재 범위의 조회 오류에는 재시도 버튼을 추가하고, 12시간 cutoff는 DB RPC로 강제함. 확인·정정 mutation은 별도 승인 범위로 남김.
 9. 실제 운영 mutation을 검증할 격리 test account와 seed contract는 있으나 production role QA 증거가 없다.
 
 ## 7. 승인 후 단계별 조치 계획

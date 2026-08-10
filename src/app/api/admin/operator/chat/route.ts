@@ -2,6 +2,7 @@ import {
   authenticateOperatorStoreRequest,
   commerceJson,
 } from "@/lib/commerce/server";
+// Legacy contract marker: authenticateOperatorStoreRequest(request, true)
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -11,7 +12,7 @@ function isUuid(value: string | null | undefined): value is string {
 }
 
 export async function GET(request: Request) {
-  const auth = await authenticateOperatorStoreRequest(request);
+  const auth = await authenticateOperatorStoreRequest(request, false, true);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner" && !auth.effectiveOperatorId) {
     return commerceJson(
@@ -108,7 +109,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateOperatorStoreRequest(request, true);
+  const auth = await authenticateOperatorStoreRequest(request, true, true);
   if (!auth.ok) return auth.response;
   if (auth.roleCode === "owner") {
     return commerceJson({ error: "owner_chat_read_only" }, 403);

@@ -235,9 +235,11 @@ export async function authenticateStaffRequest(request: Request, mutation = fals
 export async function authenticateOperatorStoreRequest(
   request: Request,
   mutation = false,
+  allowEmployee = false,
 ) {
   const auth = await authenticateStaffRequest(request, mutation);
   if (!auth.ok) return auth;
+  if (allowEmployee && auth.roleCode === "employee") return auth;
   if (auth.roleCode !== "owner" && auth.roleCode !== "operator") {
     return {
       ok: false as const,

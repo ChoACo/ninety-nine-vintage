@@ -46,7 +46,9 @@ const labels: Record<Action, string> = {
   store_requested_items: "배송 신청 상품 출고·보관",
 };
 
-export function OperatorFulfillmentConsole() {
+export function OperatorFulfillmentConsole({
+  staffLabel = "운영자",
+}: Readonly<{ staffLabel?: string }>) {
   const { session } = useSupabaseSession();
   const accessToken = session?.access_token;
   const [groups, setGroups] = useState<BuyerGroup[]>([]);
@@ -135,7 +137,7 @@ export function OperatorFulfillmentConsole() {
           </button>
         )}
         description="매장에서 상품을 내보내는 즉시 보관 완료로 처리합니다. 날짜별 페이지와 상품 그리드로 필요한 작업만 빠르게 확인할 수 있습니다."
-        eyebrow="매장 상품 업무"
+        eyebrow={`${staffLabel} / 매장 상품 업무`}
         title="출고·보관"
         variant="page"
       />

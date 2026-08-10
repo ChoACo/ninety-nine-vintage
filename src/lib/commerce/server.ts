@@ -232,6 +232,29 @@ export async function authenticateStaffRequest(request: Request, mutation = fals
   };
 }
 
+export interface OperatorStaffAuth {
+  ok: true;
+  roleCode: "owner" | "operator" | "employee";
+  gradeLevel: number;
+  effectiveOperatorId: string | null;
+  userId: string;
+  token: string;
+  admin: SupabaseClient<Database>;
+  user: SupabaseClient<Database>;
+}
+
+export async function authenticateOperatorStoreRequest(
+  request: Request,
+  mutation?: boolean,
+): Promise<
+  | (OperatorStaffAuth & { selectedStoreId: string })
+  | { ok: false; response: Response }
+>;
+export async function authenticateOperatorStoreRequest(
+  request: Request,
+  mutation: boolean,
+  allowEmployee: true,
+): Promise<OperatorStaffAuth | { ok: false; response: Response }>;
 export async function authenticateOperatorStoreRequest(
   request: Request,
   mutation = false,

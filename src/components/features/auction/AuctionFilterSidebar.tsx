@@ -11,13 +11,9 @@ type CatalogGender = (typeof genders)[number];
 
 interface CatalogFilters {
   brand?: string;
-  categories: string[];
-  closingOnly: boolean;
   date?: string;
   gender?: CatalogGender;
-  liveOnly: boolean;
   query?: string;
-  sizes: string[];
   storeId?: string;
 }
 
@@ -103,15 +99,11 @@ export function AuctionFilterSidebar({
     > = {},
   ): CatalogFilters => ({
     brand: next.brand ?? selectedBrand,
-    categories: [],
-    closingOnly: false,
     date: saleType === "auction"
       ? next.date ?? selectedDate
       : "all",
     gender: next.gender ?? selectedGender,
-    liveOnly: true,
     query: next.query ?? query,
-    sizes: [],
     storeId: next.storeId ?? selectedStoreId,
   });
 
@@ -123,13 +115,9 @@ export function AuctionFilterSidebar({
     setSelectedStoreId("all");
     notify({
       brand: "all",
-      categories: [],
-      closingOnly: false,
       date: "all",
       gender: "all",
-      liveOnly: true,
       query: "",
-      sizes: [],
       storeId: "all",
     });
   };

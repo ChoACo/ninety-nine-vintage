@@ -112,6 +112,9 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
   const [scannerOpen, setScannerOpen] = useState(false);
   const [buying, setBuying] = useState(false);
   const [buyNotice, setBuyNotice] = useState("");
+  const [buyNoticeKind, setBuyNoticeKind] = useState<"success" | "error">(
+    "success",
+  );
   const [cartReserved, setCartReserved] = useState(false);
   const [quickCartOpen, setQuickCartOpen] = useState(false);
   const [auctionSnapshot, setAuctionSnapshot] = useState(() => ({
@@ -222,15 +225,17 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
     router.replace(`${basePath}/auction/${item.id}`, { scroll: false });
     const intent: FixedPurchaseIntent = requestedIntent;
     if (!consumeFixedPurchaseIntent(item.id, intent)) {
-      queueMicrotask(() =>
-        setBuyNotice("로그인 후 구매 버튼을 다시 눌러 주세요."),
-      );
+      queueMicrotask(() => {
+        setBuyNotice("로그인 후 구매 버튼을 다시 눌러 주세요.");
+        setBuyNoticeKind("error");
+      });
       return;
     }
 
     void (async () => {
       setBuying(true);
       setBuyNotice("");
+      setBuyNoticeKind("success");
       try {
         const { data } = await getSupabaseBrowserClient().auth.getSession();
         const session = data.session;
@@ -244,11 +249,13 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
         if (intent === "buy") {
           router.push(basePath === "/m" ? `/m/checkout?productId=${item.id}` : "/cart");
         } else {
+          setBuyNoticeKind("success");
           setBuyNotice(
             `로그인 후 장바구니에 담았습니다. ${new Date(reservation.reservedUntil).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}까지 재고가 점유됩니다.`,
           );
         }
       } catch (error) {
+        setBuyNoticeKind("error");
         setBuyNotice(
           error instanceof Error ? error.message : "구매 준비에 실패했습니다.",
         );
@@ -348,6 +355,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
     setBuying(true);
     setCartReserved(false);
     setBuyNotice("");
+    setBuyNoticeKind("success");
     try {
       const { data } = await getSupabaseBrowserClient().auth.getSession();
       const session = data.session;
@@ -362,11 +370,13 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
       const reservation = await reserveCartProduct(item.id, session.user.id);
       addToCart(item.id);
       setCartReserved(true);
+      setBuyNoticeKind("success");
       setBuyNotice(
         `장바구니에 담았습니다. ${new Date(reservation.reservedUntil).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}까지 15분간 재고가 점유됩니다.`,
       );
     } catch (error) {
       setCartReserved(false);
+      setBuyNoticeKind("error");
       setBuyNotice(
         error instanceof Error ? error.message : "장바구니에 담지 못했습니다.",
       );
@@ -379,6 +389,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
     if (buying) return;
     setBuying(true);
     setBuyNotice("");
+    setBuyNoticeKind("success");
     try {
       const { data } = await getSupabaseBrowserClient().auth.getSession();
       const session = data.session;
@@ -393,6 +404,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
       addToCart(item.id);
       router.push(basePath === "/m" ? `/m/checkout?productId=${item.id}` : "/cart");
     } catch (error) {
+      setBuyNoticeKind("error");
       setBuyNotice(
         error instanceof Error ? error.message : "구매 준비에 실패했습니다.",
       );
@@ -411,9 +423,11 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
       if (await persistWishlist(item.id, nextLiked, session.user.id)) {
         toggleLike(item.id);
       } else {
+        setBuyNoticeKind("error");
         setBuyNotice("로그인 계정이 변경되었거나 찜을 저장하지 못했습니다.");
       }
     } catch {
+      setBuyNoticeKind("error");
       setBuyNotice("로그인 상태를 확인하지 못했습니다.");
     }
   };
@@ -458,10 +472,10 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
   const participationState = accountBidItems.find(
     (entry) => entry.productId === item.id,
   )?.state;
-  const knownBidCount = Math.max(
-    activeVisibleBids.length,
-    auctionSnapshot.participantCount > 0 ? 1 : 0,
-  );
+  const hasVisibleBidHistory = Array.isArray(item.bidHistory) && item.bidHistory.length > 0;
+  const knownBidCount = hasVisibleBidHistory
+    ? activeVisibleBids.length
+    : auctionSnapshot.participantCount;
   const { canBid, firstBidFinal, hasParticipated } = getAuctionFeedBidAccess({
     bidCount: knownBidCount,
     bidIncrement: item.bidIncrement,
@@ -692,7 +706,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
           <button
             className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-zinc-950 text-sm font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 disabled:opacity-50"
             disabled={buying}
-            onClick={() => { setBuyNotice(""); setCartReserved(false); setQuickCartOpen(true); }}
+            onClick={() => { setBuyNotice(""); setBuyNoticeKind("success"); setCartReserved(false); setQuickCartOpen(true); }}
             type="button"
           >
             <ShoppingBag size={15} /> 장바구니
@@ -710,7 +724,12 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
       {buyNotice && !quickCartOpen && (
         <p
           aria-live="polite"
-          className="mt-3 text-xs font-bold text-emerald-700"
+          className={`mt-3 text-xs font-bold ${
+            buyNoticeKind === "error"
+              ? "text-red-600"
+              : "text-emerald-700"
+          }`}
+          role={buyNoticeKind === "error" ? "alert" : undefined}
         >
           {buyNotice}
         </p>

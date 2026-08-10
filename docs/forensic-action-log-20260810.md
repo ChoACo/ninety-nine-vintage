@@ -79,8 +79,8 @@
 ## 5. 배포 증거
 
 - 1차 production 배포: Vercel `dpl_5W1jKm4mZ9wF86s4V94W9siiT9QC`, alias `https://www.ninety-nine-vintage.store`, BUILD_ID `89d4933...` 확인.
-- 최종 site-status 동적 redirect 보강 배포: Vercel `dpl_DZJ9feYC7YtAZkQYai56dCezoTPU`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`.
-- 최신 도메인 BUILD_ID: `91cbe69623e10704889f0d395c2f0ec8f67dcefb` (커밋 `91cbe69` 일치).
+- 최종 site-status 동적 redirect 보강 배포: Vercel `dpl_CghfhvkTcVhUDmhYTQY2FecFcqNG`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`.
+- 최신 도메인 BUILD_ID: `2f5520ce06a7299b8725822f0c9087a3b64460c2` (커밋 `2f5520c` 일치).
 - 최신 공개 smoke: `/home`, `/feed`, `/shop`, `/chat`, `/account`, `/cart`, 지정 owner/operator/employee URL 및 `/stores/dami-shop` 모두 HTTP 200.
 - 최신 비인증 API smoke: chat/cart/account/admin/cron/member-mode 지정 API 모두 HTTP 401.
 - `/admin/owner/site-status`: HTTP 404가 아니며, HTML 응답에 `/admin/owner` 307 redirect 신호가 포함됨.

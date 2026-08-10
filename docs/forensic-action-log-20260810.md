@@ -79,13 +79,13 @@
 ## 5. 배포 증거
 
 - 1차 production 배포: Vercel `dpl_5W1jKm4mZ9wF86s4V94W9siiT9QC`, alias `https://www.ninety-nine-vintage.store`, BUILD_ID `89d4933...` 확인.
-- 최종 production 배포: Vercel `dpl_BvFcdzvip6gZwakBYFKLQsGsbgnh`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`.
-- 최신 도메인 BUILD_ID: `6237fdfc3250c11b5dda957fc10980d1f3a0fa05` (커밋 `6237fdfc` 일치).
+- 최종 production 배포: Vercel `dpl_2yD4xT3B43vaXfSdAyfamJVsjvUN`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`.
+- 최신 도메인 BUILD_ID: `3a9c3533c72fee7f15144118d83e1c9844f0a449` (커밋 `3a9c353` 일치).
 - 최신 공개 smoke: `/home`, `/feed`, `/shop`, `/chat`, `/account`, `/cart`, `/stores/dami-shop`, 지정 owner/operator/employee URL 31개 모두 HTTP 200.
 - 최신 비인증 API smoke: chat/cart/account/admin/cron/member-mode 지정 API 12개 모두 HTTP 401.
 - `/admin/owner/site-status`: HTTP 404가 아니며, HTML 응답에 `/admin/owner` 307 redirect 신호가 포함됨.
 - Vercel inspect: production target `Ready`, `https://www.ninety-nine-vintage.store` alias 연결 확인.
-- rollback 기준: 직전 정상 deployment는 Vercel `dpl_JB1azGkznAXveH61CKx5PDcxBiaD`이며, 새 배포 이상 시 해당 deployment로 즉시 promote할 수 있다.
+- rollback 기준: 직전 정상 deployment는 Vercel `dpl_BvFcdzvip6gZwakBYFKLQsGsbgnh`이며, 새 배포 이상 시 해당 deployment로 즉시 promote할 수 있다.
 
 ## 5. 판정 규칙
 

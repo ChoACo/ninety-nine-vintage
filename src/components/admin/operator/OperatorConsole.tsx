@@ -86,6 +86,7 @@ export function OperatorConsole({
         };
         const shippingData = await shippingResponse.json() as {
           requests?: unknown[];
+          totalCount?: number;
         };
         const revenueData = await revenueResponse.json() as {
           stores?: { netSales?: number }[];
@@ -101,7 +102,7 @@ export function OperatorConsole({
         setProducts(productData.products ?? []);
         setCanMutate(productData.permissions?.canMutate === true);
         setOrders(orderData.activeCount ?? 0);
-        setShipping(shippingData.requests?.length ?? 0);
+        setShipping(shippingData.totalCount ?? shippingData.requests?.length ?? 0);
         setNetRevenue(
           revenueResponse.ok
             ? (revenueData.stores ?? []).reduce(

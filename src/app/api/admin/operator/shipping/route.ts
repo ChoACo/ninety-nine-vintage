@@ -211,7 +211,13 @@ export async function GET(request: Request) {
   );
   if (error) return rpcFailure(error);
   if (!isQueue(data)) return commerceJson({ error: "shipment_unavailable", message: "배송 대기열을 확인하지 못했습니다." }, 503);
-  return commerceJson(data);
+  const { data: totalCount, error: countError } = await (auth.user as unknown as RpcClient).rpc(
+    "count_inventory_shipment_queue",
+    { p_include_shipped: page.includeShipped },
+  );
+  const normalizedCount = Number(totalCount);
+  if (countError || !Number.isSafeInteger(normalizedCount) || normalizedCount < 0) return rpcFailure(countError ?? { code: "P0001" });
+  return commerceJson({ ...data, totalCount: normalizedCount });
 }
 
 export async function POST(request: Request) {

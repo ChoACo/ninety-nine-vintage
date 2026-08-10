@@ -167,6 +167,8 @@ export function OwnerMembersConsole() {
   const [segment, setSegment] = useState<MemberSegment>("active");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [pendingMemberIds, setPendingMemberIds] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
   const [phones, setPhones] = useState<Record<string, string>>({});
@@ -184,11 +186,12 @@ export function OwnerMembersConsole() {
   const [dialogError, setDialogError] = useState("");
 
   const load = useCallback(
-    async (showLoading = true) => {
+    async (showLoading = true, nextOffset = 0) => {
       if (!accessToken) return;
-      if (showLoading) setLoading(true);
+      if (nextOffset > 0) setLoadingMore(true);
+      else if (showLoading) setLoading(true);
       try {
-        const response = await fetch("/api/admin/owner/members?limit=500", {
+        const response = await fetch(`/api/admin/owner/members?limit=100&offset=${nextOffset}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
           cache: "no-store",
         });
@@ -204,7 +207,9 @@ export function OwnerMembersConsole() {
               "회원 목록을 불러오지 못했습니다.",
           );
         }
-        setMembers(payload.members ?? []);
+        const nextMembers = payload.members ?? [];
+        setMembers((current) => nextOffset > 0 ? [...current, ...nextMembers] : nextMembers);
+        setHasMore(nextMembers.length === 100);
       } catch (error) {
         setNotice(
           error instanceof Error
@@ -212,7 +217,8 @@ export function OwnerMembersConsole() {
             : "회원 목록을 불러오지 못했습니다.",
         );
       } finally {
-        if (showLoading) setLoading(false);
+        if (nextOffset > 0) setLoadingMore(false);
+        else if (showLoading) setLoading(false);
       }
     },
     [accessToken],
@@ -426,7 +432,7 @@ export function OwnerMembersConsole() {
               onClick={() => void load()}
               type="button"
             >
-              <RefreshCw size={13} /> 새로고침
+            <RefreshCw size={13} /> 새로고침
             </button>
           </span>
         )}
@@ -861,6 +867,16 @@ export function OwnerMembersConsole() {
           </p>
         )}
       </div>
+      {hasMore && !query.trim() && (
+        <button
+          className="w-full border border-line px-4 py-3 text-xs font-bold disabled:opacity-50"
+          disabled={loadingMore}
+          onClick={() => void load(false, members.length)}
+          type="button"
+        >
+          {loadingMore ? "회원 불러오는 중…" : "회원 더 불러오기"}
+        </button>
+      )}
 
       {dialog && (
         <div

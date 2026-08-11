@@ -195,7 +195,10 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
   const [selectedBrand, setSelectedBrand] = useState(() => routeSearchParams.get("brand") ?? "all");
   const [selectedGender, setSelectedGender] = useState<CatalogGender>(() => (routeSearchParams.get("gender") as CatalogGender | null) ?? "all");
   const [selectedStoreId, setSelectedStoreId] = useState(() => routeSearchParams.get("store") ?? "all");
-  const [feedSeed] = useState(() => crypto.randomUUID());
+  const feedSeed = useMemo(
+    () => `${saleType}:${initialProducts?.map((product) => product.id).join(",") ?? "catalog"}`,
+    [initialProducts, saleType],
+  );
   const [page, setPage] = useState(() => {
     const requested = Number(routeSearchParams.get("page"));
     return Number.isSafeInteger(requested) && requested > 0 ? requested : 1;

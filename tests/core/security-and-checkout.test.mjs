@@ -45,12 +45,26 @@ const origin = "https://ninety-nine.example";
 const rootUrl = new URL("../../", import.meta.url);
 
 test("browser auth rejects URL-provided Supabase sessions", async () => {
-  const source = await readFile(
-    new URL("src/lib/supabase/client.ts", rootUrl),
-    "utf8",
-  );
-  assert.match(source, /detectSessionInUrl:\s*false/);
-  assert.doesNotMatch(source, /detectSessionInUrl:\s*true/);
+  const [client, sessionHook, clockHook, feed] = await Promise.all([
+    readFile(new URL("src/lib/supabase/client.ts", rootUrl), "utf8"),
+    readFile(new URL("src/hooks/useSupabaseSession.ts", rootUrl), "utf8"),
+    readFile(new URL("src/hooks/useAuctionPolicyClock.ts", rootUrl), "utf8"),
+    readFile(
+      new URL("src/components/features/auction/AuctionFeedGrid.tsx", rootUrl),
+      "utf8",
+    ),
+  ]);
+  assert.match(client, /detectSessionInUrl:\s*false/);
+  assert.doesNotMatch(client, /detectSessionInUrl:\s*true/);
+  assert.match(client, /getSupabasePublicBrowserClient/);
+  assert.match(client, /persistSession:\s*false/);
+  assert.match(sessionHook, /auth\.getUser\(\)/);
+  assert.match(sessionHook, /signOut\(\{\s*scope:\s*"local"\s*\}\)/);
+  assert.match(sessionHook, /current\?\.access_token === rejected\.access_token/);
+  assert.match(sessionHook, /window\.setTimeout\(\(\) =>/);
+  assert.match(clockHook, /getSupabasePublicBrowserClient\(\)\.rpc\("get_auction_server_time"\)/);
+  assert.doesNotMatch(feed, /crypto\.randomUUID\(\)/);
+  assert.match(feed, /const feedSeed = useMemo/);
 });
 
 test("migration parity accepts current Supabase CLI table output", () => {

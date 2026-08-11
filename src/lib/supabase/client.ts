@@ -3,6 +3,7 @@ import type { Database } from "./database.types";
 import { createRealtimeChannelName } from "./realtime";
 
 let browserClient: SupabaseClient<Database> | undefined;
+let publicBrowserClient: SupabaseClient<Database> | undefined;
 
 export class SupabaseConfigurationError extends Error {
   constructor() {
@@ -39,6 +40,27 @@ export function getSupabaseBrowserClient(): SupabaseClient<Database> {
   });
 
   return browserClient;
+}
+
+/**
+ * Public reads must not inherit a stale member Authorization header. This
+ * client has no persisted session and is safe for RPCs explicitly granted to
+ * anon, such as the authoritative auction clock.
+ */
+export function getSupabasePublicBrowserClient(): SupabaseClient<Database> {
+  if (publicBrowserClient) return publicBrowserClient;
+
+  const { url, publishableKey } = getSupabaseConfiguration();
+  publicBrowserClient = createClient<Database>(url, publishableKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storageKey: "ninety-nine-public-browser-auth",
+    },
+  });
+
+  return publicBrowserClient;
 }
 
 /**

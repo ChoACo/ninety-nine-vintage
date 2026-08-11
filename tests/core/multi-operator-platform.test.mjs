@@ -60,8 +60,8 @@ test("payout accounts are encrypted before RPC submission and monthly fees accru
   assert.match(migration,/accrue_store_subscription_fees/); assert.match(migration,/interval '7 days'/);
 });
 
-test("same-day feeds and public store filters reshuffle by a per-page seed",async()=>{
+test("same-day feeds and public store filters use a hydration-stable seed",async()=>{
   const [feed,filters,service]=await Promise.all([source("src/components/features/auction/AuctionFeedGrid.tsx"),source("src/components/features/auction/AuctionFilterSidebar.tsx"),source("src/services/products.ts")]);
-  assert.match(feed,/crypto\.randomUUID\(\)/); assert.match(feed,/Math\.imul\(hash/);
+  assert.doesNotMatch(feed,/crypto\.randomUUID\(\)/); assert.match(feed,/const feedSeed = useMemo/); assert.match(feed,/Math\.imul\(hash/);
   assert.match(filters,/storeOptions/); assert.match(service,/storeName/); assert.match(service,/storeSlug/);
 });

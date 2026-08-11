@@ -170,3 +170,20 @@
 - 성공·실패·중복·경합·재시도는 Docker 기반 격리 Supabase 복구 뒤 실행한다. 운영에서는 지정 테스트 주문·상품만 카나리로 사용한다.
 
 2차 결과: Docker 격리 Supabase에서 해당 SQL suite의 성공·실패·중복·경합·재시도를 실행해 통과했다. 단, 실제 운영 Kakao 세션과 지정 운영 주문·상품을 사용할 권한이 확보되지 않아 운영 mutation 행은 계속 `MUTATION_UNEXECUTED`다.
+
+## 운영 카나리 판정 갱신
+
+아래 행은 앞선 `PRODUCTION_UNVERIFIED_AUTH_SESSION`·`MUTATION_UNEXECUTED` 판정을 지정 운영 데이터 범위에서 대체한다. 표에 없는 역할·URL은 기존 판정을 유지한다.
+
+| URL/API | 역할 | 운영 판정 | 증거 |
+| --- | --- | --- | --- |
+| `/api/owner/member-mode` GET·POST, `/home` | 소유자→회원→소유자 | 3분 활성화, 서버 동기화 잔여 시간, 즉시 종료 후 owner 복귀 `PASS` | CAN-AUTH-01 |
+| `/auction/[id]`, bid RPC | 숨김 테스트 회원 | 경매 1,000원 입찰·낙찰 확정 `PASS`; 소유자 자기 매장 즉시구매는 차단 `PASS` | CAN-BUY-01, CAN-AUTHZ-01 |
+| `/admin/owner/payments`, 수동 입금 확인 | 소유자 | 입금요청 1,000원→confirmed, append-only receipt 1건·잔액 1,000원 `PASS` | CAN-PAY-01 |
+| 배송 요청 RPC | 숨김 테스트 회원 | 크레딧 10→9, 동일 idempotency key 재시도 시 같은 shipment 반환 `PASS` | CAN-SHIP-01 |
+| `/admin/operator/fulfillment` | 운영자 범위의 소유자 | 지정 상품 출고·보관 완료 `PASS` | CAN-FUL-01 |
+| `/admin/operator/shipping`, `/completed` | 운영자 범위의 소유자 | 합포장→송장 등록→shipped, 완료 목록 반영 `PASS` | CAN-SHIP-02 |
+| `/api/account/cancellations` 대응 RPC | 경매 구매자 | 구매자 취소 요청을 42501로 차단, 변경 없음 `PASS` | CAN-CANCEL-01 |
+| `/api/admin/operator/products/[id]/pause` 대응 RPC | 운영자 범위의 소유자 | 공개 카나리 즉시구매 상품을 pending으로 일시중지 `PASS` | CAN-PROD-01 |
+
+운영 일반 회원의 실제 Kakao 로그인, 직원 계정, 타 매장 운영자 직접 접근, 채팅 송수신, 환불 실행은 아직 이 표로 검증되지 않았다.

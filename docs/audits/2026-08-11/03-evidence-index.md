@@ -113,4 +113,27 @@
 | CH-R02 | Production Chrome | fixed bid와 빈 sold brand document 404, console error 0 |
 | OBS-R01 | runtime log query | Vercel CLI 56.3.1/58.1.0 모두 HTTP 400; `OPEN_P2_OBSERVABILITY` |
 
-토큰·쿠키·비밀번호와 로컬 service-role 값은 문서에 기록하지 않았다. Production Kakao 로그인, checkout/입금확인/취소/출고/배송/환불/chat/push 상태 변경은 여전히 `PRODUCTION_UNVERIFIED_AUTH_SESSION` 또는 `MUTATION_UNEXECUTED`다.
+토큰·쿠키·비밀번호와 로컬 service-role 값은 문서에 기록하지 않았다. 아래 카나리 표가 갱신하는 범위를 제외한 일반 회원·직원·타 매장·환불·chat·push 상태 변경은 계속 `PRODUCTION_UNVERIFIED_AUTH_SESSION` 또는 `MUTATION_UNEXECUTED`다.
+
+## 운영 지정 데이터 카나리 증거
+
+| ID | 증거 | 결과 |
+| --- | --- | --- |
+| CAN-DEP-01 | Production inspect·`/BUILD_ID` | `dpl_6GhzCYg2pzPovLVE5dctxBr12L33`, Ready, `1f23a6ad8c9eb08dd3e10f67d319ac5607e6bce1` |
+| CAN-DB-01 | linked migration list | 로컬·원격 전 버전 일치, pending 0 |
+| CAN-AUTH-01 | owner member-mode Chrome | 서버 기준 02:54 표시, 즉시 종료 후 타이머 제거·owner 복귀 |
+| CAN-AUTHZ-01 | 소유자 자기 매장 상품 구매 | 사용자 알림으로 차단, 주문 생성 없음 |
+| CAN-BUY-01 | 경매 상품·숨김 테스트 회원 | bid `0d372f93-e425-4d62-8b64-b05ab01fa389`, 1,000원 낙찰 확정 |
+| CAN-PAY-01 | 수동입금 `3c2f641d-0a6c-489d-9542-531078b0b51b` | confirmed/version 1, receipt 1건·잔액 1,000원, inventory 1건 |
+| CAN-SHIP-01 | shipment `d74b527e-9965-444b-9058-44ae48daa793` | 최초 성공·재시도 replay, 배송권 10→9, 단일 품목 |
+| CAN-FUL-01 | 운영자 fulfillment Chrome·DB | collecting→ready_to_pack, 상품 release 이벤트 |
+| CAN-SHIP-02 | 운영자 shipping Chrome·DB | packed→shipped/version 3, 한진택배·카나리 송장, 이벤트 sequence 1–5 |
+| CAN-CANCEL-01 | 경매 구매자 취소 부정 RPC | `42501 경매 낙찰자는 취소를 요청할 수 없습니다`, cancellation row 없음 |
+| CAN-PROD-01 | fixed 카나리 상품 pause RPC | active→pending, 공개 목록 제거; 이력 보존 |
+| CAN-OBS-01 | Vercel runtime logs | CLI 56.3.1에서 계속 HTTP 400, `OPEN_P2_OBSERVABILITY` |
+| CAN-SEC-01 | Supabase security advisor | 325건 집계; anon SECURITY DEFINER 2개는 공개 read projection으로 확인, authenticated 함수 245개는 `OPEN_REVIEW` |
+| CAN-PROD-02 | pause/cron 운영 재현 | 기존 pause 뒤 다음 분 00초에 active 복귀 재현; `20260811121000_make_product_pause_persistent` 적용 후 cron이 `paused_at IS NULL`만 공개하도록 수정 |
+
+카나리용 숨김 회원과 결제·배송 감사 이력은 append-only 증거로 보존했다. 공개 카나리 즉시구매 상품은 일시중지했다. 실제 개인정보·토큰·비밀번호는 기록하지 않았다. 일반 회원 Kakao 로그인, 직원·타 매장 운영 권한, 채팅, 환불, push는 계속 `PRODUCTION_UNVERIFIED` 또는 `MUTATION_UNEXECUTED`다.
+
+상품 중지 확인창을 자동화하는 동안 첫 Chrome click이 timeout 뒤 지연 전달됐을 가능성을 먼저 조사했으나, canonical RPC 단일 실행에서도 다음 분 00초에 동일 현상이 재현됐다. 최종 원인은 매분 실행되는 자동공개 cron이 명시적 pause와 예약 pending을 구분하지 못한 것이며 F-16으로 수정했다. 최초 도구 원인 추정은 이 운영 재현으로 폐기한다.

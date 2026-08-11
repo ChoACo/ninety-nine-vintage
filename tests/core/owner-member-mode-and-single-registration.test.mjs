@@ -94,8 +94,8 @@ test("the immutable owner receives a server-timed three-minute member mode", asy
     dashboard,
   ] = await Promise.all([
     source("supabase/migrations/20260724123534_owner_member_mode_product_gender.sql"),
-    source("supabase/migrations/20260811080029_restore_hidden_test_member_role_contract.sql"),
-    source("supabase/migrations/20260811080808_fix_hidden_test_initial_shipping_credits.sql"),
+    source("supabase/migrations/20260811094959_restore_hidden_test_member_role_contract.sql"),
+    source("supabase/migrations/20260811095613_fix_hidden_test_initial_shipping_credits.sql"),
     source("src/lib/ownerMemberMode.ts"),
     source("src/app/api/owner/member-mode/route.ts"),
     source("src/components/features/auth/OwnerMemberModeProvider.tsx"),

@@ -4499,6 +4499,7 @@ export type Database = {
           inspection_notes: string[]
           measurements: Json
           participant_count: number
+          paused_at: string | null
           past_action: string | null
           past_at: string | null
           past_expires_at: string | null
@@ -4546,6 +4547,7 @@ export type Database = {
           inspection_notes?: string[]
           measurements?: Json
           participant_count?: number
+          paused_at?: string | null
           past_action?: string | null
           past_at?: string | null
           past_expires_at?: string | null
@@ -4593,6 +4595,7 @@ export type Database = {
           inspection_notes?: string[]
           measurements?: Json
           participant_count?: number
+          paused_at?: string | null
           past_action?: string | null
           past_at?: string | null
           past_expires_at?: string | null

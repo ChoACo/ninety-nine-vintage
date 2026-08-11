@@ -62,3 +62,11 @@ Vercel build는 성공했지만 Node `>=22.13.0` 범위의 자동 major upgrade 
 `5ebf988ac7a2c1639829ffd5b00b65d1adae0714` Preview `dpl_7ARyaWnacAGL3XMSUP9nctpjrG12`를 검증한 뒤 Production `dpl_H2yDY1T7jGirk6GXSr4J2n6aWVzh`로 승격했다. apex와 www alias의 `/BUILD_ID`가 모두 이 전체 SHA와 일치한다. Vercel build는 Node 22.x로 cache를 전환하고 `npm install` → `npm run build`를 실행했으며 audit 0, 123 static pages로 완료됐다.
 
 Supabase 161개 migration은 linked dry-run pending 0을 유지한다. 사이트 상태는 운영 인증 카나리가 끝나지 않아 기존 `maintenance`를 유지했으며, 임의로 open 전환하지 않았다.
+
+## 운영 카나리 배포 갱신
+
+운영 Kakao 소유자 세션으로 지정 테스트 데이터 카나리를 수행하며 발견한 결함을 `1f23a6ad8c9eb08dd3e10f67d319ac5607e6bce1`에서 수정했다. 해당 SHA는 `origin/codex/center-commerce-rebuild`에 보존했고 Vercel Production `dpl_6GhzCYg2pzPovLVE5dctxBr12L33`에 배포했다. 배포 URL은 `ninety-nine-vintage-qtunwm207-choa-co.vercel.app`, 상태는 `Ready`, apex/www alias와 `/BUILD_ID`는 이 SHA에 일치한다.
+
+이 배치의 전체 검증은 340개 중 334 pass, 정책상 폐기된 PortOne 6 skip, 실패 0이며 ESLint·TypeScript·production build가 통과했다. Supabase 운영 이력은 `20260811094959_restore_hidden_test_member_role_contract`, `20260811095613_fix_hidden_test_initial_shipping_credits`를 포함하며 로컬·원격 migration 버전이 모두 일치해 pending 0이다.
+
+직전 Production `dpl_H2yDY1T7jGirk6GXSr4J2n6aWVzh`를 이 배치의 즉시 롤백 지점으로 보존한다. runtime log 조회는 새 배포에서도 CLI HTTP 400이므로 `OPEN_P2_OBSERVABILITY`를 유지한다. 사이트 상태는 역할 전수검사와 채팅·환불 카나리가 남아 있어 `maintenance`를 유지한다.

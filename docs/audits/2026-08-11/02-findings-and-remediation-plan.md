@@ -101,4 +101,17 @@ P0로 확정된 보안·금전·데이터 손상은 없다. 다만 운영 인증
 | F-09 | `GOVERNANCE_REMAINDER` | 저장소 정책 일치는 통과, 외부 법률 검토는 범위 밖 |
 | F-10 | `RESOLVED_AS_TOOLING` | HTML/JSON/보호 Preview는 Chrome, `vercel curl`, structured HTTP로 분리 검증 |
 
-재현 가능한 P0/P1 기능 결함은 현재 남아 있지 않다. F-06은 관측성 P2이며, F-07의 운영 인증·상태 변경 증거가 없으므로 사이트 전체를 `NORMAL_OPERATION_CONFIRMED`로 선언하거나 maintenance를 해제하지 않는다.
+### 운영 카나리에서 추가 발견·수정한 항목
+
+| 항목 | 우선순위 | 상태 | 결과 |
+| --- | --- | --- | --- |
+| F-11 숨김 테스트 회원 역할 계약 회귀 | P1 | `RESOLVED` | store-scoped 역할 함수 교체가 제거한 제한적 예외를 추가 migration으로 복구. 일반 회원 역할·활성 owner provision 조건만 허용 |
+| F-12 숨김 테스트 회원 초기 배송권 0 | P1 | `RESOLVED` | profile trigger 선삽입과 provision upsert 충돌 시에도 10회로 설정하도록 수정; 운영에서 10→9 사용 확인 |
+| F-13 배송 대기열 응답 shape 불일치 | P1 | `RESOLVED` | API의 `totalCount` 추가 필드를 UI exact-key 검증에 반영; 운영 포장·발송 완료 |
+| F-14 회원 모드 타이머 브라우저 시계 의존 | P2 | `RESOLVED` | API `serverNow`와 client clock offset을 사용; 운영에서 02:54 표시 후 즉시 종료 확인 |
+| F-15 Supabase security advisor 전수 분류 | P2 | `OPEN_REVIEW` | 325건: policy 없는 RLS 77 INFO, anon SECURITY DEFINER 2 WARN, authenticated SECURITY DEFINER 245 WARN, leaked-password 보호 1 WARN. anon 2개는 제한된 공개 읽기 projection으로 확인; authenticated RPC는 함수별 내부 권한 검사와 GRANT 의도를 계속 대조 |
+| F-16 상품 일시중지와 매분 자동공개 충돌 | P1 | `RESOLVED` | pause가 과거 `publish_at`의 pending만 남겨 cron이 재공개하던 결함. `paused_at`을 추가하고 cron은 명시적 pause를 제외, 수동 공개만 표식을 제거하도록 수정 |
+
+F-07은 `PARTIAL_PRODUCTION_CANARY`로 갱신한다. 소유자 Kakao 세션, 숨김 회원, 입찰·낙찰, 수동 입금확인, inventory 생성, 배송 요청 멱등성, 출고, 합포장, 송장 발송, 경매 구매자 취소 차단, 상품 일시중지는 운영 지정 데이터로 통과했다. 일반 회원 Kakao 세션, 직원, 타 매장 직접 접근, 채팅, 환불은 계속 미검증이다. F-08은 이 잔여 범위 때문에 계속 차단한다.
+
+현재까지 재현한 P0/P1 기능 결함은 수정됐다. F-06 관측성 P2와 F-07의 남은 역할·채팅·환불 운영 증거가 있으므로 사이트 전체를 `NORMAL_OPERATION_CONFIRMED`로 선언하거나 maintenance를 해제하지 않는다.

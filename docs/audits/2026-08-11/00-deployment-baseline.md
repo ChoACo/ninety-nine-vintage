@@ -70,3 +70,7 @@ Supabase 161개 migration은 linked dry-run pending 0을 유지한다. 사이트
 이 배치의 전체 검증은 340개 중 334 pass, 정책상 폐기된 PortOne 6 skip, 실패 0이며 ESLint·TypeScript·production build가 통과했다. Supabase 운영 이력은 `20260811094959_restore_hidden_test_member_role_contract`, `20260811095613_fix_hidden_test_initial_shipping_credits`를 포함하며 로컬·원격 migration 버전이 모두 일치해 pending 0이다.
 
 직전 Production `dpl_H2yDY1T7jGirk6GXSr4J2n6aWVzh`를 이 배치의 즉시 롤백 지점으로 보존한다. runtime log 조회는 새 배포에서도 CLI HTTP 400이므로 `OPEN_P2_OBSERVABILITY`를 유지한다. 사이트 상태는 역할 전수검사와 채팅·환불 카나리가 남아 있어 `maintenance`를 유지한다.
+
+카나리 cleanup 중 발견한 상품 pause/cron 충돌은 `2fbc08bf7c2a8b68275ad4ec3dea829518d7ec6e`에서 수정했고 Production `dpl_7nvP7xb4k5vwKbze8MbZj23TWt8w`로 배포했다. 배포 URL은 `ninety-nine-vintage-en4wgogiy-choa-co.vercel.app`, 상태는 `Ready`, apex/www alias와 `/BUILD_ID`는 이 SHA에 일치한다. 첫 CLI 배포 `dpl_HPuvP7p44Mo8PgDZa84SHEyKqAwF`는 Ready였으나 Git SHA metadata cache 때문에 이전 BUILD_ID를 반환해 완료 배포로 채택하지 않았고, force 및 명시적 Git metadata로 재배포했다.
+
+최종 코드 검증은 341개 중 335 pass, PortOne 6 skip, 실패 0이며 lint·TypeScript·production build 123 pages가 통과했다. Supabase migration `20260811121000_make_product_pause_persistent` 적용 후 로컬·원격 164개 일치, pause가 다음 분 cron을 지난 뒤에도 유지됨을 확인했다. 이 시점의 코드 롤백 지점은 `dpl_6GhzCYg2pzPovLVE5dctxBr12L33` / `1f23a6ad8c9eb08dd3e10f67d319ac5607e6bce1`이다.

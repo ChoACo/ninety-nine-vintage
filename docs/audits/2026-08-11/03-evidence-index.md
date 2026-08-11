@@ -120,6 +120,7 @@
 | ID | 증거 | 결과 |
 | --- | --- | --- |
 | CAN-DEP-01 | Production inspect·`/BUILD_ID` | `dpl_6GhzCYg2pzPovLVE5dctxBr12L33`, Ready, `1f23a6ad8c9eb08dd3e10f67d319ac5607e6bce1` |
+| CAN-DEP-02 | pause 수정 Production inspect·`/BUILD_ID` | `dpl_7nvP7xb4k5vwKbze8MbZj23TWt8w`, Ready, `2fbc08bf7c2a8b68275ad4ec3dea829518d7ec6e`; metadata cache 불일치 배포 `dpl_HPuvP7p44Mo8PgDZa84SHEyKqAwF`는 채택하지 않음 |
 | CAN-DB-01 | linked migration list | 로컬·원격 전 버전 일치, pending 0 |
 | CAN-AUTH-01 | owner member-mode Chrome | 서버 기준 02:54 표시, 즉시 종료 후 타이머 제거·owner 복귀 |
 | CAN-AUTHZ-01 | 소유자 자기 매장 상품 구매 | 사용자 알림으로 차단, 주문 생성 없음 |

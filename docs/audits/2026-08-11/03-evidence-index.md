@@ -172,3 +172,15 @@
 | QA-ROLE-05 | `npm test`, lint, `tsc --noEmit`, production build | 343 total, 337 pass, 6 intentional skip, 0 fail; lint/types/build 123 pages `PASS` |
 
 push 카나리에서 누락된 Vault dispatch URL만 공식 운영 endpoint로 등록했다. VAPID private key·dispatch secret·세션 토큰은 조회하거나 출력하지 않았다. 역할 lease는 종료 또는 만료됐으며 Chrome에서 소유자 화면 복귀를 확인했다. authenticated SECURITY DEFINER 245개 개별 검토와 유효 환불 mutation은 이 표의 완료 범위에 포함하지 않는다.
+
+## SECURITY DEFINER 권한 증거
+
+| ID | 증거 | 판정 |
+|---|---|---|
+| SECDEF-01 | 운영 catalog·advisor 246행 | search_path 고정 246, 명시 ACL 246, anon 2 `PASS_REVIEWED` |
+| SECDEF-02 | `04-authenticated-security-definer-review.md` | 246개 함수 서명별 유지·회수 판정 완료 |
+| SECDEF-03 | migration `20260811131000_harden_internal_security_definer_execute` | trigger 16개·입찰 취소 helper 직접 EXECUTE 회수 `PASS` |
+| SECDEF-04 | 운영 `has_function_privilege`·catalog 재조회 | cancel helper auth/anon false, authenticated trigger 0, public authenticated SECURITY DEFINER 230 `PASS` |
+| SECDEF-05 | Supabase security advisor 재조회 | authenticated 경고 246→230, anon 공개 읽기 2 유지; password protection 설정 경고 1은 별도 운영 설정 항목 |
+
+앞 문단의 SECURITY DEFINER 미완료 표시는 이 절로 대체한다. 유효 환불 mutation은 계속 `MUTATION_UNEXECUTED_NO_VALID_CASE`다.

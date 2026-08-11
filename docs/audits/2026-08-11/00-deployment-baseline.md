@@ -92,3 +92,7 @@ Preview `dpl_95cKSDRYjRndz59u6ndfKErH92tQ`를 Vercel UI에서 Production `dpl_9K
 실제 소유자 구독 1건에 시험 push 알림 `3a97f404-ed4a-40b7-882b-89b1a1e9bab8`을 생성했다. Vault의 `web_push_dispatch_url` 누락을 발견해 공식 endpoint `https://www.ninety-nine-vintage.store/api/push/dispatch`를 등록했고, pg_net 요청은 HTTP 200, outbox는 attempts 1·`delivered_at=2026-08-11 20:58:30 KST`·오류 없음으로 완료됐다. VAPID·dispatch 비밀값은 조회하거나 문서화하지 않았다.
 
 최종 검증은 343개 중 337 pass, PortOne 6 skip, 실패 0이며 lint·TypeScript·production build 123 pages가 통과했다. 실제 환불 레코드가 0건이라 회원 환불 빈 상태는 확인했지만 금전 mutation은 실행하지 않았다. 사이트 상태는 계속 `maintenance`다.
+
+## SECURITY DEFINER 권한 검토 갱신
+
+Supabase advisor가 표시한 public authenticated SECURITY DEFINER 246개를 운영 catalog·함수 본문·ACL 기준으로 서명별 검토했다. 내부 trigger 15개와 독립 caller guard가 없는 `cancel_member_active_bids(uuid,uuid,timestamptz)`의 외부 EXECUTE를 migration `20260811131000_harden_internal_security_definer_execute`로 회수했다. 별도 `app_private` trigger 1개의 기본 PUBLIC EXECUTE도 회수했다. 적용 후 public authenticated 경고 대상은 의도된 guarded RPC·helper 230개이고 authenticated trigger는 0개다. 개별 판정은 `04-authenticated-security-definer-review.md`에 기록했다.

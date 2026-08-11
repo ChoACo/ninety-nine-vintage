@@ -128,3 +128,11 @@ F-07은 `PARTIAL_PRODUCTION_CANARY`로 갱신한다. 소유자 Kakao 세션, 숨
 - 환불: 운영 `manual_refunds`, `shipping_fee_refunds`에 유효 대상이 0건이라 개인정보·금전 이력을 인위적으로 만들지 않았다. 회원 화면 0건과 API 읽기는 정상이며 상태 변경은 `MUTATION_UNEXECUTED_NO_VALID_CASE`다.
 
 잔여 완료 경계는 일반 회원 본인 Kakao 로그인, 실제 유효 환불 건의 성공·실패 카나리, authenticated SECURITY DEFINER 함수 개별 권한 검토, 관측성 P2다. 이 항목 때문에 maintenance와 전체 정상 운영 선언 보류를 유지한다.
+
+### SECURITY DEFINER 개별 권한 검토 결과
+
+- `F-11` · P0 · 내부 입찰 취소 helper 과다 EXECUTE: `cancel_member_active_bids`는 임의 member UUID를 받아 활성 입찰을 변경하지만 자체 caller guard가 없고 authenticated EXECUTE가 남아 있었다. 보호된 제재 RPC 내부 호출만 유지하고 public·anon·authenticated·service_role 직접 EXECUTE를 회수했다. `RESOLVED_PRODUCTION_DB`.
+- `F-12` · P2 · trigger 함수 직접 EXECUTE: public trigger 15개와 app_private trigger 1개가 클라이언트 또는 PUBLIC에 불필요하게 실행 가능했다. trigger 연결은 유지하고 직접 EXECUTE만 회수했다. `RESOLVED_PRODUCTION_DB`.
+- 나머지 230개는 2개 공개 읽기, 207개 직접 guard 확인, 6개 guard delegate, 10개 policy helper, 4개 역할 guard 읽기, 1개 제한 authenticated 읽기로 판정했다. advisor 경고는 SECURITY DEFINER 사용 자체에 대한 경고이므로 의도된 RPC에는 남는다. 개별 246행은 `04-authenticated-security-definer-review.md`에 있다.
+
+따라서 authenticated SECURITY DEFINER 개별 검토는 완료했다. 잔여 완료 경계는 일반 회원 본인 Kakao 로그인, 실제 유효 환불 mutation, 관측성 P2다.

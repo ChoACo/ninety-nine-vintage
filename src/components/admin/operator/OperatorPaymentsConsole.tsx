@@ -8,6 +8,7 @@ import {
   clearPendingManualTransferReceipt,
   getOrCreatePendingManualTransferReceipt,
   MANUAL_TRANSFER_DEPOSITOR_NAME_MAX_LENGTH,
+  manualTransferCancellationFingerprint,
   manualTransferReceiptFingerprint,
   manualTransferReversalFingerprint,
 } from "@/lib/manualTransferReceipt";
@@ -182,6 +183,14 @@ function isConfirmationResult(
 
 function sessionKey(payment: PaymentRow) {
   return `${SESSION_KEY_PREFIX}${payment.paymentKind}:${payment.paymentId}:${payment.receivedAmount}:${payment.ledgerEntryCount}:${payment.version}`;
+}
+
+function canCancelPendingPayment(payment: PaymentRow, ownerSurface: boolean) {
+  return ownerSurface &&
+    payment.paymentKind === "commerce" &&
+    payment.status === "awaiting_transfer" &&
+    payment.receivedAmount === 0 &&
+    payment.remainingAmount > 0;
 }
 
 export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface?: boolean }) {
@@ -457,6 +466,69 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
     }
   };
 
+  const cancelPending = async (payment: PaymentRow) => {
+    if (!accessToken || !actorId || busyKey || !canCancelPendingPayment(payment, ownerSurface)) return;
+    const reason = window.prompt("입금 요청을 취소하는 사유를 입력해 주세요.");
+    if (!reason?.trim()) return;
+    if (!window.confirm("입금액이 없는 결제 대기 주문을 소유자 권한으로 취소하고 상품을 다시 판매 가능 상태로 돌리겠습니까?")) return;
+    const key = sessionKey(payment);
+    const cancellationScope = `unified:${payment.paymentKind}:${payment.paymentId}:cancel`;
+    const cancellationFingerprint = await manualTransferCancellationFingerprint({
+      kind: "commerce",
+      targetId: payment.paymentId,
+      reason: reason.trim(),
+      expectedVersion: payment.version,
+      expectedReceivedAmount: payment.receivedAmount,
+      expectedLedgerEntryCount: payment.ledgerEntryCount,
+    });
+    const idempotencyKey = getOrCreatePendingManualTransferReceipt(
+      actorId,
+      cancellationScope,
+      cancellationFingerprint,
+    );
+    setBusyKey(key);
+    setNotice("");
+    try {
+      const response = await fetch(
+        `/api/admin/operator/payments/${payment.paymentKind}/${payment.paymentId}/cancel`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            expectedVersion: payment.version,
+            observedReceivedAmount: payment.receivedAmount,
+            observedLedgerEntryCount: payment.ledgerEntryCount,
+            idempotencyKey,
+            reason: reason.trim(),
+          }),
+        },
+      );
+      const payload = await response.json().catch(() => null) as unknown;
+      if (response.status === 409) {
+        await load(accessToken, includeHistory, offset);
+        throw new Error("입금 상태가 변경되었습니다. 최신 목록을 확인해 주세요.");
+      }
+      if (!response.ok || !isRecord(payload) || !isRecord(payload.payment) || payload.payment.status !== "cancelled") {
+        throw new Error(
+          isRecord(payload) && typeof payload.message === "string"
+            ? payload.message
+            : "입금 요청을 취소하지 못했습니다.",
+        );
+      }
+      clearPendingManualTransferReceipt(actorId, cancellationScope, cancellationFingerprint);
+      setExpandedKey(null);
+      setNotice("입금 요청을 취소하고 상품을 다시 판매 가능 상태로 돌렸습니다.");
+      await load(accessToken, includeHistory, offset);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "입금 요청을 취소하지 못했습니다.");
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
   const summary = useMemo(() => ({
     pending: payments.filter((payment) => payment.remainingAmount > 0).length,
     confirmed: payments.filter((payment) => payment.remainingAmount === 0).length,
@@ -518,6 +590,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
             )
           );
           const needsLedgerAdjustment = payment.receivedAmount < 0 || payment.remainingAmount < 0;
+          const cancellable = canCancelPendingPayment(payment, ownerSurface);
           const firstProduct = payment.products[0];
           const productSummary = firstProduct
             ? `${firstProduct.title}${payment.products.length > 1 ? ` 외 ${payment.products.length - 1}개` : ""}`
@@ -561,14 +634,26 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
                   {statusLabel(payment.status)}
                 </p>
                 {confirmable ? (
-                  <button
-                    className="h-10 bg-ink px-3 text-xs font-bold text-paper disabled:opacity-40"
-                    disabled={busyKey !== null}
-                    onClick={() => openPaymentDetails(payment)}
-                    type="button"
-                  >
-                    {busyKey === key ? "처리 중..." : "입금 확인 완료"}
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      className="h-10 bg-ink px-3 text-xs font-bold text-paper disabled:opacity-40"
+                      disabled={busyKey !== null}
+                      onClick={() => openPaymentDetails(payment)}
+                      type="button"
+                    >
+                      {busyKey === key ? "처리 중..." : "입금 확인 완료"}
+                    </button>
+                    {cancellable && (
+                      <button
+                        className="h-9 border border-line px-3 text-[11px] font-bold disabled:opacity-40"
+                        disabled={busyKey !== null}
+                        onClick={() => void cancelPending(payment)}
+                        type="button"
+                      >
+                        입금 요청 취소
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <button
                     className="inline-flex h-10 items-center justify-center gap-1 border border-line px-3 text-xs font-bold disabled:opacity-40"
@@ -609,6 +694,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
               selectedPayment.remainingAmount === 0
             )
           );
+          const cancellable = canCancelPendingPayment(selectedPayment, ownerSurface);
           const account = [
             selectedPayment.bankNameSnapshot,
             selectedPayment.accountNumberSnapshot,
@@ -682,6 +768,11 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
                 {confirmable && (
                   <button className="h-11 bg-ink px-5 text-xs font-black text-paper disabled:opacity-40" disabled={busyKey !== null} onClick={() => void confirm(selectedPayment)} type="button">
                     {busyKey === key ? "처리 중..." : "내용 확인 후 입금 확인 완료"}
+                  </button>
+                )}
+                {cancellable && (
+                  <button className="h-11 border border-line px-5 text-xs font-bold disabled:opacity-40" disabled={busyKey !== null} onClick={() => void cancelPending(selectedPayment)} type="button">
+                    입금 요청 취소
                   </button>
                 )}
               </div>

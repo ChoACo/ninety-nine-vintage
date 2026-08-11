@@ -27,6 +27,15 @@ interface ReversalFingerprintInput {
   expectedLedgerEntryCount: number;
 }
 
+interface CancellationFingerprintInput {
+  kind: "commerce";
+  targetId: string;
+  reason: unknown;
+  expectedVersion: number;
+  expectedReceivedAmount: number;
+  expectedLedgerEntryCount: number;
+}
+
 const inMemoryPendingReceipts = new Map<string, PendingReceipt>();
 
 export function canonicalizeManualTransferText(value: unknown, maxLength: number) {
@@ -75,6 +84,31 @@ export async function manualTransferReversalFingerprint({
     targetId,
     ledgerId,
     reason: canonicalizeManualTransferText(reason, MANUAL_TRANSFER_MEMO_MAX_LENGTH),
+    expectedReceivedAmount,
+    expectedLedgerEntryCount,
+  });
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(canonicalPayload),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+export async function manualTransferCancellationFingerprint({
+  kind,
+  targetId,
+  reason,
+  expectedVersion,
+  expectedReceivedAmount,
+  expectedLedgerEntryCount,
+}: CancellationFingerprintInput) {
+  const canonicalPayload = JSON.stringify({
+    kind,
+    targetId,
+    reason: canonicalizeManualTransferText(reason, MANUAL_TRANSFER_MEMO_MAX_LENGTH),
+    expectedVersion,
     expectedReceivedAmount,
     expectedLedgerEntryCount,
   });

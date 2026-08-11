@@ -122,6 +122,9 @@ test("every operator API except scope selection requires the active selected sto
         "/api/admin/operator/payments/[kind]/[id]/confirm/route.ts",
       ) ||
       normalizedRoute.endsWith(
+        "/api/admin/operator/payments/[kind]/[id]/cancel/route.ts",
+      ) ||
+      normalizedRoute.endsWith(
         "/api/admin/operator/transfers/[id]/ledger/route.ts",
       );
 

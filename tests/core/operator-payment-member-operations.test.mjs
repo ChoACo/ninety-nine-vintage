@@ -90,6 +90,33 @@ test("owner payment page mounts the full confirmation console without operator s
   assert.match(ledgerRoute, /authenticateOwnerPaymentRequest\(request, true\)/);
 });
 
+test("owner can cancel only an unpaid fixed-price payment request with an audited CAS contract", async () => {
+  const [migration, route, consoleSource, receiptSource] = await Promise.all([
+    source("supabase/migrations/20260811120000_owner_cancel_pending_commerce_payment.sql"),
+    source("src/app/api/admin/operator/payments/[kind]/[id]/cancel/route.ts"),
+    source("src/components/admin/operator/OperatorPaymentsConsole.tsx"),
+    source("src/lib/manualTransferReceipt.ts"),
+  ]);
+
+  assert.match(migration, /create table public\.manual_transfer_cancellation_events/);
+  assert.match(migration, /if v_actor is null or not public\.is_owner\(\)/);
+  assert.match(migration, /v_transfer\.status <> 'awaiting_transfer'/);
+  assert.match(migration, /v_order\.status <> 'awaiting_payment'/);
+  assert.match(migration, /v_received <> 0 or v_entry_count <> 0/);
+  assert.match(migration, /status = 'cancelled'/);
+  assert.match(migration, /payment_status = 'cancelled'/);
+  assert.match(migration, /set status = 'active'/);
+  assert.match(migration, /insert_targeted_notification/);
+  assert.match(route, /authenticateOwnerPaymentRequest\(request, true\)/);
+  assert.match(route, /kind !== "commerce"/);
+  assert.match(route, /cancel_owner_pending_manual_payment/);
+  assert.match(route, /observedReceivedAmount !== 0/);
+  assert.match(consoleSource, /canCancelPendingPayment/);
+  assert.match(consoleSource, /입금 요청 취소/);
+  assert.match(consoleSource, /manualTransferCancellationFingerprint/);
+  assert.match(receiptSource, /interface CancellationFingerprintInput/);
+});
+
 test("member shipment history only exposes preparing or shipped and uses Hanjin lookup", async () => {
   const [migration, route, dashboard] = await Promise.all([
     source("supabase/migrations/20260724073345_operator_payment_and_member_operations.sql"),

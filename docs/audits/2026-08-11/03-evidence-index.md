@@ -184,3 +184,19 @@ push 카나리에서 누락된 Vault dispatch URL만 공식 운영 endpoint로 �
 | SECDEF-05 | Supabase security advisor 재조회 | authenticated 경고 246→230, anon 공개 읽기 2 유지; password protection 설정 경고 1은 별도 운영 설정 항목 |
 
 앞 문단의 SECURITY DEFINER 미완료 표시는 이 절로 대체한다. 유효 환불 mutation은 계속 `MUTATION_UNEXECUTED_NO_VALID_CASE`다.
+
+## 최종 운영 증거
+
+| ID | 증거 | 판정 |
+|---|---|---|
+| FINAL-DEP-01 | Vercel `dpl_3JohYeBnsEXE6jJ2hAT4oUFZNxEs`, `/BUILD_ID` | Ready·Production·SHA `6c4a9653e67f62923e06a71340ff4b895b9cba1e` |
+| FINAL-AUTH-01 | Production Chrome `/account/test-member`→`/account` | 실제 Auth member 로그인, 주문·배송·환불 렌더, admin 링크 없음 `PASS` |
+| FINAL-AUTHZ-01 | Production Chrome `/admin/owner`, member bearer admin APIs | UI 접근 차단, owner/operator API HTTP 403 `PASS` |
+| FINAL-REFUND-01 | order `8c36e6a7...`, refund `c5e014e6...` | invalid 422, 중복 200/version 1, completed/version 3, 계좌 암호문 삭제 `PASS` |
+| FINAL-ROUTE-01 | source-derived 75 URL·97 API GET | page 71×200+4×의도 404, API 5xx 0·의도된 local-test 404 `PASS` |
+| FINAL-MEMBER-API-01 | 실제 member bearer GET 18개 | 17×200, POST-only 1×405, admin 2×403 `PASS` |
+| FINAL-OBS-01 | Vercel runtime logs/errors 1h | 5xx 0, runtime error cluster 0 `PASS` |
+| FINAL-DB-01 | linked dry-run·advisor | migration 172, pending 0; leaked-password 1건만 유료 요금제 경계 |
+| FINAL-STATUS-01 | `/api/site/status`, `/home` | `operational`, 안내 `정상 운영 중입니다.`, HTTP 200, maintenance banner 없음 |
+
+이 표와 `05-final-regression-and-release.md`가 위의 시점별 미검증·미실행 표기를 대체한다. 비밀번호·토큰·환불 암호화 키는 증거 문서에 기록하지 않았다.

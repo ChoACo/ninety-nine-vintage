@@ -96,3 +96,7 @@ Preview `dpl_95cKSDRYjRndz59u6ndfKErH92tQ`를 Vercel UI에서 Production `dpl_9K
 ## SECURITY DEFINER 권한 검토 갱신
 
 Supabase advisor가 표시한 public authenticated SECURITY DEFINER 246개를 운영 catalog·함수 본문·ACL 기준으로 서명별 검토했다. 내부 trigger 15개와 독립 caller guard가 없는 `cancel_member_active_bids(uuid,uuid,timestamptz)`의 외부 EXECUTE를 migration `20260811131000_harden_internal_security_definer_execute`로 회수했다. 별도 `app_private` trigger 1개의 기본 PUBLIC EXECUTE도 회수했다. 적용 후 public authenticated 경고 대상은 의도된 guarded RPC·helper 230개이고 authenticated trigger는 0개다. 개별 판정은 `04-authenticated-security-definer-review.md`에 기록했다.
+
+## 최종 운영 기준선
+
+최종 Production은 `dpl_3JohYeBnsEXE6jJ2hAT4oUFZNxEs`, BUILD_ID `6c4a9653e67f62923e06a71340ff4b895b9cba1e`, migration 172개·pending 0이다. 환불 암호화 Production 환경을 보완했고 runtime 5xx와 error cluster가 모두 0인 것을 확인했다. 2026-08-11 22:29 KST에 Owner RPC로 사이트 상태를 `operational`로 전환했다. 상세 최종 판정은 `05-final-regression-and-release.md`를 따른다.

@@ -136,3 +136,13 @@ F-07은 `PARTIAL_PRODUCTION_CANARY`로 갱신한다. 소유자 Kakao 세션, 숨
 - 나머지 230개는 2개 공개 읽기, 207개 직접 guard 확인, 6개 guard delegate, 10개 policy helper, 4개 역할 guard 읽기, 1개 제한 authenticated 읽기로 판정했다. advisor 경고는 SECURITY DEFINER 사용 자체에 대한 경고이므로 의도된 RPC에는 남는다. 개별 246행은 `04-authenticated-security-definer-review.md`에 있다.
 
 따라서 authenticated SECURITY DEFINER 개별 검토는 완료했다. 잔여 완료 경계는 일반 회원 본인 Kakao 로그인, 실제 유효 환불 mutation, 관측성 P2다.
+
+### 최종 종료 판정
+
+- F-06 관측성: Vercel runtime connector가 새 Production의 상태 분포를 반환했고 5xx 0·runtime error 0을 확인해 `RESOLVED`.
+- F-07 역할·핵심 mutation: 전용 실제 Auth 회원의 Chrome 로그인, 주문·입금·환불 성공/실패/중복 및 관리자 403을 확인해 `RESOLVED_PRODUCTION_CANARY`.
+- F-08 maintenance: 최종 회귀와 pending 0을 확인한 뒤 `operational`로 전환해 `RESOLVED`.
+- F-15 advisor: SECURITY DEFINER 개별 검토는 완료. leaked-password 보호 1건은 Supabase Free 요금제 API가 거부해 `BLOCKED_BY_PAID_PLAN`, 비-Kakao 고객 경로가 아닌 격리 테스트 계정에 강한 비밀번호·same-origin·rate limit을 적용해 운영 차단 항목에서는 제외.
+- F-17 환불 암호화 환경 누락: 유효 계좌 제출 503을 재현하고 Production 민감 변수 3개를 등록·재배포한 뒤 성공과 중복을 확인해 `RESOLVED_PRODUCTION_CONFIG`.
+
+현재 재현 가능한 P0·P1·P2 기능 결함은 없으며 최종 판정은 `05-final-regression-and-release.md`다.

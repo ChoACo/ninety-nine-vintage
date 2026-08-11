@@ -201,3 +201,7 @@
 | web push queue·dispatch | 실제 소유자 구독 | notification→outbox→HTTP 200→delivered 성공 `PASS_PRODUCTION_CANARY` | PUSH-01, PUSH-02 |
 
 채팅 최종 발신 메시지 `de435398-d915-4f13-a9a7-9d5a647f1517`은 다미네 운영자 UUID로 기록됐다. 앞서 결함 재현용 메시지의 소유자 발신자 기록은 append-only 감사 증거로 보존했다. 타 매장 scope 및 직원 직접 접근은 위 행에 한해 더 이상 `PRODUCTION_UNVERIFIED_AUTH_SESSION`이 아니다. 실제 환불 금전 mutation과 일반 회원 자신의 Kakao 로그인은 별도 유효 대상이 없어 완료 처리하지 않는다.
+
+## 최종 대체 판정
+
+`05-final-regression-and-release.md`의 75 URL·97 API 전수 smoke와 실제 일반회원 bearer 회귀가 이 문서의 시점별 보류 판정을 대체한다. 실제 일반회원 로그인·주문·입금·환불 성공/실패/중복, owner/operator 직접 접근 차단, 기존 운영자·직원·타 매장·채팅·push 카나리가 모두 완료됐다. 고정가 `/bid`, 미판매 `/sold`, 닫힌 local-test API의 404는 계약상 의도된 결과이며 설명되지 않은 404·5xx는 0이다.

@@ -187,7 +187,7 @@ export async function POST(request: Request) {
       conversation_id: authorizedConversation.id,
       body: messageBody,
       client_nonce: body.clientNonce?.trim() || crypto.randomUUID(),
-      sender_id: auth.userId,
+      sender_id: auth.effectiveUserId,
     })
     .select("*")
     .single();

@@ -235,6 +235,7 @@ export async function authenticateStaffRequest(request: Request, mutation = fals
     ...auth,
     roleCode,
     gradeLevel: roleCanary?.gradeLevel ?? Number(role?.grade_level ?? 99),
+    effectiveUserId: roleCanary?.targetUserId ?? auth.userId,
     effectiveOperatorId: roleCode === "employee"
       ? roleCanary?.reportsToOperatorId ?? role?.reports_to_operator_id ?? null
       : roleCanary?.targetUserId ?? auth.userId,
@@ -270,6 +271,7 @@ export interface OperatorStaffAuth {
   roleCode: "owner" | "operator" | "employee";
   gradeLevel: number;
   effectiveOperatorId: string | null;
+  effectiveUserId: string;
   userId: string;
   token: string;
   admin: SupabaseClient<Database>;

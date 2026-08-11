@@ -123,10 +123,22 @@ test("employees can handle only their assigned store chats and receive role-corr
   );
   assert.match(migration, /\/admin\/employee\/inquiries/);
   assert.match(operatorRoute, /auth\.effectiveOperatorId/);
+  assert.match(operatorRoute, /sender_id: auth\.effectiveUserId/);
   assert.match(operatorRoute, /\.in\("conversation_type", \["general", "product", "internal"\]\)/);
   assert.match(employeePage, /basePath="\/admin\/employee\/inquiries"/);
   assert.match(unreadRoute, /roleCode === "employee"/);
   assert.match(unreadRoute, /\/admin\/employee\/inquiries\?conversationId=/);
+});
+
+test("support chat policies follow the bounded Owner canary principal", async () => {
+  const migration = await source(
+    "supabase/migrations/20260811124000_scope_support_chat_to_canary_principal.sql",
+  );
+
+  assert.match(migration, /current_authorization_principal\(\)/);
+  assert.match(migration, /assigned_staff_id = actor\.principal_id/);
+  assert.match(migration, /memberships\.user_id = actor\.principal_id/);
+  assert.match(migration, /is_support_member\(actor\.session_id\)/);
 });
 
 test("realtime chat events render an unread badge and dismissible five-second toast", async () => {

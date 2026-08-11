@@ -6,7 +6,7 @@ const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 test("the immutable owner can rehearse an existing operator or employee authorization for three minutes", async () => {
-  const [migration, state, staffAuth, ownerAuth, sessionRoute, memberModeRoute, storeScopeRoute] =
+  const [migration, state, staffAuth, ownerAuth, sessionRoute, memberModeRoute, storeScopeRoute, membershipPolicyMigration, principalGrantMigration] =
     await Promise.all([
       source("supabase/migrations/20260811122000_owner_role_canary_sessions.sql"),
       source("src/lib/ownerRoleCanary.server.ts"),
@@ -15,6 +15,8 @@ test("the immutable owner can rehearse an existing operator or employee authoriz
       source("src/app/api/admin/session/route.ts"),
       source("src/app/api/owner/member-mode/route.ts"),
       source("src/app/api/admin/operator/store-scope/route.ts"),
+      source("supabase/migrations/20260811113426_scope_membership_reads_to_canary_principal.sql"),
+      source("supabase/migrations/20260811113535_grant_canary_principal_to_authenticated.sql"),
     ]);
 
   assert.match(migration, /owner_id = '30be08c2-6259-42c6-af26-4ded6362de12'/);
@@ -32,9 +34,12 @@ test("the immutable owner can rehearse an existing operator or employee authoriz
   assert.match(state, /new Date\(expiresAt\)\.getTime\(\) > serverNow\.getTime\(\)/);
   assert.match(staffAuth, /getOwnerRoleCanaryState/);
   assert.match(staffAuth, /roleCanary\?\.targetUserId \?\? auth\.userId/);
+  assert.match(staffAuth, /effectiveUserId: roleCanary\?\.targetUserId \?\? auth\.userId/);
   assert.match(ownerAuth, /role_canary_active/);
   assert.match(sessionRoute, /roleCanaryActive/);
   assert.match(memberModeRoute, /end_owner_role_canary/);
   assert.match(storeScopeRoute, /scopedOperatorId = auth\.effectiveOperatorId \?\? auth\.userId/);
   assert.match(storeScopeRoute, /auth\.user[\s\S]*eq\("user_id", scopedOperatorId\)/);
+  assert.match(membershipPolicyMigration, /user_id = \(select public\.current_authorization_principal\(\)\)/);
+  assert.match(principalGrantMigration, /grant execute on function public\.current_authorization_principal\(\)[\s\S]*to authenticated/);
 });

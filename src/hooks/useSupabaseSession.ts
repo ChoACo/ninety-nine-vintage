@@ -16,6 +16,10 @@ let sessionValidationFlight: {
   accessToken: string;
   promise: Promise<SessionValidation>;
 } | null = null;
+let sessionDiscardFlight: {
+  accessToken: string;
+  promise: Promise<void>;
+} | null = null;
 
 function isAuthoritativeAuthRejection(reason: unknown) {
   if (!reason || typeof reason !== "object") return false;
@@ -74,14 +78,29 @@ async function discardInvalidSession(
   client: BrowserClient,
   rejected: Session,
 ) {
-  try {
-    const current = (await client.auth.getSession()).data.session;
-    if (current?.access_token === rejected.access_token) {
-      await client.auth.signOut({ scope: "local" });
+  if (sessionDiscardFlight?.accessToken === rejected.access_token) {
+    return sessionDiscardFlight.promise;
+  }
+
+  const promise = (async () => {
+    try {
+      const current = (await client.auth.getSession()).data.session;
+      if (current?.access_token === rejected.access_token) {
+        await client.auth.signOut({ scope: "local" });
+      }
+    } catch {
+      // Publishing a guest state still prevents private requests when local
+      // storage is unavailable or the auth client cannot finish local sign-out.
     }
-  } catch {
-    // Publishing a guest state still prevents private requests when local
-    // storage is unavailable or the auth client cannot finish local sign-out.
+  })();
+
+  sessionDiscardFlight = { accessToken: rejected.access_token, promise };
+  try {
+    await promise;
+  } finally {
+    if (sessionDiscardFlight?.promise === promise) {
+      sessionDiscardFlight = null;
+    }
   }
 }
 

@@ -60,6 +60,7 @@ test("browser auth rejects URL-provided Supabase sessions", async () => {
   assert.match(client, /persistSession:\s*false/);
   assert.match(sessionHook, /auth\.getUser\(\)/);
   assert.match(sessionHook, /signOut\(\{\s*scope:\s*"local"\s*\}\)/);
+  assert.match(sessionHook, /sessionDiscardFlight\?\.accessToken === rejected\.access_token/);
   assert.match(sessionHook, /current\?\.access_token === rejected\.access_token/);
   assert.match(sessionHook, /window\.setTimeout\(\(\) =>/);
   assert.match(clockHook, /getSupabasePublicBrowserClient\(\)\.rpc\("get_auction_server_time"\)/);

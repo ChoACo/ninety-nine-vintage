@@ -380,6 +380,9 @@ export async function GET(request: Request) {
 
   const historyCutoff = Date.parse(data.serverTime) - 7 * 24 * 60 * 60 * 1_000;
   const visiblePayments = data.payments.filter((payment) => {
+    if (payment.status === "cancelled" || payment.status === "cancelled_unpaid") {
+      return false;
+    }
     if (!page.includeHistory) return payment.remainingAmount > 0;
     if (payment.remainingAmount > 0) return true;
     return payment.confirmedAt !== null &&

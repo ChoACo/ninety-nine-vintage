@@ -691,7 +691,7 @@ test("payment API remains strict but mutations and navigation are owner-only", a
   assert.match(queueRoute, /auth\.roleCode !== "owner"/);
   assert.match(queueRoute, /auth\.user as unknown as RpcClient/);
   assert.doesNotMatch(queueRoute, /export\s+async\s+function\s+POST/);
-  assert.match(confirmRoute, /authenticateOperatorStoreRequest\(request,\s*true\)/);
+  assert.match(confirmRoute, /authenticateOwnerPaymentRequest\(request,\s*true\)/);
   assert.match(confirmRoute, /"confirm_unified_manual_payment_v2"/);
   assert.match(confirmRoute, /p_payment_kind:\s*kind/);
   assert.match(confirmRoute, /p_payment_id:\s*id/);

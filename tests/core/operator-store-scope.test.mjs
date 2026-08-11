@@ -115,8 +115,21 @@ test("every operator API except scope selection requires the active selected sto
 
   for (const routeFile of routeFiles) {
     const route = await readFile(routeFile, "utf8");
-    if (routeFile.replaceAll("\\", "/").endsWith("/store-scope/route.ts")) {
+    const normalizedRoute = routeFile.replaceAll("\\", "/");
+    const isOwnerPaymentRoute =
+      normalizedRoute.endsWith("/api/admin/operator/payments/route.ts") ||
+      normalizedRoute.endsWith(
+        "/api/admin/operator/payments/[kind]/[id]/confirm/route.ts",
+      ) ||
+      normalizedRoute.endsWith(
+        "/api/admin/operator/transfers/[id]/ledger/route.ts",
+      );
+
+    if (normalizedRoute.endsWith("/store-scope/route.ts")) {
       assert.match(route, /authenticateStaffRequest/);
+    } else if (isOwnerPaymentRoute) {
+      assert.match(route, /authenticateOwnerPaymentRequest/, routeFile);
+      assert.doesNotMatch(route, /authenticateOperatorStoreRequest/, routeFile);
     } else {
       assert.match(route, /authenticateOperatorStoreRequest/, routeFile);
       assert.doesNotMatch(route, /authenticateStaffRequest/, routeFile);

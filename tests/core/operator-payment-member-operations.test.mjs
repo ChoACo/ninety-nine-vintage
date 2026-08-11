@@ -74,6 +74,22 @@ test("operator payments expose seven-day history, amount adjustment, and reversi
   assert.doesNotMatch(consoleSource, /idempotencyStorageKey/);
 });
 
+test("owner payment page mounts the full confirmation console without operator store scope", async () => {
+  const [page, server, queueRoute, confirmRoute, ledgerRoute] = await Promise.all([
+    source("src/app/(admin)/admin/owner/payments/page.tsx"),
+    source("src/lib/commerce/server.ts"),
+    source("src/app/api/admin/operator/payments/route.ts"),
+    source("src/app/api/admin/operator/payments/[kind]/[id]/confirm/route.ts"),
+    source("src/app/api/admin/operator/transfers/[id]/ledger/route.ts"),
+  ]);
+  assert.match(page, /OperatorPaymentsConsole/);
+  assert.match(page, /ownerSurface/);
+  assert.match(server, /function authenticateOwnerPaymentRequest/);
+  assert.match(queueRoute, /authenticateOwnerPaymentRequest\(request\)/);
+  assert.match(confirmRoute, /authenticateOwnerPaymentRequest\(request, true\)/);
+  assert.match(ledgerRoute, /authenticateOwnerPaymentRequest\(request, true\)/);
+});
+
 test("member shipment history only exposes preparing or shipped and uses Hanjin lookup", async () => {
   const [migration, route, dashboard] = await Promise.all([
     source("supabase/migrations/20260724073345_operator_payment_and_member_operations.sql"),

@@ -1,4 +1,4 @@
-import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
+import { authenticateOwnerPaymentRequest, commerceJson } from "@/lib/commerce/server";
 import {
   canonicalizeManualTransferText,
   MANUAL_TRANSFER_DEPOSITOR_NAME_MAX_LENGTH,
@@ -115,7 +115,7 @@ function normalizeShippingCreditReversalResult(value: unknown) {
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await authenticateOperatorStoreRequest(request, true);
+  const auth = await authenticateOwnerPaymentRequest(request, true);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner") {
     return commerceJson({ error: "forbidden" }, 403);

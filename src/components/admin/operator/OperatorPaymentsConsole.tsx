@@ -184,7 +184,7 @@ function sessionKey(payment: PaymentRow) {
   return `${SESSION_KEY_PREFIX}${payment.paymentKind}:${payment.paymentId}:${payment.receivedAmount}:${payment.ledgerEntryCount}:${payment.version}`;
 }
 
-export function OperatorPaymentsConsole() {
+export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface?: boolean }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [actorId, setActorId] = useState<string | null>(null);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
@@ -475,9 +475,9 @@ export function OperatorPaymentsConsole() {
     <div className="space-y-8">
       <div className="flex flex-col items-stretch justify-between gap-5 border-b border-ink pb-6 sm:flex-row sm:items-end">
         <div>
-          <p className="eyebrow text-muted">운영자 / 주문·입금 확인</p>
-          <h1 className="mt-3 text-3xl font-black tracking-[-.06em] sm:text-4xl sm:tracking-[-.08em]">주문·입금 확인</h1>
-          <p className="mt-3 text-sm text-muted">구매자별 주문 상품을 확인하고 잔액 전액을 한 번에 결제 확정합니다.</p>
+          <p className="eyebrow text-muted">{ownerSurface ? "소유자 / 입금 확인" : "운영자 / 주문·입금 확인"}</p>
+          <h1 className="mt-3 text-3xl font-black tracking-[-.06em] sm:text-4xl sm:tracking-[-.08em]">{ownerSurface ? "입금 확인" : "주문·입금 확인"}</h1>
+          <p className="mt-3 text-sm text-muted">구매자별 주문 상품과 원장 잔액을 확인하고 검증된 금액만 입금 확정합니다.</p>
         </div>
         <button className="flex items-center justify-center gap-2 border border-line px-4 py-3 text-xs font-bold" onClick={refresh} type="button">
           <RefreshCw size={13} /> 새로고침

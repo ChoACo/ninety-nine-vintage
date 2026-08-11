@@ -232,6 +232,30 @@ export async function authenticateStaffRequest(request: Request, mutation = fals
   };
 }
 
+/**
+ * Payment confirmation is an Owner-wide financial operation. It must not
+ * inherit the operator workspace's selected-store requirement: a shared
+ * payment can contain products from more than one store, while the database
+ * RPC already enforces the Owner-only confirmation policy.
+ */
+export async function authenticateOwnerPaymentRequest(
+  request: Request,
+  mutation = false,
+) {
+  const auth = await authenticateStaffRequest(request, mutation);
+  if (!auth.ok) return auth;
+  if (auth.roleCode !== "owner") {
+    return {
+      ok: false as const,
+      response: commerceJson({
+        error: "payment_forbidden",
+        message: "입금 확인 권한이 없습니다.",
+      }, 403),
+    };
+  }
+  return auth;
+}
+
 export interface OperatorStaffAuth {
   ok: true;
   roleCode: "owner" | "operator" | "employee";

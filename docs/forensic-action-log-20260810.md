@@ -9,7 +9,7 @@
 - 저장소: `C:\Users\rlaal\Documents\Codex\ninety-nine-homepage`
 - 기준 커밋: `ce65024 docs: record second forensic operating evidence`
 - 기준 포렌식 문서: `docs/full-system-forensic-audit-20260810.md`, `docs/forensic-result-1-20260810.md`, `docs/forensic-result-2-20260810.md`
-- 기준 테스트: core 335개 중 329 pass, 6 skip; lint/build 통과; migration parity 157개
+- 기준 테스트: core 338개 중 332 pass, 6 skip; lint/build 통과; migration parity 160개
 - 기준 운영 오류: `/admin/owner/site-status` 404, `/stores/dami-shop` 500, operator scope 오류, 12시간 큐 라벨 충돌, account 부분 오류
 
 ## 2. 1차 조치 완료
@@ -68,6 +68,15 @@
 - 조치: 기존 owner 행의 모드를 `owner_support`로 보정하고 만료시켜 재선택을 요구한다. `get_operator_store_scope()`도 역할이 바뀐 계정의 이전 모드를 클라이언트로 반환하지 않고 현재 역할의 정규 모드(`owner_support` 또는 `assigned`)로 반환한다.
 - 검증: 원격 계정의 모드가 `owner_support`로 보정된 뒤 소유자 운영자센터에서 센터 목록이 표시되고 `다미네` 선택 후 운영자 요약 API가 정상 응답했다.
 
+### 2.8 소유자 입금 확인 콘솔 연결 및 매장 범위 충돌 해소
+
+- 재현: `/admin/owner/payments`가 12시간 초과 요청 배너만 표시하고 실제 입금 확정·부분 입금·원장 조정·취소 UI를 제공하지 않았다. 기존 전체 콘솔은 `/admin/operator/payments`에만 있었지만 해당 직접 URL은 운영자 fulfillment로 redirect되어 소유자 업무 경로에서 사용할 수 없었다.
+- 영향 경로: `src/components/admin/owner/OwnerPaymentConfirmationQueue.tsx`의 긴급 큐 아래에 처리 화면이 없었고, 운영자 결제 API 3개가 `authenticateOperatorStoreRequest`를 사용해 소유자 세션에도 선택 매장을 요구했다.
+- 코드 경로: `src/app/(admin)/admin/owner/payments/page.tsx`, `src/components/admin/operator/OperatorPaymentsConsole.tsx`, `src/lib/commerce/server.ts`, `src/app/api/admin/operator/payments/route.ts`, `src/app/api/admin/operator/payments/[kind]/[id]/confirm/route.ts`, `src/app/api/admin/operator/transfers/[id]/ledger/route.ts`.
+- 조치: 소유자 결제 페이지에 기존 검증된 `OperatorPaymentsConsole`을 `ownerSurface` 모드로 마운트했다. `authenticateOwnerPaymentRequest`를 추가해 소유자 전용 결제 API는 운영자 선택 매장 범위를 요구하지 않도록 했으며, 최종 소유자 권한·CAS·멱등·원장 검증은 기존 DB RPC에 그대로 위임했다. 운영자 일반 API의 매장 범위 강제는 유지했다.
+- 회귀 계약: `tests/core/operator-payment-member-operations.test.mjs`, `tests/core/unified-inventory-fulfillment-v2.test.mjs`, `tests/core/operator-store-scope.test.mjs`에 소유자 결제 경로와 매장 범위 예외를 명시했다.
+- 검증: 전체 core test 338개 중 332 pass, 6 skip; lint 및 production build 통과. 실제 운영 입금 확정 mutation은 실행하지 않았다.
+
 ## 3. migration 적용 증거
 
 - `supabase db push --linked --dry-run`: 소유자 범위 보정 migration 1개 pending으로 확인.
@@ -77,9 +86,9 @@
 
 ## 4. 남은 실행 단계
 
-1. 전체 core test, lint, TypeScript/production build 재실행.
+1. 전체 core test, lint, TypeScript/production build 재실행. (완료: 338/332/6, lint/build 통과)
 2. `KAKAO_OIDC_REDIRECT_URI`는 Vercel Production에 존재함을 확인하고, local verifier는 안전한 도메인 값 주입으로 재현한다.
-3. 새 commit 생성 후 Vercel production 배포 완료.
+3. 새 commit 생성 후 Vercel production 배포 완료. (이번 실행에서 진행)
 4. `/BUILD_ID`, 공개 URL, site-status redirect, `dami-shop` 200, 비인증 API 401을 확인 완료.
 5. 실제 인증 세션에서 owner scope 선택은 재검증 완료했다. payment queue 12시간 필터, employee 업무, account member mode는 운영 데이터 보호를 위해 별도 세션 검증 대상으로 남긴다.
 6. Vercel alias·BUILD_ID·migration parity·rollback 기준을 아래 배포 증거에 기록한다.

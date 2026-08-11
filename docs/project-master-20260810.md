@@ -17,7 +17,7 @@
 ## 2. 현재 구현·검증 상태
 
 - 핵심 코드·DB·권한·원장·결제·물류·취소·상품·알림·UX·정산·스토리지 변경이 현재 브랜치에 반영되어 있다.
-- core test 337개 중 331개 통과, 6개 스킵, 실패 0.
+- core test 338개 중 332개 통과, 6개 스킵, 실패 0.
 - ESLint, TypeScript, production build 통과.
 - Supabase migration parity 160개 일치.
 - 운영 BUILD_ID는 현재 배포 커밋과 일치하지만 잔여 작업 완료를 뜻하지 않는다.
@@ -35,6 +35,7 @@
 - 운영자 배송 요청 전체 count RPC 추가 및 운영 DB 적용.
 - 직원 출고·채팅·택배 API 접근 경계 복구 및 직원센터 라벨 추가.
 - 계정 찜 개수를 전체 ID 기준으로 표시.
+- 소유자 입금 확인 페이지에 전체 원장 확인·입금 확정 콘솔을 연결하고, 소유자 결제 API에서 운영자 선택 매장 범위 충돌을 제거했다. (실제 입금 확정 mutation은 운영 데이터 보호를 위해 실행하지 않음)
 - 피드·shop 무결점 검토(5-2, 5-3)의 FD-03/04/06, SH-01/02/05 조치를 코드로 반영했다.
   - FD-04: `hasAnyBid`/`bidCount`를 서버 active outcome 기준으로 통일(그리드 `hasBidHistory ? active.length : participantCount`, StickyBidPanel 동일).
   - FD-06: 사이드바의 미사용 필터 필드(sizes/categories/liveOnly/closingOnly) 제거, 카드 store lookup을 `Map`으로 변경해 O(n·m)→O(1).

@@ -74,3 +74,11 @@ Supabase 161개 migration은 linked dry-run pending 0을 유지한다. 사이트
 카나리 cleanup 중 발견한 상품 pause/cron 충돌은 `2fbc08bf7c2a8b68275ad4ec3dea829518d7ec6e`에서 수정했고 Production `dpl_7nvP7xb4k5vwKbze8MbZj23TWt8w`로 배포했다. 배포 URL은 `ninety-nine-vintage-en4wgogiy-choa-co.vercel.app`, 상태는 `Ready`, apex/www alias와 `/BUILD_ID`는 이 SHA에 일치한다. 첫 CLI 배포 `dpl_HPuvP7p44Mo8PgDZa84SHEyKqAwF`는 Ready였으나 Git SHA metadata cache 때문에 이전 BUILD_ID를 반환해 완료 배포로 채택하지 않았고, force 및 명시적 Git metadata로 재배포했다.
 
 최종 코드 검증은 341개 중 335 pass, PortOne 6 skip, 실패 0이며 lint·TypeScript·production build 123 pages가 통과했다. Supabase migration `20260811121000_make_product_pause_persistent` 적용 후 로컬·원격 164개 일치, pause가 다음 분 cron을 지난 뒤에도 유지됨을 확인했다. 이 시점의 코드 롤백 지점은 `dpl_6GhzCYg2pzPovLVE5dctxBr12L33` / `1f23a6ad8c9eb08dd3e10f67d319ac5607e6bce1`이다.
+
+## 실제 소유자 역할 카나리 배포 갱신
+
+실제 소유자의 저장 역할과 JWT를 변경하지 않고 기존 운영자·직원 계정의 권한 principal만 3분간 사용하는 역할 카나리를 `747043fa5813cd4c0dcac761bc0487f711d2b09c`에 추가했다. Supabase migration `20260811122000_owner_role_canary_sessions` 적용 후 linked migration은 165개, pending 0이다. 카나리 테이블과 시작·종료 함수는 `service_role` 전용이고 `authenticated`에는 테이블 SELECT와 시작 함수 EXECUTE가 모두 없다. 시작과 종료는 append-only 감사 기록으로 남는다.
+
+Preview `dpl_95cKSDRYjRndz59u6ndfKErH92tQ`를 Vercel UI에서 Production `dpl_9Ka18izctTtmGDPdPBu52tQZfnum`으로 승격했다. 상태는 `Ready`, 배포 URL은 `ninety-nine-vintage-g37hpyyym-choa-co.vercel.app`, apex/www alias와 `/BUILD_ID`는 모두 전체 SHA에 일치한다. 직전 Production `dpl_6BGfXfbwz9vNcqeGxtbPwmaJDBDV`를 롤백 지점으로 보존한다.
+
+검증은 342개 중 336 pass, PortOne 6 skip, 실패 0이며 전체 lint·TypeScript·production build 123 pages가 통과했다. 운영 역할 rehearsal 종료 후 저장 역할은 `owner`, active principal은 `null`이다. 사이트 Chrome 로그인 세션은 배포 후 재확인 시 만료 상태여서 역할별 UI 재검증은 `PRODUCTION_UNVERIFIED_AUTH_SESSION`으로 남기고 maintenance를 유지한다.

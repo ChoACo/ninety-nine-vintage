@@ -138,3 +138,19 @@
 카나리용 숨김 회원과 결제·배송 감사 이력은 append-only 증거로 보존했다. 공개 카나리 즉시구매 상품은 일시중지했다. 실제 개인정보·토큰·비밀번호는 기록하지 않았다. 일반 회원 Kakao 로그인, 직원·타 매장 운영 권한, 채팅, 환불, push는 계속 `PRODUCTION_UNVERIFIED` 또는 `MUTATION_UNEXECUTED`다.
 
 상품 중지 확인창을 자동화하는 동안 첫 Chrome click이 timeout 뒤 지연 전달됐을 가능성을 먼저 조사했으나, canonical RPC 단일 실행에서도 다음 분 00초에 동일 현상이 재현됐다. 최종 원인은 매분 실행되는 자동공개 cron이 명시적 pause와 예약 pending을 구분하지 못한 것이며 F-16으로 수정했다. 최초 도구 원인 추정은 이 운영 재현으로 폐기한다.
+
+## 실제 소유자 역할 카나리 증거
+
+| ID | 증거 | 결과 |
+| --- | --- | --- |
+| ROLE-CAN-DEP-01 | Vercel Preview→Production | Preview `dpl_95cKSDRYjRndz59u6ndfKErH92tQ`, Production `dpl_9Ka18izctTtmGDPdPBu52tQZfnum`, Ready, SHA/BUILD_ID `747043fa5813cd4c0dcac761bc0487f711d2b09c` |
+| ROLE-CAN-DB-01 | migration·GRANT | `20260811122000`, linked 165/pending 0; authenticated table SELECT=false, begin EXECUTE=false |
+| ROLE-CAN-OP-01 | 소유자→다미네 운영자 3분 lease | effective role operator, principal `7a1acebf...`, owner bypass=false, assigned scope active |
+| ROLE-CAN-OP-02 | 운영자 세부 권한 | 다미네 manage/publish/prepare=true; receive/create=false; 나인티 나인 manage=false |
+| ROLE-CAN-EMP-01 | 소유자→다미네 직원 3분 lease | effective role employee, principal `4a21a65d...`, owner bypass=false |
+| ROLE-CAN-EMP-02 | 직원 세부 권한 | 다미네 manage=true; publish/manage_staff/view_reports=false; 나인티 나인 manage=false; operator scope·물류는 `42501` |
+| ROLE-CAN-END-01 | 명시 종료·자동 만료·감사 | 최종 stored/effective role owner, active principal null, session ended=true, append-only start/end 감사 8행 |
+| ROLE-CAN-CH-01 | Production Chrome | 배포 후 기존 사이트 세션 만료로 로그인 링크 확인; UI 역할 재현은 `PRODUCTION_UNVERIFIED_AUTH_SESSION` |
+| ROLE-CAN-TEST-01 | test/lint/tsc/build | 342 total, 336 pass, 6 retired PortOne skip; lint/tsc/build 123 pages 통과 |
+
+역할 카나리는 저장된 `account_access_roles`, Kakao identity/JWT, 매장 멤버십을 변경하지 않는다. service-only 3분 lease가 만료되거나 명시 종료되면 소유자 권한으로 자동 복원된다. 운영자·직원 DB 권한 판정은 확인됐지만 일반 회원 Kakao, 채팅, 환불, push 실제 전달과 authenticated SECURITY DEFINER 245개 개별 검토는 이 증거로 완료 처리하지 않는다.

@@ -36,5 +36,5 @@ test("the immutable owner can rehearse an existing operator or employee authoriz
   assert.match(sessionRoute, /roleCanaryActive/);
   assert.match(memberModeRoute, /end_owner_role_canary/);
   assert.match(storeScopeRoute, /scopedOperatorId = auth\.effectiveOperatorId \?\? auth\.userId/);
-  assert.match(storeScopeRoute, /auth\.admin[\s\S]*eq\("user_id", scopedOperatorId\)/);
+  assert.match(storeScopeRoute, /auth\.user[\s\S]*eq\("user_id", scopedOperatorId\)/);
 });

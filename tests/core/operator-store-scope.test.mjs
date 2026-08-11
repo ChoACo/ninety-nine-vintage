@@ -56,8 +56,8 @@ test("operator store scope API reads and writes the preference", async () => {
   assert.match(route, /from\("store_memberships"\)[\s\S]{0,220}eq\("status", "active"\)/);
   assert.match(route, /eq\("membership_role", "operator"\)/);
   assert.match(route, /scopedOperatorId = auth\.effectiveOperatorId \?\? auth\.userId/);
-  assert.match(route, /auth\.admin[\s\S]{0,120}from\("store_memberships"\)[\s\S]{0,180}eq\("user_id", scopedOperatorId\)/);
-  assert.match(route, /auth\.admin[\s\S]{0,180}\.from\("stores"\)[\s\S]{0,180}\.eq\("is_active", true\)/);
+  assert.match(route, /auth\.user[\s\S]{0,260}from\("store_memberships"\)[\s\S]{0,180}eq\("user_id", scopedOperatorId\)/);
+  assert.match(route, /auth\.user[\s\S]{0,180}\.from\("stores"\)[\s\S]{0,180}\.in\("id", storeIds\)/);
   assert.match(route, /commerceJson\(\{ scope, stores \}\)/);
 });
 

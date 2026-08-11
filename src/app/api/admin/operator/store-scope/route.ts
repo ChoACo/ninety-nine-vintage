@@ -64,7 +64,10 @@ export async function GET(request: Request) {
     }));
   } else {
     const scopedOperatorId = auth.effectiveOperatorId ?? auth.userId;
-    const { data: memberships, error: membershipError } = await auth.admin
+    // This table is deliberately unavailable to the service-role Data API.
+    // Its RLS policy resolves an Owner canary to the effective operator, so
+    // keep the scoped membership read on the authenticated client.
+    const { data: memberships, error: membershipError } = await auth.user
       .from("store_memberships")
       .select("store_id")
       .eq("user_id", scopedOperatorId)
@@ -77,7 +80,7 @@ export async function GET(request: Request) {
       (membership) => membership.store_id,
     );
     if (storeIds.length > 0) {
-      const { data: rows, error: storeError } = await auth.admin
+      const { data: rows, error: storeError } = await auth.user
         .from("stores")
         .select("id, name, slug")
         .in("id", storeIds)

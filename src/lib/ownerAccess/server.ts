@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { hasTrustedRequestOrigin } from "@/src/lib/kakao/oidc";
 import { createSupabaseServerClients } from "@/src/lib/supabase/server";
+import { getOwnerRoleCanaryState } from "@/lib/ownerRoleCanary.server";
 
 export class OwnerAccessRequestError extends Error {
   readonly status: number;
@@ -80,6 +81,14 @@ export async function authenticateOwnerAccessRequest(
   if (roleError) throw new OwnerAccessRequestError(500, "role_check_failed");
   if (role?.role_code !== "owner" || Number(role?.grade_level) !== 0) {
     throw new OwnerAccessRequestError(403, "forbidden");
+  }
+  try {
+    if ((await getOwnerRoleCanaryState(roleClient, data.user.id)).active) {
+      throw new OwnerAccessRequestError(403, "role_canary_active");
+    }
+  } catch (error) {
+    if (error instanceof OwnerAccessRequestError) throw error;
+    throw new OwnerAccessRequestError(503, "role_canary_unavailable");
   }
 
   return {

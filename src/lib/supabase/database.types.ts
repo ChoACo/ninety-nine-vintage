@@ -4109,6 +4109,72 @@ export type Database = {
           },
         ]
       }
+      owner_role_canary_audit: {
+        Row: {
+          action: string
+          id: string
+          metadata: Json
+          occurred_at: string
+          owner_id: string
+          reason: string
+          target_role: string
+          target_user_id: string
+        }
+        Insert: {
+          action: string
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          owner_id: string
+          reason: string
+          target_role: string
+          target_user_id: string
+        }
+        Update: {
+          action?: string
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          owner_id?: string
+          reason?: string
+          target_role?: string
+          target_user_id?: string
+        }
+        Relationships: []
+      }
+      owner_role_canary_sessions: {
+        Row: {
+          activated_at: string
+          ended_at: string | null
+          expires_at: string
+          owner_id: string
+          reason: string
+          target_role: string
+          target_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string
+          ended_at?: string | null
+          expires_at: string
+          owner_id: string
+          reason: string
+          target_role: string
+          target_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string
+          ended_at?: string | null
+          expires_at?: string
+          owner_id?: string
+          reason?: string
+          target_role?: string
+          target_user_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       owner_operator_delegation_audit: {
         Row: {
           action: string
@@ -7241,6 +7307,15 @@ export type Database = {
     }
     Functions: {
       access_role_for_user: { Args: { p_user_id: string }; Returns: string }
+      begin_owner_role_canary: {
+        Args: { p_owner_id: string; p_reason: string; p_target_user_id: string }
+        Returns: Json
+      }
+      current_authorization_principal: { Args: never; Returns: string }
+      end_owner_role_canary: {
+        Args: { p_owner_id: string; p_reason: string }
+        Returns: Json
+      }
       accrue_store_subscription_fees: {
         Args: { p_as_of?: string }
         Returns: Json
@@ -8997,6 +9072,10 @@ export type Database = {
       owner_member_mode_is_active: {
         Args: { p_user_id: string }
         Returns: boolean
+      }
+      owner_role_canary_principal: {
+        Args: { p_user_id: string }
+        Returns: string
       }
       owner_override_auction_price: {
         Args: {

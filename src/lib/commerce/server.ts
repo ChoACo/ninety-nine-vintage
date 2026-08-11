@@ -10,6 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { TEMPORARY_MEMBER_OWNER_ID } from "@/lib/ownerMemberMode";
 import { getOwnerMemberModeState } from "@/lib/ownerMemberMode.server";
+import { getOwnerRoleCanaryState } from "@/lib/ownerRoleCanary.server";
 
 export function commerceJson(body: unknown, status = 200) {
   const normalizedBody = body && typeof body === "object" && !Array.isArray(body)
@@ -184,9 +185,13 @@ export function normalizeIds(value: unknown): string[] {
 export async function authenticateStaffRequest(request: Request, mutation = false) {
   const auth = await authenticateCommerceRequest(request, mutation);
   if (!auth.ok) return auth;
+  let roleCanary = null;
   if (auth.userId === TEMPORARY_MEMBER_OWNER_ID) {
     try {
-      const memberMode = await getOwnerMemberModeState(auth.admin, auth.userId);
+      const [memberMode, canary] = await Promise.all([
+        getOwnerMemberModeState(auth.admin, auth.userId),
+        getOwnerRoleCanaryState(auth.admin, auth.userId),
+      ]);
       if (memberMode.active) {
         return {
           ok: false as const,
@@ -199,6 +204,7 @@ export async function authenticateStaffRequest(request: Request, mutation = fals
           ),
         };
       }
+      roleCanary = canary.active ? canary : null;
     } catch {
       return {
         ok: false as const,
@@ -212,23 +218,26 @@ export async function authenticateStaffRequest(request: Request, mutation = fals
       };
     }
   }
-  const { data: role, error } = await auth.admin
-    .from("account_access_roles")
-    .select("role_code, grade_level, reports_to_operator_id")
-    .eq("user_id", auth.userId)
-    .maybeSingle();
-  if (error) return { ok: false as const, response: commerceJson({ error: "role_unavailable", message: "운영 권한을 확인하지 못했습니다." }, 503) };
-  const roleCode = role?.role_code;
+  const roleResult = roleCanary
+    ? null
+    : await auth.admin
+      .from("account_access_roles")
+      .select("role_code, grade_level, reports_to_operator_id")
+      .eq("user_id", auth.userId)
+      .maybeSingle();
+  if (roleResult?.error) return { ok: false as const, response: commerceJson({ error: "role_unavailable", message: "운영 권한을 확인하지 못했습니다." }, 503) };
+  const role = roleResult?.data;
+  const roleCode = roleCanary?.roleCode ?? role?.role_code;
   if (roleCode !== "owner" && roleCode !== "operator" && roleCode !== "employee") {
     return { ok: false as const, response: commerceJson({ error: "forbidden", message: "운영 권한이 없습니다." }, 403) };
   }
   return {
     ...auth,
     roleCode,
-    gradeLevel: Number(role?.grade_level ?? 99),
+    gradeLevel: roleCanary?.gradeLevel ?? Number(role?.grade_level ?? 99),
     effectiveOperatorId: roleCode === "employee"
-      ? role?.reports_to_operator_id ?? null
-      : auth.userId,
+      ? roleCanary?.reportsToOperatorId ?? role?.reports_to_operator_id ?? null
+      : roleCanary?.targetUserId ?? auth.userId,
   };
 }
 

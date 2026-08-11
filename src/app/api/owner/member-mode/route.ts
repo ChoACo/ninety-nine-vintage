@@ -125,6 +125,27 @@ export async function POST(request: Request) {
     );
   }
 
+  const { error: canaryEndError } = await auth.admin.rpc(
+    "end_owner_role_canary",
+    {
+      p_owner_id: auth.userId,
+      p_reason: "owner member mode activated",
+    },
+  );
+  if (canaryEndError) {
+    await auth.admin
+      .from("owner_member_mode_sessions")
+      .update({ ended_at: now.toISOString(), updated_at: now.toISOString() })
+      .eq("owner_id", auth.userId);
+    return commerceJson(
+      {
+        error: "owner_member_mode_update_failed",
+        message: "기존 역할 카나리를 안전하게 종료하지 못했습니다.",
+      },
+      503,
+    );
+  }
+
   return commerceJson({
     active: true,
     eligible: true,

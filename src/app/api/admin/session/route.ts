@@ -1,5 +1,6 @@
 import { authenticateCommerceRequest, commerceJson } from "@/lib/commerce/server";
 import { getOwnerMemberModeState } from "@/lib/ownerMemberMode.server";
+import { getOwnerRoleCanaryState } from "@/lib/ownerRoleCanary.server";
 
 export async function GET(request: Request) {
   const auth = await authenticateCommerceRequest(request);
@@ -10,14 +11,20 @@ export async function GET(request: Request) {
   ]);
   if (profileError || roleError) return commerceJson({ error: "session_unavailable" }, 503);
   let memberModeActive = false;
+  let roleCanary = null;
   try {
-    memberModeActive = (
-      await getOwnerMemberModeState(auth.admin, auth.userId)
-    ).active;
+    const [memberMode, canary] = await Promise.all([
+      getOwnerMemberModeState(auth.admin, auth.userId),
+      getOwnerRoleCanaryState(auth.admin, auth.userId),
+    ]);
+    memberModeActive = memberMode.active;
+    roleCanary = canary.active ? canary : null;
   } catch {
     return commerceJson({ error: "session_unavailable" }, 503);
   }
-  const roleCode = memberModeActive ? "member" : role?.role_code ?? "member";
+  const roleCode = memberModeActive
+    ? "member"
+    : roleCanary?.roleCode ?? role?.role_code ?? "member";
   const isOwner = roleCode === "owner";
   const isStaff = isOwner || roleCode === "operator" || roleCode === "employee";
   const canAccessOperator = isOwner || roleCode === "operator";
@@ -27,13 +34,16 @@ export async function GET(request: Request) {
       userId: auth.userId,
       displayName: profile?.display_name ?? "빈티지 피플",
       roleCode,
-      gradeLevel: Number(role?.grade_level ?? 3),
+      gradeLevel: roleCanary?.gradeLevel ?? Number(role?.grade_level ?? 3),
       isStaff,
       isOwner,
       canAccessOperator,
       canAccessEmployee,
       canAccessOwner: isOwner,
       memberModeActive,
+      roleCanaryActive: roleCanary !== null,
+      roleCanaryTargetUserId: roleCanary?.targetUserId ?? null,
+      roleCanaryExpiresAt: roleCanary?.expiresAt ?? null,
     },
   });
 }

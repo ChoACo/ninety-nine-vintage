@@ -82,3 +82,13 @@ Supabase 161개 migration은 linked dry-run pending 0을 유지한다. 사이트
 Preview `dpl_95cKSDRYjRndz59u6ndfKErH92tQ`를 Vercel UI에서 Production `dpl_9Ka18izctTtmGDPdPBu52tQZfnum`으로 승격했다. 상태는 `Ready`, 배포 URL은 `ninety-nine-vintage-g37hpyyym-choa-co.vercel.app`, apex/www alias와 `/BUILD_ID`는 모두 전체 SHA에 일치한다. 직전 Production `dpl_6BGfXfbwz9vNcqeGxtbPwmaJDBDV`를 롤백 지점으로 보존한다.
 
 검증은 342개 중 336 pass, PortOne 6 skip, 실패 0이며 전체 lint·TypeScript·production build 123 pages가 통과했다. 운영 역할 rehearsal 종료 후 저장 역할은 `owner`, active principal은 `null`이다. 사이트 Chrome 로그인 세션은 배포 후 재확인 시 만료 상태여서 역할별 UI 재검증은 `PRODUCTION_UNVERIFIED_AUTH_SESSION`으로 남기고 maintenance를 유지한다.
+
+## 역할별 Chrome·채팅·push 카나리 갱신
+
+소유자 Kakao 세션 재로그인 후 저장 역할을 바꾸지 않는 3분 카나리로 다미네 운영자와 다미네 직원을 각각 확인했다. 운영자는 다미네 한 매장만 선택·조회했고 `/admin/owner` 접근이 차단됐다. 직원은 `/admin/employee`와 문의 화면을 조회했으며 `/admin/operator`, `/admin/owner` 접근이 차단됐다. 각 lease는 명시 종료되거나 만료됐고 소유자 권한 복귀를 Chrome에서 확인했다.
+
+채팅 카나리 중 role canary의 유효 principal이 support RLS·발신자·읽음 처리에 일관되게 적용되지 않는 결함을 발견했다. 추가형 migration `20260811124000_scope_support_chat_to_canary_principal`과 `20260811124500_scope_support_sender_and_reads_to_canary_principal`, 서버 발신자 수정 커밋 `9af47134a91d13c1aab14b6f39ffcb6c75260e4f`로 보완했다. Production `dpl_J9HE7KE18tpNEFTfo9KXLNQrs5dM`은 `Ready`이고 당시 `/BUILD_ID`가 해당 SHA와 일치했다.
+
+실제 소유자 구독 1건에 시험 push 알림 `3a97f404-ed4a-40b7-882b-89b1a1e9bab8`을 생성했다. Vault의 `web_push_dispatch_url` 누락을 발견해 공식 endpoint `https://www.ninety-nine-vintage.store/api/push/dispatch`를 등록했고, pg_net 요청은 HTTP 200, outbox는 attempts 1·`delivered_at=2026-08-11 20:58:30 KST`·오류 없음으로 완료됐다. VAPID·dispatch 비밀값은 조회하거나 문서화하지 않았다.
+
+최종 검증은 343개 중 337 pass, PortOne 6 skip, 실패 0이며 lint·TypeScript·production build 123 pages가 통과했다. 실제 환불 레코드가 0건이라 회원 환불 빈 상태는 확인했지만 금전 mutation은 실행하지 않았다. 사이트 상태는 계속 `maintenance`다.

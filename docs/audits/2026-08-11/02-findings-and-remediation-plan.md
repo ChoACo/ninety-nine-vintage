@@ -119,3 +119,12 @@ F-07은 `PARTIAL_PRODUCTION_CANARY`로 갱신한다. 소유자 Kakao 세션, 숨
 따라서 F-07의 DB 권한 판정 중 `직원·타 매장 운영자 권한`은 `PRODUCTION_DB_CANARY_VERIFIED`로 갱신한다. 다만 배포 후 Chrome의 기존 사이트 로그인이 만료돼 화면/API bearer 기반 역할별 재현은 여전히 `PRODUCTION_UNVERIFIED_AUTH_SESSION`이다. 일반 회원 Kakao, 채팅, 환불, push 실제 전달과 SECURITY DEFINER 245개 개별 검토도 계속 남는다.
 
 현재까지 재현한 P0/P1 기능 결함은 수정됐다. F-06 관측성 P2와 F-07의 남은 역할·채팅·환불 운영 증거가 있으므로 사이트 전체를 `NORMAL_OPERATION_CONFIRMED`로 선언하거나 maintenance를 해제하지 않는다.
+
+### 실제 세션 카나리 추가 결과
+
+- `F-07` 역할 UI: 다미네 운영자·직원 Chrome 카나리와 타 역할 화면 차단을 통과했다. 저장 역할/JWT/멤버십은 변경하지 않았고 lease 종료 후 소유자 화면 복귀를 확인했다.
+- `F-09` · P1 · role canary support chat principal 불일치: support RLS와 운영자 답변 `sender_id`가 `auth.uid()`에 고정돼 소유자 rehearsal에서 대화 미노출 또는 잘못된 발신자 기록이 발생했다. `current_authorization_principal()`로 대화 접근·insert·읽음 처리와 서버 발신자를 통일했고 재카나리에서 다미네 UUID 기록을 확인했다. `RESOLVED_PRODUCTION_CANARY`.
+- `F-10` · P1 · push dispatcher URL 누락: cron 자체는 성공했지만 Vault에 dispatch URL이 없어 outbox attempts가 0에 머물렀다. 공식 Production endpoint를 Vault에 등록한 뒤 동일 알림이 HTTP 200, attempts 1, delivered로 종료됐다. `RESOLVED_PRODUCTION_CONFIG`.
+- 환불: 운영 `manual_refunds`, `shipping_fee_refunds`에 유효 대상이 0건이라 개인정보·금전 이력을 인위적으로 만들지 않았다. 회원 화면 0건과 API 읽기는 정상이며 상태 변경은 `MUTATION_UNEXECUTED_NO_VALID_CASE`다.
+
+잔여 완료 경계는 일반 회원 본인 Kakao 로그인, 실제 유효 환불 건의 성공·실패 카나리, authenticated SECURITY DEFINER 함수 개별 권한 검토, 관측성 P2다. 이 항목 때문에 maintenance와 전체 정상 운영 선언 보류를 유지한다.

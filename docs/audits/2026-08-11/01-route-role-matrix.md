@@ -187,3 +187,17 @@
 | `/api/admin/operator/products/[id]/pause` 대응 RPC | 운영자 범위의 소유자 | 공개 카나리 즉시구매 상품을 pending으로 일시중지 `PASS` | CAN-PROD-01 |
 
 운영 일반 회원의 실제 Kakao 로그인, 직원 계정, 타 매장 운영자 직접 접근, 채팅 송수신, 환불 실행은 아직 이 표로 검증되지 않았다.
+
+## 실제 소유자 세션 역할·채팅·push 갱신
+
+| 경로·기능 | 역할 | 운영 판정 | 증거 |
+|---|---|---|---|
+| `/admin/operator`, `/admin/operator/products`, `/admin/operator/chat` | 다미네 운영자 principal | 다미네 단일 매장만 노출, 채팅 조회·답변 성공 `PASS_PRODUCTION_CANARY` | ROLE-CHROME-OP-01, CHAT-01 |
+| `/admin/owner` | 다미네 운영자 principal | 접근 차단 `PASS_PRODUCTION_CANARY` | ROLE-CHROME-OP-02 |
+| `/admin/employee`, `/admin/employee/inquiries` | 다미네 직원 principal | 담당 매장 화면·문의 조회 성공 `PASS_PRODUCTION_CANARY` | ROLE-CHROME-EMP-01 |
+| `/admin/operator`, `/admin/owner` | 다미네 직원 principal | 접근 차단 `PASS_PRODUCTION_CANARY` | ROLE-CHROME-EMP-02 |
+| `/chat` | 일반회원 모드 | 다미네 대화 생성·발신, 운영자 답변 수신 성공 `PASS_PRODUCTION_CANARY` | CHAT-01, CHAT-02 |
+| `/account` 환불 진행 상황 | 일반회원 모드 | 0건 빈 상태 렌더 성공; 실제 금전 환불은 대상 없음 `MUTATION_UNEXECUTED_NO_VALID_CASE` | REFUND-01 |
+| web push queue·dispatch | 실제 소유자 구독 | notification→outbox→HTTP 200→delivered 성공 `PASS_PRODUCTION_CANARY` | PUSH-01, PUSH-02 |
+
+채팅 최종 발신 메시지 `de435398-d915-4f13-a9a7-9d5a647f1517`은 다미네 운영자 UUID로 기록됐다. 앞서 결함 재현용 메시지의 소유자 발신자 기록은 append-only 감사 증거로 보존했다. 타 매장 scope 및 직원 직접 접근은 위 행에 한해 더 이상 `PRODUCTION_UNVERIFIED_AUTH_SESSION`이 아니다. 실제 환불 금전 mutation과 일반 회원 자신의 Kakao 로그인은 별도 유효 대상이 없어 완료 처리하지 않는다.

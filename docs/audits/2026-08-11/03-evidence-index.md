@@ -154,3 +154,21 @@
 | ROLE-CAN-TEST-01 | test/lint/tsc/build | 342 total, 336 pass, 6 retired PortOne skip; lint/tsc/build 123 pages 통과 |
 
 역할 카나리는 저장된 `account_access_roles`, Kakao identity/JWT, 매장 멤버십을 변경하지 않는다. service-only 3분 lease가 만료되거나 명시 종료되면 소유자 권한으로 자동 복원된다. 운영자·직원 DB 권한 판정은 확인됐지만 일반 회원 Kakao, 채팅, 환불, push 실제 전달과 authenticated SECURITY DEFINER 245개 개별 검토는 이 증거로 완료 처리하지 않는다.
+
+## 실제 세션 역할·채팅·push 카나리 증거
+
+| ID | 증거 | 판정 |
+|---|---|---|
+| ROLE-CHROME-OP-01 | Production Chrome `/admin/operator`·products·chat | 다미네 한 매장만 노출, 상품·상담 렌더 `PASS` |
+| ROLE-CHROME-OP-02 | Production Chrome `/admin/owner` | 다미네 운영자 principal 차단 `PASS` |
+| ROLE-CHROME-EMP-01 | Production Chrome `/admin/employee`·inquiries | 다미네 직원 담당 화면 렌더 `PASS` |
+| ROLE-CHROME-EMP-02 | Production Chrome `/admin/operator`·`/admin/owner` | 직원 principal 차단 `PASS` |
+| CHAT-01 | conversation `9ac9da21-754b-4359-ad71-eef1d5007f74` | 일반회원 모드→다미네 발신, 다미네 운영자 답변, 회원 수신 `PASS` |
+| CHAT-02 | message `de435398-d915-4f13-a9a7-9d5a647f1517` DB 조회 | 최종 운영자 답변 sender `7a1acebf-5b11-4a4d-aac5-c0b29980f4fc` `PASS` |
+| REFUND-01 | `/account`·DB count | 환불 진행 0건 정상 렌더; 유효 금전 대상 없음 `MUTATION_UNEXECUTED_NO_VALID_CASE` |
+| PUSH-01 | notification `3a97f404-ed4a-40b7-882b-89b1a1e9bab8` | 실제 소유자 active subscription 1건에 durable outbox 생성 `PASS` |
+| PUSH-02 | pg_net request 8·outbox DB | HTTP 200, attempts 1, delivered 2026-08-11 20:58:30 KST, last_error null `PASS` |
+| DB-ROLE-05 | migrations `20260811113426`, `20260811113535`, `20260811124000`, `20260811124500` | role canary membership·chat principal·sender·read scope 보완, linked 적용 `PASS` |
+| QA-ROLE-05 | `npm test`, lint, `tsc --noEmit`, production build | 343 total, 337 pass, 6 intentional skip, 0 fail; lint/types/build 123 pages `PASS` |
+
+push 카나리에서 누락된 Vault dispatch URL만 공식 운영 endpoint로 등록했다. VAPID private key·dispatch secret·세션 토큰은 조회하거나 출력하지 않았다. 역할 lease는 종료 또는 만료됐으며 Chrome에서 소유자 화면 복귀를 확인했다. authenticated SECURITY DEFINER 245개 개별 검토와 유효 환불 mutation은 이 표의 완료 범위에 포함하지 않는다.

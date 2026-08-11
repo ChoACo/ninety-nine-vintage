@@ -131,14 +131,17 @@ test("employees can handle only their assigned store chats and receive role-corr
 });
 
 test("support chat policies follow the bounded Owner canary principal", async () => {
-  const migration = await source(
-    "supabase/migrations/20260811124000_scope_support_chat_to_canary_principal.sql",
-  );
+  const [migration, senderMigration] = await Promise.all([
+    source("supabase/migrations/20260811124000_scope_support_chat_to_canary_principal.sql"),
+    source("supabase/migrations/20260811124500_scope_support_sender_and_reads_to_canary_principal.sql"),
+  ]);
 
   assert.match(migration, /current_authorization_principal\(\)/);
   assert.match(migration, /assigned_staff_id = actor\.principal_id/);
   assert.match(migration, /memberships\.user_id = actor\.principal_id/);
   assert.match(migration, /is_support_member\(actor\.session_id\)/);
+  assert.match(senderMigration, /sender_id = \(select public\.current_authorization_principal\(\)\)/);
+  assert.match(senderMigration, /v_user_id uuid := public\.current_authorization_principal\(\)/);
 });
 
 test("realtime chat events render an unread badge and dismissible five-second toast", async () => {

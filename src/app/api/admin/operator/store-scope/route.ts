@@ -63,10 +63,11 @@ export async function GET(request: Request) {
       slug: store.slug,
     }));
   } else {
-    const { data: memberships, error: membershipError } = await auth.user
+    const scopedOperatorId = auth.effectiveOperatorId ?? auth.userId;
+    const { data: memberships, error: membershipError } = await auth.admin
       .from("store_memberships")
       .select("store_id")
-      .eq("user_id", auth.userId)
+      .eq("user_id", scopedOperatorId)
       .eq("status", "active")
       .eq("membership_role", "operator");
     if (membershipError) {
@@ -76,7 +77,7 @@ export async function GET(request: Request) {
       (membership) => membership.store_id,
     );
     if (storeIds.length > 0) {
-      const { data: rows, error: storeError } = await auth.user
+      const { data: rows, error: storeError } = await auth.admin
         .from("stores")
         .select("id, name, slug")
         .in("id", storeIds)

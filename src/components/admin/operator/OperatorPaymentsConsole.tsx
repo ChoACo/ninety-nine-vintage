@@ -8,6 +8,7 @@ import {
   clearPendingManualTransferReceipt,
   getOrCreatePendingManualTransferReceipt,
   MANUAL_TRANSFER_DEPOSITOR_NAME_MAX_LENGTH,
+  MANUAL_TRANSFER_MEMO_MAX_LENGTH,
   manualTransferCancellationFingerprint,
   manualTransferReceiptFingerprint,
   manualTransferReversalFingerprint,
@@ -204,6 +205,8 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
   const [confirmationAmounts, setConfirmationAmounts] = useState<Record<string, string>>({});
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [cancellationTarget, setCancellationTarget] = useState<PaymentRow | null>(null);
+  const [cancellationReason, setCancellationReason] = useState("");
   const [notice, setNotice] = useState("");
 
   const load = useCallback(async (
@@ -466,11 +469,20 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
     }
   };
 
-  const cancelPending = async (payment: PaymentRow) => {
+  const openCancellation = (payment: PaymentRow) => {
+    if (busyKey || !canCancelPendingPayment(payment, ownerSurface)) return;
+    setNotice("");
+    setCancellationReason("");
+    setCancellationTarget(payment);
+  };
+
+  const cancelPending = async (payment: PaymentRow, rawReason: string) => {
     if (!accessToken || !actorId || busyKey || !canCancelPendingPayment(payment, ownerSurface)) return;
-    const reason = window.prompt("입금 요청을 취소하는 사유를 입력해 주세요.");
-    if (!reason?.trim()) return;
-    if (!window.confirm("입금액이 없는 결제 대기 주문을 소유자 권한으로 취소하고 상품을 다시 판매 가능 상태로 돌리겠습니까?")) return;
+    const reason = rawReason.trim();
+    if (reason.length < 3) {
+      setNotice("입금 요청 취소 사유를 3자 이상 입력해 주세요.");
+      return;
+    }
     const key = sessionKey(payment);
     const cancellationScope = `unified:${payment.paymentKind}:${payment.paymentId}:cancel`;
     const cancellationFingerprint = await manualTransferCancellationFingerprint({
@@ -519,6 +531,8 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
         );
       }
       clearPendingManualTransferReceipt(actorId, cancellationScope, cancellationFingerprint);
+      setCancellationTarget(null);
+      setCancellationReason("");
       setExpandedKey(null);
       setNotice("입금 요청을 취소하고 상품을 다시 판매 가능 상태로 돌렸습니다.");
       await load(accessToken, includeHistory, offset);
@@ -647,7 +661,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
                       <button
                         className="h-9 border border-line px-3 text-[11px] font-bold disabled:opacity-40"
                         disabled={busyKey !== null}
-                        onClick={() => void cancelPending(payment)}
+                        onClick={() => openCancellation(payment)}
                         type="button"
                       >
                         입금 요청 취소
@@ -771,7 +785,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
                   </button>
                 )}
                 {cancellable && (
-                  <button className="h-11 border border-line px-5 text-xs font-bold disabled:opacity-40" disabled={busyKey !== null} onClick={() => void cancelPending(selectedPayment)} type="button">
+                  <button className="h-11 border border-line px-5 text-xs font-bold disabled:opacity-40" disabled={busyKey !== null} onClick={() => openCancellation(selectedPayment)} type="button">
                     입금 요청 취소
                   </button>
                 )}
@@ -779,6 +793,63 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
             </div>
           );
         })()}
+      </PremiumDialog>
+
+      <PremiumDialog
+        ariaLabel="입금 요청 취소 확인"
+        closeDisabled={busyKey !== null}
+        onClose={() => {
+          if (busyKey === null) {
+            setCancellationTarget(null);
+            setCancellationReason("");
+          }
+        }}
+        open={cancellationTarget !== null}
+        panelClassName="max-w-lg"
+        zIndexClassName="z-[140]"
+      >
+        {cancellationTarget && (
+          <div className="p-5 sm:p-7">
+            <p className="eyebrow text-muted">소유자 일방 취소</p>
+            <h2 className="mt-2 text-xl font-black">입금 요청을 취소할까요?</h2>
+            <p className="mt-3 text-sm text-muted">
+              입금액이 없는 결제 대기 주문만 취소할 수 있습니다. 취소 후 주문과 상품 예약이 해제되고 구매자에게 알림이 전송됩니다.
+            </p>
+            <label className="mt-5 block text-xs font-bold" htmlFor="payment-cancellation-reason">취소 사유</label>
+            <textarea
+              autoFocus
+              className="mt-2 min-h-28 w-full resize-y border border-line bg-paper px-3 py-3 text-sm"
+              id="payment-cancellation-reason"
+              maxLength={MANUAL_TRANSFER_MEMO_MAX_LENGTH}
+              onChange={(event) => setCancellationReason(event.target.value)}
+              placeholder="예: 입금 기한 경과로 주문을 취소합니다."
+              value={cancellationReason}
+            />
+            <p className="mt-2 text-[11px] text-muted">3자 이상 입력해 주세요. 실제 입금·부분 입금 건은 이 기능으로 취소할 수 없습니다.</p>
+            {notice && <p aria-live="polite" className="mt-4 border border-line bg-surface px-4 py-3 text-xs font-bold">{notice}</p>}
+            <div className="mt-6 flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-end">
+              <button
+                className="h-11 border border-line px-5 text-xs font-bold"
+                disabled={busyKey !== null}
+                onClick={() => {
+                  setCancellationTarget(null);
+                  setCancellationReason("");
+                }}
+                type="button"
+              >
+                닫기
+              </button>
+              <button
+                className="h-11 bg-ink px-5 text-xs font-black text-paper disabled:opacity-40"
+                disabled={busyKey !== null || cancellationReason.trim().length < 3}
+                onClick={() => void cancelPending(cancellationTarget, cancellationReason)}
+                type="button"
+              >
+                {busyKey ? "처리 중..." : "입금 요청 취소 확정"}
+              </button>
+            </div>
+          </div>
+        )}
       </PremiumDialog>
 
       <div className="flex items-center justify-between gap-4">

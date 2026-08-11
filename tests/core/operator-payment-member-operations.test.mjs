@@ -114,6 +114,9 @@ test("owner can cancel only an unpaid fixed-price payment request with an audite
   assert.match(route, /observedReceivedAmount !== 0/);
   assert.match(consoleSource, /canCancelPendingPayment/);
   assert.match(consoleSource, /입금 요청 취소/);
+  assert.match(consoleSource, /입금 요청 취소 확정/);
+  assert.match(consoleSource, /cancellationReason\.trim\(\)\.length < 3/);
+  assert.doesNotMatch(consoleSource, /window\.prompt\("입금 요청을 취소하는 사유/);
   assert.match(consoleSource, /manualTransferCancellationFingerprint/);
   assert.match(receiptSource, /interface CancellationFingerprintInput/);
 });

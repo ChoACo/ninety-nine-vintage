@@ -46,6 +46,9 @@ async function fetchActiveBidItems(
     | (BidPayload & { error?: string })
     | null;
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error("로그인 상태가 만료되었습니다. 다시 로그인해 주세요.");
+    }
     throw new Error(payload?.error ?? "입찰 상품을 불러오지 못했습니다.");
   }
   return (payload?.items ?? []).filter(
@@ -161,6 +164,9 @@ export function ActiveBidProducts({
         return;
       }
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          throw new Error("로그인 상태가 만료되었습니다. 다시 로그인해 주세요.");
+        }
         throw new Error(payload?.error ?? "간편입찰을 완료하지 못했습니다.");
       }
       setConfirmItem(null);

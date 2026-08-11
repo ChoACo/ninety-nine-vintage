@@ -204,13 +204,15 @@ test("a server-recorded anti-sniping overtime stays closing-soon during the dail
 });
 
 test("restored feed UI uses separated desktop and mobile routes with authoritative account and product APIs", async () => {
-  const [feedPage, mobileFeedPage, grid, sidebar, card, summary, bidRoutePanel, interceptedBid, history, gallery, detailPanel, bidApi, productApi, productService, detailView] = await Promise.all([
+  const [feedPage, mobileFeedPage, mobileBidPage, grid, sidebar, card, summary, activeBids, bidRoutePanel, interceptedBid, history, gallery, detailPanel, bidApi, productApi, productService, detailView] = await Promise.all([
     source("src/app/(shop)/feed/page.tsx"),
     source("src/app/(mobile)/m/feed/page.tsx"),
+    source("src/app/(mobile)/m/auction/[id]/bid/page.tsx"),
     source("src/components/features/auction/AuctionFeedGrid.tsx"),
     source("src/components/features/auction/AuctionFilterSidebar.tsx"),
     source("src/components/features/auction/AuctionFeedCard.tsx"),
     source("src/components/features/auction/AuctionBidSummary.tsx"),
+    source("src/components/features/auction/ActiveBidProducts.tsx"),
     source("src/components/features/auction/detail/AuctionBidRoutePanel.tsx"),
     source("src/app/(shop)/@modal/(.)auction/[id]/bid/page.tsx"),
     source("src/components/features/auction/AuctionBidHistoryModal.tsx"),
@@ -225,6 +227,9 @@ test("restored feed UI uses separated desktop and mobile routes with authoritati
   assert.match(feedPage, /surface="desktop"/);
   assert.match(mobileFeedPage, /basePath="\/m"/);
   assert.match(mobileFeedPage, /surface="mobile"/);
+  assert.match(mobileBidPage, /fetchPublishedProduct\(id\)/);
+  assert.match(mobileBidPage, /product\.saleType !== "auction"\) notFound\(\)/);
+  assert.match(activeBids, /로그인 상태가 만료되었습니다\. 다시 로그인해 주세요\./);
   assert.match(grid, /paginateAuctionFeed\(visibleCards, page\)/);
   assert.match(sidebar, /상품명·설명 검색/);
   assert.match(sidebar, /브랜드 카테고리/);

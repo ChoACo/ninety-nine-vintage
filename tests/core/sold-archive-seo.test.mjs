@@ -50,10 +50,11 @@ test("sold RPCs expose only archive-safe fields with cursor and brand filtering"
 });
 
 test("sold routes own their canonical, structured data and safe 404 boundary", async () => {
-  const [shopLayout, soldPage, brandPage, detailPage, sitemap, robots] = await Promise.all([
+  const [shopLayout, soldPage, brandPage, mobileBrandPage, detailPage, sitemap, robots] = await Promise.all([
     source("src/app/(shop)/layout.tsx"),
     source("src/app/(shop)/sold/page.tsx"),
     source("src/app/(shop)/sold/brand/[slug]/page.tsx"),
+    source("src/app/(mobile)/m/sold/brand/[slug]/page.tsx"),
     source("src/app/(shop)/sold/[id]/page.tsx"),
     source("src/app/sitemap.ts"),
     source("src/app/robots.ts"),
@@ -62,6 +63,9 @@ test("sold routes own their canonical, structured data and safe 404 boundary", a
   assert.match(soldPage, /canonical:\s*"\/sold"/);
   assert.match(brandPage, /alternates:\s*\{ canonical: url, media:/);
   assert.match(brandPage, /decodeURIComponent\(value\)/);
+  assert.match(mobileBrandPage, /decodeURIComponent\(value\)/);
+  assert.match(mobileBrandPage, /fetchSoldBrands\(\)/);
+  assert.match(mobileBrandPage, /brand\.brand_slug === slug\)\) notFound\(\)/);
   assert.match(detailPage, /UUID_PATTERN\.test\(id\).*notFound\(\)/s);
   assert.match(detailPage, /"@type":\s*"Product"/);
   assert.match(detailPage, /https:\/\/schema\.org\/SoldOut/);

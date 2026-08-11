@@ -81,34 +81,30 @@ test("single registration requires a feed title while keeping description and ca
   assert.match(filters, /post\.gender === "남성"/);
 });
 
-test("the immutable owner receives a server-timed three-minute member mode", async () => {
+test("owner member mode is retired in favor of a dedicated production member account", async () => {
   const [
-    migration,
+    legacyMigration,
     roleContractRepair,
     creditRepair,
-    constants,
-    route,
-    provider,
-    serverState,
+    retirement,
+    checkoutEligibility,
+    testMemberRoute,
+    testMemberPage,
     serverAuth,
     dashboard,
   ] = await Promise.all([
     source("supabase/migrations/20260724123534_owner_member_mode_product_gender.sql"),
     source("supabase/migrations/20260811094959_restore_hidden_test_member_role_contract.sql"),
     source("supabase/migrations/20260811095613_fix_hidden_test_initial_shipping_credits.sql"),
-    source("src/lib/ownerMemberMode.ts"),
-    source("src/app/api/owner/member-mode/route.ts"),
-    source("src/components/features/auth/OwnerMemberModeProvider.tsx"),
-    source("src/lib/ownerMemberMode.server.ts"),
+    source("supabase/migrations/20260811194500_retire_owner_member_mode.sql"),
+    source("supabase/migrations/20260811202500_allow_production_test_member_checkout.sql"),
+    source("src/app/api/auth/test-member/route.ts"),
+    source("src/app/(shop)/account/test-member/page.tsx"),
     source("src/lib/commerce/server.ts"),
     source("src/components/admin/owner/OwnerDashboard.tsx"),
   ]);
 
-  for (const text of [migration, constants]) {
-    assert.match(text, /30be08c2-6259-42c6-af26-4ded6362de12/);
-  }
-  assert.match(migration, /insert into public\.member_accounts/);
-  assert.match(migration, /when public\.owner_member_mode_is_active\(p_user_id\) then 'member'/);
+  assert.match(legacyMigration, /insert into public\.member_accounts/);
   assert.match(
     roleContractRepair,
     /roles\.role_code = 'member'[\s\S]*public\.is_owner_hidden_test_member\(roles\.user_id\)[\s\S]*then 'member'/,
@@ -121,17 +117,26 @@ test("the immutable owner receives a server-timed three-minute member mode", asy
     roleContractRepair,
     /v_is_hidden_test[\s\S]*new\.role_code <> 'member'[\s\S]*not v_is_hidden_test[\s\S]*auth_user_has_kakao_identity/,
   );
-  assert.match(route, /OWNER_MEMBER_MODE_DURATION_MS/);
-  assert.match(route, /action === "extend"/);
-  assert.match(route, /action === "end"/);
-  assert.match(provider, /3분 연장/);
-  assert.match(provider, /즉시 종료/);
-  assert.match(provider, /remainingSeconds/);
-  assert.match(provider, /clockOffsetMs/);
-  assert.match(provider, /new Date\(payload\.serverNow\)\.getTime\(\) - Date\.now\(\)/);
-  assert.match(serverState, /serverNow: serverNow\.toISOString\(\)/);
-  assert.match(serverAuth, /member_mode_active/);
-  assert.match(dashboard, /3분간 회원 권한 활성화/);
+  assert.match(retirement, /select false/);
+  assert.match(retirement, /revoke insert, update, delete on public\.owner_member_mode_sessions/);
+  assert.match(
+    retirement,
+    /current_access_role\(\) = 'member'[\s\S]*is_owner_hidden_test_member\(auth\.uid\(\)\)/,
+  );
+  assert.match(
+    checkoutEligibility,
+    /v_is_production_test_member := public\.is_owner_hidden_test_member\(v_user_id\)/,
+  );
+  assert.match(
+    checkoutEligibility,
+    /not public\.auth_user_has_kakao_identity\(v_user_id\)[\s\S]*not v_is_production_test_member/,
+  );
+  assert.match(testMemberRoute, /signInWithPassword/);
+  assert.match(testMemberRoute, /hidden_test/);
+  assert.match(testMemberRoute, /enforceTestMemberLoginRateLimit/);
+  assert.match(testMemberPage, /index: false/);
+  assert.doesNotMatch(serverAuth, /getOwnerMemberModeState|member_mode_active/);
+  assert.doesNotMatch(dashboard, /회원 화면 임시 확인|3분간 회원 권한 활성화/);
 });
 
 test("brand choices are derived from the complete registered-product catalog", async () => {

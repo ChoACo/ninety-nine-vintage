@@ -1,5 +1,4 @@
 import { authenticateCommerceRequest, commerceJson } from "@/lib/commerce/server";
-import { getOwnerMemberModeState } from "@/lib/ownerMemberMode.server";
 import { getOwnerRoleCanaryState } from "@/lib/ownerRoleCanary.server";
 
 export async function GET(request: Request) {
@@ -10,21 +9,14 @@ export async function GET(request: Request) {
     auth.admin.from("account_access_roles").select("role_code, grade_level, reports_to_operator_id").eq("user_id", auth.userId).maybeSingle(),
   ]);
   if (profileError || roleError) return commerceJson({ error: "session_unavailable" }, 503);
-  let memberModeActive = false;
   let roleCanary = null;
   try {
-    const [memberMode, canary] = await Promise.all([
-      getOwnerMemberModeState(auth.admin, auth.userId),
-      getOwnerRoleCanaryState(auth.admin, auth.userId),
-    ]);
-    memberModeActive = memberMode.active;
+    const canary = await getOwnerRoleCanaryState(auth.admin, auth.userId);
     roleCanary = canary.active ? canary : null;
   } catch {
     return commerceJson({ error: "session_unavailable" }, 503);
   }
-  const roleCode = memberModeActive
-    ? "member"
-    : roleCanary?.roleCode ?? role?.role_code ?? "member";
+  const roleCode = roleCanary?.roleCode ?? role?.role_code ?? "member";
   const isOwner = roleCode === "owner";
   const isStaff = isOwner || roleCode === "operator" || roleCode === "employee";
   const canAccessOperator = isOwner || roleCode === "operator";
@@ -40,7 +32,7 @@ export async function GET(request: Request) {
       canAccessOperator,
       canAccessEmployee,
       canAccessOwner: isOwner,
-      memberModeActive,
+      memberModeActive: false,
       roleCanaryActive: roleCanary !== null,
       roleCanaryTargetUserId: roleCanary?.targetUserId ?? null,
       roleCanaryExpiresAt: roleCanary?.expiresAt ?? null,

@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { TEMPORARY_MEMBER_OWNER_ID } from "@/lib/ownerMemberMode";
+import { IMMUTABLE_OWNER_ID } from "@/lib/ownerIdentity";
 
 export type OwnerRoleCanaryRole = "operator" | "employee";
 
@@ -33,7 +33,7 @@ export async function getOwnerRoleCanaryState(
     serverNow: serverNow.toISOString(),
   } satisfies OwnerRoleCanaryState;
 
-  if (userId !== TEMPORARY_MEMBER_OWNER_ID) return inactive;
+  if (userId !== IMMUTABLE_OWNER_ID) return inactive;
 
   const [{ data: ownerRole, error: ownerRoleError }, { data: lease, error: leaseError }] =
     await Promise.all([

@@ -26,6 +26,16 @@ function buildRatelimit(prefix: string): Ratelimit | null {
 
 const bidLimiter = buildRatelimit("ratelimit:auction-bids");
 const cartLimiter = buildRatelimit("ratelimit:cart");
+const testMemberLoginLimiter = (() => {
+  const redis = buildRedis();
+  if (!redis) return null;
+  return new Ratelimit({
+    redis,
+    prefix: "ratelimit:production-test-member-login",
+    limiter: Ratelimit.slidingWindow(5, "10 m"),
+    analytics: true,
+  });
+})();
 
 export function getClientIp(request: Request): string | null {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -79,6 +89,21 @@ export async function enforceCartRateLimit(
     if (!result.success) return { ok: false, response: limitedResponse() };
     return { ok: true };
   } catch {
+    return { ok: true };
+  }
+}
+
+export async function enforceTestMemberLoginRateLimit(
+  request: Request,
+): Promise<RateLimitResult> {
+  if (!testMemberLoginLimiter) return { ok: true };
+  try {
+    const result = await testMemberLoginLimiter.limit(identifier(null, request));
+    if (!result.success) return { ok: false, response: limitedResponse() };
+    return { ok: true };
+  } catch {
+    // Supabase Auth still applies its own authentication rate limits when the
+    // optional edge limiter is temporarily unavailable.
     return { ok: true };
   }
 }

@@ -410,7 +410,7 @@ function AccountDashboardForSession({
             [auctionResponse, fixedResponse].filter((response) => response && !response.ok).length;
           setMemberAccessRequired(requiresMemberAccess);
           if (requiresMemberAccess) {
-            setNotice("현재 로그인한 계정은 경매 입찰용 회원 계정이 아닙니다. 소유자 센터에서 임시 회원 권한을 활성화한 뒤 다시 시도해 주세요.");
+            setNotice("현재 로그인한 계정은 일반 회원 계정이 아닙니다. 회원 계정으로 다시 로그인해 주세요.");
           } else if (unavailableCount > 0) {
             setNotice("일부 계정 정보를 불러오지 못했습니다. 다른 메뉴는 계속 이용할 수 있습니다.");
           }

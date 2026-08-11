@@ -3,7 +3,6 @@ import Script from "next/script";
 import { ChatNotificationProvider } from "@/components/features/chat/ChatNotificationProvider";
 import { GlobalToastHost } from "@/components/features/notifications/GlobalToastHost";
 import { NotificationExperienceProvider } from "@/components/features/notifications/NotificationExperienceProvider";
-import { OwnerMemberModeProvider } from "@/components/features/auth/OwnerMemberModeProvider";
 import { SimpleModeProvider } from "@/components/features/accessibility/SimpleModeProvider";
 import "./globals.css";
 
@@ -64,13 +63,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: themeInitializationScript }}
         />
-        <OwnerMemberModeProvider>
-          <SimpleModeProvider>
-            <NotificationExperienceProvider>
-              <ChatNotificationProvider>{children}</ChatNotificationProvider>
-            </NotificationExperienceProvider>
-          </SimpleModeProvider>
-        </OwnerMemberModeProvider>
+        <SimpleModeProvider>
+          <NotificationExperienceProvider>
+            <ChatNotificationProvider>{children}</ChatNotificationProvider>
+          </NotificationExperienceProvider>
+        </SimpleModeProvider>
         <GlobalToastHost />
       </body>
     </html>

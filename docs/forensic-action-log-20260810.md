@@ -85,13 +85,15 @@
 - API 경로: `src/app/api/admin/operator/payments/[kind]/[id]/cancel/route.ts`
 - UI 경로: `src/components/admin/operator/OperatorPaymentsConsole.tsx`
 - 조치: 소유자 전용 RPC가 주문·입금 요청·상품을 잠그고 CAS(version)와 원장 누적액/건수를 재검증한다. `awaiting_transfer` + `awaiting_payment` + 원장 0원일 때만 `cancelled` 처리하며, 주문 항목을 취소하고 닫혀 있던 고정가 상품을 안전하게 `active`로 복구한다. 사유·actor·멱등 키·fingerprint·이전 상태는 append-only 취소 이벤트로 보존하고 구매자에게 알림을 남긴다.
+- 보완: 취소된 `cancelled`/`cancelled_unpaid` 상태는 결제 큐 조회에서도 제외하여 취소 후 대기 목록에 재노출되지 않도록 했다. 경로: `src/app/api/admin/operator/payments/route.ts`.
 - 검증: 전체 core test 339개 중 333 pass, 6 skip; lint/build 통과; migration parity 161개. 인증 소유자 화면에서 3개 대기 행에 취소 버튼 표시를 확인했으며 실제 취소 mutation은 실행하지 않았다.
 
 ## 3. migration 적용 증거
 
-- `supabase db push --linked --dry-run`: 소유자 범위 보정 migration 1개 pending으로 확인.
+- `supabase db push --linked --dry-run`: 현재 pending migration 없음.
 - `supabase db push --linked --yes`: `20260811090000_reconcile_owner_operator_store_scope_mode.sql` 적용 완료.
-- `npm run verify:migrations`: `PASS migration parity (160 linked migrations)`.
+- `supabase db push --linked --yes`: `20260811120000_owner_cancel_pending_commerce_payment.sql` 적용 완료.
+- `npm run verify:migrations`: `PASS migration parity (161 linked migrations)`.
 - Supabase CLI가 Docker catalog cache를 갱신하지 못했다는 경고가 있었으나 원격 migration 적용 자체는 완료되었다. 로컬 Docker 기반 reset 검증은 별도 환경 게이트로 남긴다.
 
 ## 4. 남은 실행 단계
@@ -108,14 +110,15 @@
 - 1차 production 배포: Vercel `dpl_5W1jKm4mZ9wF86s4V94W9siiT9QC`, alias `https://www.ninety-nine-vintage.store`, BUILD_ID `89d4933...` 확인.
 - 최종 production 배포: Vercel `dpl_4vaQoK44LhPe5NF1tifaUAqFvMjf`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`.
 - 소유자 입금 확인 콘솔 배포: Vercel `dpl_GPysWuRVUHQSxTV7unfHX61dhgHt`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`, 배포 커밋 `c88c490`.
-- 소유자 미입금 취소 배포: Vercel `dpl_2eQeqPCaq48CB39rf8tR8RmxZNft`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`, 배포 커밋 `ef0bc81`.
-- 최신 소유자 미입금 취소 도메인 BUILD_ID: `ef0bc81` (Vercel CLI 배포 시 `VERCEL_GIT_COMMIT_SHA=ef0bc81`을 런타임에 명시해 배포 커밋과 일치시킴).
+- 소유자 미입금 취소 1차 배포: Vercel `dpl_2eQeqPCaq48CB39rf8tR8RmxZNft`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`, 배포 커밋 `ef0bc81`.
+- 최신 보완 배포: Vercel `dpl_6LzoSRKPDdSYJZmAXxeSHWbBWKkx`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`, 배포 커밋 `5cc91ea`.
+- 최신 소유자 미입금 취소 도메인 BUILD_ID: `5cc91ea` (Vercel CLI 배포 시 `VERCEL_GIT_COMMIT_SHA=5cc91ea`을 런타임에 명시해 배포 커밋과 일치시킴).
 - 최신 공개 smoke: `/home`, `/feed`, `/shop`, `/chat`, `/account`, `/cart`, `/stores/dami-shop`, 지정 owner/operator/employee URL 31개 모두 HTTP 200.
 - 최신 비인증 API smoke: chat/cart/account/admin/cron/member-mode 지정 API 12개 모두 HTTP 401.
 - owner payment 인증 smoke: `/admin/owner/payments` HTTP 200; 인증 세션 화면에 `소유자 / 입금 확인`, 현재 페이지 입금 대기 3건, 각 행의 `입금 확인 완료` 버튼이 표시됨. `/api/admin/owner/payment-confirmation-requests` 비인증 요청은 HTTP 401.
 - owner payment browser console: 배포 후 인증 세션에서 오류·경고 로그 없음. 상세보기 버튼과 처리 버튼의 노출만 점검했으며 실제 입금 확정·금액 변경·원장 취소 mutation은 실행하지 않음.
 - owner payment cancellation smoke: 인증 세션에서 `입금 요청 취소` 버튼 3건 표시 확인. 비인증 POST는 HTTP 403으로 차단되며 실제 취소 요청은 실행하지 않음.
-- 최신 alias smoke: `/BUILD_ID` HTTP 200 및 `ef0bc81`, `/admin/owner/payments` HTTP 200.
+- 최신 alias smoke: `/BUILD_ID` HTTP 200 및 `5cc91ea`, `/admin/owner/payments` HTTP 200.
 - `/admin/owner/site-status`: HTTP 404가 아니며, HTML 응답에 `/admin/owner` 307 redirect 신호가 포함됨.
 - Vercel inspect: production target `Ready`, `https://www.ninety-nine-vintage.store` alias 연결 확인.
 - rollback 기준: 직전 정상 deployment는 Vercel `dpl_2yD4xT3B43vaXfSdAyfamJVsjvUN`이며, 새 배포 이상 시 해당 deployment로 즉시 promote할 수 있다.

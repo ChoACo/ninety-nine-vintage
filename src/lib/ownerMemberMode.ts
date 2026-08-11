@@ -7,4 +7,5 @@ export interface OwnerMemberModeState {
   active: boolean;
   eligible: boolean;
   expiresAt: string | null;
+  serverNow: string;
 }

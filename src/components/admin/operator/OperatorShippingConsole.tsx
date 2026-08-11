@@ -156,8 +156,10 @@ function isCompletedDelivery(value: unknown): value is CompletedDelivery {
 function isQueue(value: unknown): value is {
   completedDeliveries: CompletedDelivery[];
   shipments: InventoryShipment[];
+  totalCount: number;
 } {
-  return isRecord(value) && Object.keys(value).length === 2 &&
+  return isRecord(value) && Object.keys(value).length === 3 &&
+    isInteger(value.totalCount) && value.totalCount >= 0 &&
     Array.isArray(value.shipments) && value.shipments.every(isShipment) &&
     Array.isArray(value.completedDeliveries) &&
     value.completedDeliveries.every(isCompletedDelivery);

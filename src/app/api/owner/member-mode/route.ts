@@ -84,6 +84,7 @@ export async function POST(request: Request) {
       active: false,
       eligible: true,
       expiresAt: null,
+      serverNow: now.toISOString(),
     });
   }
 
@@ -124,5 +125,10 @@ export async function POST(request: Request) {
     );
   }
 
-  return commerceJson({ active: true, eligible: true, expiresAt });
+  return commerceJson({
+    active: true,
+    eligible: true,
+    expiresAt,
+    serverNow: now.toISOString(),
+  });
 }

@@ -11,8 +11,14 @@ export async function getOwnerMemberModeState(
   admin: SupabaseClient<Database>,
   userId: string,
 ): Promise<OwnerMemberModeState> {
+  const serverNow = new Date();
   if (userId !== TEMPORARY_MEMBER_OWNER_ID) {
-    return { active: false, eligible: false, expiresAt: null };
+    return {
+      active: false,
+      eligible: false,
+      expiresAt: null,
+      serverNow: serverNow.toISOString(),
+    };
   }
 
   const [{ data: role, error: roleError }, { data: lease, error: leaseError }] =
@@ -40,8 +46,9 @@ export async function getOwnerMemberModeState(
       eligible &&
       lease?.ended_at === null &&
       typeof expiresAt === "string" &&
-      new Date(expiresAt).getTime() > Date.now(),
+      new Date(expiresAt).getTime() > serverNow.getTime(),
     eligible,
     expiresAt,
+    serverNow: serverNow.toISOString(),
   };
 }

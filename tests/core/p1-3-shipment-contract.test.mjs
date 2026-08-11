@@ -32,6 +32,10 @@ test("P1-3 operator corrections carry an explicit reason into the shipment comma
   assert.match(consoleSource, /송장 정정 사유/);
   assert.match(consoleSource, /note: form\.note\.trim\(\) \|\| null/);
   assert.match(consoleSource, /발송 완료 · 송장 1개/);
+  assert.match(
+    consoleSource,
+    /Object\.keys\(value\)\.length === 3[\s\S]*isInteger\(value\.totalCount\)[\s\S]*value\.totalCount >= 0/,
+  );
 });
 
 test("P1-3 retires every commerce_shipments writer and freezes legacy history", async () => {

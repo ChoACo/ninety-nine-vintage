@@ -82,11 +82,24 @@ test("single registration requires a feed title while keeping description and ca
 });
 
 test("the immutable owner receives a server-timed three-minute member mode", async () => {
-  const [migration, constants, route, provider, serverAuth, dashboard] = await Promise.all([
+  const [
+    migration,
+    roleContractRepair,
+    creditRepair,
+    constants,
+    route,
+    provider,
+    serverState,
+    serverAuth,
+    dashboard,
+  ] = await Promise.all([
     source("supabase/migrations/20260724123534_owner_member_mode_product_gender.sql"),
+    source("supabase/migrations/20260811080029_restore_hidden_test_member_role_contract.sql"),
+    source("supabase/migrations/20260811080808_fix_hidden_test_initial_shipping_credits.sql"),
     source("src/lib/ownerMemberMode.ts"),
     source("src/app/api/owner/member-mode/route.ts"),
     source("src/components/features/auth/OwnerMemberModeProvider.tsx"),
+    source("src/lib/ownerMemberMode.server.ts"),
     source("src/lib/commerce/server.ts"),
     source("src/components/admin/owner/OwnerDashboard.tsx"),
   ]);
@@ -96,12 +109,27 @@ test("the immutable owner receives a server-timed three-minute member mode", asy
   }
   assert.match(migration, /insert into public\.member_accounts/);
   assert.match(migration, /when public\.owner_member_mode_is_active\(p_user_id\) then 'member'/);
+  assert.match(
+    roleContractRepair,
+    /roles\.role_code = 'member'[\s\S]*public\.is_owner_hidden_test_member\(roles\.user_id\)[\s\S]*then 'member'/,
+  );
+  assert.match(
+    creditRepair,
+    /on conflict \(member_id\) do update[\s\S]*shipping_credit_count = excluded\.shipping_credit_count[\s\S]*account_status = excluded\.account_status/,
+  );
+  assert.match(
+    roleContractRepair,
+    /v_is_hidden_test[\s\S]*new\.role_code <> 'member'[\s\S]*not v_is_hidden_test[\s\S]*auth_user_has_kakao_identity/,
+  );
   assert.match(route, /OWNER_MEMBER_MODE_DURATION_MS/);
   assert.match(route, /action === "extend"/);
   assert.match(route, /action === "end"/);
   assert.match(provider, /3분 연장/);
   assert.match(provider, /즉시 종료/);
   assert.match(provider, /remainingSeconds/);
+  assert.match(provider, /clockOffsetMs/);
+  assert.match(provider, /new Date\(payload\.serverNow\)\.getTime\(\) - Date\.now\(\)/);
+  assert.match(serverState, /serverNow: serverNow\.toISOString\(\)/);
   assert.match(serverAuth, /member_mode_active/);
   assert.match(dashboard, /3분간 회원 권한 활성화/);
 });

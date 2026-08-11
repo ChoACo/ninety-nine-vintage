@@ -23,6 +23,7 @@ const EMPTY_STATE: OwnerMemberModeState = {
   active: false,
   eligible: false,
   expiresAt: null,
+  serverNow: new Date(0).toISOString(),
 };
 
 const OwnerMemberModeContext =
@@ -31,6 +32,7 @@ const OwnerMemberModeContext =
 interface OwnerMemberModeSnapshot {
   mode: OwnerMemberModeState;
   sessionKey: string | null;
+  clockOffsetMs: number;
 }
 
 export function useOwnerMemberMode() {
@@ -52,6 +54,7 @@ export function OwnerMemberModeProvider({
   const [snapshot, setSnapshot] = useState<OwnerMemberModeSnapshot>({
     mode: EMPTY_STATE,
     sessionKey: null,
+    clockOffsetMs: 0,
   });
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -74,12 +77,16 @@ export function OwnerMemberModeProvider({
       })
       .then((next) => {
         if (!controller.signal.aborted) {
-          setSnapshot({ mode: next, sessionKey });
+          setSnapshot({
+            mode: next,
+            sessionKey,
+            clockOffsetMs: new Date(next.serverNow).getTime() - Date.now(),
+          });
         }
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setSnapshot({ mode: EMPTY_STATE, sessionKey });
+          setSnapshot({ mode: EMPTY_STATE, sessionKey, clockOffsetMs: 0 });
         }
       });
     return () => controller.abort();
@@ -94,7 +101,11 @@ export function OwnerMemberModeProvider({
   const remainingSeconds = state.active && state.expiresAt
     ? Math.max(
         0,
-        Math.ceil((new Date(state.expiresAt).getTime() - now) / 1000),
+        Math.ceil(
+          (new Date(state.expiresAt).getTime() -
+            (now + snapshot.clockOffsetMs)) /
+            1000,
+        ),
       )
     : 0;
 
@@ -123,7 +134,11 @@ export function OwnerMemberModeProvider({
         throw new Error(payload?.message ?? "임시 회원 권한을 변경하지 못했습니다.");
       }
       setNow(Date.now());
-      setSnapshot({ mode: payload, sessionKey });
+      setSnapshot({
+        mode: payload,
+        sessionKey,
+        clockOffsetMs: new Date(payload.serverNow).getTime() - Date.now(),
+      });
       return true;
     } catch {
       return false;

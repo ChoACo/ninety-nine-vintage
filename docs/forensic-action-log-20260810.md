@@ -102,7 +102,7 @@
 - 최신 공개 smoke: `/home`, `/feed`, `/shop`, `/chat`, `/account`, `/cart`, `/stores/dami-shop`, 지정 owner/operator/employee URL 31개 모두 HTTP 200.
 - 최신 비인증 API smoke: chat/cart/account/admin/cron/member-mode 지정 API 12개 모두 HTTP 401.
 - owner payment 인증 smoke: `/admin/owner/payments` HTTP 200; 인증 세션 화면에 `소유자 / 입금 확인`, 현재 페이지 입금 대기 3건, 각 행의 `입금 확인 완료` 버튼이 표시됨. `/api/admin/owner/payment-confirmation-requests` 비인증 요청은 HTTP 401.
-- owner payment browser console: 배포 후 인증 세션에서 오류·경고 로그 없음. 상세보기 화면만 읽었으며 실제 입금 확정·금액 변경·원장 취소 mutation은 실행하지 않음.
+- owner payment browser console: 배포 후 인증 세션에서 오류·경고 로그 없음. 상세보기 버튼과 처리 버튼의 노출만 점검했으며 실제 입금 확정·금액 변경·원장 취소 mutation은 실행하지 않음.
 - `/admin/owner/site-status`: HTTP 404가 아니며, HTML 응답에 `/admin/owner` 307 redirect 신호가 포함됨.
 - Vercel inspect: production target `Ready`, `https://www.ninety-nine-vintage.store` alias 연결 확인.
 - rollback 기준: 직전 정상 deployment는 Vercel `dpl_2yD4xT3B43vaXfSdAyfamJVsjvUN`이며, 새 배포 이상 시 해당 deployment로 즉시 promote할 수 있다.

@@ -203,6 +203,29 @@ where stores.is_active
 order by stores.created_at, stores.id
 limit 1;
 
+insert into public.products (
+  title, description, publish_at, closes_at, status,
+  starting_price, current_price, fixed_price, image_urls, thumbnail_urls,
+  sale_type, store_id
+)
+select
+  '로컬 브라우저 검증 즉시구매',
+  '격리된 로컬 테스트 즉시구매 상품',
+  clock_timestamp() - interval '1 hour',
+  clock_timestamp() + interval '30 days',
+  'active',
+  12000,
+  12000,
+  12000,
+  array['https://example.com/local-test-fixed-product.jpg'],
+  array['https://example.com/local-test-fixed-product-thumb.jpg'],
+  'fixed',
+  stores.id
+from public.stores as stores
+where stores.is_active
+order by stores.created_at, stores.id
+limit 1;
+
 -- Auction scheduling normalizes newly inserted rows to the next KST release
 -- slot. This disposable fixture must be visible regardless of the test clock.
 set local session_replication_role = replica;

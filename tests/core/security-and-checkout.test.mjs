@@ -68,6 +68,18 @@ test("browser auth rejects URL-provided Supabase sessions", async () => {
   assert.match(feed, /const feedSeed = useMemo/);
 });
 
+test("the isolated browser fixture seeds both auction and fixed purchase flows", async () => {
+  const [localTest, happyPath] = await Promise.all([
+    readFile(new URL("scripts/local-test-supabase.mjs", rootUrl), "utf8"),
+    readFile(new URL("scripts/verify-local-happy-path.mjs", rootUrl), "utf8"),
+  ]);
+  assert.match(localTest, /'로컬 브라우저 검증 경매'/);
+  assert.match(localTest, /'로컬 브라우저 검증 즉시구매'/);
+  assert.match(localTest, /12000,\s*12000,\s*12000,[\s\S]*?'fixed'/);
+  assert.match(happyPath, /retired external payment sync must stay absent/);
+  assert.match(happyPath, /retiredPaymentSync\.response\.status === 404/);
+});
+
 test("migration parity accepts current Supabase CLI table output", () => {
   const migrations = parseSupabaseMigrationList(`
    Local            | Remote           | Time (UTC)

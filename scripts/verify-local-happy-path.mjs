@@ -64,12 +64,12 @@ const anonymousCheckout = await read("/api/orders/checkout", {
 });
 assert(anonymousCheckout.response.status === 401, "checkout must reject an anonymous request");
 
-const anonymousPaymentSync = await read("/api/payments/sync", {
+const retiredPaymentSync = await read("/api/payments/sync", {
   method: "POST",
   headers: { "Content-Type": "application/json", Origin: baseUrl },
   body: "{}",
 });
-assert(anonymousPaymentSync.response.status === 401, "payment sync must reject an anonymous request");
+assert(retiredPaymentSync.response.status === 404, "retired external payment sync must stay absent");
 
 const anonymousAuctionBid = await read("/api/auction/bids", {
   method: "POST",

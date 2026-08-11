@@ -17,9 +17,9 @@
 ## 2. 현재 구현·검증 상태
 
 - 핵심 코드·DB·권한·원장·결제·물류·취소·상품·알림·UX·정산·스토리지 변경이 현재 브랜치에 반영되어 있다.
-- core test 336개 중 330개 통과, 6개 스킵, 실패 0.
+- core test 337개 중 331개 통과, 6개 스킵, 실패 0.
 - ESLint, TypeScript, production build 통과.
-- Supabase migration parity 159개 일치.
+- Supabase migration parity 160개 일치.
 - 운영 BUILD_ID는 현재 배포 커밋과 일치하지만 잔여 작업 완료를 뜻하지 않는다.
 - 약관·개인정보 페이지 200, 비인증 cron API 401.
 - PortOne·중앙 물류 실행 경로는 폐기하고 역사 읽기만 보존했다.

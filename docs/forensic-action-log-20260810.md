@@ -60,11 +60,19 @@
 - 조치: 응답 계약에서 `member_required`를 식별하고, 수치를 `—`로 표시하며 소유자 센터에서 임시 회원 권한을 활성화하라는 사용자 안내를 표시한다. 내부 오류 코드는 노출하지 않는다.
 - 검증: lint 통과; member mode 활성/비활성 역할별 브라우저 확인이 남아 있다.
 
+### 2.7 소유자 운영자센터 범위 모드 정합성
+
+- 재현: 운영자 URL에서 소유자 세션이 `store_scope_unavailable`(HTTP 503)을 반환했다. `/api/admin/session`은 `roleCode=owner`였지만, 해당 계정의 `operator_store_scope_preferences.access_mode`가 과거 운영자 값인 `assigned`로 남아 있었다.
+- 영향 경로: `src/app/api/admin/operator/store-scope/route.ts`의 `owner_support` 검증 실패 → 센터 선택기가 오류 상태에 고정 → 운영자 API의 `require_active_operator_store_scope()`도 연쇄 실패.
+- 경로: `supabase/migrations/20260811090000_reconcile_owner_operator_store_scope_mode.sql`
+- 조치: 기존 owner 행의 모드를 `owner_support`로 보정하고 만료시켜 재선택을 요구한다. `get_operator_store_scope()`도 역할이 바뀐 계정의 이전 모드를 클라이언트로 반환하지 않고 현재 역할의 정규 모드(`owner_support` 또는 `assigned`)로 반환한다.
+- 검증: 원격 계정의 모드가 `owner_support`로 보정된 뒤 소유자 운영자센터에서 센터 목록이 표시되고 `다미네` 선택 후 운영자 요약 API가 정상 응답했다.
+
 ## 3. migration 적용 증거
 
-- `supabase db push --linked --dry-run`: 두 migration만 pending으로 확인.
-- `supabase db push --linked --yes`: 두 migration 적용 완료.
-- `npm run verify:migrations`: `PASS migration parity (159 linked migrations)`.
+- `supabase db push --linked --dry-run`: 소유자 범위 보정 migration 1개 pending으로 확인.
+- `supabase db push --linked --yes`: `20260811090000_reconcile_owner_operator_store_scope_mode.sql` 적용 완료.
+- `npm run verify:migrations`: `PASS migration parity (160 linked migrations)`.
 - Supabase CLI가 Docker catalog cache를 갱신하지 못했다는 경고가 있었으나 원격 migration 적용 자체는 완료되었다. 로컬 Docker 기반 reset 검증은 별도 환경 게이트로 남긴다.
 
 ## 4. 남은 실행 단계

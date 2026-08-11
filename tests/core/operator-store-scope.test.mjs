@@ -93,6 +93,19 @@ test("current operator workspace requires one expiring store and removes all-sto
   assert.doesNotMatch(selector, /전체 센터/);
 });
 
+test("owner scope preferences are reconciled to the owner support mode", async () => {
+  const migration = await source(
+    "supabase/migrations/20260811090000_reconcile_owner_operator_store_scope_mode.sql",
+  );
+  assert.match(migration, /role\.role_code = 'owner'/);
+  assert.match(migration, /scope\.access_mode <> 'owner_support'/);
+  assert.match(migration, /set access_mode = 'owner_support'[\s\S]*expires_at = clock_timestamp\(\)/);
+  assert.match(migration, /v_role = 'owner' and v_row\.access_mode <> 'owner_support'/);
+  assert.match(migration, /'accessMode', 'owner_support'/);
+  assert.match(migration, /v_role = 'operator' and v_row\.access_mode <> 'assigned'/);
+  assert.match(migration, /'accessMode', 'assigned'/);
+});
+
 test("every operator API except scope selection requires the active selected store", async () => {
   const apiRoot = fileURLToPath(new URL("src/app/api/admin/operator/", rootUrl));
   const entries = await readdir(apiRoot, { recursive: true, withFileTypes: true });

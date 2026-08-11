@@ -88,18 +88,21 @@
 
 1. 전체 core test, lint, TypeScript/production build 재실행. (완료: 338/332/6, lint/build 통과)
 2. `KAKAO_OIDC_REDIRECT_URI`는 Vercel Production에 존재함을 확인하고, local verifier는 안전한 도메인 값 주입으로 재현한다.
-3. 새 commit 생성 후 Vercel production 배포 완료. (이번 실행에서 진행)
-4. `/BUILD_ID`, 공개 URL, site-status redirect, `dami-shop` 200, 비인증 API 401을 확인 완료.
+3. 새 commit 생성 후 Vercel production 배포 완료. (완료: `c88c490`)
+4. `/BUILD_ID`, 공개 URL, site-status redirect, `dami-shop` 200, 비인증 API 401을 확인 완료. (완료)
 5. 실제 인증 세션에서 owner scope 선택은 재검증 완료했다. payment queue 12시간 필터, employee 업무, account member mode는 운영 데이터 보호를 위해 별도 세션 검증 대상으로 남긴다.
-6. Vercel alias·BUILD_ID·migration parity·rollback 기준을 아래 배포 증거에 기록한다.
+6. Vercel alias·BUILD_ID·migration parity·rollback 기준을 아래 배포 증거에 기록한다. (완료; 아래 owner payment 인증 smoke 포함)
 
 ## 5. 배포 증거
 
 - 1차 production 배포: Vercel `dpl_5W1jKm4mZ9wF86s4V94W9siiT9QC`, alias `https://www.ninety-nine-vintage.store`, BUILD_ID `89d4933...` 확인.
 - 최종 production 배포: Vercel `dpl_4vaQoK44LhPe5NF1tifaUAqFvMjf`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`.
-- 최신 도메인 BUILD_ID: `118b9bb7c5263e74374e23ea359e36cbd2782061` (커밋 `118b9bb` 일치).
+- 소유자 입금 확인 콘솔 배포: Vercel `dpl_GPysWuRVUHQSxTV7unfHX61dhgHt`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`, 배포 커밋 `c88c490`.
+- 최신 도메인 BUILD_ID: `c88c4900768ba25c578eaf4ee7d8f2c89a593ff4` (커밋 `c88c490` 일치).
 - 최신 공개 smoke: `/home`, `/feed`, `/shop`, `/chat`, `/account`, `/cart`, `/stores/dami-shop`, 지정 owner/operator/employee URL 31개 모두 HTTP 200.
 - 최신 비인증 API smoke: chat/cart/account/admin/cron/member-mode 지정 API 12개 모두 HTTP 401.
+- owner payment 인증 smoke: `/admin/owner/payments` HTTP 200; 인증 세션 화면에 `소유자 / 입금 확인`, 현재 페이지 입금 대기 3건, 각 행의 `입금 확인 완료` 버튼이 표시됨. `/api/admin/owner/payment-confirmation-requests` 비인증 요청은 HTTP 401.
+- owner payment browser console: 배포 후 인증 세션에서 오류·경고 로그 없음. 상세보기 화면만 읽었으며 실제 입금 확정·금액 변경·원장 취소 mutation은 실행하지 않음.
 - `/admin/owner/site-status`: HTTP 404가 아니며, HTML 응답에 `/admin/owner` 307 redirect 신호가 포함됨.
 - Vercel inspect: production target `Ready`, `https://www.ninety-nine-vintage.store` alias 연결 확인.
 - rollback 기준: 직전 정상 deployment는 Vercel `dpl_2yD4xT3B43vaXfSdAyfamJVsjvUN`이며, 새 배포 이상 시 해당 deployment로 즉시 promote할 수 있다.

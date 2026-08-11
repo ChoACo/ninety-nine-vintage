@@ -20,7 +20,7 @@
 - core test 338개 중 332개 통과, 6개 스킵, 실패 0.
 - ESLint, TypeScript, production build 통과.
 - Supabase migration parity 160개 일치.
-- 운영 BUILD_ID는 현재 배포 커밋과 일치하지만 잔여 작업 완료를 뜻하지 않는다.
+- 운영 BUILD_ID `c88c4900768ba25c578eaf4ee7d8f2c89a593ff4`가 배포 커밋 `c88c490`과 일치한다.
 - 약관·개인정보 페이지 200, 비인증 cron API 401.
 - PortOne·중앙 물류 실행 경로는 폐기하고 역사 읽기만 보존했다.
 - 수동 계좌이체, 매장 범위, CAS·멱등·append-only 원장 계약을 유지한다.
@@ -30,12 +30,12 @@
 
 - 소유자 404 사이트·로그 링크 제거.
 - 소유자 결제 합계 전체 집계, 회원 페이지네이션, 플랫폼 GET 공유 캐시 적용.
+- 소유자 입금 확인 페이지에 전체 원장 확인·입금 확정 콘솔을 연결하고, 소유자 결제 API에서 운영자 선택 매장 범위 충돌을 제거했다. (실제 입금 확정 mutation은 운영 데이터 보호를 위해 실행하지 않음)
 - 계좌 원문 열람을 인페이지 표시·즉시 숨기기 방식으로 통일.
 - 운영자 죽은 내비게이션과 잘못된 출고 링크 제거.
 - 운영자 배송 요청 전체 count RPC 추가 및 운영 DB 적용.
 - 직원 출고·채팅·택배 API 접근 경계 복구 및 직원센터 라벨 추가.
 - 계정 찜 개수를 전체 ID 기준으로 표시.
-- 소유자 입금 확인 페이지에 전체 원장 확인·입금 확정 콘솔을 연결하고, 소유자 결제 API에서 운영자 선택 매장 범위 충돌을 제거했다. (실제 입금 확정 mutation은 운영 데이터 보호를 위해 실행하지 않음)
 - 피드·shop 무결점 검토(5-2, 5-3)의 FD-03/04/06, SH-01/02/05 조치를 코드로 반영했다.
   - FD-04: `hasAnyBid`/`bidCount`를 서버 active outcome 기준으로 통일(그리드 `hasBidHistory ? active.length : participantCount`, StickyBidPanel 동일).
   - FD-06: 사이드바의 미사용 필터 필드(sizes/categories/liveOnly/closingOnly) 제거, 카드 store lookup을 `Map`으로 변경해 O(n·m)→O(1).

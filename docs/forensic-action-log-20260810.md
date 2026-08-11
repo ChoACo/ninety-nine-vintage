@@ -86,7 +86,8 @@
 - UI 경로: `src/components/admin/operator/OperatorPaymentsConsole.tsx`
 - 조치: 소유자 전용 RPC가 주문·입금 요청·상품을 잠그고 CAS(version)와 원장 누적액/건수를 재검증한다. `awaiting_transfer` + `awaiting_payment` + 원장 0원일 때만 `cancelled` 처리하며, 주문 항목을 취소하고 닫혀 있던 고정가 상품을 안전하게 `active`로 복구한다. 사유·actor·멱등 키·fingerprint·이전 상태는 append-only 취소 이벤트로 보존하고 구매자에게 알림을 남긴다.
 - 보완: 취소된 `cancelled`/`cancelled_unpaid` 상태는 결제 큐 조회에서도 제외하여 취소 후 대기 목록에 재노출되지 않도록 했다. 경로: `src/app/api/admin/operator/payments/route.ts`.
-- 검증: 전체 core test 339개 중 333 pass, 6 skip; lint/build 통과; migration parity 161개. 인증 소유자 화면에서 3개 대기 행에 취소 버튼 표시를 확인했으며 실제 취소 mutation은 실행하지 않았다.
+- 추가 보완: 브라우저 `window.prompt/confirm` 의존을 제거하고 인페이지 취소 사유·확정 대화상자로 교체했다. 서버 계약과 동일하게 사유 3자 미만은 전송 전 차단한다. 경로: `src/components/admin/operator/OperatorPaymentsConsole.tsx`.
+- 검증: 전체 core test 339개 중 333 pass, 6 skip; lint/build 통과; migration parity 161개. 인증 소유자 화면에서 3개 대기 행과 인페이지 `입금 요청 취소 확정` 흐름을 확인했으며 실제 취소 mutation은 실행하지 않았다. 대상 주문 `ff6df77e`에 대해 동일 RPC를 owner claim으로 호출한 뒤 transaction rollback하여 DB 상태 변화가 없음을 확인했다.
 
 ## 3. migration 적용 증거
 
@@ -112,13 +113,15 @@
 - 소유자 입금 확인 콘솔 배포: Vercel `dpl_GPysWuRVUHQSxTV7unfHX61dhgHt`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`, 배포 커밋 `c88c490`.
 - 소유자 미입금 취소 1차 배포: Vercel `dpl_2eQeqPCaq48CB39rf8tR8RmxZNft`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`, 배포 커밋 `ef0bc81`.
 - 최신 보완 배포: Vercel `dpl_6LzoSRKPDdSYJZmAXxeSHWbBWKkx`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`, 배포 커밋 `5cc91ea`.
-- 최신 소유자 미입금 취소 도메인 BUILD_ID: `5cc91ea` (Vercel CLI 배포 시 `VERCEL_GIT_COMMIT_SHA=5cc91ea`을 런타임에 명시해 배포 커밋과 일치시킴).
+- 취소 UI 보완 배포: Vercel `dpl_A7wy8Z8cCpqt11Mj6PagtAmAYPjP`, alias `https://www.ninety-nine-vintage.store`, 상태 `Ready`, 배포 커밋 `f2eb9b4`.
+- 최신 소유자 미입금 취소 도메인 BUILD_ID: `f2eb9b4` (Vercel CLI 배포 시 `VERCEL_GIT_COMMIT_SHA=f2eb9b4`을 런타임에 명시해 배포 커밋과 일치시킴).
 - 최신 공개 smoke: `/home`, `/feed`, `/shop`, `/chat`, `/account`, `/cart`, `/stores/dami-shop`, 지정 owner/operator/employee URL 31개 모두 HTTP 200.
 - 최신 비인증 API smoke: chat/cart/account/admin/cron/member-mode 지정 API 12개 모두 HTTP 401.
 - owner payment 인증 smoke: `/admin/owner/payments` HTTP 200; 인증 세션 화면에 `소유자 / 입금 확인`, 현재 페이지 입금 대기 3건, 각 행의 `입금 확인 완료` 버튼이 표시됨. `/api/admin/owner/payment-confirmation-requests` 비인증 요청은 HTTP 401.
 - owner payment browser console: 배포 후 인증 세션에서 오류·경고 로그 없음. 상세보기 버튼과 처리 버튼의 노출만 점검했으며 실제 입금 확정·금액 변경·원장 취소 mutation은 실행하지 않음.
 - owner payment cancellation smoke: 인증 세션에서 `입금 요청 취소` 버튼 3건 표시 확인. 비인증 POST는 HTTP 403으로 차단되며 실제 취소 요청은 실행하지 않음.
-- 최신 alias smoke: `/BUILD_ID` HTTP 200 및 `5cc91ea`, `/admin/owner/payments` HTTP 200.
+- owner cancellation dialog smoke: 첫 번째 대기 행에서 native prompt 없이 `입금 요청 취소 확인` dialog와 `취소 사유` textbox, 3자 미만 확정 버튼 비활성 상태를 확인했으며 닫기로 종료했다.
+- 최신 alias smoke: `/BUILD_ID` HTTP 200 및 `f2eb9b4`, `/admin/owner/payments` HTTP 200.
 - `/admin/owner/site-status`: HTTP 404가 아니며, HTML 응답에 `/admin/owner` 307 redirect 신호가 포함됨.
 - Vercel inspect: production target `Ready`, `https://www.ninety-nine-vintage.store` alias 연결 확인.
 - rollback 기준: 직전 정상 deployment는 Vercel `dpl_2yD4xT3B43vaXfSdAyfamJVsjvUN`이며, 새 배포 이상 시 해당 deployment로 즉시 promote할 수 있다.

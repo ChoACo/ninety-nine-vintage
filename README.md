@@ -22,12 +22,12 @@ npm run verify:integrations -- --public-only
 ## 운영 구성
 
 - 공개 주소: `https://www.ninety-nine-vintage.store`
-- 런타임: Cloudflare Workers + OpenNext
+- canonical 런타임·배포: Vercel Production + Next.js
 - 데이터베이스·인증·Realtime: Supabase
 - 활성 결제: 수동 계좌이체
 - 소셜 로그인: Kakao OIDC → Supabase 세션
 
-브라우저 공개값은 `NEXT_PUBLIC_*`, 서버 비밀값은 Cloudflare Worker secret으로 관리합니다. 실제 비밀값은 저장소에 커밋하지 않습니다. 결제는 수동 계좌이체만 사용하며 PortOne 실행 경로는 폐기하고 필요한 역사 식별자만 읽기 전용으로 보존합니다.
+브라우저 공개값은 `NEXT_PUBLIC_*`, 서버 비밀값은 Vercel Environment Variables로 관리합니다. 실제 비밀값은 저장소에 커밋하지 않습니다. Cloudflare/OpenNext 배포물은 과거 호환 자료일 뿐 현재 운영 배포 대상이 아니며, 별도 전환 계획과 검증 없이 이중 배포하지 않습니다. 결제는 수동 계좌이체만 사용하며 PortOne 실행 경로는 폐기하고 필요한 역사 식별자만 읽기 전용으로 보존합니다.
 
 ## 로컬 테스트 계정
 

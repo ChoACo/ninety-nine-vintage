@@ -85,3 +85,20 @@ P0로 확정된 보안·금전·데이터 손상은 없다. 다만 운영 인증
 ## 완료 게이트
 
 각 배치는 core test, SQL/RLS, TypeScript, lint, production build, 역할별 Chrome 재현을 통과해야 한다. Preview 후 Production을 배포하고 BUILD_ID, 로그, migration pending 0, rollback 지점을 기록한다. F-01~F-07의 `PRODUCTION_UNVERIFIED_AUTH_SESSION`과 핵심 `MUTATION_UNEXECUTED`가 제거되기 전 정상 운영으로 판정하지 않는다.
+
+## 2차 처리 현황
+
+| 항목 | 상태 | 결과 |
+| --- | --- | --- |
+| F-01 | `RESOLVED` | `306f618`, `86740a1`; stale token server validation과 정리 dedupe, 공개 clock 분리. Production guest 재검증 오류 0 |
+| F-02 | `RESOLVED` | `306f618`; 결정적 feed seed, Production hydration 오류 0 |
+| F-03 | `RESOLVED` | `4eebce4`; guest desktop/mobile 모두 로그인 안내 |
+| F-04 | `RESOLVED` | `4eebce4`; fixed bid와 빈 brand desktop/mobile hard 404 |
+| F-05 | `RESOLVED` | `5ebf988`; README/Vercel/npm/Node 22.x 일치, ESLint peer conflict 제거, `npm audit` 0 |
+| F-06 | `OPEN_P2_OBSERVABILITY` | build logs는 조회 가능하나 runtime logs API가 CLI 56.3.1과 58.1.0에서 모두 HTTP 400 |
+| F-07 | `PARTIAL` | 격리 역할·RLS·GRANT·CAS·동시성 통과. 운영 Kakao 역할 세션과 지정 데이터 mutation은 미실행 |
+| F-08 | `BLOCKED_BY_F07` | maintenance 유지. 운영 인증 카나리 전 open 전환 금지 |
+| F-09 | `GOVERNANCE_REMAINDER` | 저장소 정책 일치는 통과, 외부 법률 검토는 범위 밖 |
+| F-10 | `RESOLVED_AS_TOOLING` | HTML/JSON/보호 Preview는 Chrome, `vercel curl`, structured HTTP로 분리 검증 |
+
+재현 가능한 P0/P1 기능 결함은 현재 남아 있지 않다. F-06은 관측성 P2이며, F-07의 운영 인증·상태 변경 증거가 없으므로 사이트 전체를 `NORMAL_OPERATION_CONFIRMED`로 선언하거나 maintenance를 해제하지 않는다.

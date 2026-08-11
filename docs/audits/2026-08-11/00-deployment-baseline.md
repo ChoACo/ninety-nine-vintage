@@ -46,3 +46,19 @@ Vercel build는 성공했지만 Node `>=22.13.0` 범위의 자동 major upgrade 
 ## 변경 제한
 
 이 문서 작성 시점에는 애플리케이션 코드, migration, 운영 데이터, 환경 변수, 사이트 상태를 수정하지 않았다. 로컬 격리 Supabase는 Docker Desktop 미실행으로 시작되지 않아 `BLOCKED_LOCAL_DOCKER`로 기록한다.
+
+## 2차 정상화 배포 갱신
+
+최초 기준선은 위 내용 그대로 보존한다. 수정 단계에서는 다음 커밋을 순서대로 원격 브랜치에 게시했다.
+
+| 커밋 | 범위 |
+| --- | --- |
+| `306f618` | 브라우저 세션 server validation, 공개 clock client 분리, hydration-stable feed |
+| `4eebce4` | mobile 인증 오류 문구 및 동적 URL hard-404 계약 통일 |
+| `86740a1` | invalid session 정리 요청 deduplication |
+| `f383873` | 격리 fixed-price fixture와 현재 PortOne 폐기 계약에 맞춘 local verifier |
+| `5ebf988` | Vercel/npm/Node 22.x canonical 구성, ESLint peer 충돌 제거 |
+
+`5ebf988ac7a2c1639829ffd5b00b65d1adae0714` Preview `dpl_7ARyaWnacAGL3XMSUP9nctpjrG12`를 검증한 뒤 Production `dpl_H2yDY1T7jGirk6GXSr4J2n6aWVzh`로 승격했다. apex와 www alias의 `/BUILD_ID`가 모두 이 전체 SHA와 일치한다. Vercel build는 Node 22.x로 cache를 전환하고 `npm install` → `npm run build`를 실행했으며 audit 0, 123 static pages로 완료됐다.
+
+Supabase 161개 migration은 linked dry-run pending 0을 유지한다. 사이트 상태는 운영 인증 카나리가 끝나지 않아 기존 `maintenance`를 유지했으며, 임의로 open 전환하지 않았다.

@@ -91,3 +91,26 @@
 - Chrome의 non-HTML resource 직접 탭 차단과 API 수집기 status 0은 도구 한계이며 운영 장애로 사용하지 않는다.
 - `/auth/callback` 직접 진입과 세션 401의 인과는 확정하지 않았다. 애플리케이션 callback logout 결함으로 단정하지 않는다.
 - DB 2 active stores와 open conversation은 read-only로 확인했으므로 `/chat`의 빈 상태는 데이터 부재 증거가 아니라 인증 context 증거다.
+
+## 2차 수정·검증 증거
+
+| ID | 증거 | 결과 |
+| --- | --- | --- |
+| FIX-01 | `306f618`, `86740a1` | server-validated session, anonymous public clock, deterministic hydration, invalid-session dedupe |
+| FIX-02 | `4eebce4` | mobile 오류 복구 문구와 desktop/mobile hard-404 계약 |
+| TEST-R01 | 최종 core/lint/tsc/build | 340개 중 334 pass, 정책상 retired PortOne 6 skip, 실패 0; lint/tsc/build 통과; 123 static pages |
+| TEST-R02 | dependency 검사 | ESLint tree valid, `npm audit` 0 |
+| DB-R01 | local Supabase 161 migration reset 후 7개 suite | central fulfillment, intake/concurrency, store membership, published products, queue snapshot/concurrency, reversal target/concurrency, canonical shipment/retired writer/legacy compat 모두 통과 |
+| ROLE-01 | local Chrome member | `/account` private sections 렌더, `roleCode=member`; owner/operator API 403 |
+| ROLE-02 | local Chrome operator | scope 전 428, 본인 매장 선택 후 상품 2개 렌더, operator session 200 |
+| ROLE-03 | local Chrome employee | `/admin/employee` 업무 메뉴 렌더, owner API 403 |
+| ROLE-04 | local Chrome owner | `/admin/owner` 렌더, 수동 계좌이체/매장 2개/감사 기록, owner overview 200 |
+| ROLE-05 | cross-store direct API | operator-secondary가 operator-primary 매장을 `assigned`로 선택 시 403 |
+| MUT-R01 | local happy path/browser verifier | fixed 상품 API/detail/cart, anonymous 401, retired payment sync 404, `/home→상품→cart` 통과 |
+| DEP-R01 | Preview | `dpl_7ARyaWnacAGL3XMSUP9nctpjrG12`, Node 22.x, npm install/build, audit 0, `/BUILD_ID=5ebf988...` |
+| DEP-R02 | Production | `dpl_H2yDY1T7jGirk6GXSr4J2n6aWVzh`, apex/www alias, `/BUILD_ID=5ebf988...`, `/shop` 200, local-test API 404 |
+| CH-R01 | Production Chrome | `/shop`, `/bidding` document 200, console error·failed network 0 |
+| CH-R02 | Production Chrome | fixed bid와 빈 sold brand document 404, console error 0 |
+| OBS-R01 | runtime log query | Vercel CLI 56.3.1/58.1.0 모두 HTTP 400; `OPEN_P2_OBSERVABILITY` |
+
+토큰·쿠키·비밀번호와 로컬 service-role 값은 문서에 기록하지 않았다. Production Kakao 로그인, checkout/입금확인/취소/출고/배송/환불/chat/push 상태 변경은 여전히 `PRODUCTION_UNVERIFIED_AUTH_SESSION` 또는 `MUTATION_UNEXECUTED`다.

@@ -9,6 +9,23 @@
 - 역할: 공개 방문자, 회원, 운영자(매장 사장), 직원(매장 직원), 소유자(사이트 소유자)
 - 증거 키는 `03-evidence-index.md`를 참조한다.
 
+## 2차 재검증 오버레이
+
+아래 표는 최초 감사 행의 `DEFECT`, `BLOCKED_LOCAL_DOCKER`, 역할 검증 상태를 보완하며 충돌 시 우선한다. 운영 Kakao 실계정과 상태 변경 카나리를 실행하지 않은 행의 원래 표시는 계속 유효하다.
+
+| 범위 | 2차 판정 | 증거 |
+| --- | --- | --- |
+| `/shop`, `/m/shop`, `/feed` 공개 렌더·clock | hydration/공개 clock 오염 수정, Production console/network 오류 0 `PASS` | FIX-01, CH-R01 |
+| `/bidding`, `/m/bidding` guest | raw `unauthorized` 제거, 로그인 안내 렌더 `PASS` | FIX-02, CH-R01 |
+| fixed 상품 `/auction/[id]/bid`, mobile 대응 경로 | desktop/mobile hard 404 통일 `PASS` | FIX-02, CH-R02 |
+| 빈 `/sold/brand/[slug]`, mobile 대응 경로 | desktop/mobile hard 404 통일 `PASS` | FIX-02, CH-R02 |
+| 회원 `/account` 및 회원 API | 격리 Chrome 렌더, role=session member, owner/operator API 403 `PASS_ISOLATED`; Production은 `PRODUCTION_UNVERIFIED_AUTH_SESSION` | ROLE-01, ROLE-05 |
+| 운영자 `/admin/operator` 및 operator API | store scope 선택 전 428, 본인 매장 선택 후 정상, 타 매장 선택 403 `PASS_ISOLATED`; Production은 `PRODUCTION_UNVERIFIED_AUTH_SESSION` | ROLE-02, ROLE-05 |
+| 직원 `/admin/employee` | 직원센터 렌더, owner API 403 `PASS_ISOLATED`; Production은 `PRODUCTION_UNVERIFIED_AUTH_SESSION` | ROLE-03, ROLE-05 |
+| 소유자 `/admin/owner` 및 owner API | 소유자센터·수동 계좌이체 설정 렌더, owner overview 200 `PASS_ISOLATED`; Production은 `PRODUCTION_UNVERIFIED_AUTH_SESSION` | ROLE-04, ROLE-05 |
+| local-only `/api/local-test-accounts` | Preview/Production 404 `PASS` | DEP-R02 |
+| 모든 mutation API | SQL/RLS/CAS/경합 suite는 통과. 운영 지정 데이터 카나리는 `MUTATION_UNEXECUTED` | DB-R01, MUT-R01 |
+
 ## 페이지 77개
 
 같은 행에 여러 역할이 있으면 공개 페이지는 모두 동일한 읽기 계약을 사용하고, 관리 페이지는 서버가 세션·역할·매장 범위를 다시 검증해야 한다.
@@ -151,3 +168,5 @@
 - 공개 product/store 동적 URL은 정상 ID와 invalid/없는 ID를 검사했다.
 - 타 회원·타 매장·권한 없는 직원의 운영 직접 API 호출은 정상 인증 세션과 격리 DB가 없어 아직 `PRODUCTION_UNVERIFIED_AUTH_SESSION` 또는 `MUTATION_UNEXECUTED`다.
 - 성공·실패·중복·경합·재시도는 Docker 기반 격리 Supabase 복구 뒤 실행한다. 운영에서는 지정 테스트 주문·상품만 카나리로 사용한다.
+
+2차 결과: Docker 격리 Supabase에서 해당 SQL suite의 성공·실패·중복·경합·재시도를 실행해 통과했다. 단, 실제 운영 Kakao 세션과 지정 운영 주문·상품을 사용할 권한이 확보되지 않아 운영 mutation 행은 계속 `MUTATION_UNEXECUTED`다.

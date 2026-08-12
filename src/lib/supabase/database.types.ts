@@ -9159,6 +9159,10 @@ export type Database = {
           product_id: string
         }[]
       }
+      owner_record_hidden_test_member_session_access: {
+        Args: { p_test_user_id: string }
+        Returns: number
+      }
       owner_request_hidden_test_shipping: {
         Args: { p_address_id: string; p_product_ids: string[] }
         Returns: string

@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "./client";
+import { isProductionTestMember } from "@/lib/productionTestMember";
 
 export type AppRole =
   | "member"
@@ -89,7 +90,11 @@ export function getUserRole(user: User | null | undefined): AppRole {
   const isLocalTestAccount =
     process.env.NODE_ENV === "development" &&
     user?.app_metadata?.local_test_account === true;
-  if (!hasKakaoProvider && !isLocalTestAccount) return "unauthorized";
+  if (
+    !hasKakaoProvider &&
+    !isLocalTestAccount &&
+    !isProductionTestMember(user)
+  ) return "unauthorized";
 
   if (
     explicitRole === "admin" ||

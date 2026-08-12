@@ -89,7 +89,13 @@ test("owner member mode is retired in favor of a dedicated production member acc
     retirement,
     checkoutEligibility,
     testMemberRoute,
+    testMemberServer,
     testMemberPage,
+    ownerMemberAccessRoute,
+    ownerMemberAccessPanel,
+    ownerReturnControl,
+    sessionAccessMigration,
+    clientAuth,
     serverAuth,
     dashboard,
   ] = await Promise.all([
@@ -99,7 +105,13 @@ test("owner member mode is retired in favor of a dedicated production member acc
     source("supabase/migrations/20260811194500_retire_owner_member_mode.sql"),
     source("supabase/migrations/20260811202500_allow_production_test_member_checkout.sql"),
     source("src/app/api/auth/test-member/route.ts"),
+    source("src/lib/productionTestMember.server.ts"),
     source("src/app/(shop)/account/test-member/page.tsx"),
+    source("src/app/api/admin/owner/member-access/route.ts"),
+    source("src/components/admin/owner/OwnerMemberAccessPanel.tsx"),
+    source("src/components/features/account/OwnerReturnControl.tsx"),
+    source("supabase/migrations/20260812090000_record_owner_test_member_session_access.sql"),
+    source("src/lib/supabase/auth.ts"),
     source("src/lib/commerce/server.ts"),
     source("src/components/admin/owner/OwnerDashboard.tsx"),
   ]);
@@ -131,10 +143,29 @@ test("owner member mode is retired in favor of a dedicated production member acc
     checkoutEligibility,
     /not public\.auth_user_has_kakao_identity\(v_user_id\)[\s\S]*not v_is_production_test_member/,
   );
-  assert.match(testMemberRoute, /signInWithPassword/);
-  assert.match(testMemberRoute, /hidden_test/);
+  assert.match(testMemberRoute, /signInProductionTestMember/);
+  assert.match(testMemberServer, /signInWithPassword/);
+  assert.match(testMemberServer, /isProductionTestMember/);
   assert.match(testMemberRoute, /enforceTestMemberLoginRateLimit/);
   assert.match(testMemberPage, /index: false/);
+  assert.match(ownerMemberAccessRoute, /authenticateOwnerAccessRequest\(request\)/);
+  assert.match(ownerMemberAccessRoute, /PRODUCTION_TEST_MEMBER_PASSWORD/);
+  assert.match(ownerMemberAccessRoute, /signInProductionTestMember/);
+  assert.match(ownerMemberAccessRoute, /get_owner_hidden_test_member/);
+  assert.match(ownerMemberAccessRoute, /owner_record_hidden_test_member_session_access/);
+  assert.match(ownerMemberAccessPanel, /회원으로 접속/);
+  assert.match(ownerMemberAccessPanel, /storeOwnerMemberAccessMarker/);
+  assert.match(ownerReturnControl, /소유자 복귀/);
+  assert.match(ownerReturnControl, /auth\.signOut\(\{[\s\S]*scope: "local"/);
+  assert.match(ownerReturnControl, /api\/auth\/kakao\/start/);
+  assert.match(sessionAccessMigration, /security definer[\s\S]*set search_path = ''/);
+  assert.match(sessionAccessMigration, /roles\.role_code = 'member'/);
+  assert.match(sessionAccessMigration, /test_members\.owner_id = v_owner_id/);
+  assert.match(sessionAccessMigration, /effective_member_account_status\(accounts\.member_id\) = 'active'/);
+  assert.match(sessionAccessMigration, /test_member\.session_accessed/);
+  assert.match(sessionAccessMigration, /revoke all[\s\S]*from public, anon, service_role/);
+  assert.match(sessionAccessMigration, /grant execute[\s\S]*to authenticated/);
+  assert.match(clientAuth, /isProductionTestMember\(user\)/);
   assert.doesNotMatch(serverAuth, /getOwnerMemberModeState|member_mode_active/);
   assert.doesNotMatch(dashboard, /회원 화면 임시 확인|3분간 회원 권한 활성화/);
 });

@@ -1,10 +1,9 @@
 import { hasTrustedRequestOrigin } from "@/lib/kakao/oidc";
 import {
-  PRODUCTION_TEST_MEMBER_EMAIL,
   PRODUCTION_TEST_MEMBER_IDENTIFIER,
 } from "@/lib/productionTestMember";
+import { signInProductionTestMember } from "@/lib/productionTestMember.server";
 import { enforceTestMemberLoginRateLimit } from "@/lib/ratelimit/server";
-import { createSupabasePublicClient } from "@/lib/supabase/server";
 
 function response(body: Record<string, unknown>, status = 200) {
   return Response.json(body, {
@@ -39,27 +38,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const signedIn = await createSupabasePublicClient().auth.signInWithPassword({
-      email: PRODUCTION_TEST_MEMBER_EMAIL,
-      password: body.password,
-    });
-    const user = signedIn.data.user;
-    const session = signedIn.data.session;
-    if (
-      signedIn.error ||
-      !user ||
-      !session ||
-      user.app_metadata?.canary !== true ||
-      user.app_metadata?.hidden_test !== true ||
-      user.app_metadata?.role !== "member"
-    ) {
-      if (session) await createSupabasePublicClient().auth.signOut();
+    const session = await signInProductionTestMember(body.password);
+    if (!session) {
       return response({ error: "invalid_credentials" }, 401);
     }
     return response({
       session: {
-        accessToken: session.access_token,
-        refreshToken: session.refresh_token,
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
       },
     });
   } catch {

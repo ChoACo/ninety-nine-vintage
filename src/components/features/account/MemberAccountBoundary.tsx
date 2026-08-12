@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
+import { OwnerReturnControl } from "@/components/features/account/OwnerReturnControl";
 
 export function MemberAccountBoundary({
   basePath = "",
@@ -36,5 +37,5 @@ export function MemberAccountBoundary({
     );
   }
 
-  return children;
+  return <>{children}<OwnerReturnControl /></>;
 }

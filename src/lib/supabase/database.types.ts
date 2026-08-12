@@ -10191,7 +10191,7 @@ export type Database = {
       upsert_my_shipping_address: {
         Args: {
           p_address: string
-          p_id: string
+          p_id: string | null
           p_is_default?: boolean
           p_label: string
           p_phone: string

@@ -39,7 +39,9 @@ async function saveAddress(request: Request, addressId: string | null) {
   }
   const { data, error } = await auth.user
     .rpc("upsert_my_shipping_address", {
-      p_id: addressId ?? crypto.randomUUID(),
+      // A null id is the RPC's create signal. Supplying a freshly generated id
+      // makes the ownership guard treat a new address as a missing edit target.
+      p_id: addressId,
       p_label: body.label.trim(),
       p_recipient_name: body.recipientName.trim(),
       p_phone: body.phone.trim(),

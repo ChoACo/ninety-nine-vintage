@@ -78,6 +78,8 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   ]);
 
   assert.match(addressRoute, /\.rpc\("upsert_my_shipping_address"/);
+  assert.match(addressRoute, /p_id:\s*addressId/);
+  assert.doesNotMatch(addressRoute, /p_id:\s*addressId\s*\?\?\s*crypto\.randomUUID\(\)/);
   assert.doesNotMatch(addressRoute, /\.from\("shipping_addresses"\)\.insert/);
   assert.match(addressRoute, /5자리 우편번호/);
   assert.match(storageRoute, /storage_class_snapshot,\s*storage_duration_days/);

@@ -5,7 +5,6 @@ import { useEffect } from "react";
 
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { resolveKakaoPostLoginReturnTo } from "@/lib/kakao/returnTo";
-import { getMyNicknameState } from "@/lib/supabase/nickname";
 
 export function LoginSessionBoundary({
   children,
@@ -17,39 +16,11 @@ export function LoginSessionBoundary({
   const { loading, session } = useSupabaseSession();
 
   useEffect(() => {
-    let active = true;
     if (loading || !session) {
-      return () => {
-        active = false;
-      };
+      return;
     }
 
-    const hasKakaoIdentity =
-      session.user.identities?.some(
-        (identity) => identity.provider === "kakao",
-      ) === true;
-
-    void (async () => {
-      let nicknameInitialized = true;
-      if (hasKakaoIdentity) {
-        try {
-          nicknameInitialized = (await getMyNicknameState()).isInitialized;
-        } catch {
-          // Keep the authenticated user out of the login loop. The account
-          // hub can retry the nickname check and show the required gate.
-          nicknameInitialized = false;
-        }
-      }
-
-      if (!active) return;
-      window.location.replace(
-        resolveKakaoPostLoginReturnTo(returnTo, nicknameInitialized),
-      );
-    })();
-
-    return () => {
-      active = false;
-    };
+    window.location.replace(resolveKakaoPostLoginReturnTo(returnTo));
   }, [loading, returnTo, session]);
 
   if (loading || session) {

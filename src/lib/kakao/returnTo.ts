@@ -26,7 +26,6 @@ function applicationPathname(value: string): string | null {
 
 export function resolveKakaoPostLoginReturnTo(
   requestedReturnTo: string,
-  nicknameInitialized: boolean,
 ): string {
   const pathname = applicationPathname(requestedReturnTo);
   const accountPath =
@@ -36,8 +35,7 @@ export function resolveKakaoPostLoginReturnTo(
 
   if (
     !pathname ||
-    isAuthenticationPath(pathname) ||
-    !nicknameInitialized
+    isAuthenticationPath(pathname)
   ) {
     return accountPath;
   }

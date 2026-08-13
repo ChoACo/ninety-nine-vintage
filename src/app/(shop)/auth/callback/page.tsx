@@ -9,7 +9,6 @@ import {
   safeSameOriginReturnTo,
 } from "@/lib/kakao/returnTo";
 import { completeForOwnedKakaoSession } from "@/lib/kakao/callbackFlow";
-import { getMyNicknameState } from "@/lib/supabase/nickname";
 
 interface KakaoSessionPayload {
   idToken?: string;
@@ -113,19 +112,8 @@ async function completeKakaoCallback(): Promise<KakaoCallbackResult> {
     window.location.origin,
     window.location.pathname.startsWith("/m/") ? "/m/account" : "/account",
   );
-  let nicknameInitialized = false;
-  try {
-    nicknameInitialized = (await getMyNicknameState()).isInitialized;
-  } catch {
-    // A successful Kakao session must not fall back into the login page when
-    // the onboarding state cannot be read. The account hub retries the query.
-  }
-
   return {
-    returnTo: resolveKakaoPostLoginReturnTo(
-      safeReturnTo,
-      nicknameInitialized,
-    ),
+    returnTo: resolveKakaoPostLoginReturnTo(safeReturnTo),
   };
 }
 

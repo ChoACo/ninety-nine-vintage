@@ -198,11 +198,11 @@ test("Kakao returnTo accepts only same-origin application paths", () => {
   assert.equal(safeSameOriginReturnTo("/cart", "javascript:alert(1)"), "/account");
 });
 
-test("Kakao first login reaches the nickname gate before the requested page", () => {
-  assert.equal(resolveKakaoPostLoginReturnTo("/home", false), "/account");
-  assert.equal(resolveKakaoPostLoginReturnTo("/m/home", false), "/m/account");
-  assert.equal(resolveKakaoPostLoginReturnTo("/cart?from=login", true), "/cart?from=login");
-  assert.equal(resolveKakaoPostLoginReturnTo("/account/login?next=%2Fhome", true), "/account");
+test("Kakao login restores the requested page and only rejects authentication routes", () => {
+  assert.equal(resolveKakaoPostLoginReturnTo("/home"), "/home");
+  assert.equal(resolveKakaoPostLoginReturnTo("/m/home"), "/m/home");
+  assert.equal(resolveKakaoPostLoginReturnTo("/cart?from=login"), "/cart?from=login");
+  assert.equal(resolveKakaoPostLoginReturnTo("/account/login?next=%2Fhome"), "/account");
 });
 
 test("Kakao concurrent login flows use isolated scoped cookies", () => {
@@ -301,7 +301,7 @@ test("Kakao callback hides identity and commerce surfaces until profile validati
     headerSource,
     /authenticating\s*\?\s*<span[\s\S]*?로그인 상태 확인 중[\s\S]*?:\s*<>[\s\S]*?<AuthStatus\s*\/>[\s\S]*?<CommerceToolbar\s*\/>/,
   );
-  assert.match(callbackSource, /getMyNicknameState\(\)/);
+  assert.doesNotMatch(callbackSource, /getMyNicknameState\(\)/);
   assert.match(callbackSource, /resolveKakaoPostLoginReturnTo/);
 });
 

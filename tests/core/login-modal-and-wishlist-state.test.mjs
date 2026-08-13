@@ -19,7 +19,6 @@ test("intercepted login dismissal and guest browsing preserve the underlying pag
   assert.match(prompt, /basePath=\{surface === "mobile" \? "\/m" : ""\}/);
   assert.match(prompt, /<LoginSessionBoundary returnTo=\{returnTo\}>/);
   assert.match(sessionBoundary, /if \(loading \|\| session\)/);
-  assert.match(sessionBoundary, /getMyNicknameState\(\)/);
   assert.match(sessionBoundary, /resolveKakaoPostLoginReturnTo/);
   assert.match(sessionBoundary, /window\.location\.replace/);
   assert.match(guestAction, /onClick=\{\(\) => router\.back\(\)\}/);
@@ -29,6 +28,16 @@ test("intercepted login dismissal and guest browsing preserve the underlying pag
   assert.match(authStatus, /window\.location\.pathname/);
   assert.match(authStatus, /window\.location\.search/);
   assert.match(authStatus, /window\.location\.hash/);
+});
+
+test("Kakao login returns to the requested storefront route without account forcing", async () => {
+  const [callbackPage, returnTo] = await Promise.all([
+    source("src/app/(shop)/auth/callback/page.tsx"),
+    source("src/lib/kakao/returnTo.ts"),
+  ]);
+  assert.doesNotMatch(callbackPage, /getMyNicknameState/);
+  assert.doesNotMatch(returnTo, /nicknameInitialized/);
+  assert.match(returnTo, /return requestedReturnTo/);
 });
 
 test("wishlist empty copy distinguishes session and loading states", async () => {

@@ -95,6 +95,7 @@ interface StoredCheckoutRequest {
   ledgerMayExist: boolean;
   includeShippingFee: boolean;
   shippingFeeQuote: number;
+  shippingRegion: "regular" | "remote_area";
 }
 
 const UUID_PATTERN =
@@ -344,6 +345,7 @@ function readStoredCheckoutRequest(options?: {
         // therefore represents a product-only order.
         includeShippingFee: parsed.includeShippingFee === true,
         shippingFeeQuote: Number(parsed.shippingFeeQuote ?? 0),
+        shippingRegion: parsed.shippingRegion === "remote_area" ? "remote_area" : "regular",
       };
     }
   } catch {
@@ -432,6 +434,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const [shippingFee, setShippingFee] = useState(0);
   const [shippingCharges, setShippingCharges] = useState<ShippingCharge[]>([]);
   const [includeShippingFee, setIncludeShippingFee] = useState(true);
+  const [shippingRegion, setShippingRegion] = useState<"regular" | "remote_area">("regular");
   const [heldCheckoutIds, setHeldCheckoutIds] = useState<string[]>([]);
   const [releaseCheckoutAllowed, setReleaseCheckoutAllowed] = useState(false);
   const [restoredCheckoutProducts, setRestoredCheckoutProducts] = useState<
@@ -542,7 +545,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
 
         if (!isCurrent()) return;
         setAccess("member");
-        const response = await fetch("/api/cart", {
+        const response = await fetch(`/api/cart?shippingRegion=${shippingRegion}`, {
           headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
         });
@@ -679,7 +682,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
         authGeneration.current += 1;
       };
     }
-  }, [replaceCart]);
+  }, [replaceCart, shippingRegion]);
 
   const products = useMemo(() => {
     // A prepared order is immutable. While it is pending, show and retry only
@@ -773,6 +776,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           ledgerMayExist: false,
           includeShippingFee: requestIncludesShipping,
           shippingFeeQuote: requestShippingFee,
+          shippingRegion,
         }),
         productIds,
         productSnapshots,
@@ -793,6 +797,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           idempotencyKey: currentRequest.idempotencyKey,
           expectedPaymentMode,
           includeShippingFee: currentRequest.includeShippingFee,
+          shippingRegion: currentRequest.shippingRegion,
         }),
       });
       const payload = (await response.json().catch(() => null)) as unknown;
@@ -1132,6 +1137,21 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                   : "나중에 결제"}
               </strong>
             </div>
+            <label className="mt-3 block text-xs font-bold">
+              배송 지역
+              <select
+                className="mt-1 h-11 w-full border border-line bg-paper px-3"
+                disabled={busy || hasPendingCheckout}
+                onChange={(event) => {
+                  invalidateCheckoutRequest();
+                  setShippingRegion(event.target.value === "remote_area" ? "remote_area" : "regular");
+                }}
+                value={shippingRegion}
+              >
+                <option value="regular">일반 택배</option>
+                <option value="remote_area">제주 및 도서산간 지역 택배</option>
+              </select>
+            </label>
             {shippingCharges.length > 0 ? (
               <div className="mt-3 space-y-2 border border-line bg-paper p-3 text-[11px]">
                 <p className="font-bold">배송비 {shippingCharges.length}건</p>

@@ -942,6 +942,7 @@ export type Database = {
           member_id: string
           shipping_credit_applied: boolean
           shipping_fee: number
+          shipping_region: string | null
           status: string
           subtotal: number
           total: number
@@ -954,6 +955,7 @@ export type Database = {
           member_id: string
           shipping_credit_applied?: boolean
           shipping_fee?: number
+          shipping_region?: string | null
           status?: string
           subtotal: number
           total: number
@@ -966,6 +968,7 @@ export type Database = {
           member_id?: string
           shipping_credit_applied?: boolean
           shipping_fee?: number
+          shipping_region?: string | null
           status?: string
           subtotal?: number
           total?: number
@@ -6921,6 +6924,8 @@ export type Database = {
           is_active: boolean
           name: string
           operator_id: string
+          regular_shipping_fee: number | null
+          remote_area_shipping_fee: number | null
           slug: string
           updated_at: string
           version: number
@@ -6934,6 +6939,8 @@ export type Database = {
           is_active?: boolean
           name: string
           operator_id: string
+          regular_shipping_fee?: number | null
+          remote_area_shipping_fee?: number | null
           slug: string
           updated_at?: string
           version?: number
@@ -6947,6 +6954,8 @@ export type Database = {
           is_active?: boolean
           name?: string
           operator_id?: string
+          regular_shipping_fee?: number | null
+          remote_area_shipping_fee?: number | null
           slug?: string
           updated_at?: string
           version?: number
@@ -7711,6 +7720,16 @@ export type Database = {
               p_idempotency_key: string
               p_include_shipping_fee: boolean
               p_product_ids: string[]
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_apply_shipping_credit: boolean
+              p_idempotency_key: string
+              p_include_shipping_fee: boolean
+              p_product_ids: string[]
+              p_shipping_region: string
             }
             Returns: Json
           }
@@ -9351,10 +9370,9 @@ export type Database = {
         Returns: number
       }
       queue_test_web_push_notification: { Args: never; Returns: Json }
-      quote_commerce_shipping_fee: {
-        Args: { p_product_ids: string[] }
-        Returns: Json
-      }
+      quote_commerce_shipping_fee:
+        | { Args: { p_product_ids: string[] }; Returns: Json }
+        | { Args: { p_product_ids: string[]; p_shipping_region: string }; Returns: Json }
       reconcile_inventory_item_route: {
         Args: {
           p_expected_version: number
@@ -10001,6 +10019,10 @@ export type Database = {
         Returns: string
       }
       support_store_operator: { Args: { p_store_id: string }; Returns: string }
+      send_support_message: {
+        Args: { p_body: string; p_client_nonce: string; p_conversation_id: string }
+        Returns: Database["public"]["Tables"]["support_messages"]["Row"][]
+      }
       sync_manual_transfer_runtime_settings: {
         Args: { p_account_number: string; p_bank_name: string }
         Returns: boolean

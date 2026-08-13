@@ -70,9 +70,12 @@ export async function GET(request: Request) {
     .lte("publish_at", new Date().toISOString());
   if (productError) return commerceJson({ error: "cart_unavailable" }, 503);
   const liveIds = (products ?? []).map((product) => product.id);
+  const shippingRegion = new URL(request.url).searchParams.get("shippingRegion") === "remote_area"
+    ? "remote_area"
+    : "regular";
   const quoteResult = await (auth.user as unknown as RpcClient).rpc(
     "quote_commerce_shipping_fee",
-    { p_product_ids: liveIds },
+    { p_product_ids: liveIds, p_shipping_region: shippingRegion },
   );
   if (quoteResult.error || !quoteResult.data || typeof quoteResult.data !== "object") {
     return commerceJson({ error: "shipping_fee_unavailable" }, 503);

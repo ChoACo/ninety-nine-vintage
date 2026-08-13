@@ -199,16 +199,12 @@ export async function POST(request: Request) {
     return commerceJson({ error: "상담할 매장을 선택해 주세요." }, 400);
   }
 
-  const { data, error } = await auth.user
-    .from("support_messages")
-    .insert({
-      conversation_id: conversationId,
-      body: messageBody,
-      client_nonce: body?.clientNonce?.trim() || crypto.randomUUID(),
-      sender_id: auth.userId,
-    })
-    .select("*")
-    .single();
+  const { data, error } = await auth.user.rpc("send_support_message", {
+    p_conversation_id: conversationId,
+    p_body: messageBody,
+    p_client_nonce: body?.clientNonce?.trim() || crypto.randomUUID(),
+  });
+  const message = Array.isArray(data) ? data[0] : data;
   if (error) {
     return commerceJson(
       {
@@ -218,5 +214,5 @@ export async function POST(request: Request) {
       error.code === "42501" ? 403 : 409,
     );
   }
-  return commerceJson({ message: data }, 201);
+  return commerceJson({ message }, 201);
 }

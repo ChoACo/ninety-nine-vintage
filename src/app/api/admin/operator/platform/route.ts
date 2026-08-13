@@ -9,7 +9,18 @@ export async function GET(request: Request) {
   if (!['owner','operator'].includes(auth.roleCode)) return commerceJson({error:'forbidden'},403);
   const {data,error}=await (auth.user as unknown as RpcClient).rpc('get_operator_store_platform_management');
   if (error) return commerceJson({error:error.message??'platform_unavailable'},503);
-  return commerceJson({management:data});
+  const management = data && typeof data === "object" ? data as { stores?: Array<Record<string, unknown>> } : {};
+  const storeIds = (management.stores ?? []).map((store) => String(store.id));
+  const { data: fees, error: feeError } = storeIds.length
+    ? await auth.admin.from("stores").select("id,regular_shipping_fee,remote_area_shipping_fee").in("id", storeIds)
+    : { data: [], error: null };
+  if (feeError) return commerceJson({ error: "shipping_settings_unavailable" }, 503);
+  const feeByStore = new Map((fees ?? []).map((fee) => [fee.id, fee]));
+  return commerceJson({management:{...management,stores:(management.stores ?? []).map((store) => ({
+    ...store,
+    regularShippingFee: feeByStore.get(String(store.id))?.regular_shipping_fee ?? null,
+    remoteAreaShippingFee: feeByStore.get(String(store.id))?.remote_area_shipping_fee ?? null,
+  }))}});
 }
 
 export async function POST(request: Request) {
@@ -22,6 +33,12 @@ export async function POST(request: Request) {
   let result;
   if (body.action==='request_plan') {
     result=await rpc.rpc('request_store_service_plan',{p_store_id:body.storeId,p_plan_code:body.planCode});
+  } else if (body.action==='save_shipping_fees') {
+    result=await rpc.rpc('configure_store_shipping_fees',{
+      p_store_id:body.storeId,
+      p_regular_shipping_fee:body.regularShippingFee,
+      p_remote_area_shipping_fee:body.remoteAreaShippingFee,
+    });
   } else if (body.action==='submit_payout_account') {
     try {
       const account=normalizeAccountNumber(String(body.accountNumber??''));

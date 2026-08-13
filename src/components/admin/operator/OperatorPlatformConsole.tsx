@@ -16,6 +16,8 @@ type Store = {
   totalSettlementSales: number;
   weeklySales: number;
   nextSettlementEstimate: number;
+  regularShippingFee: number | null;
+  remoteAreaShippingFee: number | null;
   paidTotal: number;
   payoutAccount: {
     bankName: string;
@@ -37,6 +39,22 @@ type Store = {
     batchId: string | null;
   }>;
 };
+
+function ShippingFeeEditor({ store, save }: { store: Store; save: (body: Record<string, unknown>) => Promise<void> }) {
+  const [regular, setRegular] = useState(String(store.regularShippingFee ?? ""));
+  const [remote, setRemote] = useState(String(store.remoteAreaShippingFee ?? ""));
+  const valid = Number.isSafeInteger(Number(regular)) && Number(regular) > 0
+    && Number.isSafeInteger(Number(remote)) && Number(remote) >= Number(regular);
+  return <div className="mt-5 border-t border-line pt-4">
+    <h3 className="text-xs font-black">센터 택배비 설정</h3>
+    <p className="mt-1 text-[10px] text-muted">일반 택배와 제주 및 도서산간 지역 택배 2개만 설정합니다.</p>
+    <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+      <label className="text-[10px] font-bold">일반 택배<input className="mt-1 w-full border border-line bg-paper p-2 text-xs" min="1" onChange={(e) => setRegular(e.target.value)} type="number" value={regular} /></label>
+      <label className="text-[10px] font-bold">제주 및 도서산간<input className="mt-1 w-full border border-line bg-paper p-2 text-xs" min={Number(regular) || 1} onChange={(e) => setRemote(e.target.value)} type="number" value={remote} /></label>
+      <button className="self-end bg-ink p-2 text-xs font-bold text-paper disabled:opacity-40" disabled={!valid} onClick={() => void save({ action: "save_shipping_fees", storeId: store.id, regularShippingFee: Number(regular), remoteAreaShippingFee: Number(remote) })} type="button">택배비 저장</button>
+    </div>
+  </div>;
+}
 
 export function OperatorPlatformConsole() {
   const { session } = useSupabaseSession();
@@ -116,6 +134,7 @@ export function OperatorPlatformConsole() {
             <button className="bg-ink p-2 text-xs font-bold text-paper" onClick={() => void action({ action: "submit_payout_account", storeId: store.id, bankName: bank, accountHolder: holder, accountNumber: account })} type="button">정산계좌 제출</button>
           </div>
           {store.payoutAccount && <p className="mt-2 text-xs text-muted">{store.payoutAccount.bankName} {store.payoutAccount.accountNumberMasked} · {store.payoutAccount.status}</p>}
+          <ShippingFeeEditor save={action} store={store} />
           <div className="mt-5 grid gap-2 sm:grid-cols-4">
             <p className="border border-line p-3 text-xs">총 정산 매출<br /><strong>{store.totalSettlementSales.toLocaleString("ko-KR")}원</strong></p>
             <p className="border border-line p-3 text-xs">이번 주 매출<br /><strong>{store.weeklySales.toLocaleString("ko-KR")}원</strong></p>

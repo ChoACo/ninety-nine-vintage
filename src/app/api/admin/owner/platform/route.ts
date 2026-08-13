@@ -20,7 +20,18 @@ export async function GET(request: Request) {
     "get_owner_store_platform_management",
   );
   if (error) return commerceJson({ error: error.message ?? "platform_management_unavailable" }, 503);
-  return commerceJson({ management: data });
+  const management = data && typeof data === "object" ? data as { stores?: Array<Record<string, unknown>> } : {};
+  const storeIds = (management.stores ?? []).map((store) => String(store.id));
+  const { data: fees, error: feeError } = storeIds.length
+    ? await auth.admin.from("stores").select("id,regular_shipping_fee,remote_area_shipping_fee").in("id", storeIds)
+    : { data: [], error: null };
+  if (feeError) return commerceJson({ error: "shipping_settings_unavailable" }, 503);
+  const feeByStore = new Map((fees ?? []).map((fee) => [fee.id, fee]));
+  return commerceJson({ management: { ...management, stores: (management.stores ?? []).map((store) => ({
+    ...store,
+    regularShippingFee: feeByStore.get(String(store.id))?.regular_shipping_fee ?? null,
+    remoteAreaShippingFee: feeByStore.get(String(store.id))?.remote_area_shipping_fee ?? null,
+  })) } });
 }
 
 export async function POST(request: Request) {
@@ -32,7 +43,13 @@ export async function POST(request: Request) {
     return commerceJson({ error: "invalid_platform_request" }, 422);
   }
   const rpc = auth.admin as unknown as RpcClient;
-  const result = body.action === "save_group"
+  const result = body.action === "save_shipping_fees"
+    ? await rpc.rpc("configure_store_shipping_fees", {
+      p_store_id: body.storeId,
+      p_regular_shipping_fee: body.regularShippingFee,
+      p_remote_area_shipping_fee: body.remoteAreaShippingFee,
+    })
+    : body.action === "save_group"
     ? await rpc.rpc("manage_owner_fulfillment_group", {
       p_group_id: typeof body.groupId === "string" ? body.groupId : null,
       p_name: body.name,

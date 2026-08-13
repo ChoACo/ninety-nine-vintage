@@ -41,7 +41,22 @@ export async function GET(request: Request) {
   if (roleCode === "member" || roleCode === "band_member") {
     query = query
       .eq("member_id", auth.userId)
-      .eq("conversation_type", "general");
+      .in("conversation_type", ["general", "product"]);
+  } else if (roleCode === "owner") {
+    const { data: selectedStoreId, error: scopeError } = await auth.user.rpc(
+      "require_active_operator_store_scope",
+    );
+    if (scopeError || typeof selectedStoreId !== "string") {
+      return commerceJson({
+        unreadCount: 0,
+        latestConversationId: null,
+        latestMessageAt: null,
+        href: "/admin/operator/chat",
+      });
+    }
+    query = query
+      .eq("store_id", selectedStoreId)
+      .in("conversation_type", ["general", "product", "internal"]);
   } else if (roleCode === "operator") {
     query = query
       .eq("assigned_staff_id", auth.userId)
@@ -52,6 +67,7 @@ export async function GET(request: Request) {
     return commerceJson({
       unreadCount: 0,
       latestConversationId: null,
+      latestMessageAt: null,
       href: null,
     });
   }
@@ -97,8 +113,9 @@ export async function GET(request: Request) {
   return commerceJson({
     unreadCount: unread.length,
     latestConversationId: latest?.id ?? null,
+    latestMessageAt: latest?.last_message_at ?? null,
     href:
-      roleCode === "operator"
+      roleCode === "owner" || roleCode === "operator"
         ? latest
           ? `/admin/operator/chat?conversationId=${encodeURIComponent(latest.id)}`
           : "/admin/operator/chat"

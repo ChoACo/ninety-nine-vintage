@@ -93,12 +93,15 @@ test("member and operator surfaces expose store selection and direct member chat
     ]);
 
   assert.match(memberPanel, /매장별 상담/);
+  assert.match(memberPanel, /conversationStores\.map/);
+  assert.doesNotMatch(memberPanel, /새 상담 시작/);
   assert.match(memberPanel, /selectStore/);
   assert.match(operatorPanel, /memberId/);
   assert.match(operatorPanel, /storeId/);
   assert.match(storagePanel, /채팅하기/);
   assert.match(storagePanel, /\/admin\/operator\/chat\?memberId=/);
   assert.match(operatorLayout, /회원 채팅/);
+  assert.match(operatorLayout, /href="\/account"/);
   assert.match(localAccounts, /slot === "operator-secondary" \? 1 : 0/);
 });
 
@@ -127,7 +130,11 @@ test("employees can handle only their assigned store chats and receive role-corr
   assert.match(operatorRoute, /\.in\("conversation_type", \["general", "product", "internal"\]\)/);
   assert.match(employeePage, /basePath="\/admin\/employee\/inquiries"/);
   assert.match(unreadRoute, /roleCode === "employee"/);
+  assert.match(unreadRoute, /roleCode === "owner"/);
+  assert.match(unreadRoute, /require_active_operator_store_scope/);
+  assert.match(unreadRoute, /\["general", "product"\]/);
   assert.match(unreadRoute, /\/admin\/employee\/inquiries\?conversationId=/);
+  assert.match(operatorRoute, /query = query\.eq\("store_id", selectedStoreId\)/);
 });
 
 test("support chat policies follow the bounded Owner canary principal", async () => {
@@ -169,6 +176,8 @@ test("realtime chat events render an unread badge and dismissible five-second to
   assert.match(chatProvider, /postgres_changes/);
   assert.match(chatProvider, /table: "support_messages"/);
   assert.match(chatProvider, /unreadCount/);
+  assert.match(chatProvider, /읽지 않은 채팅 안내/);
+  assert.match(chatProvider, /<PremiumDialog/);
   assert.match(notificationProvider, /table: "notifications"/);
   assert.match(notificationProvider, /5_000/);
   assert.match(notificationProvider, /알림 닫기/);

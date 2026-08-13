@@ -151,6 +151,12 @@ export default function OperatorLayout({
         >
           {mainNavigationItem.label}
         </Link>
+        <Link
+          className="ml-2 inline-flex min-h-11 items-center whitespace-nowrap border border-line px-5 text-xs font-black text-muted"
+          href="/account"
+        >
+          내 정보
+        </Link>
       </nav>
       <p className="mb-2 text-[10px] font-black tracking-[.12em] text-muted">운영 탭</p>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-ink pb-3">

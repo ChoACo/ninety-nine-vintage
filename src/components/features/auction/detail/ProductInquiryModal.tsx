@@ -61,7 +61,9 @@ export function ProductInquiryModal({
         throw new Error(payload?.error ?? "상품 문의를 보내지 못했습니다.");
       }
       onClose();
-      router.push(`${basePath}/chat?conversationId=${encodeURIComponent(payload.conversation.id)}`);
+      window.location.assign(
+        `${basePath}/chat?conversationId=${encodeURIComponent(payload.conversation.id)}`,
+      );
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "상품 문의를 보내지 못했습니다.");
     } finally {

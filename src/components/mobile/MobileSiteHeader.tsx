@@ -34,6 +34,9 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
     ["실시간 경매", "/m/feed"],
     ["즉시 구매", "/m/shop"],
     [roleNavigation.chatLabel, roleNavigation.chatHref],
+    ...(access.roleCode === "operator" || access.roleCode === "employee"
+      ? [["내 정보", "/m/account"] as const]
+      : []),
     ["설정", "/m/account/settings"],
   ] as const;
   const links = consumerSimpleMode

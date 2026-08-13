@@ -5,7 +5,7 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("mobile staff navigation replaces member account and routes chat to the assigned-store console", async () => {
+test("mobile staff navigation keeps member account and routes chat to the assigned-store console", async () => {
   const [navigation, bottomNav, header, chatLink, account, settings] =
     await Promise.all([
       source("src/lib/admin/mobileNavigation.ts"),
@@ -26,7 +26,7 @@ test("mobile staff navigation replaces member account and routes chat to the ass
   );
   assert.match(bottomNav, /roleNavigation\.centerHref/);
   assert.match(bottomNav, /simpleMode\.enabled && !roleNavigation\.isStaff/);
-  assert.doesNotMatch(bottomNav, /\["내 정보", "\/m\/account"/);
+  assert.match(bottomNav, /\["내 정보", "\/m\/account"/);
   assert.match(header, /fallbackHref=\{roleNavigation\.chatHref\}/);
   assert.match(header, /allowedHrefPrefix=\{staffChatPrefix\}/);
   assert.match(header, /\["설정", "\/m\/account\/settings"\]/);

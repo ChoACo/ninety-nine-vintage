@@ -40,6 +40,9 @@ export function MobileSiteBottomNav() {
     ["구매", "/m/shop", Store],
     ["장바구니", "/m/cart", ShoppingBag],
     ...(identityTab ? [identityTab] : []),
+    ...(access.roleCode === "operator" || access.roleCode === "employee"
+      ? [["내 정보", "/m/account", UserRound] as const]
+      : []),
   ] as const;
   const tabs = consumerSimpleMode
     ? ([

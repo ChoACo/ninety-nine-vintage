@@ -42,7 +42,7 @@ test("staff navigation follows each role's core work sequence", async () => {
   ]) {
     assert.match(operatorLayout, new RegExp(`label: "${label}"`));
   }
-  for (const label of ["오늘의 작업", "입출고·보관", "소포·송장", "문의"]) {
+  for (const label of ["오늘의 작업", "입출고·보관", "소포·송장", "문의", "내 정보"]) {
     assert.match(employeeLayout, new RegExp(`"${label}"`));
   }
   for (const label of [
@@ -55,4 +55,21 @@ test("staff navigation follows each role's core work sequence", async () => {
     assert.match(ownerLayout, new RegExp(`label: "${label}"`));
   }
   assert.match(operatorDashboard, /오늘 \/ 업무 목록/);
+});
+
+test("staff keeps member account access and auction pages keep the cart control", async () => {
+  const [mobileHeader, mobileBottomNav, toolbar] = await Promise.all([
+    source("src/components/mobile/MobileSiteHeader.tsx"),
+    source("src/components/mobile/MobileSiteBottomNav.tsx"),
+    source("src/components/features/commerce/CommerceToolbar.tsx"),
+  ]);
+
+  for (const sourceText of [mobileHeader, mobileBottomNav]) {
+    assert.match(sourceText, /access\.roleCode === "operator"/);
+    assert.match(sourceText, /access\.roleCode === "employee"/);
+    assert.match(sourceText, /"내 정보", "\/m\/account"/);
+  }
+  assert.match(toolbar, /aria-label="장바구니"/);
+  assert.doesNotMatch(toolbar, /aria-label="입찰 현황"/);
+  assert.doesNotMatch(toolbar, /auctionContext/);
 });

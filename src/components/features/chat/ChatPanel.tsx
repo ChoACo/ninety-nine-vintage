@@ -145,7 +145,6 @@ export function ChatPanel({
       requestedStoreId ??
       selectedStoreId ??
       nextConversations[0]?.store_id ??
-      nextStores[0]?.id ??
       null;
     setSelectedStoreId(nextStoreId);
     const nextConversation =
@@ -184,6 +183,12 @@ export function ChatPanel({
   const selectedStore = useMemo(
     () => stores.find((store) => store.id === selectedStoreId) ?? null,
     [selectedStoreId, stores],
+  );
+  const conversationStores = useMemo(
+    () => stores.filter((store) =>
+      conversations.some((item) => item.store_id === store.id)
+    ),
+    [conversations, stores],
   );
 
   const selectStore = async (storeId: string) => {
@@ -292,7 +297,7 @@ export function ChatPanel({
               : "max-h-[480px] overflow-y-auto"
           }`}
         >
-          {stores.map((store) => {
+          {conversationStores.map((store) => {
             const thread = conversations.find(
               (item) => item.store_id === store.id,
             );
@@ -316,7 +321,7 @@ export function ChatPanel({
                     {store.name}
                   </span>
                   <span className="mt-1 block truncate text-[10px] opacity-60">
-                    {thread?.last_message_preview ?? "새 상담 시작"}
+                    {thread?.last_message_preview}
                   </span>
                   {responseStatus(thread ?? null) && (
                     <span className="mt-1 block text-[9px] font-bold opacity-70">
@@ -328,9 +333,10 @@ export function ChatPanel({
               </button>
             );
           })}
-          {token && stores.length === 0 && (
+          {token && conversationStores.length === 0 && (
             <p className="border border-line bg-paper p-4 text-xs text-muted">
-              현재 상담 가능한 매장이 없습니다.
+              아직 시작된 상담이 없습니다. 상품 상세의 문의하기에서 상담을
+              시작할 수 있습니다.
             </p>
           )}
         </div>

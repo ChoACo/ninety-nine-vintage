@@ -24,17 +24,24 @@ export async function GET(request: Request) {
     );
   }
   const scopedOperatorId = auth.effectiveOperatorId ?? auth.userId;
+  const selectedStoreId = "selectedStoreId" in auth &&
+    typeof auth.selectedStoreId === "string"
+    ? auth.selectedStoreId
+    : null;
   const conversationId = new URL(request.url).searchParams.get("conversationId");
   if (conversationId) {
     if (!isUuid(conversationId)) {
       return commerceJson({ error: "conversation_not_found" }, 404);
     }
-    const conversationQuery = (
+    let conversationQuery = (
       auth.roleCode === "owner" ? auth.admin : auth.user
     )
       .from("support_conversations")
       .select("*")
       .eq("id", conversationId);
+    if (selectedStoreId) {
+      conversationQuery = conversationQuery.eq("store_id", selectedStoreId);
+    }
     const { data: conversation } =
       auth.roleCode === "owner"
         ? await conversationQuery.maybeSingle()
@@ -58,7 +65,7 @@ export async function GET(request: Request) {
     return commerceJson({ conversation, messages: messages ?? [] });
   }
 
-  const query = (
+  let query = (
     auth.roleCode === "owner" ? auth.admin : auth.user
   )
     .from("support_conversations")
@@ -68,6 +75,9 @@ export async function GET(request: Request) {
     .in("conversation_type", ["general", "product", "internal"])
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
+  if (selectedStoreId) {
+    query = query.eq("store_id", selectedStoreId);
+  }
   const { data: conversations, error } =
     auth.roleCode === "owner"
       ? await query

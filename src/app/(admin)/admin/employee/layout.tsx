@@ -9,6 +9,7 @@ const links = [
   ["/admin/employee/fulfillment", "입출고·보관"],
   ["/admin/employee/parcels", "소포·송장"],
   ["/admin/employee/inquiries", "문의"],
+  ["/account", "내 정보"],
 ] as const;
 
 export default function EmployeeLayout({

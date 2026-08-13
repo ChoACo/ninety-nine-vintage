@@ -153,10 +153,10 @@ test("only the owner confirms shared payments while operators retain fulfillment
     /can_confirm_shared_payment/i,
   );
   assert.match(platformMigration, /can_confirm_shared_payment[\s\S]*public\.is_owner\(\)/i);
-  assert.match(ownerLayout, /사이트·로그/);
-  assert.match(ownerLayout, /회원·권한/);
+  assert.match(ownerLayout, /label: "시스템"/);
+  assert.match(ownerLayout, /label: "회원"/);
   assert.doesNotMatch(ownerLayout, /센터·매장 구조/);
-  assert.match(ownerLayout, /환불 승인/);
+  assert.match(ownerLayout, /환불·긴급/);
   assert.doesNotMatch(ownerLayout, /배송·결제/);
   assert.doesNotMatch(operatorLayout, /label:\s*"주문·입금"/);
   assert.match(operatorLayout, /label:\s*"준비·배송"/);

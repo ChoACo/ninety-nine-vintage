@@ -5,7 +5,7 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("mobile staff navigation keeps member account and routes chat to the assigned-store console", async () => {
+test("mobile shopping navigation stays buyer-first and exposes work mode separately", async () => {
   const [navigation, bottomNav, header, chatLink, account, settings] =
     await Promise.all([
       source("src/lib/admin/mobileNavigation.ts"),
@@ -24,11 +24,13 @@ test("mobile staff navigation keeps member account and routes chat to the assign
     navigation,
     /roleCode === "employee"[\s\S]*centerHref: "\/admin\/employee"[\s\S]*chatHref: "\/admin\/employee\/inquiries"/,
   );
-  assert.match(bottomNav, /roleNavigation\.centerHref/);
-  assert.match(bottomNav, /simpleMode\.enabled && !roleNavigation\.isStaff/);
-  assert.match(bottomNav, /\["내 정보", "\/m\/account"/);
-  assert.match(header, /fallbackHref=\{roleNavigation\.chatHref\}/);
-  assert.match(header, /allowedHrefPrefix=\{staffChatPrefix\}/);
+  assert.doesNotMatch(bottomNav, /roleNavigation|access\.roleCode/);
+  for (const destination of ["/m/home", "/m/feed", "/m/shop", "/m/saved", "/m/account"]) {
+    assert.match(bottomNav, new RegExp(destination.replaceAll("/", "\\/")));
+  }
+  assert.match(header, /fallbackHref="\/m\/chat"/);
+  assert.match(header, /allowedHrefPrefix="\/m\/chat"/);
+  assert.match(header, /업무 모드로 전환/);
   assert.match(header, /\["설정", "\/m\/account\/settings"\]/);
   assert.match(chatLink, /allowedHrefPrefix/);
   assert.doesNotMatch(account, /\["설정"/);

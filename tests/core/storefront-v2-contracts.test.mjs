@@ -5,7 +5,7 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("the storefront renders separate mobile and fixed desktop presentation trees", async () => {
+test("the storefront renders separate mobile and fluid desktop presentation trees", async () => {
   const [home, mobileHome, layout, mobileLayout, header, productRail, css] = await Promise.all([
     source("src/app/(shop)/home/page.tsx"),
     source("src/app/(mobile)/m/home/page.tsx"),
@@ -24,15 +24,14 @@ test("the storefront renders separate mobile and fixed desktop presentation tree
   assert.match(mobileHome, /basePath="\/m"/);
   assert.match(layout, /<PcHeader hasLiveTicker=\{LIVE_AUCTION_ENABLED\} \/>/);
   assert.match(layout, /data-ui-surface="desktop"/);
-  assert.match(layout, /w-\[1280px\]/);
-  assert.match(layout, /min-w-\[1280px\]/);
-  assert.match(layout, /data-desktop-canvas="1280"/);
-  assert.match(layout, /w-\[1200px\]/);
-  assert.match(layout, /data-desktop-content="1200"/);
+  assert.match(layout, /max-w-\[1600px\]/);
+  assert.match(layout, /data-desktop-canvas="fluid"/);
+  assert.match(layout, /max-w-\[1440px\]/);
+  assert.match(layout, /data-desktop-content="fluid"/);
   assert.doesNotMatch(layout, /MobileHeader|MobileBottomNav|md:hidden/);
-  assert.match(header, /w-\[1200px\]/);
+  assert.match(header, /max-w-\[1440px\]/);
   assert.match(header, /form className="flex h-10 w-40/);
-  assert.doesNotMatch(header, /(?:sm|md|lg|xl):/);
+  assert.match(header, /(?:sm|md|lg|xl):/);
   assert.match(productRail, /surface === "desktop" \? "grid grid-cols-3 gap-2"/);
   assert.match(productRail, /surface === "desktop" \? "grid grid-cols-5 gap-x-3 gap-y-9"/);
   assert.doesNotMatch(home, /clamp\(|(?:sm|md|lg|xl):/);

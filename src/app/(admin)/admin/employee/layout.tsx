@@ -1,31 +1,25 @@
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { AdminWorkspaceShell } from "@/components/admin/AdminWorkspaceShell";
 import { EmployeeOwnerScopeBridge } from "@/components/admin/employee/EmployeeOwnerScopeBridge";
 
-const links = [
-  ["/admin/employee", "오늘의 작업"],
-  ["/admin/employee/fulfillment", "입출고·보관"],
-  ["/admin/employee/parcels", "소포·송장"],
-  ["/admin/employee/inquiries", "문의"],
-  ["/account", "내 정보"],
+const navigation = [
+  { exact: true, href: "/admin/employee", label: "오늘의 작업", description: "우선 처리할 매장 업무" },
+  { href: "/admin/employee/fulfillment", label: "상품 준비", description: "입출고와 보관" },
+  { href: "/admin/employee/parcels", label: "포장·송장", description: "택배 요청과 발송" },
+  { href: "/admin/employee/inquiries", label: "문의", description: "구매자 응대" },
 ] as const;
 
-export default function EmployeeLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
-  const pathname = usePathname();
+export default function EmployeeLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div>
+    <>
       <EmployeeOwnerScopeBridge />
-      <nav aria-label="직원센터 메뉴" className="mb-8 flex max-w-full gap-5 overflow-x-auto whitespace-nowrap border-b border-line pb-4 text-xs font-bold">
-        {links.map(([href, label], index) => {
-          const active = index === 0 ? pathname === href : pathname.startsWith(href);
-          return <Link className={active ? "border-b-2 border-ink pb-4" : "text-muted"} href={href} key={href}>{label}</Link>;
-        })}
-      </nav>
-      {children}
-    </div>
+      <AdminWorkspaceShell
+        description="오늘 배정된 상품 준비·포장·문의 업무에 집중합니다."
+        eyebrow="Staff workspace"
+        navigation={navigation}
+        title="직원센터"
+      >
+        {children}
+      </AdminWorkspaceShell>
+    </>
   );
 }

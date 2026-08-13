@@ -24,19 +24,17 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
   const simpleMode = useSimpleMode();
   const roleNavigation = getMobileRoleNavigation(access.roleCode);
   const consumerSimpleMode = simpleMode.enabled && !roleNavigation.isStaff;
-  const staffChatPrefix = roleNavigation.isStaff &&
-      (access.roleCode === "operator" || access.roleCode === "employee")
-    ? roleNavigation.chatHref
-    : undefined;
   const standardLinks = [
     ["홈", "/m/home"],
     ...(hasActiveBid ? [["입찰 중인 상품", "/m/bidding"] as const] : []),
     ["실시간 경매", "/m/feed"],
     ["즉시 구매", "/m/shop"],
     ["찜", "/m/saved"],
-    [roleNavigation.chatLabel, roleNavigation.chatHref],
-    ...(access.roleCode === "operator" || access.roleCode === "employee"
-      ? [["내 정보", "/m/account"] as const]
+    ["상담·채팅", "/m/chat"],
+    ["장바구니", "/m/cart"],
+    ["MY", "/m/account"],
+    ...(roleNavigation.isStaff
+      ? [["업무 모드로 전환", roleNavigation.centerHref] as const]
       : []),
     ["설정", "/m/account/settings"],
   ] as const;
@@ -66,11 +64,11 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
           <div className="flex items-center">
             {!consumerSimpleMode && <>
             <ChatNotificationLink
-              allowedHrefPrefix={staffChatPrefix}
-              ariaLabel={roleNavigation.chatLabel}
+              allowedHrefPrefix="/m/chat"
+              ariaLabel="상담·채팅"
               basePath="/m"
               className="grid size-11 place-items-center"
-              fallbackHref={roleNavigation.chatHref}
+              fallbackHref="/m/chat"
             >
               <Headphones size={19} />
             </ChatNotificationLink>

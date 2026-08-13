@@ -36,8 +36,8 @@ export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean })
     : standardNavigation;
   return (
     <header className={`sticky ${hasLiveTicker ? "top-9" : "top-0"} z-[60] block border-b border-line bg-paper/95 text-ink backdrop-blur-md`}>
-      <div className="mx-auto flex h-20 w-[1200px] items-center gap-5">
-        <Link className="w-[210px] shrink-0 whitespace-nowrap text-lg font-black tracking-[-0.06em]" href="/home" prefetch={false}>NINETY-NINE VINTAGE</Link>
+      <div className="mx-auto flex h-20 w-full max-w-[1440px] items-center gap-5 px-5 sm:px-8 xl:px-10">
+        <Link className="shrink-0 whitespace-nowrap text-lg font-black tracking-[-0.06em]" href="/home" prefetch={false}>NINETY-NINE VINTAGE</Link>
         <nav className="flex min-w-0 flex-1 items-center justify-center gap-5 whitespace-nowrap" aria-label="주요 메뉴">
           {navigation.map((item) => <Link className="border-b-2 border-transparent py-2 text-sm font-bold tracking-[0.02em] transition-colors hover:border-ink" href={item.href} key={item.href}>{item.label}</Link>)}
         </nav>

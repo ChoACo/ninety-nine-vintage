@@ -33,24 +33,25 @@ test("staff navigation follows each role's core work sequence", async () => {
     ]);
 
   for (const label of [
-    "판매",
-    "결제 상태",
+    "오늘의 할 일",
+    "상품 관리",
+    "주문·낙찰",
     "준비·배송",
-    "문의",
+    "회원 채팅",
     "매출·정산",
     "매장 설정",
   ]) {
     assert.match(operatorLayout, new RegExp(`label: "${label}"`));
   }
-  for (const label of ["오늘의 작업", "입출고·보관", "소포·송장", "문의", "내 정보"]) {
+  for (const label of ["오늘의 작업", "상품 준비", "포장·송장", "문의"]) {
     assert.match(employeeLayout, new RegExp(`"${label}"`));
   }
   for (const label of [
     "입금 확인",
-    "긴급 요청",
-    "매장·권한",
+    "환불·긴급",
+    "매장·직원",
     "정산",
-    "정책·보안",
+    "시스템",
   ]) {
     assert.match(ownerLayout, new RegExp(`label: "${label}"`));
   }
@@ -64,11 +65,10 @@ test("staff keeps member account access and auction pages keep the cart control"
     source("src/components/features/commerce/CommerceToolbar.tsx"),
   ]);
 
-  for (const sourceText of [mobileHeader, mobileBottomNav]) {
-    assert.match(sourceText, /access\.roleCode === "operator"/);
-    assert.match(sourceText, /access\.roleCode === "employee"/);
-    assert.match(sourceText, /"내 정보", "\/m\/account"/);
-  }
+  assert.match(mobileHeader, /업무 모드로 전환/);
+  assert.match(mobileHeader, /\["MY", "\/m\/account"\]/);
+  assert.doesNotMatch(mobileBottomNav, /access\.roleCode|roleNavigation/);
+  assert.match(mobileBottomNav, /\["MY", "\/m\/account", UserRound\]/);
   assert.match(toolbar, /aria-label="장바구니"/);
   assert.doesNotMatch(toolbar, /aria-label="입찰 현황"/);
   assert.doesNotMatch(toolbar, /auctionContext/);

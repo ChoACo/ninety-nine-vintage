@@ -110,7 +110,7 @@ test("single product registration is separate, scheduled by saved hourly prefere
   assert.doesNotMatch(dashboard, /products\?import=xlsx/);
   assert.doesNotMatch(dashboard, /products\?create=single/);
   assert.doesNotMatch(dashboard, /엑셀 일괄 등록|단품 등록/);
-  assert.match(layout, /href:\s*"\/admin\/operator\/products"[\s\S]*label:\s*"상품"/);
+  assert.match(layout, /href:\s*"\/admin\/operator\/products"[\s\S]*label:\s*"상품 관리"/);
   assert.match(layout, /href:\s*"\/admin\/operator\/products\/registration"[\s\S]*label:\s*"상품 등록"/);
   assert.match(activePage, /<OperatorProductsConsole view="active"\s*\/>/);
   assert.match(registrationPage, /<OperatorProductsConsole view="registration"\s*\/>/);

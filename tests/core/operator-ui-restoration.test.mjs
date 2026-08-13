@@ -14,7 +14,7 @@ test("operator revenue is summarized on the dashboard and retains a guarded deta
     source("src/components/admin/operator/OperatorRevenueConsole.tsx"),
   ]);
 
-  assert.doesNotMatch(layout, /href:\s*"\/admin\/operator\/revenue"/);
+  assert.match(layout, /href:\s*"\/admin\/operator\/revenue"/);
   assert.match(dashboard, /href="\/admin\/operator\/revenue"/);
   assert.match(dashboard, /\/api\/admin\/operator\/revenue\?from=/);
   assert.match(dashboard, /이번 달 순매출/);
@@ -40,7 +40,7 @@ test("operator revenue is summarized on the dashboard and retains a guarded deta
   assert.match(revenue, /grid grid-cols-2[^"]*lg:grid-cols-4/);
 });
 
-test("operator center uses major and minor navigation with separated shipping workspaces", async () => {
+test("operator center uses one task-oriented navigation with compatible shipping routes", async () => {
   const [
     layout,
     dashboard,
@@ -57,28 +57,13 @@ test("operator center uses major and minor navigation with separated shipping wo
     source("src/app/(admin)/admin/operator/shipping/history/page.tsx"),
   ]);
 
-  assert.match(layout, /aria-label="운영자 대분류"/);
-  assert.match(layout, /aria-label="운영자 상단 탭"/);
-  assert.match(layout, />운영 탭<\/p>/);
-  assert.match(layout, /aria-label=\{`\$\{activeGroup\.label\} 소분류`\}/);
-  for (const label of ["메인", "판매", "결제 상태", "준비·배송", "문의", "매출·정산", "매장 설정"]) {
+  assert.match(layout, /<AdminWorkspaceShell/);
+  assert.doesNotMatch(layout, /운영자 대분류|운영자 상단 탭|소분류/);
+  for (const label of ["오늘의 할 일", "상품 관리", "상품 등록", "주문·낙찰", "준비·배송", "회원 채팅", "매출·정산", "매장 설정"]) {
     assert.match(layout, new RegExp(`label:\\s*"${label}"`));
   }
-  for (const label of [
-    "상품 등록",
-    "등급·정산계좌",
-    "낙찰된 회원",
-    "출고·보관",
-    "회원 보관함",
-    "지난 상품",
-    "출고 예외",
-    "택배 요청",
-    "택배 발송 완료",
-    "지난 택배 기록",
-  ]) {
-    assert.match(layout, new RegExp(`label:\\s*"${label}"`));
-  }
-  assert.match(dashboard, />\s*메인\s*</);
+  assert.match(layout, /matchPrefixes:[\s\S]*shipping[\s\S]*exceptions/);
+  assert.match(dashboard, /오늘 \/ 업무 목록/);
   assert.ok(layout.indexOf('label: "준비·배송"') > -1);
   assert.match(requestPage, /<OperatorShippingConsole\s*\/>/);
   assert.match(completedPage, /<OperatorShippingConsole view="completed"\s*\/>/);

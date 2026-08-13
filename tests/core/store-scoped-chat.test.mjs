@@ -81,7 +81,7 @@ test("product inquiries become product-attached messages in the product store ro
 });
 
 test("member and operator surfaces expose store selection and direct member chat", async () => {
-  const [memberPanel, operatorPanel, storagePanel, operatorLayout, localAccounts] =
+  const [memberPanel, operatorPanel, storagePanel, operatorLayout, workspaceShell, localAccounts] =
     await Promise.all([
       source("src/components/features/chat/ChatPanel.tsx"),
       source("src/components/admin/operator/OperatorChatConsole.tsx"),
@@ -89,6 +89,7 @@ test("member and operator surfaces expose store selection and direct member chat
         "src/components/admin/operator/OperatorMemberOperationsConsole.tsx",
       ),
       source("src/app/(admin)/admin/operator/layout.tsx"),
+      source("src/components/admin/AdminWorkspaceShell.tsx"),
       source("src/app/api/local-test-accounts/route.ts"),
     ]);
 
@@ -101,7 +102,7 @@ test("member and operator surfaces expose store selection and direct member chat
   assert.match(storagePanel, /채팅하기/);
   assert.match(storagePanel, /\/admin\/operator\/chat\?memberId=/);
   assert.match(operatorLayout, /회원 채팅/);
-  assert.match(operatorLayout, /href="\/account"/);
+  assert.match(workspaceShell, /href="\/account"/);
   assert.match(localAccounts, /slot === "operator-secondary" \? 1 : 0/);
 });
 

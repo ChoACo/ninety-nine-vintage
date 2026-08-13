@@ -1,58 +1,27 @@
 "use client";
 
-import {
-  Building2,
-  CreditCard,
-  Gavel,
-  Heart,
-  Home,
-  ShoppingBag,
-  Store,
-  TrendingUp,
-  UserRound,
-} from "lucide-react";
+import { Gavel, Heart, Home, Store, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCommerceStore } from "@/store/useCommerceStore";
-import { useActiveBidNavigation } from "@/components/features/auction/ActiveBidNavigationProvider";
-import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
-import { getMobileRoleNavigation } from "@/lib/admin/mobileNavigation";
 import { useSimpleMode } from "@/components/features/accessibility/SimpleModeProvider";
 
 export function MobileSiteBottomNav() {
   const pathname = usePathname();
-  const cartCount = useCommerceStore((state) => state.cartIds.length);
-  const { hasActiveBid } = useActiveBidNavigation();
-  const access = useAdminNavigationAccess();
-  const roleNavigation = getMobileRoleNavigation(access.roleCode);
   const simpleMode = useSimpleMode();
-  const consumerSimpleMode = simpleMode.enabled && !roleNavigation.isStaff;
-  const identityTab = access.loading
-    ? null
-    : ([
-        roleNavigation.centerLabel,
-        roleNavigation.centerHref,
-        roleNavigation.isStaff ? Building2 : UserRound,
-      ] as const);
   const standardTabs = [
     ["홈", "/m/home", Home],
-    ...(hasActiveBid ? [["입찰 중", "/m/bidding", TrendingUp] as const] : []),
     ["경매", "/m/feed", Gavel],
     ["구매", "/m/shop", Store],
     ["찜", "/m/saved", Heart],
-    ["장바구니", "/m/cart", ShoppingBag],
-    ...(identityTab ? [identityTab] : []),
-    ...(access.roleCode === "operator" || access.roleCode === "employee"
-      ? [["내 정보", "/m/account", UserRound] as const]
-      : []),
+    ["MY", "/m/account", UserRound],
   ] as const;
-  const tabs = consumerSimpleMode
+  const tabs = simpleMode.enabled
     ? ([
         ["홈", "/m/home", Home],
         ["입찰", "/m/feed", Gavel],
         ["구매", "/m/shop", Store],
-        ["결제·배송", "/m/account/payments", CreditCard],
-        ["내 정보", `/m/${"account"}`, UserRound],
+        ["찜", "/m/saved", Heart],
+        ["MY", "/m/account", UserRound],
       ] as const)
     : standardTabs;
   return (
@@ -60,7 +29,7 @@ export function MobileSiteBottomNav() {
       <div className="grid h-16" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
         {tabs.map(([label, href, Icon]) => {
           const active = pathname === href || (href !== "/m/home" && pathname.startsWith(`${href}/`));
-          return <Link aria-current={active ? "page" : undefined} className={`relative flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[9px] font-bold ${active ? "text-ink" : "text-muted"}`} href={href} key={href} prefetch={false}><span className="relative grid size-7 place-items-center"><Icon size={18} strokeWidth={active ? 2.5 : 1.7} />{href === "/m/cart" && cartCount > 0 && <span className="absolute -right-2 -top-1 grid size-4 place-items-center rounded-full bg-ink text-[8px] text-paper">{Math.min(cartCount, 9)}</span>}</span><span className="truncate">{label}</span></Link>;
+          return <Link aria-current={active ? "page" : undefined} className={`relative flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[10px] font-bold ${active ? "text-ink" : "text-muted"}`} href={href} key={href} prefetch={false}><span className={`relative grid size-8 place-items-center rounded-full ${active ? "bg-ink text-paper" : ""}`}><Icon size={18} strokeWidth={active ? 2.5 : 1.7} /></span><span className="truncate">{label}</span></Link>;
         })}
       </div>
     </nav>

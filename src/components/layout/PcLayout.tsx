@@ -13,11 +13,11 @@ interface PcLayoutProps {
 export function PcLayout({ children }: PcLayoutProps) {
   return (
     <ActiveBidNavigationProvider>
-      <div className="min-h-screen w-full overflow-x-auto bg-paper text-ink" data-ui-surface="desktop">
-        <div className="mx-auto min-h-screen w-[1280px] min-w-[1280px]" data-desktop-canvas="1280">
+      <div className="min-h-screen w-full bg-paper text-ink" data-ui-surface="desktop">
+        <div className="mx-auto min-h-screen w-full max-w-[1600px]" data-desktop-canvas="fluid">
           {LIVE_AUCTION_ENABLED && <LiveTickerBar surface="desktop" />}
           <PcHeader hasLiveTicker={LIVE_AUCTION_ENABLED} />
-          <main className="mx-auto min-h-[calc(100vh-7rem)] w-[1200px] py-8" data-desktop-content="1200">{children}</main>
+          <main className="mx-auto min-h-[calc(100vh-7rem)] w-full max-w-[1440px] px-5 py-8 sm:px-8 xl:px-10" data-desktop-content="fluid">{children}</main>
           <PcFooter />
           <CacheConsentBanner surface="desktop" />
         </div>

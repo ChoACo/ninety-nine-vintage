@@ -88,13 +88,13 @@ test("employee and operator navigation use direct-store fulfillment without cent
   assert.match(session, /canAccessOperator = isOwner \|\| roleCode === "operator"/);
   assert.match(session, /canAccessEmployee = isOwner \|\| roleCode === "employee"/);
   assert.match(boundary, /pathname\.startsWith\("\/admin\/employee\/"\)/);
-  assert.match(employeeLayout, /직원센터 메뉴/);
+  assert.match(employeeLayout, /title="직원센터"/);
   for (const route of ["inquiries", "fulfillment", "parcels"]) {
     assert.match(employeeLayout, new RegExp(`/admin/employee/${route}`));
   }
   assert.doesNotMatch(employeeLayout, /\/admin\/employee\/center/);
   assert.doesNotMatch(operatorLayout, /\/admin\/operator\/center/);
-  assert.match(operatorLayout, /출고·보관/);
+  assert.match(operatorLayout, /출고·보관부터 송장까지/);
   assert.doesNotMatch(operatorLayout, /\/admin\/operator\/payments/);
   assert.match(operatorLayout, /\/admin\/operator\/platform/);
   assert.doesNotMatch(operatorLayout, /\/admin\/operator\/members/);

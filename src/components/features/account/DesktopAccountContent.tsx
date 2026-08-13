@@ -24,7 +24,7 @@ export function DesktopAccountContent() {
         <div className="mb-10">
           <p className="eyebrow text-muted">MY / 빠른 메뉴</p>
           <h2 className="mt-2 text-xl font-black tracking-[-0.05em]">필요한 업무로 바로 이동</h2>
-          <MobileAccountTaskGrid />
+          <MobileAccountTaskGrid basePath="" />
         </div>
         <RoleWorkCenterLink />
       </section>

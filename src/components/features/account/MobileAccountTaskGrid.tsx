@@ -60,7 +60,7 @@ const tasks = [
   ],
 ] as const;
 
-export function MobileAccountTaskGrid() {
+export function MobileAccountTaskGrid({ basePath = "/m" }: { basePath?: "" | "/m" }) {
   const simpleMode = useSimpleMode();
   const visibleTasks = simpleMode.enabled
     ? tasks.filter((task) => task[4])
@@ -75,7 +75,7 @@ export function MobileAccountTaskGrid() {
     >
       {visibleTasks.map(([label, href, Icon, links]) => (
         <section className="bg-paper p-5" key={href}>
-          <Link className="flex items-center gap-3" href={href}>
+          <Link className="flex items-center gap-3" href={`${basePath}${href.slice(2)}`}>
             <Icon className="shrink-0" size={simpleMode.enabled ? 28 : 20} />
             <span className={simpleMode.enabled ? "text-lg font-black" : "text-sm font-black"}>
               {label}
@@ -85,7 +85,7 @@ export function MobileAccountTaskGrid() {
             {links.map(([linkLabel, linkHref]) => (
               <Link
                 className="border border-line px-3 py-2 text-[10px] font-bold"
-                href={linkHref}
+                href={`${basePath}${linkHref.slice(2)}`}
                 key={linkHref}
               >
                 {linkLabel}

@@ -105,7 +105,7 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   assert.doesNotMatch(dashboard, /<details[^>]*id="refunds"[^>]*open=\{true\}/);
   assert.match(accountPage, /<DesktopAccountContent \/>/);
   assert.match(accountContent, /view=\{simpleMode\.enabled \? "simple" : "overview"\}/);
-  assert.match(accountContent, /<MobileAccountTaskGrid \/>/);
+  assert.match(accountContent, /<MobileAccountTaskGrid basePath="" \/>/);
   assert.match(accountContent, /<RoleWorkCenterLink \/>/);
   assert.doesNotMatch(accountContent, /<BidHistory surface="desktop" \/>/);
   assert.match(rollout, /create_customer_inventory_entitlement\(\s*'auction'/i);

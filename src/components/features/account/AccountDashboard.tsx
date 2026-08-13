@@ -241,6 +241,7 @@ function AccountDashboardForSession({
   const [addressManagerOpen, setAddressManagerOpen] = useState(false);
   const [addressEditorOpen, setAddressEditorOpen] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [pendingDeleteAddressId, setPendingDeleteAddressId] = useState<string | null>(null);
   const [legacyAuctionWins, setLegacyAuctionWins] = useState<LegacyAuctionWin[]>([]);
   const [deadlineEnforcementExempt, setDeadlineEnforcementExempt] = useState(false);
   const [rememberedDepositorName, setRememberedDepositorName] = useState<string | null>(null);
@@ -543,11 +544,13 @@ function AccountDashboardForSession({
     setAddressEditorOpen(false);
   };
   const openAddressCreate = () => {
+    setPendingDeleteAddressId(null);
     resetAddressEditor();
     setAddressEditorOpen(true);
     setAddressManagerOpen(true);
   };
   const openAddressEdit = (address: Address) => {
+    setPendingDeleteAddressId(null);
     setEditingAddressId(address.id);
     setAddressForm({
       label: address.label,
@@ -614,7 +617,7 @@ function AccountDashboardForSession({
     }
   };
   const deleteAddress = async (address: Address) => {
-    if (!token || !window.confirm(`${address.label} 배송지를 삭제할까요?`)) return;
+    if (!token) return;
     setShippingMessage("");
     try {
       const response = await fetch("/api/account/addresses", {
@@ -637,6 +640,7 @@ function AccountDashboardForSession({
         setSelectedAddressId(next.find((item) => item.is_default)?.id ?? next[0]?.id ?? "");
       }
       if (editingAddressId === address.id) resetAddressEditor();
+      setPendingDeleteAddressId(null);
       setShippingMessage("배송지를 삭제했습니다.");
     } catch (error) {
       setShippingMessage(
@@ -1765,11 +1769,22 @@ function AccountDashboardForSession({
                           수정
                         </button>
                         <button
-                          className="border border-rose-300 px-3 py-2 text-[10px] font-bold text-rose-700"
-                          onClick={() => void deleteAddress(address)}
+                          aria-pressed={pendingDeleteAddressId === address.id}
+                          className={`min-h-11 border px-3 py-2 text-[10px] font-bold ${
+                            pendingDeleteAddressId === address.id
+                              ? "border-rose-700 bg-rose-700 text-white"
+                              : "border-rose-300 text-rose-700"
+                          }`}
+                          onClick={() => {
+                            if (pendingDeleteAddressId === address.id) {
+                              void deleteAddress(address);
+                              return;
+                            }
+                            setPendingDeleteAddressId(address.id);
+                          }}
                           type="button"
                         >
-                          삭제
+                          {pendingDeleteAddressId === address.id ? "삭제 확인" : "삭제"}
                         </button>
                       </div>
                     </div>

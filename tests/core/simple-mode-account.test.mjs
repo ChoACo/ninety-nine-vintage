@@ -74,6 +74,9 @@ test("mobile account tabs render dedicated views and tolerate partial API failur
   assert.match(dashboard, /일부 계정 정보를 불러오지 못했습니다/);
   assert.match(dashboard, /showAddresses/);
   assert.match(dashboard, /새 배송지 추가/);
+  assert.match(dashboard, /pendingDeleteAddressId/);
+  assert.match(dashboard, /삭제 확인/);
+  assert.doesNotMatch(dashboard, /window\.confirm\(`\$\{address\.label\} 배송지를 삭제할까요\?`\)/);
   assert.match(dashboard, /hidden=\{!showPayments\}/);
   assert.match(dashboard, /hidden=\{!showShipments\}/);
   assert.match(

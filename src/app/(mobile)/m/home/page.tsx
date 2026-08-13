@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Clock3, PackageCheck } from "lucide-react";
+import Link from "next/link";
 import { ProductRail } from "@/components/features/catalog/ProductRail";
 import {
   HomeFeaturedAuction,
@@ -41,7 +42,7 @@ export default async function MobileHomePage() {
     }));
 
   return (
-    <div className="space-y-10" data-mobile-home>
+    <div className="space-y-8" data-mobile-home>
       {(auctionResult.status === "rejected" || fixedResult.status === "rejected") && <StatusNotice variant="warning">상품 정보를 일시적으로 불러오지 못했습니다.</StatusNotice>}
       <section className="theme-invariant-dark -mx-4 -mt-5 overflow-hidden bg-ink text-paper">
         <HomeFeaturedAuction
@@ -50,7 +51,10 @@ export default async function MobileHomePage() {
           surface="mobile"
         />
       </section>
-      <section className="grid grid-cols-2 gap-px overflow-hidden border border-line bg-line"><div className="bg-paper p-4"><Clock3 size={17} /><p className="mt-4 text-xs font-bold">바로 구매</p><p className="mt-1 text-[10px] text-muted">15분 안전 점유 후 결제</p></div><div className="bg-paper p-4"><PackageCheck size={17} /><p className="mt-4 text-xs font-bold">보관·묶음 배송</p><p className="mt-1 text-[10px] text-muted">내 정보에서 간편 신청</p></div></section>
+      <section aria-label="빠른 메뉴" className="grid grid-cols-2 gap-3">
+        <Link className="min-h-28 rounded-2xl bg-surface p-4 active:scale-[.98]" href="/m/shop"><Clock3 size={20} /><p className="mt-5 text-sm font-black">바로 구매</p><p className="mt-1 text-[11px] text-muted">지금 살 수 있는 상품</p></Link>
+        <Link className="min-h-28 rounded-2xl bg-surface p-4 active:scale-[.98]" href="/m/account/storage"><PackageCheck size={20} /><p className="mt-5 text-sm font-black">보관·배송</p><p className="mt-1 text-[11px] text-muted">보관 확인과 배송 신청</p></Link>
+      </section>
       {LIVE_AUCTION_ENABLED && <ProductRail basePath="/m" eyebrow="실시간 경매" href="/m/feed" products={auctions.slice(0, 6)} surface="mobile" title="오늘 밤의 경매" />}
       <ProductRail basePath="/m" eyebrow="즉시 구매" href="/m/shop" products={fixed} surface="mobile" title="지금 구매 가능한 상품" />
     </div>

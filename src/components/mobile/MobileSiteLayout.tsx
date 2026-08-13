@@ -11,10 +11,10 @@ export function MobileSiteLayout({ children }: { children: ReactNode }) {
   return (
     <MobilePwaProvider>
       <ActiveBidNavigationProvider>
-        <div className="min-h-screen bg-paper text-ink" data-ui-surface="mobile">
+        <div className="min-h-screen overflow-x-hidden bg-paper text-ink" data-ui-surface="mobile">
           {LIVE_AUCTION_ENABLED && <LiveTickerBar surface="mobile" />}
           <MobileSiteHeader hasLiveTicker={LIVE_AUCTION_ENABLED} />
-          <main className="mx-auto min-h-[calc(100svh-7rem)] max-w-5xl px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))]">{children}</main>
+          <main className="mx-auto min-h-[calc(100svh-7rem)] w-full max-w-lg px-4 py-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">{children}</main>
           <MobileSiteBottomNav />
           <CacheConsentBanner surface="mobile" />
         </div>

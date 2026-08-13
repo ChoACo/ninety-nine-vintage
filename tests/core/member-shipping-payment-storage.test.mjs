@@ -104,8 +104,10 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   );
   assert.doesNotMatch(dashboard, /<details[^>]*id="refunds"[^>]*open=\{true\}/);
   assert.match(accountPage, /<DesktopAccountContent \/>/);
-  assert.match(accountContent, /<details[\s\S]*<BidHistory surface="desktop" \/>[\s\S]*<\/details>/);
-  assert.match(accountContent, /open=\{simpleMode\.enabled \? true : undefined\}/);
+  assert.match(accountContent, /view=\{simpleMode\.enabled \? "simple" : "overview"\}/);
+  assert.match(accountContent, /<MobileAccountTaskGrid \/>/);
+  assert.match(accountContent, /<RoleWorkCenterLink \/>/);
+  assert.doesNotMatch(accountContent, /<BidHistory surface="desktop" \/>/);
   assert.match(rollout, /create_customer_inventory_entitlement\(\s*'auction'/i);
   assert.match(rollout, /current_stage = 'reconciliation_required'/i);
   assert.match(rollout, /current_stage = 'preparing'/i);

@@ -159,17 +159,41 @@ export function OperatorConsole({
       )}
       {enableLocalTestMembers && <LocalTestMemberSwitcher />}
 
-      <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-4">
-        {stats.map(([label, value, Icon]) => (
-          <div className="bg-paper p-5" key={label}>
-            <Icon size={17} />
-            <p className="mt-7 text-xs text-muted">{label}</p>
-            <p className="mt-2 font-mono text-3xl font-bold">{value}</p>
+      <section className="border border-ink bg-ink p-6 text-paper">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <p className="eyebrow text-paper/60">판매센터 / 지금 할 일</p>
+            <h2 className="mt-2 text-2xl font-black">처리가 필요한 업무부터 확인하세요.</h2>
           </div>
-        ))}
+          <Link className="inline-flex items-center gap-2 border border-paper/40 px-4 py-3 text-xs font-bold" href="/admin/operator/products/registration">
+            상품 등록 <ArrowUpRight size={14} />
+          </Link>
+        </div>
+        <div className="mt-6 grid gap-px bg-paper/20 sm:grid-cols-3">
+          <Link className="bg-ink p-4" href="/admin/operator/orders"><span className="text-xs text-paper/70">확인할 주문·결제</span><strong className="mt-2 block font-mono text-3xl">{orders}</strong></Link>
+          <Link className="bg-ink p-4" href="/admin/operator/shipping"><span className="text-xs text-paper/70">처리할 배송 요청</span><strong className="mt-2 block font-mono text-3xl">{shipping}</strong></Link>
+          <Link className="bg-ink p-4" href="/admin/operator/products"><span className="text-xs text-paper/70">공개 중인 상품</span><strong className="mt-2 block font-mono text-3xl">{products.filter((product) => product.status === "active").length}</strong></Link>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-4">
+        {stats.map(([label, value, Icon]) => <div className="bg-paper p-5" key={label}><Icon size={17} /><p className="mt-7 text-xs text-muted">{label}</p><p className="mt-2 font-mono text-3xl font-bold">{value}</p></div>)}
+      </div>
+      <div className="flex justify-end">
+        <Link className="inline-flex items-center gap-2 text-xs font-bold underline" href="/admin/operator/revenue">매출·정산 상세 보기 <ArrowUpRight size={14} /></Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.25fr_.75fr] lg:gap-10">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[.75fr_1.25fr] lg:gap-10">
+        <section className="border border-line bg-surface p-6">
+          <p className="eyebrow text-muted">오늘 / 업무 목록</p>
+          <div className="mt-7 space-y-5 text-xs">
+            <Link className="flex gap-3 underline" href="/admin/operator/products/registration">새 상품 등록 <ArrowUpRight size={14} /></Link>
+            <Link className="flex gap-3 underline" href="/admin/operator/orders">주문·결제 확인 <ArrowUpRight size={14} /></Link>
+            <Link className="flex gap-3 underline" href="/admin/operator/fulfillment">출고·보관 업무 <ArrowUpRight size={14} /></Link>
+            <Link className="flex gap-3 underline" href="/admin/operator/shipping">배송 요청·송장 입력 <ArrowUpRight size={14} /></Link>
+            <Link className="flex gap-3 underline" href="/admin/operator/chat">회원 문의 확인 <ArrowUpRight size={14} /></Link>
+          </div>
+        </section>
         <section>
           <div className="mb-4 flex items-end justify-between border-b border-ink pb-4">
             <div>
@@ -220,41 +244,6 @@ export function OperatorConsole({
           </div>
         </section>
 
-        <section className="border border-line bg-surface p-6">
-          <p className="eyebrow text-muted">오늘 / 업무 목록</p>
-          <div className="mt-7 space-y-5 text-xs">
-            <Link
-              className="flex gap-3 underline"
-              href="/admin/operator/products/registration"
-            >
-              업로드 예정·초안 확인 <ArrowUpRight size={14} />
-            </Link>
-            <Link
-              className="flex gap-3 underline"
-              href="/admin/operator/fulfillment"
-            >
-              출고·배송 업무 열기 <ArrowUpRight size={14} />
-            </Link>
-            <Link
-              className="flex gap-3 underline"
-              href="/admin/operator/revenue"
-            >
-              확정 매출 집계 입력 <ArrowUpRight size={14} />
-            </Link>
-            <Link
-              className="flex gap-3 underline"
-              href="/admin/operator/shipping"
-            >
-              배송 요청 송장 입력 <ArrowUpRight size={14} />
-            </Link>
-            <Link
-              className="flex gap-3 underline"
-              href="/admin/operator/fulfillment"
-            >
-              출고·보관 업무 열기 <ArrowUpRight size={14} />
-            </Link>
-          </div>
-        </section>
       </div>
       <OwnerNicknameReviewPanel />
     </div>

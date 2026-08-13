@@ -4,6 +4,7 @@ import {
   Building2,
   CreditCard,
   Gavel,
+  Heart,
   Home,
   ShoppingBag,
   Store,
@@ -38,6 +39,7 @@ export function MobileSiteBottomNav() {
     ...(hasActiveBid ? [["입찰 중", "/m/bidding", TrendingUp] as const] : []),
     ["경매", "/m/feed", Gavel],
     ["구매", "/m/shop", Store],
+    ["찜", "/m/saved", Heart],
     ["장바구니", "/m/cart", ShoppingBag],
     ...(identityTab ? [identityTab] : []),
     ...(access.roleCode === "operator" || access.roleCode === "employee"

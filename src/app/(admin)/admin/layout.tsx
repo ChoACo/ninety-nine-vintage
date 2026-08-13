@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     follow: false,
     index: false,
   },
-  title: "운영 센터 | NINETY-NINE",
+  title: "판매센터 | NINETY-NINE",
 };
 
 export default function AdminLayout({
@@ -24,7 +24,7 @@ export default function AdminLayout({
             className="whitespace-nowrap text-sm font-black tracking-[0.08em] sm:tracking-[0.14em]"
             href="/admin/operator"
           >
-            NINETY-NINE 운영 센터
+            NINETY-NINE 판매센터
           </Link>
           <div className="flex max-w-full flex-wrap items-center gap-2 sm:justify-end">
             <ChatNotificationLink ariaLabel="운영 채팅" className="grid size-10 place-items-center border border-line" fallbackHref="/admin"><MessageCircle size={16} /></ChatNotificationLink>

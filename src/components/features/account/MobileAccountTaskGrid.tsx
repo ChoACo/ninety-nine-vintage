@@ -55,10 +55,7 @@ const tasks = [
     "계정",
     "/m/account/settings",
     Settings,
-    [
-      ["계정·화면 설정", "/m/account/settings"],
-      ["찜 목록", "/m/account/saved"],
-    ],
+    [["계정·화면 설정", "/m/account/settings"]],
     true,
   ],
 ] as const;

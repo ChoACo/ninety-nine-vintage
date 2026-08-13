@@ -33,6 +33,7 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
     ...(hasActiveBid ? [["입찰 중인 상품", "/m/bidding"] as const] : []),
     ["실시간 경매", "/m/feed"],
     ["즉시 구매", "/m/shop"],
+    ["찜", "/m/saved"],
     [roleNavigation.chatLabel, roleNavigation.chatHref],
     ...(access.roleCode === "operator" || access.roleCode === "employee"
       ? [["내 정보", "/m/account"] as const]

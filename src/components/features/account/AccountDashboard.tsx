@@ -190,6 +190,7 @@ interface ShippingCreditPayment {
 
 export type AccountDashboardView =
   | "full"
+  | "overview"
   | "simple"
   | "payments"
   | "storage"
@@ -458,38 +459,39 @@ function AccountDashboardForSession({
     v2Storage.length +
     legacyEligibleItemCount +
     settledLegacyAuctionWins.length;
+  const accountPath = `${basePath}/account`;
   const cards = [
     [
       "낙찰품 결제",
       String(pendingAuctionWins.length).padStart(2, "0"),
       "결제 마감 전 입금 진행",
-      "#auction-payments",
+      `${accountPath}/payments`,
       ReceiptText,
     ],
     [
       "보관 중인 상품",
       String(visibleStorageItemCount).padStart(2, "0"),
       "합배송 가능한 상품",
-      "#storage",
+      `${accountPath}/storage`,
       PackageCheck,
     ],
     [
       "배송 내역",
       String(shipments.length).padStart(2, "0"),
       "요청·발송 현황",
-      "#shipments",
+      `${accountPath}/shipping`,
       Truck,
     ],
     [
       "찜한 상품",
       String(likedCount).padStart(2, "0"),
       "다시 보고 싶은 아이템",
-      "#likes",
+      `${basePath}/saved`,
       Heart,
     ],
   ] as const;
   const visibleCards = view === "simple" ? cards.slice(0, 3) : cards;
-  const showOverview = view === "full" || view === "simple";
+  const showOverview = view === "full" || view === "simple" || view === "overview";
   const showPayments =
     view === "full" || view === "simple" || view === "payments";
   const showStorage =
@@ -499,7 +501,7 @@ function AccountDashboardForSession({
   const showRefunds = view === "full" || view === "refunds";
   const showShipments =
     view === "full" || view === "simple" || view === "shipping";
-  const showLikes = view === "full" || view === "saved";
+  const showLikes = view === "saved";
   const showAddresses = view === "addresses";
   const requestEligibleItems = useMemo(
     () => v2Storage.filter((item) => item.requestEligible && !item.activeShipmentId),
@@ -986,12 +988,12 @@ function AccountDashboardForSession({
     <div className={surface === "desktop" ? "space-y-14" : "space-y-10"} data-account-dashboard-view={view}>
       <div hidden={!showOverview} className={`flex justify-between gap-5 border-b border-ink pb-8 ${surface === "desktop" ? "flex-row items-end" : "flex-col"}`}>
         <div className="min-w-0">
-          <p className="eyebrow text-muted">내 계정 / 이용 현황</p>
+          <p className="eyebrow text-muted">MY / 지금 할 일</p>
           <h1 className={`mt-3 break-keep font-black tracking-[-0.08em] ${surface === "desktop" ? "text-4xl" : "text-3xl"}`}>
             안녕하세요, {userName}.
           </h1>
           <p className="mt-3 text-sm text-muted">
-            나의 경매와 보관, 배송을 한 곳에서 관리하세요.
+            결제부터 배송까지 지금 확인할 일을 먼저 보여드려요.
           </p>
         </div>
         {token ? (

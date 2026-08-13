@@ -12,7 +12,7 @@ export function getMobileRoleNavigation(
   if (roleCode === "operator") {
     return {
       centerHref: "/admin/operator",
-      centerLabel: "운영자센터",
+      centerLabel: "판매센터",
       chatHref: "/admin/operator/chat",
       chatLabel: "매장 채팅",
       isStaff: true,

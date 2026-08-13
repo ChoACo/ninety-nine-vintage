@@ -4,8 +4,8 @@ import { NicknameSettings } from "@/components/account/NicknameSettings";
 import { SimpleModeToggle } from "@/components/features/accessibility/SimpleModeToggle";
 import { useSimpleMode } from "@/components/features/accessibility/SimpleModeProvider";
 import { AccountDashboard } from "@/components/features/account/AccountDashboard";
-import { BidHistory } from "@/components/features/account/BidHistory";
-import { OrderHistory } from "@/components/features/account/OrderHistory";
+import { MobileAccountTaskGrid } from "@/components/features/account/MobileAccountTaskGrid";
+import { RoleWorkCenterLink } from "@/components/features/account/RoleWorkCenterLink";
 
 export function DesktopAccountContent() {
   const simpleMode = useSimpleMode();
@@ -18,24 +18,16 @@ export function DesktopAccountContent() {
       </section>
       <AccountDashboard
         surface="desktop"
-        view={simpleMode.enabled ? "simple" : "full"}
+        view={simpleMode.enabled ? "simple" : "overview"}
       />
-      <OrderHistory surface="desktop" />
-      <details
-        className="group mx-auto w-full max-w-[1540px] border-y border-line px-5 py-1 sm:px-8"
-        open={simpleMode.enabled ? true : undefined}
-      >
-        <summary className="flex cursor-pointer list-none items-end justify-between gap-4 py-4">
-          <div>
-            <p className="eyebrow text-muted">실시간 경매 / 나의 입찰</p>
-            <h2 className="mt-2 text-xl font-black tracking-[-0.05em]">입찰 현황</h2>
-          </div>
-          <span className="shrink-0 text-xs font-bold text-muted">열기/닫기</span>
-        </summary>
-        <div className="pb-4">
-          <BidHistory surface="desktop" />
+      <section className="mx-auto w-full max-w-[1540px] px-5 sm:px-8">
+        <div className="mb-10">
+          <p className="eyebrow text-muted">MY / 빠른 메뉴</p>
+          <h2 className="mt-2 text-xl font-black tracking-[-0.05em]">필요한 업무로 바로 이동</h2>
+          <MobileAccountTaskGrid />
         </div>
-      </details>
+        <RoleWorkCenterLink />
+      </section>
       {!simpleMode.enabled && (
         <details className="mx-auto w-full max-w-[1540px] border-y border-line px-5 py-1 sm:px-8">
           <summary className="cursor-pointer py-4 text-sm font-black">닉네임 설정</summary>

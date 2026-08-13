@@ -171,6 +171,8 @@ test("fixed navigation and operator dialogs share the accessible portaled lifecy
   assert.match(dialog, /event\.key !== "Tab"/);
   assert.match(dialog, /returnFocusRef\.current\?\.focus\(\)/);
   assert.match(dialog, /lockBodyScroll\(\)/);
+  assert.match(dialog, /\(!open && !rendered\)/);
+  assert.doesNotMatch(dialog, /if \(!rendered \|\| typeof document/);
   assert.match(dialog, /"drawer-left"/);
   assert.match(dialog, /"sheet-bottom"/);
 

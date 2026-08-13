@@ -150,7 +150,9 @@ export function PremiumDialog({
     };
   }, [rendered, requestClose]);
 
-  if (!rendered || typeof document === "undefined") return null;
+  // Mount immediately when the caller opens the dialog. `rendered` is only
+  // needed to keep the portal alive during the short closing animation.
+  if ((!open && !rendered) || typeof document === "undefined") return null;
 
   const overlayPlacementClassName =
     placement === "drawer-left"

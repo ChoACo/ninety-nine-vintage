@@ -194,6 +194,7 @@ export type AccountDashboardView =
   | "simple"
   | "payments"
   | "storage"
+  | "shipping-request"
   | "shipping"
   | "addresses"
   | "refunds"
@@ -495,9 +496,9 @@ function AccountDashboardForSession({
   const showPayments =
     view === "full" || view === "simple" || view === "payments";
   const showStorage =
-    view === "full" || view === "simple" || view === "storage" || view === "shipping";
+    view === "full" || view === "simple" || view === "storage";
   const showShippingRequest =
-    view === "full" || view === "simple" || view === "shipping";
+    view === "full" || view === "simple" || view === "shipping-request";
   const showRefunds = view === "full" || view === "refunds";
   const showShipments =
     view === "full" || view === "simple" || view === "shipping";
@@ -1097,10 +1098,10 @@ function AccountDashboardForSession({
           </div>
         )}
       </section>
-      <div hidden={!showStorage && !showShippingRequest} className={`grid gap-10 ${surface === "desktop" ? "grid-cols-[1.4fr_.8fr]" : "grid-cols-1"}`}>
+      <div hidden={!showStorage && !showShippingRequest} className={`grid gap-10 ${surface === "desktop" && showStorage && showShippingRequest ? "grid-cols-[1.4fr_.8fr]" : "grid-cols-1"}`}>
         <section className="contents">
           <div
-            className={surface === "desktop" ? "col-start-2 row-start-1" : ""}
+            className={surface === "desktop" && showShippingRequest ? "col-start-2 row-start-1" : ""}
             hidden={!showStorage}
             id="storage"
           >
@@ -1127,6 +1128,7 @@ function AccountDashboardForSession({
               <Link className="text-xs font-bold underline" href={`${basePath}/chat`}>
                 배송 상담
               </Link>
+              {view === "storage" && <Link className="text-xs font-black underline" href={`${basePath}/account/shipping-request`}>배송 신청</Link>}
             </div>
           </div>
           <div className="divide-y divide-line border-y border-line">
@@ -1285,7 +1287,7 @@ function AccountDashboardForSession({
           </div>
           </div>
           <div
-            className={surface === "desktop" ? "col-start-1 row-start-1" : ""}
+            className={surface === "desktop" && showStorage ? "col-start-1 row-start-1" : ""}
             hidden={!showShippingRequest}
             id="shipping-request"
           >

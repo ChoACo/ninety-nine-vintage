@@ -1185,13 +1185,31 @@ export function OperatorProductsConsole({
 
   return <div className="space-y-8">
     <SectionHeading
-      action={view === "registration" ? <div className="grid grid-cols-1 gap-2 sm:grid-cols-3"><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate || busy || !stores.some((store) => store.entitlements?.bulkImportEnabled)} onClick={() => setXlsxImportOpen(true)} title={stores.some((store) => store.entitlements?.bulkImportEnabled) ? undefined : "월 5만원 등급 센터에서 사용할 수 있습니다."} type="button" variant="primary"><FileSpreadsheet size={15} /> 엑셀 일괄 등록</Button><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate} onClick={() => startSingleCreate("fixed")} type="button"><Plus size={15} /> 즉시구매 간편등록</Button><Button className="flex items-center justify-center gap-2" disabled={!token || !permissions.canCreate} onClick={() => startSingleCreate("auction")} type="button"><Plus size={15} /> 경매 간편등록</Button></div> : undefined}
       description={view === "active" ? "현재 공개 중인 상품만 판매 방식별로 나누어 관리합니다." : "신규 상품을 등록하고 업로드 예정 상품과 초안을 따로 관리합니다."}
       eyebrow={view === "active" ? "운영자 / 상품" : "운영자 / 상품 등록"}
       title={view === "active" ? "진행 중 상품" : "상품 등록"}
       variant="page"
     />
     {notice && <StatusNotice>{notice}</StatusNotice>}
+    {view === "registration" && !singleCreateOpen && !editingId && (
+      <section aria-label="상품 등록 방식 선택" className="grid gap-3 lg:grid-cols-[1.35fr_.65fr]">
+        <div className="border border-ink bg-surface p-5 sm:p-6">
+          <p className="eyebrow text-muted">일반 상품 등록</p>
+          <h2 className="mt-2 text-xl font-black tracking-[-.05em]">한 상품씩 차근차근 등록</h2>
+          <p className="mt-2 text-xs leading-5 text-muted">사진, 상품 정보, 가격, 공개 순서로 진행합니다. 처음 판매하는 분에게 권장합니다.</p>
+          <div className="mt-5 grid gap-2 sm:grid-cols-2">
+            <Button className="flex min-h-12 items-center justify-center gap-2" disabled={!token || !permissions.canCreate} onClick={() => startSingleCreate("fixed")} type="button" variant="primary"><Plus size={15} /> 즉시구매 상품 등록</Button>
+            <Button className="flex min-h-12 items-center justify-center gap-2" disabled={!token || !permissions.canCreate} onClick={() => startSingleCreate("auction")} type="button"><Plus size={15} /> 경매 상품 등록</Button>
+          </div>
+        </div>
+        <div className="border border-line bg-paper p-5 sm:p-6">
+          <p className="eyebrow text-muted">대량 등록</p>
+          <h2 className="mt-2 text-lg font-black tracking-[-.04em]">엑셀로 여러 상품 등록</h2>
+          <p className="mt-2 text-xs leading-5 text-muted">형식이 준비된 판매자를 위한 별도 작업입니다.</p>
+          <Button className="mt-5 flex min-h-12 w-full items-center justify-center gap-2" disabled={!token || !permissions.canCreate || busy || !stores.some((store) => store.entitlements?.bulkImportEnabled)} onClick={() => setXlsxImportOpen(true)} title={stores.some((store) => store.entitlements?.bulkImportEnabled) ? undefined : "월 5만원 등급 매장에서 사용할 수 있습니다."} type="button"><FileSpreadsheet size={15} /> 엑셀 대량 등록</Button>
+        </div>
+      </section>
+    )}
     {view === "registration" && singleRegistrationJobs.length > 0 && <section aria-live="polite" className="border border-line bg-surface px-4 py-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold">단품 백그라운드 저장</p><p className="font-mono text-[10px] text-muted">{pendingSingleRegistrationCount > 0 ? `${pendingSingleRegistrationCount}건 처리 중` : "처리 대기 없음"}</p></div>{pendingSingleRegistrationCount > 0 && <p className="mt-2 text-[11px] text-muted">사진 처리와 저장이 진행되는 동안 간편등록칸에서 다음 상품을 계속 등록할 수 있습니다. 완료 전에는 이 페이지를 닫지 마세요.</p>}{failedSingleRegistrations.length > 0 && <div className="mt-3 space-y-2">{failedSingleRegistrations.map((job) => <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2" key={job.id}><p className="min-w-0 truncate text-[11px] font-bold text-red-700">“{job.title}” 등록 실패</p><div className="flex gap-2"><Button disabled={!token} onClick={() => retrySingleRegistration(job.id)} size="compact" type="button">다시 시도</Button><Button onClick={() => dismissFailedSingleRegistration(job.id)} size="compact" type="button" variant="ghost">닫기</Button></div></div>)}</div>}</section>}
     {view === "active" ? (
       <nav aria-label="진행 상품 판매 방식" className="grid grid-cols-2 border border-ink">
@@ -1208,7 +1226,7 @@ export function OperatorProductsConsole({
       <form className="grid grid-cols-1 gap-3 border border-ink bg-surface p-4 sm:grid-cols-2 sm:p-6" onSubmit={submit}>
         <div className="flex flex-col gap-3 sm:col-span-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-bold">{editingId ? "상품 수정" : form.saleType === "fixed" ? "즉시구매 간편등록" : "경매 간편등록"}</p>
+            <p className="text-sm font-bold">{editingId ? "상품 수정" : form.saleType === "fixed" ? "즉시구매 상품 등록" : "경매 상품 등록"}</p>
             {!editingId && <p className="mt-1 text-[11px] leading-5 text-muted">{form.saleType === "auction" ? "사진을 먼저 선택하세요. 상품명은 피드에 보이는 간판글로 필수이며 성별은 선택 사항입니다." : "사진을 먼저 선택하세요. 상품명은 피드에 보이는 간판글로 필수이며 상품설명과 성별은 선택 사항입니다."}</p>}
           </div>
           {editingId ? (
@@ -1268,6 +1286,8 @@ export function OperatorProductsConsole({
           </section>
         )}
 
+        {!editingId && <div className="border-b border-ink pb-3 pt-2 sm:col-span-2"><p className="text-xs font-black">2. 상품 정보</p><p className="mt-1 text-[11px] text-muted">상품명은 필수이며 나머지는 확인 가능한 정보만 입력하세요.</p></div>}
+
         {editingId ? (
           <>
             <TextInput aria-label="상품명" disabled={!productFieldsEditable} onChange={(event) => update("title", event.target.value)} placeholder="상품명" required value={form.title} />
@@ -1305,6 +1325,7 @@ export function OperatorProductsConsole({
           </SelectInput>
           <TextInput aria-label="사이즈" onChange={(event) => update("sizeLabel", event.target.value)} placeholder="사이즈 (선택)" value={form.sizeLabel} />
         </>}
+        {!editingId && <div className="border-b border-ink pb-3 pt-2 sm:col-span-2"><p className="text-xs font-black">3. 판매 정보</p><p className="mt-1 text-[11px] text-muted">판매 매장과 가격, 보관 기준을 확인하세요.</p></div>}
         <SelectInput aria-label="숍" disabled={!saleSetupEditable} onChange={(event) => {
           const storeId = event.target.value;
           setForm((current) => ({
@@ -1334,6 +1355,7 @@ export function OperatorProductsConsole({
           <>
             <SelectInput aria-label="보관 등급" onChange={(event) => update("storageClass", event.target.value)} value={form.storageClass}><option value="small">소형 · 14일 보관</option><option value="large">대형 · 7일 보관</option></SelectInput>
             {form.saleType === "auction" ? <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">입찰 최소 단위는 1,000원으로 자동 적용됩니다.</div> : <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">즉시구매 상품은 입찰 단위를 사용하지 않습니다.</div>}
+            <div className="border-b border-ink pb-3 pt-2 sm:col-span-2"><p className="text-xs font-black">4. 공개 설정</p><p className="mt-1 text-[11px] text-muted">즉시 공개하거나 원하는 시간에 예약할 수 있습니다.</p></div>
             <label className="text-xs font-bold sm:col-span-2">
               공개 시각
               <SelectInput aria-label="단품 공개 방식" className="mt-2" onChange={async (event) => {
@@ -1350,6 +1372,10 @@ export function OperatorProductsConsole({
                 {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, "0")}:00 (KST)</option>)}
               </SelectInput>}
             </label>
+            <div className="flex flex-col gap-2 border-t border-line pt-4 sm:col-span-2 sm:flex-row sm:justify-end">
+              <Button className="px-6" disabled={singleRegistrationDisabled} variant="primary" type="submit">{singleRegistrationSubmitLabel}</Button>
+              <Button className="px-6" onClick={resetForm} type="button">취소</Button>
+            </div>
           </>
         )}
         {editingId && <div className="flex flex-wrap gap-2 sm:col-span-2"><Button className="px-5" disabled={busy || !token || !productFieldsEditable} variant="primary" type="submit">수정 저장</Button><Button className="px-5" onClick={resetForm} type="button">수정 취소</Button></div>}

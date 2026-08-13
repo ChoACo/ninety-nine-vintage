@@ -29,7 +29,8 @@ const tasks = [
     PackageCheck,
     [
       ["보관 상품", "/m/account/storage"],
-      ["배송 신청·현황", "/m/account/shipping"],
+      ["배송 신청", "/m/account/shipping-request"],
+      ["배송 현황", "/m/account/shipping"],
       ["배송지", "/m/account/addresses"],
     ],
     true,

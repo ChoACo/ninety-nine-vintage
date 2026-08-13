@@ -62,12 +62,13 @@ test("mobile account tabs render dedicated views and tolerate partial API failur
   for (const view of [
     "payments",
     "storage",
+    "shipping-request",
     "shipping",
     "addresses",
     "refunds",
     "saved",
   ]) {
-    assert.match(sectionPage, new RegExp(`${view}: "${view}"`));
+    assert.match(sectionPage, new RegExp(`"?${view}"?: "${view}"`));
   }
   assert.match(sectionPage, /<AccountDashboard basePath="\/m" view=\{view\}/);
   assert.match(dashboard, /일부 계정 정보를 불러오지 못했습니다/);

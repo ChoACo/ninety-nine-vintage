@@ -19,7 +19,8 @@ test("buyer account navigation is grouped into five core workflows", async () =>
   ]) {
     assert.match(grid, new RegExp(`"${label}"`));
   }
-  assert.match(grid, /배송 신청·현황/);
+  assert.match(grid, /배송 신청/);
+  assert.match(grid, /배송 현황/);
   assert.match(grid, /문의 채팅/);
 });
 

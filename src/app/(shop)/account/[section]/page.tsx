@@ -6,6 +6,7 @@ import { MemberAccountBoundary } from "@/components/features/account/MemberAccou
 import { OrderHistory } from "@/components/features/account/OrderHistory";
 import { NicknameSettings } from "@/components/account/NicknameSettings";
 import { SimpleModeToggle } from "@/components/features/accessibility/SimpleModeToggle";
+import { AccountShippingNav } from "@/components/features/account/AccountShippingNav";
 
 const sectionLabels = {
   addresses: "배송지",
@@ -14,6 +15,7 @@ const sectionLabels = {
   payments: "결제하기",
   refunds: "환불",
   settings: "계정·화면 설정",
+  "shipping-request": "배송 신청",
   shipping: "배송 현황",
   storage: "보관 상품",
 } as const;
@@ -23,6 +25,7 @@ const dashboardViews = {
   addresses: "addresses",
   payments: "payments",
   refunds: "refunds",
+  "shipping-request": "shipping-request",
   shipping: "shipping",
   storage: "storage",
 } as const;
@@ -55,6 +58,7 @@ export default async function AccountSectionPage({ params }: { params: Promise<{
           <p className="eyebrow text-muted">MY / {sectionLabels[section as AccountSection]}</p>
           <h1 className="mt-3 text-4xl font-black tracking-[-.08em]">{sectionLabels[section as AccountSection]}</h1>
         </header>
+        {["storage", "shipping-request", "shipping", "addresses"].includes(section) && <AccountShippingNav current={section} />}
         <AccountDashboard surface="desktop" view={view} />
       </div>
     </MemberAccountBoundary>

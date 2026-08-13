@@ -44,9 +44,13 @@ test("single product registration is separate, scheduled by saved hourly prefere
     source("supabase/migrations/20260724010000_remove_legacy_used_clothing_category.sql"),
   ]);
 
-  assert.match(consoleSource, /엑셀 일괄 등록[\s\S]*variant="primary"/);
-  assert.match(consoleSource, /즉시구매 간편등록/);
-  assert.match(consoleSource, /경매 간편등록/);
+  assert.match(consoleSource, /일반 상품 등록[\s\S]*대량 등록/);
+  assert.match(consoleSource, /엑셀 대량 등록/);
+  assert.match(consoleSource, /즉시구매 상품 등록/);
+  assert.match(consoleSource, /경매 상품 등록/);
+  for (const step of ["1. 상품 사진 선택", "2. 상품 정보", "3. 판매 정보", "4. 공개 설정"]) {
+    assert.match(consoleSource, new RegExp(step.replace(".", "\\.")));
+  }
   assert.match(consoleSource, /const singleRegistrationSubmitLabel/);
   assert.ok(
     consoleSource.indexOf("{singleRegistrationSubmitLabel}")

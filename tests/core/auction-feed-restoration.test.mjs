@@ -237,6 +237,8 @@ test("restored feed UI uses separated desktop and mobile routes with authoritati
   assert.match(sidebar, /상품 등록일/);
   assert.match(sidebar, /<option value="today">오늘 등록 상품<\/option>/);
   assert.match(sidebar, /<option value="all">전체 등록일<\/option>/);
+  assert.match(sidebar, /readInitialParam\("date", "all"\)/);
+  assert.match(grid, /routeSearchParams\.get\("date"\) \?\? "all"/);
   assert.match(grid, /catalog-filter-options/);
   assert.match(grid, /판매 완료 상품만 보기/);
   assert.match(grid, /showSoldOnly\s*\?\s*<SoldFeedCard/);

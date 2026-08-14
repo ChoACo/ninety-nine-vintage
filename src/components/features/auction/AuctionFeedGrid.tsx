@@ -190,7 +190,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
     () => routeSearchParams.get("view") === "sold",
   );
   const [selectedDate, setSelectedDate] = useState(
-    () => routeSearchParams.get("date") ?? "today",
+    () => routeSearchParams.get("date") ?? "all",
   );
   const [selectedBrand, setSelectedBrand] = useState(() => routeSearchParams.get("brand") ?? "all");
   const [selectedGender, setSelectedGender] = useState<CatalogGender>(() => (routeSearchParams.get("gender") as CatalogGender | null) ?? "all");
@@ -463,7 +463,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
       || selectedDate === "all"
       || dateKeys.includes(selectedDate)
     ? selectedDate
-    : "today";
+    : "all";
   const brandOptions = useMemo(() => ["all", ...new Set(cards.map((card) => card.brand.trim()).filter(Boolean))].sort((a, b) => a === "all" ? -1 : b === "all" ? 1 : a.localeCompare(b, "ko-KR")), [cards]);
   const storeOptions = useMemo(() => {
     const values = [...new Map(orderedProducts.filter((product) => product.storeId && product.storeName).map((product) => [product.storeId as string, product.storeName as string])).entries()];
@@ -524,7 +524,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
       setSelectedBrand(params.get("brand") ?? "all");
       setSelectedGender((params.get("gender") as CatalogGender | null) ?? "all");
       setSelectedStoreId(params.get("store") ?? "all");
-      setSelectedDate(params.get("date") ?? "today");
+      setSelectedDate(params.get("date") ?? "all");
       const requested = Number(params.get("page"));
       setPage(Number.isSafeInteger(requested) && requested > 0 ? requested : 1);
     };
@@ -537,7 +537,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
     if (query.trim()) params.set("q", query.trim()); else params.delete("q");
     if (pagination.page > 1) params.set("page", String(pagination.page)); else params.delete("page");
     if (effectiveSelectedBrand !== "all") params.set("brand", effectiveSelectedBrand); else params.delete("brand");
-    if (effectiveSelectedDate !== "today") params.set("date", effectiveSelectedDate); else params.delete("date");
+    if (effectiveSelectedDate !== "all") params.set("date", effectiveSelectedDate); else params.delete("date");
     if (effectiveSelectedGender !== "all") params.set("gender", effectiveSelectedGender); else params.delete("gender");
     if (selectedStoreId !== "all") params.set("store", selectedStoreId); else params.delete("store");
     if (showSoldOnly) params.set("view", "sold"); else params.delete("view");

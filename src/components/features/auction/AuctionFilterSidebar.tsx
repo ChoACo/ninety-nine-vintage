@@ -45,7 +45,7 @@ export function AuctionFilterSidebar({
     readInitialParam("brand", "all")
   );
   const [selectedDate, setSelectedDate] = useState(() =>
-    readInitialParam("date", "today")
+    readInitialParam("date", "all")
   );
   const [selectedGender, setSelectedGender] = useState<CatalogGender>(() => {
     const initial = readInitialParam("gender", "all");
@@ -107,12 +107,12 @@ export function AuctionFilterSidebar({
   const resetFilters = () => {
     setQuery("");
     setSelectedBrand("all");
-    setSelectedDate("today");
+    setSelectedDate("all");
     setSelectedGender("all");
     setSelectedStoreId("all");
     notify({
       brand: "all",
-      date: "today",
+      date: "all",
       gender: "all",
       query: "",
       storeId: "all",
@@ -126,7 +126,7 @@ export function AuctionFilterSidebar({
   const effectiveDate = selectedDate === "today" || selectedDate === "all" ||
       dateOptions.includes(selectedDate)
     ? selectedDate
-    : "today";
+    : "all";
 
   const filterContent = (
     <>
@@ -244,8 +244,8 @@ export function AuctionFilterSidebar({
             }}
             value={effectiveDate}
           >
-            <option value="today">오늘 등록 상품</option>
             <option value="all">전체 등록일</option>
+            <option value="today">오늘 등록 상품</option>
             {dateOptions.map((date) => (
               <option key={date} value={date}>
                 {dateFilterLabel(date)}
@@ -259,7 +259,7 @@ export function AuctionFilterSidebar({
   const selectedCount = Number(Boolean(query.trim())) +
     Number(effectiveBrand !== "all") +
     Number(selectedGender !== "all") +
-    Number(effectiveDate !== "today") +
+    Number(effectiveDate !== "all") +
     Number(selectedStoreId !== "all");
 
   return (

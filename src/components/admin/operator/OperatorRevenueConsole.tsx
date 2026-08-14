@@ -1,9 +1,11 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
+import { CatalogImage } from "@/components/ui/CatalogImage";
 import { formatKRW } from "@/utils/formatters";
 
 interface FinancialEntry {
@@ -13,6 +15,10 @@ interface FinancialEntry {
   occurredAt: string;
   inventoryItemId: string | null;
   manualRefundId: string | null;
+  buyerName: string | null;
+  productId: string | null;
+  productTitle: string | null;
+  productImageUrl: string | null;
 }
 
 function entryKindLabel(entryKind: FinancialEntry["entryKind"]) {
@@ -36,9 +42,24 @@ interface ReportPayload {
   stores?: StoreReport[];
   centralShippingFees?: number;
   serverTime?: string;
+  settlementSummary?: SettlementSummary;
   error?: string;
   message?: string;
 }
+
+interface SettlementSummary {
+  totalSettlementSales: number;
+  weeklySales: number;
+  nextSettlementEstimate: number;
+  paidTotal: number;
+}
+
+const EMPTY_SETTLEMENT_SUMMARY: SettlementSummary = {
+  totalSettlementSales: 0,
+  weeklySales: 0,
+  nextSettlementEstimate: 0,
+  paidTotal: 0,
+};
 
 function kstDateKey(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -57,6 +78,7 @@ export function OperatorRevenueConsole() {
   const [to, setTo] = useState(today);
   const [stores, setStores] = useState<StoreReport[]>([]);
   const [centralShippingFees, setCentralShippingFees] = useState(0);
+  const [settlementSummary, setSettlementSummary] = useState<SettlementSummary>(EMPTY_SETTLEMENT_SUMMARY);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
 
@@ -76,6 +98,7 @@ export function OperatorRevenueConsole() {
       }
       setStores(payload.stores);
       setCentralShippingFees(payload.centralShippingFees ?? 0);
+      setSettlementSummary(payload.settlementSummary ?? EMPTY_SETTLEMENT_SUMMARY);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "매장별 매출을 불러오지 못했습니다.");
     } finally {
@@ -114,10 +137,17 @@ export function OperatorRevenueConsole() {
       {notice && <p aria-live="polite" className="border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">{notice}</p>}
 
       <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-4">
-        <article className="bg-paper p-5"><p className="text-xs text-muted">상품 결제</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(totals.gross)}</p></article>
-        <article className="bg-paper p-5"><p className="text-xs text-muted">결제 취소·상품 환불</p><p className="mt-3 font-mono text-2xl font-bold">-{formatKRW(totals.refunds)}</p></article>
-        <article className="bg-ink p-5 text-paper"><p className="text-xs text-zinc-400">매장 순매출</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(totals.net)}</p></article>
-        <article className="bg-paper p-5"><p className="text-xs text-muted">공용 배송비 수익</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(centralShippingFees)}</p></article>
+        <article className="bg-paper p-5"><p className="text-xs text-muted">선택 기간 총매출</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(totals.gross)}</p></article>
+        <article className="bg-paper p-5"><p className="text-xs text-muted">이번 주 매출</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(settlementSummary.weeklySales)}</p></article>
+        <article className="bg-ink p-5 text-paper"><p className="text-xs text-zinc-400">다음 정산 예정</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(settlementSummary.nextSettlementEstimate)}</p><p className="mt-2 text-[10px] text-zinc-400">월·목요일 09:00 KST 기준</p></article>
+        <article className="bg-paper p-5"><p className="text-xs text-muted">누적 지급 완료</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(settlementSummary.paidTotal)}</p></article>
+      </div>
+
+      <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-4">
+        <article className="bg-paper p-4"><p className="text-[10px] text-muted">누적 정산 매출</p><p className="mt-2 font-mono font-bold">{formatKRW(settlementSummary.totalSettlementSales)}</p></article>
+        <article className="bg-paper p-4"><p className="text-[10px] text-muted">선택 기간 취소·환불</p><p className="mt-2 font-mono font-bold text-rose-700">-{formatKRW(totals.refunds)}</p></article>
+        <article className="bg-paper p-4"><p className="text-[10px] text-muted">선택 기간 순매출</p><p className="mt-2 font-mono font-bold">{formatKRW(totals.net)}</p></article>
+        <article className="bg-paper p-4"><p className="text-[10px] text-muted">센터 공용 배송비</p><p className="mt-2 font-mono font-bold">{formatKRW(centralShippingFees)}</p></article>
       </div>
 
       <section className="space-y-5" aria-busy={loading}>
@@ -130,10 +160,10 @@ export function OperatorRevenueConsole() {
               <div className="bg-paper p-4"><p className="text-[10px] text-muted">순매출</p><p className="mt-2 font-mono font-bold">{formatKRW(store.netSales)}</p></div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-xs">
-                <thead className="border-b border-line text-[10px] text-muted"><tr><th className="px-4 py-3">시각</th><th className="px-4 py-3">구분</th><th className="px-4 py-3">금액</th><th className="px-4 py-3">재고 상품</th><th className="px-4 py-3">환불</th></tr></thead>
+              <table className="w-full min-w-[820px] text-left text-xs">
+                <thead className="border-b border-line text-[10px] text-muted"><tr><th className="px-4 py-3">시각</th><th className="px-4 py-3">구분</th><th className="px-4 py-3">상품</th><th className="px-4 py-3">구매자</th><th className="px-4 py-3">금액</th></tr></thead>
                 <tbody className="divide-y divide-line">
-                  {store.entries.map((entry) => <tr key={entry.id}><td className="px-4 py-3">{new Date(entry.occurredAt).toLocaleString("ko-KR")}</td><td className="px-4 py-3">{entryKindLabel(entry.entryKind)}</td><td className={`px-4 py-3 font-mono font-bold ${entry.amount < 0 ? "text-rose-700" : ""}`}>{formatKRW(entry.amount)}</td><td className="px-4 py-3 font-mono text-[10px] text-muted">{entry.inventoryItemId ?? "-"}</td><td className="px-4 py-3 font-mono text-[10px] text-muted">{entry.manualRefundId ?? "-"}</td></tr>)}
+                  {store.entries.map((entry) => <tr key={entry.id}><td className="px-4 py-3">{new Date(entry.occurredAt).toLocaleString("ko-KR")}</td><td className="px-4 py-3">{entryKindLabel(entry.entryKind)}</td><td className="px-4 py-3">{entry.productId ? <Link className="flex min-w-0 items-center gap-3 hover:underline" href={`/auction/${entry.productId}`}><CatalogImage alt="" className="size-10 shrink-0 rounded-lg object-cover" sizes="40px" src={entry.productImageUrl ?? ""} /><span className="max-w-52 truncate font-bold">{entry.productTitle ?? "상품 정보 확인"}</span></Link> : <span className="text-muted">상품 정보 없음</span>}</td><td className="px-4 py-3 font-bold">{entry.buyerName ?? "-"}</td><td className={`px-4 py-3 font-mono font-bold ${entry.amount < 0 ? "text-rose-700" : ""}`}>{formatKRW(entry.amount)}</td></tr>)}
                   {store.entries.length === 0 && <tr><td className="px-4 py-10 text-center text-muted" colSpan={5}>선택 기간의 원장 항목이 없습니다.</td></tr>}
                 </tbody>
               </table>

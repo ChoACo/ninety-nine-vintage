@@ -7,11 +7,12 @@ const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 test("operator revenue is summarized on the dashboard and retains a guarded detail route", async () => {
   await access(new URL("src/app/(admin)/admin/operator/revenue/page.tsx", rootUrl));
-  const [layout, dashboard, route, revenue] = await Promise.all([
+  const [layout, dashboard, route, revenue, migration] = await Promise.all([
     source("src/app/(admin)/admin/operator/layout.tsx"),
     source("src/components/admin/operator/OperatorConsole.tsx"),
     source("src/app/api/admin/operator/revenue/route.ts"),
     source("src/components/admin/operator/OperatorRevenueConsole.tsx"),
+    source("supabase/migrations/20260814053132_scope_store_financial_report.sql"),
   ]);
 
   assert.match(layout, /href:\s*"\/admin\/operator\/revenue"/);
@@ -26,6 +27,14 @@ test("operator revenue is summarized on the dashboard and retains a guarded deta
   assert.match(route, /days\s*<\s*0\s*\|\|\s*days\s*>\s*365/);
   assert.match(route, /error\?\.code\s*===\s*"42501"/);
   assert.doesNotMatch(route, /auth\.admin[\s\S]*\.(?:update|insert|upsert|delete)\(/);
+  assert.match(route, /data\.stores\.some\(\(store\) => store\.storeId !== auth\.selectedStoreId\)/);
+  assert.match(route, /buyerName/);
+  assert.match(route, /productTitle/);
+
+  assert.match(migration, /require_active_operator_store_scope\(\)/);
+  assert.match(migration, /where store\.id = v_store_id/);
+  assert.match(migration, /has_store_permission\(v_store_id, 'view_reports'\)/);
+  assert.match(migration, /revoke all on function public\.get_store_financial_report\(date, date\)[\s\S]*service_role/i);
 
   assert.match(revenue, /new URLSearchParams\(\{\s*from,\s*to\s*\}\)/);
   assert.match(revenue, /\/api\/admin\/operator\/revenue\?\$\{query\}/);
@@ -36,6 +45,9 @@ test("operator revenue is summarized on the dashboard and retains a guarded deta
   assert.match(revenue, /store\.refunds/);
   assert.match(revenue, /store\.netSales/);
   assert.match(revenue, /centralShippingFees/);
+  assert.match(revenue, /다음 정산 예정/);
+  assert.match(revenue, /buyerName/);
+  assert.match(revenue, /productTitle/);
   assert.doesNotMatch(revenue, /getDailyRevenue|upsertDailyRevenue/);
   assert.match(revenue, /grid grid-cols-2[^"]*lg:grid-cols-4/);
 });

@@ -15,6 +15,7 @@ import { persistWishlist } from "@/lib/commerce/client";
 import { useCommerceStore } from "@/store/useCommerceStore";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 import { ProductFeedTags } from "@/components/features/catalog/ProductFeedTags";
+import { isNewlyPublishedProduct } from "@/components/features/auction/auctionFeedLogic";
 
 export type { AuctionFeedPhase } from "@/components/features/auction/auctionFeedLogic";
 
@@ -83,6 +84,7 @@ function EnabledAuctionFeedCard({ basePath = "", bidCapability, item, participat
             : policyBidLabel;
   const canStartBid = canBid && canStartAuctionBid(bidCapability);
   const galleryImages = item.imageUrls.length > 0 ? item.imageUrls : item.imageUrl ? [item.imageUrl] : [];
+  const isNew = isNewlyPublishedProduct(item.publishAt);
 
   const updateWishlist = async () => {
     try {
@@ -108,6 +110,7 @@ function EnabledAuctionFeedCard({ basePath = "", bidCapability, item, participat
         <Link className="block h-full" href={`${basePath}/auction/${item.id}`}>
           {item.imageUrl ? <CatalogImage alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" sizes={surface === "desktop" ? "220px" : "(max-width: 699px) 50vw, 33vw"} src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
           <span className="absolute left-2 top-2 rounded-lg bg-paper/90 px-2 py-1 font-mono text-[9px] font-bold tracking-[0.1em] shadow-sm backdrop-blur-md">{phase === "CLOSED" ? "마감됨" : "실시간 입찰"}</span>
+          {isNew && <span className="absolute left-2 top-10 rounded-lg bg-emerald-600 px-2 py-1 text-[9px] font-black tracking-[0.12em] text-white shadow-sm">NEW</span>}
           <div className="absolute inset-x-0 bottom-0 translate-y-full bg-ink/95 px-3 py-3 text-paper opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100"><p className="text-[10px] text-zinc-400">경매 상품 상세</p><p className="mt-1 text-xs font-bold">상태·실측·현재가를 확인하세요.</p></div>
         </Link>
         <button aria-label={liked ? "찜 해제" : "찜하기"} className={`absolute right-2 top-2 grid size-9 place-items-center rounded-xl bg-paper/90 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${liked ? "text-red-700" : "text-ink"}`} onClick={() => void updateWishlist()} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>

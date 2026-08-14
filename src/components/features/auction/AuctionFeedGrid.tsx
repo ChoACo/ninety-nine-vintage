@@ -190,7 +190,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
     () => routeSearchParams.get("view") === "sold",
   );
   const [selectedDate, setSelectedDate] = useState(
-    () => saleType === "auction" ? routeSearchParams.get("date") ?? "all" : "all",
+    () => routeSearchParams.get("date") ?? "today",
   );
   const [selectedBrand, setSelectedBrand] = useState(() => routeSearchParams.get("brand") ?? "all");
   const [selectedGender, setSelectedGender] = useState<CatalogGender>(() => (routeSearchParams.get("gender") as CatalogGender | null) ?? "all");
@@ -245,7 +245,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
       if (!next) return;
       if (typeof next.query === "string") setQuery(next.query);
       if (typeof next.brand === "string") setSelectedBrand(next.brand);
-      if (saleType === "auction" && typeof next.date === "string") {
+      if (typeof next.date === "string") {
         setSelectedDate(next.date);
       }
       if (
@@ -459,10 +459,11 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
   }), [dailyAuctionPhase, now, orderedProducts, saleType, showSoldOnly]);
 
   const dateKeys = useMemo(() => [...new Set(cards.map((card) => getKoreanFeedDateKey(card.publishAt ?? "")).filter(Boolean))].sort().reverse(), [cards]);
-  const effectiveSelectedDate = saleType === "auction"
-      && (selectedDate === "all" || dateKeys.includes(selectedDate))
+  const effectiveSelectedDate = selectedDate === "today"
+      || selectedDate === "all"
+      || dateKeys.includes(selectedDate)
     ? selectedDate
-    : "all";
+    : "today";
   const brandOptions = useMemo(() => ["all", ...new Set(cards.map((card) => card.brand.trim()).filter(Boolean))].sort((a, b) => a === "all" ? -1 : b === "all" ? 1 : a.localeCompare(b, "ko-KR")), [cards]);
   const storeOptions = useMemo(() => {
     const values = [...new Map(orderedProducts.filter((product) => product.storeId && product.storeName).map((product) => [product.storeId as string, product.storeName as string])).entries()];
@@ -482,12 +483,12 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
       new CustomEvent("catalog-filter-options", {
         detail: {
           brands: brandOptions.filter((brand) => brand !== "all"),
-          dates: saleType === "auction" ? dateKeys : [],
+          dates: dateKeys,
           stores: storeOptions,
         },
       }),
     );
-  }, [brandOptions, dateKeys, saleType, storeOptions]);
+  }, [brandOptions, dateKeys, storeOptions]);
 
   const productById = useMemo(
     () => new Map(orderedProducts.map((product) => [product.id, product])),
@@ -499,15 +500,16 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
     const queryMatch = !normalizedQuery
       || `${card.title} ${card.description}`.toLocaleLowerCase("ko-KR")
         .includes(normalizedQuery);
-    const dateMatch = saleType !== "auction"
-      || effectiveSelectedDate === "all"
-      || getKoreanFeedDateKey(card.publishAt ?? "") === effectiveSelectedDate;
+    const cardDate = getKoreanFeedDateKey(card.publishAt ?? "");
+    const todayDate = getKoreanFeedDateKey(new Date().toISOString());
+    const dateMatch = effectiveSelectedDate === "all"
+      || cardDate === (effectiveSelectedDate === "today" ? todayDate : effectiveSelectedDate);
     const brandMatch = effectiveSelectedBrand === "all" || card.brand === effectiveSelectedBrand;
     const genderMatch = effectiveSelectedGender === "all" || card.catalogGender === effectiveSelectedGender;
     const source = productById.get(card.id);
     const storeMatch = selectedStoreId === "all" || source?.storeId === selectedStoreId;
     return queryMatch && dateMatch && brandMatch && genderMatch && storeMatch;
-  }), [cards, effectiveSelectedBrand, effectiveSelectedDate, effectiveSelectedGender, productById, query, saleType, selectedStoreId]);
+  }), [cards, effectiveSelectedBrand, effectiveSelectedDate, effectiveSelectedGender, productById, query, selectedStoreId]);
   const pagination = useMemo(() => paginateAuctionFeed(visibleCards, page), [page, visibleCards]);
 
   const urlHasMounted = useRef(false);
@@ -522,9 +524,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
       setSelectedBrand(params.get("brand") ?? "all");
       setSelectedGender((params.get("gender") as CatalogGender | null) ?? "all");
       setSelectedStoreId(params.get("store") ?? "all");
-      if (saleType === "auction") {
-        setSelectedDate(params.get("date") ?? "all");
-      }
+      setSelectedDate(params.get("date") ?? "today");
       const requested = Number(params.get("page"));
       setPage(Number.isSafeInteger(requested) && requested > 0 ? requested : 1);
     };
@@ -537,7 +537,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
     if (query.trim()) params.set("q", query.trim()); else params.delete("q");
     if (pagination.page > 1) params.set("page", String(pagination.page)); else params.delete("page");
     if (effectiveSelectedBrand !== "all") params.set("brand", effectiveSelectedBrand); else params.delete("brand");
-    if (saleType === "auction" && effectiveSelectedDate !== "all") params.set("date", effectiveSelectedDate); else params.delete("date");
+    if (effectiveSelectedDate !== "today") params.set("date", effectiveSelectedDate); else params.delete("date");
     if (effectiveSelectedGender !== "all") params.set("gender", effectiveSelectedGender); else params.delete("gender");
     if (selectedStoreId !== "all") params.set("store", selectedStoreId); else params.delete("store");
     if (showSoldOnly) params.set("view", "sold"); else params.delete("view");

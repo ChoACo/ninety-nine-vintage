@@ -167,6 +167,11 @@ export function getKoreanFeedDateKey(value: string | Date): string {
   return `${read("year")}-${read("month")}-${read("day")}`;
 }
 
+export function isNewlyPublishedProduct(publishAt: string | undefined, now = new Date()): boolean {
+  if (!publishAt || !Number.isFinite(Date.parse(publishAt))) return false;
+  return getKoreanFeedDateKey(publishAt) === getKoreanFeedDateKey(now);
+}
+
 export function paginateAuctionFeed<T>(items: readonly T[], requestedPage: number) {
   const pageCount = Math.max(1, Math.ceil(items.length / AUCTION_FEED_PAGE_SIZE));
   const page = Number.isSafeInteger(requestedPage)

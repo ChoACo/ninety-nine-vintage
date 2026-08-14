@@ -192,13 +192,10 @@ export function ChatNotificationLink({
   fallbackHref,
 }: ChatNotificationLinkProps) {
   const pathname = usePathname();
-  const { href, unreadCount } = useContext(ChatNotificationContext);
-  const notificationHref =
-    href && (!allowedHrefPrefix || href.startsWith(allowedHrefPrefix))
-      ? href
-      : fallbackHref;
+  const { unreadCount } = useContext(ChatNotificationContext);
+  void allowedHrefPrefix;
   const resolvedHref = withMobileBase(
-    notificationHref,
+    fallbackHref,
     pathname,
     basePath,
   );

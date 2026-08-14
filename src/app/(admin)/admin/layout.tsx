@@ -30,7 +30,7 @@ export default function AdminLayout({
             NINETY-NINE WORKSPACE
           </Link>
           <div className="flex max-w-full flex-wrap items-center gap-2 sm:justify-end">
-            <ChatNotificationLink ariaLabel="운영 채팅" className="grid size-10 place-items-center border border-line" fallbackHref="/admin"><MessageCircle size={16} /></ChatNotificationLink>
+            <ChatNotificationLink ariaLabel="채팅" className="grid size-10 place-items-center border border-line" fallbackHref="/chat"><MessageCircle size={16} /></ChatNotificationLink>
             <ThemeToggle className="size-10 px-0 sm:w-auto sm:px-3" />
             <Link className="whitespace-nowrap text-xs font-bold underline" href="/">
               쇼핑 화면으로 이동

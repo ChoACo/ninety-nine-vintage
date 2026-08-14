@@ -235,11 +235,12 @@ test("restored feed UI uses separated desktop and mobile routes with authoritati
   assert.match(sidebar, /브랜드 카테고리/);
   assert.match(sidebar, /성별 카테고리/);
   assert.match(sidebar, /상품 등록일/);
-  assert.match(sidebar, /saleType === "auction"/);
+  assert.match(sidebar, /<option value="today">오늘 등록 상품<\/option>/);
+  assert.match(sidebar, /<option value="all">전체 등록일<\/option>/);
   assert.match(grid, /catalog-filter-options/);
   assert.match(grid, /판매 완료 상품만 보기/);
   assert.match(grid, /showSoldOnly\s*\?\s*<SoldFeedCard/);
-  assert.match(grid, /dates:\s*saleType === "auction"/);
+  assert.match(grid, /dates:\s*dateKeys/);
   assert.doesNotMatch(grid, /마감 임박순/);
   assert.doesNotMatch(sidebar, /현재 입찰가 높은순|현재 입찰가 낮은순|경매 상태|구제 의류/);
   assert.doesNotMatch(sidebar, /가격 높은순|가격 낮은순|사이즈/);

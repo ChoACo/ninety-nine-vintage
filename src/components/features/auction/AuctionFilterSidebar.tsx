@@ -35,7 +35,6 @@ function dateFilterLabel(dateKey: string) {
 }
 
 export function AuctionFilterSidebar({
-  saleType = "auction",
   surface = "mobile",
 }: {
   saleType?: "auction" | "fixed";
@@ -46,7 +45,7 @@ export function AuctionFilterSidebar({
     readInitialParam("brand", "all")
   );
   const [selectedDate, setSelectedDate] = useState(() =>
-    saleType === "auction" ? readInitialParam("date", "all") : "all"
+    readInitialParam("date", "today")
   );
   const [selectedGender, setSelectedGender] = useState<CatalogGender>(() => {
     const initial = readInitialParam("gender", "all");
@@ -99,9 +98,7 @@ export function AuctionFilterSidebar({
     > = {},
   ): CatalogFilters => ({
     brand: next.brand ?? selectedBrand,
-    date: saleType === "auction"
-      ? next.date ?? selectedDate
-      : "all",
+    date: next.date ?? selectedDate,
     gender: next.gender ?? selectedGender,
     query: next.query ?? query,
     storeId: next.storeId ?? selectedStoreId,
@@ -110,12 +107,12 @@ export function AuctionFilterSidebar({
   const resetFilters = () => {
     setQuery("");
     setSelectedBrand("all");
-    setSelectedDate("all");
+    setSelectedDate("today");
     setSelectedGender("all");
     setSelectedStoreId("all");
     notify({
       brand: "all",
-      date: "all",
+      date: "today",
       gender: "all",
       query: "",
       storeId: "all",
@@ -126,10 +123,10 @@ export function AuctionFilterSidebar({
       brandOptions.includes(selectedBrand)
     ? selectedBrand
     : "all";
-  const effectiveDate = selectedDate === "all" ||
+  const effectiveDate = selectedDate === "today" || selectedDate === "all" ||
       dateOptions.includes(selectedDate)
     ? selectedDate
-    : "all";
+    : "today";
 
   const filterContent = (
     <>
@@ -215,10 +212,7 @@ export function AuctionFilterSidebar({
         </select>
       </section>
 
-      <section className={saleType === "auction"
-          ? "border-b border-zinc-200 py-5"
-          : "py-5"}
-      >
+      <section className="border-b border-zinc-200 py-5">
         <h3 className="mb-3 text-xs font-bold">성별 카테고리</h3>
         <select
           aria-label="성별 카테고리"
@@ -238,7 +232,6 @@ export function AuctionFilterSidebar({
         </select>
       </section>
 
-      {saleType === "auction" && (
         <section className="py-5">
           <h3 className="mb-3 text-xs font-bold">상품 등록일</h3>
           <select
@@ -251,6 +244,7 @@ export function AuctionFilterSidebar({
             }}
             value={effectiveDate}
           >
+            <option value="today">오늘 등록 상품</option>
             <option value="all">전체 등록일</option>
             {dateOptions.map((date) => (
               <option key={date} value={date}>
@@ -259,14 +253,13 @@ export function AuctionFilterSidebar({
             ))}
           </select>
         </section>
-      )}
     </>
   );
 
   const selectedCount = Number(Boolean(query.trim())) +
     Number(effectiveBrand !== "all") +
     Number(selectedGender !== "all") +
-    Number(saleType === "auction" && effectiveDate !== "all") +
+    Number(effectiveDate !== "today") +
     Number(selectedStoreId !== "all");
 
   return (

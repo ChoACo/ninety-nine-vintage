@@ -10,6 +10,38 @@ interface RpcClient {
   ): PromiseLike<{ data: unknown; error: { code?: string } | null }>;
 }
 
+interface InventoryDetailRow {
+  id: string;
+  member_id: string;
+  product_id: string;
+}
+
+interface RevenueEntry {
+  id: string;
+  entryKind: "item_payment" | "item_refund" | "payment_reversal";
+  amount: number;
+  occurredAt: string;
+  inventoryItemId: string | null;
+  manualRefundId: string | null;
+}
+
+interface RevenueStore {
+  storeId: string;
+  storeName: string;
+  grossSales: number;
+  refunds: number;
+  netSales: number;
+  paidItemCount: number;
+  refundedItemCount: number;
+  entries: RevenueEntry[];
+}
+
+interface RevenueReport {
+  stores: RevenueStore[];
+  centralShippingFees: number;
+  serverTime: string;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -31,7 +63,7 @@ function isMoney(value: unknown): value is number {
   return Number.isSafeInteger(value);
 }
 
-function isEntry(value: unknown) {
+function isEntry(value: unknown): value is RevenueEntry {
   return isRecord(value) && hasExactKeys(value, [
     "id", "entryKind", "amount", "occurredAt", "inventoryItemId", "manualRefundId",
   ]) && isUuid(value.id) && typeof value.entryKind === "string" &&
@@ -41,7 +73,7 @@ function isEntry(value: unknown) {
     isNullableUuid(value.inventoryItemId) && isNullableUuid(value.manualRefundId);
 }
 
-function isStore(value: unknown) {
+function isStore(value: unknown): value is RevenueStore {
   return isRecord(value) && hasExactKeys(value, [
     "storeId", "storeName", "grossSales", "refunds", "netSales",
     "paidItemCount", "refundedItemCount", "entries",
@@ -54,7 +86,7 @@ function isStore(value: unknown) {
     Array.isArray(value.entries) && value.entries.every(isEntry);
 }
 
-function isReport(value: unknown) {
+function isReport(value: unknown): value is RevenueReport {
   return isRecord(value) && hasExactKeys(value, ["stores", "centralShippingFees", "serverTime"]) &&
     Array.isArray(value.stores) && value.stores.every(isStore) &&
     isMoney(value.centralShippingFees) &&
@@ -95,15 +127,85 @@ export async function GET(request: Request) {
     );
   }
 
-  const { data, error } = await (auth.user as unknown as RpcClient).rpc(
-    "get_store_financial_report",
-    { p_from: from, p_to: to },
-  );
+  const rpc = auth.user as unknown as RpcClient;
+  const [{ data, error }, platformResult] = await Promise.all([
+    rpc.rpc("get_store_financial_report", { p_from: from, p_to: to }),
+    rpc.rpc("get_operator_store_platform_management", {}),
+  ]);
   if (error?.code === "42501") {
     return commerceJson({ error: "revenue_forbidden", message: "매출 조회 권한이 없습니다." }, 403);
   }
   if (error || !isReport(data)) {
     return commerceJson({ error: "revenue_unavailable", message: "매장별 매출을 불러오지 못했습니다." }, 503);
   }
-  return commerceJson(data);
+
+  const selectedStore = data.stores.find((store) => store.storeId === auth.selectedStoreId);
+  if (!selectedStore || data.stores.some((store) => store.storeId !== auth.selectedStoreId)) {
+    return commerceJson({ error: "revenue_scope_mismatch", message: "선택한 매장의 매출 범위를 확인하지 못했습니다." }, 503);
+  }
+
+  const inventoryIds = selectedStore.entries
+    .map((entry) => entry.inventoryItemId)
+    .filter((id): id is string => typeof id === "string");
+  const { data: inventoryRows, error: inventoryError } = inventoryIds.length
+    ? await auth.admin
+      .from("customer_inventory_items")
+      .select("id,member_id,product_id")
+      .in("id", inventoryIds)
+      .eq("origin_store_id", auth.selectedStoreId)
+    : { data: [], error: null };
+  if (inventoryError) {
+    return commerceJson({ error: "revenue_detail_unavailable", message: "매출 상품 정보를 불러오지 못했습니다." }, 503);
+  }
+
+  const details = (inventoryRows ?? []) as InventoryDetailRow[];
+  const productIds = [...new Set(details.map((row) => row.product_id))];
+  const memberIds = [...new Set(details.map((row) => row.member_id))];
+  const [{ data: products, error: productError }, { data: profiles, error: profileError }] = await Promise.all([
+    productIds.length
+      ? auth.admin.from("products").select("id,title,thumbnail_urls,image_urls").in("id", productIds).eq("store_id", auth.selectedStoreId)
+      : Promise.resolve({ data: [], error: null }),
+    memberIds.length
+      ? auth.admin.from("profiles").select("id,display_name").in("id", memberIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (productError || profileError) {
+    return commerceJson({ error: "revenue_detail_unavailable", message: "매출 상세 정보를 불러오지 못했습니다." }, 503);
+  }
+
+  const inventoryById = new Map(details.map((row) => [row.id, row]));
+  const productById = new Map((products ?? []).map((product) => [product.id, product]));
+  const memberById = new Map((profiles ?? []).map((profile) => [profile.id, profile.display_name]));
+  const entries = selectedStore.entries.map((entry) => {
+    const inventory = entry.inventoryItemId ? inventoryById.get(entry.inventoryItemId) : null;
+    const product = inventory ? productById.get(inventory.product_id) : null;
+    return {
+      ...entry,
+      buyerName: inventory ? memberById.get(inventory.member_id) ?? "구매자" : null,
+      productId: inventory?.product_id ?? null,
+      productTitle: product?.title ?? null,
+      productImageUrl: product?.thumbnail_urls?.[0] ?? product?.image_urls?.[0] ?? null,
+    };
+  });
+
+  const platformStores = isRecord(platformResult.data) && Array.isArray(platformResult.data.stores)
+    ? platformResult.data.stores.filter(isRecord)
+    : [];
+  const platformStore = platformStores.find((store) => store.id === auth.selectedStoreId);
+  const safeMetric = (key: string) => {
+    const value = platformStore?.[key];
+    return Number.isSafeInteger(value) ? Number(value) : 0;
+  };
+
+  return commerceJson({
+    stores: [{ ...selectedStore, entries }],
+    centralShippingFees: 0,
+    serverTime: data.serverTime,
+    settlementSummary: {
+      totalSettlementSales: safeMetric("totalSettlementSales"),
+      weeklySales: safeMetric("weeklySales"),
+      nextSettlementEstimate: safeMetric("nextSettlementEstimate"),
+      paidTotal: safeMetric("paidTotal"),
+    },
+  });
 }

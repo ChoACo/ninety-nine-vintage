@@ -22,20 +22,24 @@ test("publication preferences persist per operator and store with hourly KST sch
 });
 
 test("store malls expose active, auction, sold, inquiry, and capped premium discovery", async () => {
-  const [migration, desktopStore, mobileStore, feed] = await Promise.all([
+  const [migration, desktopStore, mobileStore, storeExperience, storeDates, feed] = await Promise.all([
     readFile(new URL("supabase/migrations/20260809172131_add_operator_publication_preferences.sql", rootUrl), "utf8"),
     readFile(new URL("src/app/(shop)/stores/[slug]/page.tsx", rootUrl), "utf8"),
     readFile(new URL("src/app/(mobile)/m/stores/[slug]/page.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/components/features/catalog/StoreMallExperience.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/components/features/catalog/StoreMallDateNav.tsx", rootUrl), "utf8"),
     readFile(new URL("src/components/features/auction/AuctionFeedGrid.tsx", rootUrl), "utf8"),
   ]);
   assert.match(migration, /get_public_store_sold_feed_products/);
   assert.match(migration, /plan_code='pro'/);
-  for (const source of [desktopStore, mobileStore]) {
-    assert.match(source, /즉시구매 상품/);
-    assert.match(source, /진행 중 경매/);
-    assert.match(source, /판매완료 상품/);
-    assert.match(source, /센터 문의/);
-  }
+  assert.match(storeExperience, /센터 즉시구매관/);
+  assert.match(storeExperience, /센터 경매관/);
+  assert.match(storeExperience, /이 센터에서 판매된 상품/);
+  assert.match(storeExperience, /센터 문의/);
+  assert.match(storeExperience, /상품이 있는 날만 골라보기/);
+  assert.match(storeDates, /dates\.map/);
+  assert.doesNotMatch(storeDates, /getRecentCatalogDates/);
+  for (const source of [desktopStore, mobileStore]) assert.match(source, /fetchStoreProductDates\(store\.id\)/);
   assert.match(desktopStore, /fetchStoreBySlug\(slug\)/);
   assert.match(feed, /storeTier === "premium" \? 1\.2 : 1/);
   assert.match(feed, /top\.length < 8 && count >= 2/);

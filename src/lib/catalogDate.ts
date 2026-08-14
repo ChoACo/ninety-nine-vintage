@@ -1,6 +1,7 @@
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-export function getKstDateKey(date = new Date()): string {
+export function getKstDateKey(value: string | Date = new Date()): string {
+  const date = typeof value === "string" ? new Date(value) : value;
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
     year: "numeric",
@@ -34,4 +35,11 @@ export function getRecentCatalogDates(days = 7): string[] {
     date.setUTCDate(date.getUTCDate() - index);
     return date.toISOString().slice(0, 10);
   });
+}
+
+export function resolveStoreCatalogDate(requested: string | undefined, availableDates: string[]): string {
+  const normalized = normalizeCatalogDate(requested);
+  if (availableDates.includes(normalized)) return normalized;
+  const today = getKstDateKey();
+  return availableDates.includes(today) ? today : availableDates[0] ?? today;
 }

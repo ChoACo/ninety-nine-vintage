@@ -155,7 +155,7 @@ test("the former entry gate is absent while live auctions keep their authoritati
   assert.doesNotMatch(shopLayout, /EntryGate|entry\/complete/);
   assert.doesNotMatch(middleware, /ENTRY_GATE_ENABLED|EntryGate|entry\/complete/);
   assert.match(storePage, /fetchStoreProducts\(store\.id,\s*"fixed",\s*selectedDate\)/);
-  assert.match(storePage, /normalizeCatalogDate\(query\.date\)/);
+  assert.match(storePage, /resolveStoreCatalogDate\(query\.date,\s*dates\)/);
   assert.match(storeService, /query\s*=\s*query\.eq\("sale_type",\s*saleType\)/);
   assert.match(auctionGrid, /props\.saleType\s*===\s*"auction"\s*&&\s*!LIVE_AUCTION_ENABLED/);
   for (const source of [auctionRoute, auctionService, bidRepository]) {
@@ -320,6 +320,7 @@ test("public shop surfaces expose shopper controls while admin links remain sess
     storePage,
     storeService,
     adminLayout,
+    storeExperience,
   ] = await Promise.all([
     readFile(new URL("src/components/layout/AuthStatus.tsx", rootUrl), "utf8"),
     readFile(new URL("src/components/layout/PcHeader.tsx", rootUrl), "utf8"),
@@ -336,6 +337,7 @@ test("public shop surfaces expose shopper controls while admin links remain sess
     ),
     readFile(new URL("src/services/stores.ts", rootUrl), "utf8"),
     readFile(new URL("src/app/(admin)/admin/layout.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/components/features/catalog/StoreMallExperience.tsx", rootUrl), "utf8"),
   ]);
 
   assert.match(authStatus, /useSupabaseSession\(\)/);
@@ -372,8 +374,8 @@ test("public shop surfaces expose shopper controls while admin links remain sess
   }
   assert.doesNotMatch(homePage, /String\(index \+ 1\)\.padStart\(2, "0"\)/);
   assert.doesNotMatch(homePage, /엄선된 숍|전체 숍 보기/);
-  assert.match(storePage, /판매 센터몰 · 센터 소개/);
-  assert.match(storePage, /센터 정보[\s\S]*경매[\s\S]*즉시구매[\s\S]*문의하기/);
+  assert.match(storeExperience, /공식 판매 센터몰/);
+  assert.match(storeExperience, /센터 정보[\s\S]*문의하기/);
 });
 
 test.skip("retired provider payment ID behavior", () => {

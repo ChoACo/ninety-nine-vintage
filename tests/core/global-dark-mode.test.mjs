@@ -64,11 +64,11 @@ test("dark palette uses layered non-black surfaces with readable contrast", asyn
 });
 
 test("legacy fixed light surfaces and status notices have dark palette coverage", async () => {
-  const [css, middleware, home, storePage, gallery, ticker] = await Promise.all([
+  const [css, middleware, home, storeExperience, gallery, ticker] = await Promise.all([
     source("src/app/globals.css"),
     source("src/proxy.ts"),
     source("src/app/(shop)/home/page.tsx"),
-    source("src/app/(shop)/stores/[slug]/page.tsx"),
+    source("src/components/features/catalog/StoreMallExperience.tsx"),
     source("src/components/features/auction/AuctionGalleryModal.tsx"),
     source("src/components/layout/LiveTickerBar.tsx"),
   ]);
@@ -83,7 +83,7 @@ test("legacy fixed light surfaces and status notices have dark palette coverage"
   }
   assert.doesNotMatch(home, /\["#c7b9a5", "#9fa9a2", "#b8a7a1"\]/);
   assert.doesNotMatch(home, /var\(--store-card-/);
-  assert.match(storePage, /bg-\[var\(--store-card-1\)\]/);
+  assert.match(storeExperience, /bg-\[var\(--store-card-1\)\]/);
   assert.match(gallery, /theme-invariant-dark/);
   assert.match(ticker, /theme-invariant-dark/);
   assert.match(middleware, /@media\(prefers-color-scheme:dark\)/);

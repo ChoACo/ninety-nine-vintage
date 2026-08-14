@@ -2,7 +2,7 @@ import "server-only";
 
 import { createSupabasePublicClient } from "@/lib/supabase/server";
 import { mapPublishedProduct, type PublishedProduct } from "@/services/products";
-import { getKstDateRange } from "@/lib/catalogDate";
+import { getKstDateKey, getKstDateRange } from "@/lib/catalogDate";
 
 export interface PublicStore {
   id: string;
@@ -43,4 +43,18 @@ export async function fetchStoreProducts(storeId: string, saleType?: "auction" |
   const { data, error } = await query.order("publish_at", { ascending: false }).limit(100);
   if (error) throw new Error("숍 상품을 불러오지 못했습니다.");
   return (data ?? []).map(mapPublishedProduct);
+}
+
+export async function fetchStoreProductDates(storeId: string): Promise<string[]> {
+  const verifier = createSupabasePublicClient();
+  const { data, error } = await verifier
+    .from("products")
+    .select("publish_at")
+    .eq("store_id", storeId)
+    .eq("status", "active")
+    .lte("publish_at", new Date().toISOString())
+    .order("publish_at", { ascending: false })
+    .limit(1000);
+  if (error) throw new Error("숍 상품 등록일을 불러오지 못했습니다.");
+  return [...new Set((data ?? []).map((row) => getKstDateKey(row.publish_at)))];
 }

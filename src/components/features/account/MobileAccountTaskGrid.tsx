@@ -87,7 +87,7 @@ export function MobileAccountTaskGrid({ basePath = "/m" }: { basePath?: "" | "/m
           <h2 className="text-lg font-black">자주 쓰는 메뉴</h2>
           <span className="text-[11px] text-muted">바로 이동</span>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className={`grid gap-3 ${simpleMode.enabled ? "grid-cols-1" : "grid-cols-2"}`}>
           {quickActions.map(([label, href, Icon]) => (
             <Link
               className="flex min-h-24 flex-col justify-between rounded-2xl bg-surface p-4 active:scale-[.98]"
@@ -122,7 +122,7 @@ export function MobileAccountTaskGrid({ basePath = "/m" }: { basePath?: "" | "/m
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Link className="flex min-h-12 items-center justify-center gap-1 rounded-xl border border-line text-xs font-bold" href={`${basePath}/account/bids`}><Gavel size={15} /> 입찰</Link>
-          <Link className="flex min-h-12 items-center justify-center gap-1 rounded-xl border border-line text-xs font-bold" href={`${basePath}/account/saved`}><Heart size={15} /> 찜</Link>
+          <Link className="flex min-h-12 items-center justify-center gap-1 rounded-xl border border-line text-xs font-bold" href={`${basePath}/saved`}><Heart size={15} /> 찜</Link>
           <Link className="flex min-h-12 items-center justify-center gap-1 rounded-xl border border-line text-xs font-bold" href={`${basePath}/account/addresses`}><MapPin size={15} /> 배송지</Link>
         </div>
       </section>

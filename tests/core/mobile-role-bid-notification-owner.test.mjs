@@ -30,7 +30,7 @@ test("mobile shopping navigation stays buyer-first and exposes work mode separat
   }
   assert.match(header, /fallbackHref="\/m\/chat"/);
   assert.match(header, /allowedHrefPrefix="\/m\/chat"/);
-  assert.match(header, /업무 모드로 전환/);
+  assert.match(header, /\[\["업무", roleNavigation\.centerHref\]/);
   assert.match(header, /\["설정", "\/m\/account\/settings"\]/);
   assert.match(chatLink, /allowedHrefPrefix/);
   assert.doesNotMatch(account, /\["설정"/);

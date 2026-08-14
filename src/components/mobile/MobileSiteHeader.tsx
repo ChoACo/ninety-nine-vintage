@@ -34,7 +34,7 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
     ["장바구니", "/m/cart"],
     ["MY", "/m/account"],
     ...(roleNavigation.isStaff
-      ? [["업무 모드로 전환", roleNavigation.centerHref] as const]
+      ? [["업무", roleNavigation.centerHref] as const]
       : []),
     ["설정", "/m/account/settings"],
   ] as const;
@@ -82,7 +82,7 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
         <div className="mt-6 grid gap-3">
           <SimpleModeToggle detailed />
           {!consumerSimpleMode && <ThemeToggle className="w-full" showLabel />}
-          <AuthStatus basePath="/m" />
+          <AuthStatus basePath="/m" showWorkLink={false} />
         </div>
       </PremiumDialog>
     </>

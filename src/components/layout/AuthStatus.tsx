@@ -9,7 +9,13 @@ import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
 import { disableWebPush } from "@/lib/webPush/client";
 
-export function AuthStatus({ basePath = "" }: { basePath?: "" | "/m" }) {
+export function AuthStatus({
+  basePath = "",
+  showWorkLink = true,
+}: {
+  basePath?: "" | "/m";
+  showWorkLink?: boolean;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { loading, session } = useSupabaseSession();
@@ -34,16 +40,18 @@ export function AuthStatus({ basePath = "" }: { basePath?: "" | "/m" }) {
       }}
     ><LogIn size={15} /> 카카오 로그인</Link>;
   }
-  const accountLink = access.roleCode === "operator"
-    ? { href: "/admin/operator", label: "운영자센터", Icon: Building2 }
+  const workLink = access.roleCode === "operator"
+    ? { href: "/admin/operator", label: "업무" }
     : access.roleCode === "employee"
-      ? { href: "/admin/employee", label: "직원센터", Icon: Building2 }
+      ? { href: "/admin/employee", label: "업무" }
       : access.roleCode === "owner"
-        ? { href: "/admin/owner", label: "소유자 센터", Icon: Building2 }
-        : { href: `${basePath}/account`, label: "내 정보", Icon: UserRound };
-  const AccountIcon = accountLink.Icon;
+        ? { href: "/admin/owner", label: "업무" }
+        : null;
   return <div className="flex shrink-0 items-center gap-1">
-    <Link aria-label={accountLink.label} className="inline-flex h-10 shrink-0 items-center gap-2 border border-line px-3 text-[11px] font-bold whitespace-nowrap" href={accountLink.href}><AccountIcon size={15} /> {accountLink.label}</Link>
+    {showWorkLink && workLink && (
+      <Link aria-label={workLink.label} className="inline-flex h-10 shrink-0 items-center gap-2 border border-line px-3 text-[11px] font-bold whitespace-nowrap" href={workLink.href}><Building2 size={15} /> {workLink.label}</Link>
+    )}
+    <Link aria-label="MY" className="inline-flex h-10 shrink-0 items-center gap-2 border border-line px-3 text-[11px] font-bold whitespace-nowrap" href={`${basePath}/account`}><UserRound size={15} /> MY</Link>
     <button aria-label="로그아웃" className="inline-flex h-10 shrink-0 items-center gap-2 border border-line px-3 text-[11px] font-bold whitespace-nowrap disabled:opacity-40" disabled={busy} onClick={() => { setBusy(true); void (async () => { try { const client = getSupabaseBrowserClient(); await disableWebPush(session.access_token); await Promise.race([Promise.allSettled([client.auth.signOut(), fetch("/api/auth/kakao/logout", { method: "POST", credentials: "include" })]), new Promise((resolve) => window.setTimeout(resolve, 2_000))]); } finally { window.location.assign(`${basePath}/account/login`); } })(); }} type="button"><LogOut size={15} /> 로그아웃</button>
   </div>;
 }

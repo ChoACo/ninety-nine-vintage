@@ -102,9 +102,10 @@ test("employee and operator navigation use direct-store fulfillment without cent
   assert.match(operatorLayout, /회원 채팅/);
   assert.match(
     header,
-    /href: "\/admin\/operator", label: "운영자센터"/,
+    /href: "\/admin\/operator", label: "업무"/,
   );
-  assert.match(header, /label: "직원센터"/);
+  assert.match(header, /href: "\/admin\/employee", label: "업무"/);
+  assert.match(header, /aria-label="MY"/);
 });
 
 test("retired center management is gone and product control uses explicit store membership", async () => {

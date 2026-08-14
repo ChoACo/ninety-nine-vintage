@@ -1,25 +1,19 @@
 "use client";
 
-import { BriefcaseBusiness, Gavel, Heart, Home, Store, UserRound } from "lucide-react";
+import { Gavel, Heart, Home, Store, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSimpleMode } from "@/components/features/accessibility/SimpleModeProvider";
-import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
-import { getMobileRoleNavigation } from "@/lib/admin/mobileNavigation";
 
 export function MobileSiteBottomNav() {
   const pathname = usePathname();
   const simpleMode = useSimpleMode();
-  const access = useAdminNavigationAccess();
-  const roleNavigation = getMobileRoleNavigation(access.roleCode);
   const standardTabs: ReadonlyArray<readonly [string, string, LucideIcon]> = [
     ["홈", "/m/home", Home],
     ["경매", "/m/feed", Gavel],
     ["구매", "/m/shop", Store],
-    roleNavigation.isStaff
-      ? ["업무", roleNavigation.centerHref, BriefcaseBusiness]
-      : ["관심", "/m/saved", Heart],
+    ["찜", "/m/saved", Heart],
     ["MY", "/m/account", UserRound],
   ] as const;
   const tabs: ReadonlyArray<readonly [string, string, LucideIcon]> = simpleMode.enabled

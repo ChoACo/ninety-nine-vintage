@@ -66,7 +66,7 @@ test("staff keeps member account access and auction pages keep the cart control"
     source("src/components/features/commerce/CommerceToolbar.tsx"),
   ]);
 
-  assert.match(mobileHeader, /업무 모드로 전환/);
+  assert.match(mobileHeader, /\[\["업무", roleNavigation\.centerHref\]/);
   assert.match(mobileHeader, /\["MY", "\/m\/account"\]/);
   assert.doesNotMatch(mobileBottomNav, /access\.roleCode|roleNavigation/);
   assert.match(mobileBottomNav, /\["MY", "\/m\/account", UserRound\]/);

@@ -47,18 +47,20 @@ test("stage 4 scope RPCs validate the operator and the selected store", async ()
   assert.match(migration, /grant execute on function public\.set_operator_store_scope\(text, uuid\) to authenticated/);
 });
 
-test("operator store scope API reads and writes the preference", async () => {
+test("only owners select a store while operators receive their fixed assignment", async () => {
   const route = await source("src/app/api/admin/operator/store-scope/route.ts");
   assert.match(route, /authenticateStaffRequest/);
   assert.match(route, /get_operator_store_scope/);
   assert.match(route, /set_active_operator_store_scope/);
-  assert.match(route, /expectedMode = auth\.roleCode === "owner" \? "owner_support" : "assigned"/);
+  assert.match(route, /auth\.roleCode === "owner"[\s\S]*get_operator_store_scope/);
   assert.match(route, /from\("store_memberships"\)[\s\S]{0,220}eq\("status", "active"\)/);
   assert.match(route, /eq\("membership_role", "operator"\)/);
   assert.match(route, /scopedOperatorId = auth\.effectiveOperatorId \?\? auth\.userId/);
   assert.match(route, /auth\.user[\s\S]{0,260}from\("store_memberships"\)[\s\S]{0,180}eq\("user_id", scopedOperatorId\)/);
   assert.match(route, /auth\.user[\s\S]{0,180}\.from\("stores"\)[\s\S]{0,180}\.in\("id", storeIds\)/);
-  assert.match(route, /commerceJson\(\{ scope, stores \}\)/);
+  assert.match(route, /new Set\(storeIds\)\.size !== 1/);
+  assert.match(route, /canSelectStores: auth\.roleCode === "owner"/);
+  assert.match(route, /if \(auth\.roleCode !== "owner"\)[\s\S]*forbidden/);
 });
 
 test("operator store reads stay within the public column grant", async () => {
@@ -72,7 +74,7 @@ test("operator store reads stay within the public column grant", async () => {
   assert.doesNotMatch(productsRoute, /operator_id, is_active/);
 });
 
-test("current operator workspace requires one expiring store and removes all-store execution", async () => {
+test("current operator workspace fixes operators to one assignment and keeps owner selection", async () => {
   const [migration, server, route, selector] = await Promise.all([
     source("supabase/migrations/20260809161500_require_expiring_operator_store_scope.sql"),
     source("src/lib/commerce/server.ts"),
@@ -89,10 +91,12 @@ test("current operator workspace requires one expiring store and removes all-sto
   assert.match(migration, /has_exact_store_or_group_permission[\s\S]*operator_scope_allows_store/i);
   assert.match(migration, /revoke all on function public\.set_operator_store_scope\(text, uuid\)[\s\S]*authenticated/i);
   assert.match(server, /authenticateOperatorStoreRequest[\s\S]*require_active_operator_store_scope/);
+  assert.match(server, /auth\.roleCode === "operator"[\s\S]*resolveAssignedOperatorStoreId/);
   assert.match(route, /authenticateOperatorStoreRequest\(request/);
   assert.match(route, /eq\("id", auth\.selectedStoreId\)/);
   assert.match(route, /storeId !== auth\.selectedStoreId/);
   assert.doesNotMatch(selector, /전체 센터/);
+  assert.match(selector, /if \(!canSelectStores\) return null/);
 });
 
 test("owner scope preferences are reconciled to the owner support mode", async () => {

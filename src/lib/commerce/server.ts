@@ -205,6 +205,24 @@ export interface OperatorStaffAuth {
   user: SupabaseClient<Database>;
 }
 
+async function resolveAssignedOperatorStoreId(
+  auth: Pick<OperatorStaffAuth, "effectiveOperatorId" | "userId" | "user">,
+) {
+  const operatorId = auth.effectiveOperatorId ?? auth.userId;
+  const { data, error } = await auth.user
+    .from("store_memberships")
+    .select("store_id")
+    .eq("user_id", operatorId)
+    .eq("membership_role", "operator")
+    .eq("status", "active")
+    .limit(2);
+  if (error) return { storeId: null, status: 503 } as const;
+  const storeIds = [...new Set((data ?? []).map((row) => row.store_id))];
+  return storeIds.length === 1
+    ? { storeId: storeIds[0], status: 200 } as const
+    : { storeId: null, status: 409 } as const;
+}
+
 export async function authenticateOperatorStoreRequest(
   request: Request,
   mutation?: boolean,
@@ -233,6 +251,19 @@ export async function authenticateOperatorStoreRequest(
         message: "운영자 센터 접근 권한이 없습니다.",
       }, 403),
     };
+  }
+  if (auth.roleCode === "operator") {
+    const assigned = await resolveAssignedOperatorStoreId(auth);
+    if (!assigned.storeId) {
+      return {
+        ok: false as const,
+        response: commerceJson({
+          error: "operator_store_assignment_required",
+          message: "배정된 매장을 확인해 주세요.",
+        }, assigned.status),
+      };
+    }
+    return { ...auth, selectedStoreId: assigned.storeId };
   }
   const { data, error } = await auth.user.rpc("require_active_operator_store_scope");
   if (error || typeof data !== "string") {

@@ -36,16 +36,23 @@ export async function GET(request: Request) {
     return commerceJson({ error: "forbidden" }, 403);
   }
   const rpc = auth.user as unknown as RpcClient;
-  const { data: scope, error } = await rpc.rpc("get_operator_store_scope");
-  if (error || !isScope(scope)) {
-    return commerceJson(
-      { error: error?.message ?? "store_scope_unavailable" },
-      error?.code === "42501" ? 403 : 503,
-    );
-  }
+  let scope: {
+    active: boolean;
+    accessMode: "assigned" | "owner_support";
+    storeId: string | null;
+    expiresAt: string | null;
+  };
 
   let stores: Array<{ id: string; name: string; slug: string }> = [];
   if (auth.roleCode === "owner") {
+    const { data, error } = await rpc.rpc("get_operator_store_scope");
+    if (error || !isScope(data)) {
+      return commerceJson(
+        { error: error?.message ?? "store_scope_unavailable" },
+        error?.code === "42501" ? 403 : 503,
+      );
+    }
+    scope = data;
     // Owner support scope is an explicit server-authorized view. The user
     // client is still subject to public RLS and can return an empty/error
     // result even after the scope RPC has accepted the owner role.
@@ -79,6 +86,12 @@ export async function GET(request: Request) {
     const storeIds = (memberships ?? []).map(
       (membership) => membership.store_id,
     );
+    if (new Set(storeIds).size !== 1) {
+      return commerceJson({
+        error: "operator_store_assignment_required",
+        message: "배정된 매장을 확인해 주세요.",
+      }, 409);
+    }
     if (storeIds.length > 0) {
       const { data: rows, error: storeError } = await auth.user
         .from("stores")
@@ -94,22 +107,32 @@ export async function GET(request: Request) {
         slug: store.slug,
       }));
     }
+    scope = {
+      active: true,
+      accessMode: "assigned",
+      storeId: storeIds[0],
+      expiresAt: null,
+    };
   }
   const expectedMode = auth.roleCode === "owner" ? "owner_support" : "assigned";
   if (scope.accessMode !== expectedMode) {
     return commerceJson({ error: "store_scope_unavailable" }, 503);
   }
-  return commerceJson({ scope, stores });
+  return commerceJson({
+    scope,
+    stores,
+    canSelectStores: auth.roleCode === "owner",
+  });
 }
 
 export async function POST(request: Request) {
   const auth = await authenticateStaffRequest(request, true);
   if (!auth.ok) return auth.response;
-  if (!["owner", "operator"].includes(auth.roleCode)) {
+  if (auth.roleCode !== "owner") {
     return commerceJson({ error: "forbidden" }, 403);
   }
   const body = await request.json().catch(() => null) as unknown;
-  const expectedMode = auth.roleCode === "owner" ? "owner_support" : "assigned";
+  const expectedMode = "owner_support";
   if (!isRecord(body) || Object.keys(body).some((key) => !["storeId", "accessMode"].includes(key)) ||
     typeof body.storeId !== "string" || !UUID_PATTERN.test(body.storeId) ||
     body.accessMode !== expectedMode) {

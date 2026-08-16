@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { useOperatorStoreScope } from "@/store/useOperatorStoreScope";
 
 export function OperatorStoreScopeSelector() {
-  const { scope, stores, loaded, busy, error, load, select } =
+  const { scope, stores, loaded, busy, error, canSelectStores, load, select } =
     useOperatorStoreScope();
 
   useEffect(() => {
@@ -40,6 +40,8 @@ export function OperatorStoreScopeSelector() {
       </div>
     );
   }
+
+  if (!canSelectStores) return null;
 
   const savedStoreId = scope.active ? scope.storeId : null;
   const savedStoreAvailable =

@@ -22,6 +22,7 @@ interface OperatorStoreScopeState {
   loaded: boolean;
   busy: boolean;
   error: string | null;
+  canSelectStores: boolean;
   load: () => Promise<void>;
   select: (next: OperatorStoreScope) => Promise<boolean>;
 }
@@ -30,7 +31,7 @@ async function fetchWithToken(
   init: RequestInit = {},
 ): Promise<{
   ok: boolean;
-  payload: { scope?: OperatorStoreScope; stores?: ScopeStore[]; error?: string };
+  payload: { scope?: OperatorStoreScope; stores?: ScopeStore[]; canSelectStores?: boolean; error?: string };
 }> {
   const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
   const accessToken = session?.access_token;
@@ -49,6 +50,7 @@ async function fetchWithToken(
   const payload = (await response.json().catch(() => null)) as {
     scope?: OperatorStoreScope;
     stores?: ScopeStore[];
+    canSelectStores?: boolean;
     error?: string;
   } | null;
   return { ok: response.ok, payload: payload ?? {} };
@@ -61,6 +63,7 @@ export const useOperatorStoreScope = create<OperatorStoreScopeState>(
     loaded: false,
     busy: false,
     error: null,
+    canSelectStores: false,
     load: async () => {
       if (get().busy) return;
       set({ busy: true, error: null });
@@ -70,6 +73,7 @@ export const useOperatorStoreScope = create<OperatorStoreScopeState>(
           set({
             scope: payload.scope ?? { active: false, accessMode: "assigned", storeId: null, expiresAt: null },
             stores: payload.stores ?? [],
+            canSelectStores: payload.canSelectStores === true,
             loaded: true,
             busy: false,
           });

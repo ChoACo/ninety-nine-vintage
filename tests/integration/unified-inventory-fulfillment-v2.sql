@@ -322,6 +322,34 @@ on conflict (store_id, user_id) do update set
   view_reports = excluded.view_reports,
   updated_by = excluded.updated_by;
 
+insert into public.store_fulfillment_groups (
+  id, business_id, name, shipping_charge_mode,
+  group_shipping_fee_amount, representative_store_id, is_active, version
+) values (
+  '77000000-0000-4000-8000-000000000002',
+  '99000000-0000-4000-8000-000000000001',
+  'A/B 통합 출고그룹',
+  'per_group',
+  3500,
+  '20000000-0000-4000-8000-000000000002',
+  true,
+  0
+);
+
+insert into public.store_fulfillment_group_members (
+  group_id, store_id, business_id
+) values
+  (
+    '77000000-0000-4000-8000-000000000002',
+    '20000000-0000-4000-8000-000000000001',
+    '99000000-0000-4000-8000-000000000001'
+  ),
+  (
+    '77000000-0000-4000-8000-000000000002',
+    '20000000-0000-4000-8000-000000000002',
+    '99000000-0000-4000-8000-000000000001'
+  );
+
 insert into public.fulfillment_center_staff_assignments (
   business_id,
   fulfillment_center_id,
@@ -517,15 +545,16 @@ select public.configure_inventory_fulfillment_rollout(
   true,
   false,
   3500,
-  0,
+  (select version from public.inventory_fulfillment_rollout_settings
+    where business_id='99000000-0000-4000-8000-000000000001'),
   '81000000-0000-4000-8000-000000000003'
 );
 reset role;
 
 select test_support.assert_true(
   (
-    select items.fulfillment_center_id is null
-      and fulfillments.current_stage = 'reconciliation_required'
+    select items.fulfillment_center_id = '99000000-0000-4000-8000-000000000002'
+      and fulfillments.current_stage = 'entitled'
       and items.storage_expires_at < clock_timestamp()
       and items.storage_expires_at = source_items.storage_expires_at
     from public.customer_inventory_items as items
@@ -536,7 +565,7 @@ select test_support.assert_true(
     where items.commerce_order_item_id =
       '41000000-0000-4000-8000-000000000001'
   ),
-  'backfill must preserve expiration and require explicit route reconciliation'
+  'direct-store backfill must preserve expiration and resolve the fulfillment location'
 );
 
 set role authenticated;
@@ -577,38 +606,15 @@ select set_config(
 );
 
 select test_support.assert_true(
-  exists (
+  not exists (
     select 1
     from jsonb_array_elements(
       public.get_owner_inventory_reconciliation_queue(200, 0) -> 'items'
     ) as queued(value)
     where value ->> 'productId' =
         '30000000-0000-4000-8000-000000000001'
-      and value ->> 'targetCenterId' =
-        '99000000-0000-4000-8000-000000000002'
-      and value ->> 'targetRouteMode' = 'transfer'
-      and (value ->> 'fulfillmentVersion')::bigint = 0
   ),
-  'the owner reconciliation queue must expose the explicit target route'
-);
-
-select test_support.expect_sqlstate(
-  $$select public.configure_inventory_fulfillment_rollout(
-    '99000000-0000-4000-8000-000000000001',true,true,true,3500,1,
-    '81000000-0000-4000-8000-000000000004')$$,
-  '23514',
-  'shipment rollout must be blocked while reconciliation remains'
-);
-
-select public.reconcile_inventory_item_route(
-  (
-    select id
-    from public.customer_inventory_items
-    where commerce_order_item_id = '41000000-0000-4000-8000-000000000001'
-  ),
-  0,
-  '81000000-0000-4000-8000-000000000005',
-  '기존 보관 상품 경로 수동 확인'
+  'resolved direct-store inventory must not enter the reconciliation queue'
 );
 select public.configure_inventory_fulfillment_rollout(
   '99000000-0000-4000-8000-000000000001',
@@ -616,19 +622,37 @@ select public.configure_inventory_fulfillment_rollout(
   true,
   true,
   3500,
-  1,
+  (select version from public.inventory_fulfillment_rollout_settings
+    where business_id='99000000-0000-4000-8000-000000000001'),
   '81000000-0000-4000-8000-000000000006'
 );
 reset role;
 
-select test_support.expect_sqlstate(
-  $$update public.commerce_order_items
-    set payment_status = 'cancelled'
-    where id = '41000000-0000-4000-8000-000000000001'$$,
-  '55000',
-  'a moved unified entitlement must reject legacy paid-source reversal',
-  '이동 또는 예외 처리가 시작된 보관 소유권은 결제 원천에서 되돌릴 수 없습니다. 수동 환불 절차를 사용해 주세요.'
+begin;
+update public.commerce_order_items
+set payment_status = 'cancelled'
+where id = '41000000-0000-4000-8000-000000000001';
+select test_support.assert_true(
+  (
+    select items.ownership_status = 'cancelled'
+      and fulfillments.current_stage = 'cancelled'
+      and fulfillments.location_kind = 'unknown'
+    from public.customer_inventory_items as items
+    join public.inventory_item_fulfillments as fulfillments
+      on fulfillments.inventory_item_id = items.id
+    where items.commerce_order_item_id = '41000000-0000-4000-8000-000000000001'
+  ) and exists (
+    select 1
+    from public.store_financial_entries as entries
+    join public.customer_inventory_items as items
+      on items.id = entries.inventory_item_id
+    where items.commerce_order_item_id = '41000000-0000-4000-8000-000000000001'
+      and entries.entry_kind = 'payment_reversal'
+      and entries.amount < 0
+  ),
+  'an unmoved direct-store entitlement must reverse inventory and finance atomically'
 );
+rollback;
 
 select test_support.expect_sqlstate(
   $$insert into public.commerce_shipment_orders (
@@ -652,11 +676,11 @@ select test_support.assert_true(
       and unified_inventory_reads_enabled
       and item_selected_shipments_enabled
       and shipping_fee_amount = 3500
-      and version = 2
+      and version > 0
     from public.inventory_fulfillment_rollout_settings
     where business_id = '99000000-0000-4000-8000-000000000001'
   ),
-  'staged rollout must only activate after explicit reconciliation'
+  'selected shipping rollout must activate after direct-store route resolution'
 );
 
 -- Fixed and auction payment fixtures -------------------------------------
@@ -731,6 +755,18 @@ select set_config(
   '4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',
   false
 );
+select test_support.expect_sqlstate(
+  $$select public.confirm_unified_manual_payment(
+    'commerce','50000000-0000-4000-8000-000000000002',0,
+    'Buyer fixture',0,0,'82000000-0000-4000-8000-000000000002')$$,
+  '42501',
+  'a store operator must not confirm a manual payment'
+);
+select set_config(
+  'request.jwt.claim.sub',
+  '30be08c2-6259-42c6-af26-4ded6362de12',
+  false
+);
 select public.confirm_unified_manual_payment(
   'commerce',
   '50000000-0000-4000-8000-000000000002',
@@ -762,8 +798,7 @@ select test_support.expect_sqlstate(
   'a stale payment version must fail CAS'
 );
 
--- Operator A has business payment permission through store A and must be
--- allowed to confirm a store-B auction payment shared by both centers.
+-- The Owner confirms the store-B auction payment in the shared queue.
 select public.confirm_unified_manual_payment(
   'auction',
   '60000000-0000-4000-8000-000000000005',
@@ -826,6 +861,10 @@ select set_config(
   '4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',
   false
 );
+select public.set_active_operator_store_scope(
+  '20000000-0000-4000-8000-000000000001',
+  'assigned'
+);
 select public.release_paid_inventory_items(
   array[
     (
@@ -842,7 +881,7 @@ select public.release_paid_inventory_items(
 
 select set_config(
   'request.jwt.claim.sub',
-  '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d',
+  '30be08c2-6259-42c6-af26-4ded6362de12',
   false
 );
 select public.release_paid_inventory_items(
@@ -859,76 +898,23 @@ select public.release_paid_inventory_items(
   'B 매장 전일 결제 상품 현장 인계'
 );
 
-do $$
-declare
-  v_a uuid;
-  v_b uuid;
-  v_a_version bigint;
-  v_b_version bigint;
-begin
-  select items.id, fulfillments.version
-  into v_a, v_a_version
-  from public.customer_inventory_items as items
-  join public.inventory_item_fulfillments as fulfillments
-    on fulfillments.inventory_item_id = items.id
-  where items.commerce_order_item_id =
-    '41000000-0000-4000-8000-000000000002';
-  select items.id, fulfillments.version
-  into v_b, v_b_version
-  from public.customer_inventory_items as items
-  join public.inventory_item_fulfillments as fulfillments
-    on fulfillments.inventory_item_id = items.id
-  where items.commerce_order_item_id =
-    '41000000-0000-4000-8000-000000000003';
-
-  perform test_support.assert_true(
-    (
-      select current_stage = 'in_transit_to_center'
-        and location_kind = 'transit'
-        and outbound_released
-      from public.inventory_item_fulfillments
-      where inventory_item_id = v_a
+select test_support.assert_true(
+  (
+    select count(*) = 2
+      and bool_and(fulfillments.current_stage = 'center_stored')
+      and bool_and(fulfillments.location_kind = 'center')
+      and bool_and(fulfillments.storage_location_code = 'DIRECT_STORE')
+      and bool_and(fulfillments.outbound_released)
+    from public.customer_inventory_items as items
+    join public.inventory_item_fulfillments as fulfillments
+      on fulfillments.inventory_item_id = items.id
+    where items.commerce_order_item_id in (
+      '41000000-0000-4000-8000-000000000002',
+      '41000000-0000-4000-8000-000000000003'
     )
-    and (
-      select current_stage = 'center_received'
-        and location_kind = 'center'
-        and outbound_released
-      from public.inventory_item_fulfillments
-      where inventory_item_id = v_b
-    ),
-    'A and B routes must produce distinct transfer and co-located stages'
-  );
-
-  perform public.record_inventory_center_items(
-    'receive',
-    array[v_a],
-    array[v_a_version],
-    null,
-    '83000000-0000-4000-8000-000000000003',
-    'A 상품 B 센터 수령'
-  );
-  select version into v_a_version
-  from public.inventory_item_fulfillments
-  where inventory_item_id = v_a;
-  select version into v_b_version
-  from public.inventory_item_fulfillments
-  where inventory_item_id = v_b;
-
-  if v_a < v_b then
-    perform public.record_inventory_center_items(
-      'store', array[v_a, v_b], array[v_a_version, v_b_version],
-      'B-RACK-01', '83000000-0000-4000-8000-000000000004',
-      'A/B 상품 함께 보관'
-    );
-  else
-    perform public.record_inventory_center_items(
-      'store', array[v_b, v_a], array[v_b_version, v_a_version],
-      'B-RACK-01', '83000000-0000-4000-8000-000000000004',
-      'A/B 상품 함께 보관'
-    );
-  end if;
-end;
-$$;
+  ),
+  'direct-store release must store each paid item at its originating store'
+);
 reset role;
 
 select test_support.assert_true(
@@ -979,7 +965,7 @@ where id = '50000000-0000-4000-8000-000000000003';
 
 select set_config(
   'request.jwt.claim.sub',
-  '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d',
+  '30be08c2-6259-42c6-af26-4ded6362de12',
   false
 );
 select test_support.assert_true(
@@ -1148,6 +1134,10 @@ select set_config(
   '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d',
   false
 );
+select public.set_active_operator_store_scope(
+  '20000000-0000-4000-8000-000000000002',
+  'assigned'
+);
 select public.release_inventory_shipment_items(
   (
     select works.id
@@ -1174,66 +1164,23 @@ select public.release_inventory_shipment_items(
 );
 
 select test_support.assert_true(
-  not exists (
-    select 1
-    from jsonb_array_elements(
-      public.get_inventory_center_queue(200, 0) -> 'items'
-    ) as queued(value)
-    where not (value ? 'centerId')
-       or (value ->> 'centerId')::uuid is null
+  (
+    select count(*) = 2 and bool_and(line_status = 'ready')
+    from public.inventory_shipment_items
+    where shipment_id = (
+      select value from test_support.runtime_values
+      where label = 'partial-shipment'
+    )
+  ) and (
+    select count(*) = 2 and bool_and(status = 'outbound_complete')
+    from public.inventory_shipment_store_works
+    where shipment_id = (
+      select value from test_support.runtime_values
+      where label = 'partial-shipment'
+    )
   ),
-  'every center queue item must carry its explicit center identity'
+  'each store release must make its group-shipment work ready without center intake'
 );
-
-do $$
-declare
-  v_a uuid;
-  v_b uuid;
-  v_a_version bigint;
-  v_b_version bigint;
-begin
-  select items.id, fulfillments.version
-  into v_a, v_a_version
-  from public.customer_inventory_items as items
-  join public.inventory_item_fulfillments as fulfillments
-    on fulfillments.inventory_item_id = items.id
-  where items.commerce_order_item_id =
-    '41000000-0000-4000-8000-000000000004';
-  select items.id, fulfillments.version
-  into v_b, v_b_version
-  from public.customer_inventory_items as items
-  join public.inventory_item_fulfillments as fulfillments
-    on fulfillments.inventory_item_id = items.id
-  where items.manual_transfer_order_id =
-    '60000000-0000-4000-8000-000000000005';
-
-  perform public.record_inventory_center_items(
-    'receive', array[v_a], array[v_a_version], null,
-    '85000000-0000-4000-8000-000000000005',
-    'A 배송 상품 B 센터 수령'
-  );
-  select version into v_a_version
-  from public.inventory_item_fulfillments
-  where inventory_item_id = v_a;
-  select version into v_b_version
-  from public.inventory_item_fulfillments
-  where inventory_item_id = v_b;
-
-  if v_a < v_b then
-    perform public.record_inventory_center_items(
-      'store', array[v_a, v_b], array[v_a_version, v_b_version],
-      'B-RACK-02', '85000000-0000-4000-8000-000000000006',
-      '배송 요청 상품 보관 완료'
-    );
-  else
-    perform public.record_inventory_center_items(
-      'store', array[v_b, v_a], array[v_b_version, v_a_version],
-      'B-RACK-02', '85000000-0000-4000-8000-000000000006',
-      '배송 요청 상품 보관 완료'
-    );
-  end if;
-end;
-$$;
 
 do $$
 declare
@@ -1268,11 +1215,10 @@ begin
 end;
 $$;
 
--- Any store operator with the business payment permission can confirm the
--- central shipping fee, while only the assigned B center can pack/ship.
+-- The Owner confirms the shipping fee; store-scoped staff still pack and ship.
 select set_config(
   'request.jwt.claim.sub',
-  '4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',
+  '30be08c2-6259-42c6-af26-4ded6362de12',
   false
 );
 select public.confirm_unified_manual_payment(
@@ -1400,8 +1346,12 @@ select test_support.assert_true(
       where label = 'partial-shipment'
     )
       and items.line_status = 'shipped'
-  )
-  and (
+  ),
+  'partial exclusion must ship the remaining item'
+);
+
+select test_support.assert_true(
+  (
     select line_status = 'excluded'
     from public.inventory_shipment_items
     where shipment_id = (
@@ -1415,14 +1365,24 @@ select test_support.assert_true(
         where manual_transfer_order_id =
           '60000000-0000-4000-8000-000000000005'
       )
-  )
-  and (
-    select count(*) = 1
-    from public.shipping_fee_waiver_entitlements
-    where member_id = '10000000-0000-4000-8000-000000000001'
-      and status = 'available'
   ),
-  'partial exclusion must ship the remaining item and issue one waiver'
+  'partial exclusion must leave the held auction item excluded'
+);
+
+select test_support.assert_true(
+  (
+    select count(*) = 1
+    from public.shipping_fee_waiver_entitlements as waivers
+    join public.inventory_exception_cases as cases
+      on cases.id = waivers.exception_case_id
+    join public.customer_inventory_items as inventory
+      on inventory.id = cases.inventory_item_id
+    where waivers.member_id = '10000000-0000-4000-8000-000000000001'
+      and waivers.status = 'available'
+      and inventory.manual_transfer_order_id =
+        '60000000-0000-4000-8000-000000000005'
+  ),
+  'partial exclusion must issue one waiver linked to the excluded auction item'
 );
 
 select set_config(
@@ -1553,7 +1513,7 @@ where member_id = '10000000-0000-4000-8000-000000000001'
 
 select set_config(
   'request.jwt.claim.sub',
-  '4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',
+  '30be08c2-6259-42c6-af26-4ded6362de12',
   false
 );
 select public.confirm_unified_manual_payment(
@@ -1600,7 +1560,7 @@ $$;
 
 select set_config(
   'request.jwt.claim.sub',
-  '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d',
+  '30be08c2-6259-42c6-af26-4ded6362de12',
   false
 );
 select public.confirm_unified_manual_payment(
@@ -1801,7 +1761,7 @@ select test_support.assert_true(
 
 select set_config(
   'request.jwt.claim.sub',
-  '4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',
+  '30be08c2-6259-42c6-af26-4ded6362de12',
   false
 );
 select public.confirm_unified_manual_payment(
@@ -2100,11 +2060,11 @@ select public.dblink_exec('confirm_a', 'set role authenticated');
 select public.dblink_exec('confirm_b', 'set role authenticated');
 select public.dblink_exec(
   'confirm_a',
-  $$set request.jwt.claim.sub = '4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee'$$
+    $$set request.jwt.claim.sub = '30be08c2-6259-42c6-af26-4ded6362de12'$$
 );
 select public.dblink_exec(
   'confirm_b',
-  $$set request.jwt.claim.sub = '4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee'$$
+    $$set request.jwt.claim.sub = '30be08c2-6259-42c6-af26-4ded6362de12'$$
 );
 select public.dblink_send_query(
   'confirm_a',
@@ -2255,28 +2215,37 @@ select set_config(
   '30be08c2-6259-42c6-af26-4ded6362de12',
   false
 );
+select public.set_active_operator_store_scope(
+  '20000000-0000-4000-8000-000000000001',
+  'owner_support'
+);
 select test_support.assert_true(
   (
-    select count(*) = 2
+    select count(*) = 1
     from jsonb_array_elements(
       public.get_store_financial_report(
         (clock_timestamp() at time zone 'Asia/Seoul')::date-30,
         (clock_timestamp() at time zone 'Asia/Seoul')::date
       ) -> 'stores'
     ) as stores(value)
-    where value ->> 'storeId' in (
-      '20000000-0000-4000-8000-000000000001',
-      '20000000-0000-4000-8000-000000000002'
-    )
+    where value ->> 'storeId' =
+      '20000000-0000-4000-8000-000000000001'
   )
   and (
     public.get_store_financial_report(
       (clock_timestamp() at time zone 'Asia/Seoul')::date-30,
       (clock_timestamp() at time zone 'Asia/Seoul')::date
     ) ->> 'centralShippingFees'
-  )::bigint = 3500
-  and exists (
-    select 1
+  )::bigint = 0,
+  'owner financial report must stay within the selected A store'
+);
+select public.set_active_operator_store_scope(
+  '20000000-0000-4000-8000-000000000002',
+  'owner_support'
+);
+select test_support.assert_true(
+  (
+    select count(*) = 1
     from jsonb_array_elements(
       public.get_store_financial_report(
         (clock_timestamp() at time zone 'Asia/Seoul')::date-30,
@@ -2286,8 +2255,19 @@ select test_support.assert_true(
     where value ->> 'storeId' =
       '20000000-0000-4000-8000-000000000002'
       and (value ->> 'refunds')::bigint >= 25000
+  )
+  and not exists (
+    select 1
+    from jsonb_array_elements(
+      public.get_store_financial_report(
+        (clock_timestamp() at time zone 'Asia/Seoul')::date-30,
+        (clock_timestamp() at time zone 'Asia/Seoul')::date
+      ) -> 'stores'
+    ) as stores(value)
+    where value ->> 'storeId' <>
+      '20000000-0000-4000-8000-000000000002'
   ),
-  'financial report must split A/B revenue and keep shipping fees central'
+  'owner financial report must switch cleanly to the selected B store'
 );
 reset role;
 
@@ -2321,7 +2301,7 @@ begin
   begin
     perform public.record_buyer_inventory_center_items('receive',v_ids,v_versions,null,gen_random_uuid(),'혼합 구매자 거부 검증');
     raise exception 'mixed buyer center work should fail';
-  exception when sqlstate '22023' then null;
+  exception when insufficient_privilege then null;
   end;
 end;
 $$;

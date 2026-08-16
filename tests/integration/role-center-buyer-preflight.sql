@@ -97,9 +97,6 @@ do $$
 declare
   v_owner uuid:=auth.uid();
   v_nickname_request uuid;
-  v_created jsonb;
-  v_replay jsonb;
-  v_updated jsonb;
   v_site jsonb;
 begin
   if not exists(select 1 from public.get_manager_member_directory(500,0) d where d.id=v_owner and d.access_role='owner') then
@@ -133,29 +130,14 @@ begin
     raise exception 'site status RPC must persist the authenticated owner save';
   end if;
 
-  v_created:=public.configure_managed_fulfillment_center(
-    'create',null,'preflight-center','배포 전 검증 센터',false,'12345','서울시 검증로 1','2층','검증 담당','010-0000-0000',0,
-    'a1000000-0000-4000-8000-000000000001'
-  );
-  v_replay:=public.configure_managed_fulfillment_center(
-    'create',null,'preflight-center','배포 전 검증 센터',false,'12345','서울시 검증로 1','2층','검증 담당','010-0000-0000',0,
-    'a1000000-0000-4000-8000-000000000001'
-  );
-  if not coalesce((v_replay->>'idempotent_replay')::boolean,false) then raise exception 'center create replay must be idempotent'; end if;
-  v_updated:=public.configure_managed_fulfillment_center(
-    'update',(v_created->>'id')::uuid,'preflight-center','배포 전 검증 센터 수정',false,'54321','서울시 검증로 2','3층','새 담당','010-1111-1111',
-    (v_created->>'version')::bigint,'a1000000-0000-4000-8000-000000000002'
-  );
-  if not exists(select 1 from public.fulfillment_centers where id=(v_created->>'id')::uuid and address_line1='서울시 검증로 2' and contact_name='새 담당') then
-    raise exception 'center address and contact update failed';
-  end if;
-  perform public.configure_managed_fulfillment_center(
-    'archive',(v_created->>'id')::uuid,'preflight-center','배포 전 검증 센터 수정',false,'54321','서울시 검증로 2','3층','새 담당','010-1111-1111',
-    (v_updated->>'version')::bigint,'a1000000-0000-4000-8000-000000000003'
-  );
-  if not exists(select 1 from public.fulfillment_centers where id=(v_created->>'id')::uuid and status='archived') then
-    raise exception 'center archival failed';
-  end if;
+  begin
+    perform public.configure_managed_fulfillment_center(
+      'create',null,'preflight-center','배포 전 검증 센터',false,'12345','서울시 검증로 1','2층','검증 담당','010-0000-0000',0,
+      'a1000000-0000-4000-8000-000000000001'
+    );
+    raise exception 'retired center topology mutation should fail';
+  exception when sqlstate '42501' then null;
+  end;
 end;
 $$;
 rollback;
@@ -337,77 +319,6 @@ rollback;
 
 begin;
 select set_config('request.jwt.claim.sub',(select user_id::text from public.account_access_roles where role_code='owner'),true);
-update public.profiles
-set deleted_at=null,anonymized_reference=null
-where id='4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee';
-insert into public.account_access_roles(user_id,role_code)
-values('4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee','operator');
-set local role authenticated;
-do $$
-declare
-  v_center uuid := (
-    select id from public.fulfillment_centers
-    where status='active'
-    order by name,id
-    limit 1
-  );
-  v_user uuid := '4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee';
-  v_created jsonb;
-  v_updated jsonb;
-  v_deleted jsonb;
-begin
-  v_created := public.configure_fulfillment_center_staff_assignment(
-    v_center,
-    v_user,
-    false,
-    false,
-    'active',
-    0,
-    'a2000000-0000-4000-8000-000000000001'
-  );
-  if not (v_created->>'receiveAtCenter')::boolean
-    or not (v_created->>'createShipments')::boolean
-  then
-    raise exception 'center capabilities must derive from the staff role';
-  end if;
-  v_updated := public.configure_fulfillment_center_staff_assignment(
-    v_center,
-    v_user,
-    false,
-    false,
-    'inactive',
-    (v_created->>'version')::bigint,
-    'a2000000-0000-4000-8000-000000000002'
-  );
-  if v_updated->>'status'<>'inactive' then
-    raise exception 'center assignment edit failed';
-  end if;
-  v_deleted := public.delete_fulfillment_center_staff_assignment(
-    v_center,
-    v_user,
-    (v_updated->>'version')::bigint,
-    'a2000000-0000-4000-8000-000000000003'
-  );
-  if not (v_deleted->>'deleted')::boolean then
-    raise exception 'center assignment delete failed';
-  end if;
-end;
-$$;
-reset role;
-do $$
-begin
-  if exists(
-    select 1 from public.fulfillment_center_staff_assignments
-    where user_id='4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee'
-  ) then
-    raise exception 'deleted center assignment row must not remain';
-  end if;
-end;
-$$;
-rollback;
-
-begin;
-select set_config('request.jwt.claim.sub',(select user_id::text from public.account_access_roles where role_code='owner'),true);
 update public.profiles set deleted_at=null,anonymized_reference=null where id='4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee';
 insert into public.account_access_roles(user_id,role_code) values('4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee','operator');
 update public.profiles set deleted_at=null,anonymized_reference=null where id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
@@ -443,38 +354,31 @@ end;
 $$;
 select set_config('request.jwt.claim.sub','4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',true);
 do $$
-declare v_member uuid:='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d'; v_sanction uuid;
+declare v_member uuid:='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
 begin
-  if public.review_nickname_change_request(
-    (select request_id from public.get_pending_nickname_change_requests()
-      where member_id=v_member limit 1),
-    true,
-    '운영자 승인 검증'
-  ) <> 'approved' then
-    raise exception 'operator nickname approval failed';
-  end if;
-  if public.can_manage_members() or not public.can_manage_member_enforcement() then raise exception 'operator privilege split is invalid'; end if;
+  begin perform * from public.get_pending_nickname_change_requests(); raise exception 'operator nickname request listing should fail'; exception when sqlstate '42501' then null; end;
+  begin perform public.review_nickname_change_request(gen_random_uuid(),true,'운영자 승인 거부 검증'); raise exception 'operator nickname approval should fail'; exception when sqlstate '42501' then null; end;
+  if public.can_manage_members() then raise exception 'operator full member management must remain disabled'; end if;
   begin perform * from public.get_manager_member_directory(10,0); raise exception 'operator full directory should fail'; exception when sqlstate '42501' then null; end;
-  if not exists(select 1 from public.get_operator_member_directory(50,0) where id=v_member) then raise exception 'operator limited directory must include a normal member'; end if;
+  if exists(select 1 from public.get_operator_member_directory(50,0) where id=v_member) then raise exception 'operator directory must exclude members without a store transaction relationship'; end if;
   if exists(select 1 from public.profiles where id=v_member) then raise exception 'operator must not read another member profile directly'; end if;
   begin perform public.set_managed_member_status(v_member,'suspended',null,'denied'); raise exception 'operator status mutation should fail'; exception when sqlstate '42501' then null; end;
-  perform public.add_member_warning(v_member,'manual','첫 번째 경고');
-  perform public.add_member_warning(v_member,'manual','두 번째 경고');
-  perform public.add_member_warning(v_member,'manual','세 번째 경고');
-  select (active_sanctions->0->>'id')::uuid into strict v_sanction
-  from public.get_operator_member_directory(50,0) where id=v_member;
-  perform public.manage_member_sanction('update',v_member,v_sanction,null,clock_timestamp()+interval '2 days','기간 수정');
-  perform public.manage_member_sanction('cancel',v_member,v_sanction,null,null,'제재 취소');
+  begin perform public.add_member_warning(v_member,'manual','운영자 경고 거부'); raise exception 'operator warning mutation should fail'; exception when sqlstate '42501' then null; end;
+  begin perform public.manage_member_sanction('create',v_member,null,null,clock_timestamp()+interval '2 days','운영자 제재 거부'); raise exception 'operator sanction mutation should fail'; exception when sqlstate '42501' then null; end;
 end;
 $$;
+select set_config('request.jwt.claim.sub','30be08c2-6259-42c6-af26-4ded6362de12',true);
+select public.review_nickname_change_request(
+  (select request_id from public.get_pending_nickname_change_requests()
+    where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d' limit 1),
+  true,
+  '소유자 승인 검증'
+);
 reset role;
 do $$
 begin
   if (select display_name from public.profiles where id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d') <> '승인 닉네임' then
     raise exception 'approved nickname was not persisted';
-  end if;
-  if (select count(*) from public.member_sanction_events where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d')<>3 then
-    raise exception 'sanction lifecycle audit is incomplete';
   end if;
 end;
 $$;
@@ -492,7 +396,7 @@ delete from public.member_sanction_events where member_id='9d7b47fc-3cd5-4dfc-aa
 delete from public.member_bid_sanctions where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
 delete from public.member_warnings where member_id='9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d';
 set local role authenticated;
-select set_config('request.jwt.claim.sub','4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',true);
+select set_config('request.jwt.claim.sub','30be08c2-6259-42c6-af26-4ded6362de12',true);
 select * from public.add_member_warning(
   '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d',
   'late_payment',
@@ -509,11 +413,11 @@ begin
 end;
 $$;
 set local role authenticated;
-select set_config('request.jwt.claim.sub','4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',true);
+select set_config('request.jwt.claim.sub','30be08c2-6259-42c6-af26-4ded6362de12',true);
 select * from public.add_member_warning(
   '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d',
   'manual',
-  '운영자 수동 경고'
+  '소유자 수동 경고'
 );
 reset role;
 do $$
@@ -528,14 +432,14 @@ begin
 end;
 $$;
 set local role authenticated;
-select set_config('request.jwt.claim.sub','4132c4b2-87e0-4ffe-9ce3-74ca1ae67cee',true);
+select set_config('request.jwt.claim.sub','30be08c2-6259-42c6-af26-4ded6362de12',true);
 select public.manage_member_sanction(
   'create',
   '9d7b47fc-3cd5-4dfc-aacb-1656e9e4e15d',
   null,
   clock_timestamp(),
   clock_timestamp()+interval '1 day',
-  '운영자 수동 제재'
+  '소유자 수동 제재'
 );
 reset role;
 do $$

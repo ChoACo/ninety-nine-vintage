@@ -21,6 +21,8 @@ const fixtureMigrationName =
   "20260718025000_test_seed_required_owner_identity.sql";
 const secondOperatorFixtureMigrationName =
   "20260718055000_test_promote_required_second_operator.sql";
+const authorizationPrincipalBootstrapName =
+  "20260811113000_test_bootstrap_authorization_principal.sql";
 const executableName = (name) =>
   process.platform === "win32" ? `${name}.exe` : name;
 const supabase = executableName("supabase");
@@ -150,6 +152,46 @@ try {
     path.join(temporaryMigrations, secondOperatorFixtureMigrationName),
   );
 
+  // The local Supabase image installs extension-owned SECURITY DEFINER
+  // functions in public. Patch only the disposable migration copy so the
+  // historical advisor sweep does not revoke extension internals.
+  const advisorMigrationPath = path.join(
+    temporaryMigrations,
+    "20260725103000_resolve_advisor_security_and_rls_warnings.sql",
+  );
+  const advisorMigration = await readFile(advisorMigrationPath, "utf8");
+  const patchedAdvisorMigration = advisorMigration.replace(
+    /      and procedures\.prosecdef\r?\n/u,
+    `      and procedures.prosecdef
+      and not exists (
+        select 1
+        from pg_catalog.pg_depend as dependencies
+        where dependencies.classid = 'pg_proc'::regclass
+          and dependencies.objid = procedures.oid
+          and dependencies.deptype = 'e'
+      )
+`,
+  );
+  if (patchedAdvisorMigration === advisorMigration) {
+    throw new Error("The advisor migration patch no longer matches its source.");
+  }
+  await writeFile(advisorMigrationPath, patchedAdvisorMigration);
+
+  // A later migration installs the canary-aware implementation. This
+  // disposable bootstrap lets the immediately preceding RLS migration build
+  // cleanly from an empty database without changing production history.
+  await writeFile(
+    path.join(temporaryMigrations, authorizationPrincipalBootstrapName),
+    `create or replace function public.current_authorization_principal()
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$ select auth.uid(); $$;
+`,
+  );
+
   const migrationNames = (await readdir(temporaryMigrations)).sort();
   const fixturePosition = migrationNames.indexOf(fixtureMigrationName);
   const expectedPrevious = "20260718023000_gate_required_kakao_profiles.sql";
@@ -161,6 +203,20 @@ try {
   ) {
     throw new Error(
       "The owner fixture migration no longer sorts immediately before the migration that requires it.",
+    );
+  }
+  const authorizationBootstrapPosition = migrationNames.indexOf(
+    authorizationPrincipalBootstrapName,
+  );
+  if (
+    authorizationBootstrapPosition < 1 ||
+    migrationNames[authorizationBootstrapPosition - 1] !==
+      "20260811095613_fix_hidden_test_initial_shipping_credits.sql" ||
+    migrationNames[authorizationBootstrapPosition + 1] !==
+      "20260811113426_scope_membership_reads_to_canary_principal.sql"
+  ) {
+    throw new Error(
+      "The authorization-principal bootstrap no longer sorts before its first RLS use.",
     );
   }
   const secondOperatorFixturePosition = migrationNames.indexOf(

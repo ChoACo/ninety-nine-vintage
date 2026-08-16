@@ -14,7 +14,13 @@ try {
   const { apiUrl, anonKey, serviceRoleKey } = readLocalSupabaseEnvironment();
   const next = spawn(
     process.execPath,
-    [path.join(root, "node_modules", "next", "dist", "bin", "next"), "dev", "--port", "3000"],
+    [
+      path.join(root, "node_modules", "next", "dist", "bin", "next"),
+      "dev",
+      "--webpack",
+      "--port",
+      "3000",
+    ],
     {
       cwd: root,
       env: {

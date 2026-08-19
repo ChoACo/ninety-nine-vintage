@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { StoreMallGrid } from "@/components/features/catalog/StoreMallGrid";
 import { fetchStoreMallCards } from "@/services/stores";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "센터몰 | NINETY-NINE VINTAGE",
   description: "판매 센터별 상품과 센터 소식을 한곳에서 확인하세요.",

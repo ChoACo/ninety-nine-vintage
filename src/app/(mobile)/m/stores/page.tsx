@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { StoreMallGrid } from "@/components/features/catalog/StoreMallGrid";
 import { fetchStoreMallCards } from "@/services/stores";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "센터몰",
   description: "판매 센터별 상품을 둘러보세요.",

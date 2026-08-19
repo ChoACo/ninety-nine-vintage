@@ -57,17 +57,7 @@ export function AuctionFilterSidebar({
   const [dateOptions, setDateOptions] = useState<string[]>([]);
   const [storeOptions, setStoreOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedStoreId, setSelectedStoreId] = useState(() => readInitialParam("store", "all"));
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    const desktop = window.matchMedia("(min-width: 768px)");
-    const closeAtDesktop = () => {
-      if (desktop.matches) setMobileOpen(false);
-    };
-    closeAtDesktop();
-    desktop.addEventListener("change", closeAtDesktop);
-    return () => desktop.removeEventListener("change", closeAtDesktop);
-  }, []);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   useEffect(() => {
     const receiveOptions = (event: Event) => {
@@ -128,6 +118,11 @@ export function AuctionFilterSidebar({
     ? selectedDate
     : "all";
 
+  const selectStore = (storeId: string) => {
+    setSelectedStoreId(storeId);
+    notify(sharedFilters({ storeId }));
+  };
+
   const filterContent = (
     <>
       <div className="flex items-center justify-between border-b border-zinc-200 py-4">
@@ -145,17 +140,46 @@ export function AuctionFilterSidebar({
           >
             <RotateCcw size={12} /> 초기화
           </button>
-          {surface === "mobile" && (
-            <button
-              aria-label="모바일 필터 닫기"
-              onClick={() => setMobileOpen(false)}
-              type="button"
-            >
-              <X size={18} />
-            </button>
-          )}
+          <button
+            aria-label="필터 닫기"
+            onClick={() => setFilterOpen(false)}
+            type="button"
+          >
+            <X size={18} />
+          </button>
         </div>
       </div>
+
+      <section className="border-b border-zinc-200 py-5">
+        <h3 className="mb-3 text-xs font-bold">센터별로 보기</h3>
+        <div className="flex flex-wrap gap-2">
+          <button
+            aria-pressed={selectedStoreId === "all"}
+            className={`min-h-9 rounded-full border px-3 text-[11px] font-bold transition-colors ${selectedStoreId === "all" ? "border-ink bg-ink text-paper" : "border-zinc-200 bg-white text-ink hover:border-ink"}`}
+            onClick={() => selectStore("all")}
+            type="button"
+          >
+            전체
+          </button>
+          {storeOptions.map((store) => {
+            const active = selectedStoreId === store.id;
+            return (
+              <button
+                aria-pressed={active}
+                className={`min-h-9 rounded-full border px-3 text-[11px] font-bold transition-colors ${active ? "border-ink bg-ink text-paper" : "border-zinc-200 bg-white text-ink hover:border-ink"}`}
+                key={store.id}
+                onClick={() => selectStore(store.id)}
+                type="button"
+              >
+                {store.name}
+              </button>
+            );
+          })}
+        </div>
+        {storeOptions.length === 0 && (
+          <p className="mt-2 text-[11px] text-muted">등록된 센터가 없습니다.</p>
+        )}
+      </section>
 
       <section className="border-b border-zinc-200 py-5">
         <h3 className="mb-3 text-xs font-bold">상품 검색</h3>
@@ -173,23 +197,6 @@ export function AuctionFilterSidebar({
             value={query}
           />
         </label>
-      </section>
-
-      <section className="border-b border-zinc-200 py-5">
-        <h3 className="mb-3 text-xs font-bold">운영 센터</h3>
-        <select
-          aria-label="운영 센터"
-          className="h-11 w-full border border-zinc-200 bg-white px-3 text-xs font-bold outline-none focus:border-zinc-950"
-          onChange={(event) => {
-            const storeId = event.target.value;
-            setSelectedStoreId(storeId);
-            notify(sharedFilters({ storeId }));
-          }}
-          value={selectedStoreId === "all" || storeOptions.some((store) => store.id === selectedStoreId) ? selectedStoreId : "all"}
-        >
-          <option value="all">모든 센터</option>
-          {storeOptions.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
-        </select>
       </section>
 
       <section className="border-b border-zinc-200 py-5">
@@ -265,16 +272,37 @@ export function AuctionFilterSidebar({
   return (
     <>
       {surface === "desktop" ? (
-        <aside className="sticky top-[100px] block w-[240px] flex-shrink-0 self-start border-t border-zinc-950">
-          {filterContent}
-        </aside>
+        <div className="mb-6">
+          <button
+            aria-expanded={filterOpen}
+            aria-haspopup="dialog"
+            className="inline-flex h-11 items-center gap-2 border border-zinc-950 bg-paper px-4 text-xs font-bold shadow-sm transition-colors hover:bg-ink hover:text-paper"
+            onClick={() => setFilterOpen(true)}
+            type="button"
+          >
+            <SlidersHorizontal size={15} />
+            필터
+            <span className="text-[10px] text-muted">
+              {selectedCount}개 선택
+            </span>
+          </button>
+          <PremiumDialog
+            ariaLabel="필터"
+            onClose={() => setFilterOpen(false)}
+            open={filterOpen}
+            panelClassName="px-4 py-2"
+            placement="center"
+          >
+            {filterContent}
+          </PremiumDialog>
+        </div>
       ) : (
         <>
           <button
-            aria-expanded={mobileOpen}
+            aria-expanded={filterOpen}
             aria-haspopup="dialog"
             className="mb-4 flex h-12 w-full items-center justify-between rounded-2xl border border-zinc-950 px-4 text-xs font-bold shadow-sm transition-all duration-300 active:scale-95"
-            onClick={() => setMobileOpen(true)}
+            onClick={() => setFilterOpen(true)}
             type="button"
           >
             <span className="flex items-center gap-2">
@@ -287,8 +315,8 @@ export function AuctionFilterSidebar({
           </button>
           <PremiumDialog
             ariaLabel="모바일 필터 바텀시트"
-            onClose={() => setMobileOpen(false)}
-            open={mobileOpen}
+            onClose={() => setFilterOpen(false)}
+            open={filterOpen}
             panelClassName="px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
             placement="sheet-bottom"
             zIndexClassName="z-[80]"

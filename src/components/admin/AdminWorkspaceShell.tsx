@@ -10,10 +10,12 @@ export interface AdminWorkspaceItem {
   label: string;
   description?: string;
   matchPrefixes?: readonly string[];
+  group?: string;
 }
 
 interface AdminWorkspaceShellProps {
   children: ReactNode;
+  contentHeader?: ReactNode;
   eyebrow: string;
   title: string;
   description: string;
@@ -28,7 +30,7 @@ function isActive(pathname: string, item: AdminWorkspaceItem) {
     : pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
-export function AdminWorkspaceShell({ children, description, eyebrow, navigation, title, utility }: Readonly<AdminWorkspaceShellProps>) {
+export function AdminWorkspaceShell({ children, contentHeader, description, eyebrow, navigation, title, utility }: Readonly<AdminWorkspaceShellProps>) {
   const pathname = usePathname();
   return (
     <div className="grid min-w-0 gap-6 lg:grid-cols-[248px_minmax(0,1fr)] lg:gap-10">
@@ -43,16 +45,21 @@ export function AdminWorkspaceShell({ children, description, eyebrow, navigation
           {navigation.map((item) => {
             const active = isActive(pathname, item);
             return (
-              <Link aria-current={active ? "page" : undefined} className={`group min-w-[132px] border px-4 py-3 transition-colors lg:min-w-0 ${active ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink"}`} href={item.href} key={item.href}>
+              <div key={item.href}>
+                <Link aria-current={active ? "page" : undefined} className={`group block w-full min-w-[132px] border px-4 py-3 transition-colors lg:min-w-0 ${active ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink"}`} href={item.href}>
                 <span className="block text-sm font-black">{item.label}</span>
                 {item.description && <span className={`mt-1 hidden text-[10px] leading-4 lg:block ${active ? "text-paper/70" : "text-muted"}`}>{item.description}</span>}
-              </Link>
+                </Link>
+              </div>
             );
           })}
         </nav>
         <Link className="mt-3 hidden min-h-11 items-center justify-center border border-line bg-paper px-4 text-xs font-bold lg:flex" href="/account">구매자 MY로 이동</Link>
       </aside>
-      <section className="min-w-0" data-admin-workspace-content>{children}</section>
+      <section className="min-w-0" data-admin-workspace-content>
+        {contentHeader}
+        {children}
+      </section>
     </div>
   );
 }

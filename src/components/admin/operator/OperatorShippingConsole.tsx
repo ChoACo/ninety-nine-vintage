@@ -6,6 +6,7 @@ import {
   PackageCheck,
   RefreshCw,
   Truck,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -279,6 +280,7 @@ export function OperatorShippingConsole({
   const [addressReveals, setAddressReveals] = useState<Record<string, AddressReveal>>({});
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [trackingModalShipment, setTrackingModalShipment] = useState<InventoryShipment | null>(null);
 
   const load = useCallback(async (accessToken: string | null, shipped: boolean, nextOffset: number) => {
     if (!accessToken) return;
@@ -335,6 +337,13 @@ export function OperatorShippingConsole({
       ...current,
       [shipmentId]: { ...(current[shipmentId] ?? { courier: "", trackingNumber: "", note: "" }), [field]: value },
     }));
+  };
+  const openTrackingModal = (shipment: InventoryShipment) => {
+    setForms((current) => current[shipment.id] ? current : {
+      ...current,
+      [shipment.id]: { courier: shipment.courier ?? "", trackingNumber: shipment.trackingNumber ?? "", note: "" },
+    });
+    setTrackingModalShipment(shipment);
   };
 
   const revealAddress = async (shipment: InventoryShipment) => {
@@ -584,11 +593,6 @@ export function OperatorShippingConsole({
           const gate = packGate(shipment);
           const active = activeItems(shipment);
           const canShip = shipment.status === "packed" && active.length > 0 && active.every((item) => item.lineStatus === "packed" && !item.isBlocked);
-          const form = forms[shipment.id] ?? {
-            courier: shipment.courier ?? "",
-            trackingNumber: shipment.trackingNumber ?? "",
-            note: "",
-          };
           const addressReveal = addressReveals[shipment.id];
           return (
             <article className="border-b border-line px-4 py-5 last:border-b-0 sm:px-5" key={shipment.id}>
@@ -687,10 +691,8 @@ export function OperatorShippingConsole({
               )}
 
               {shipment.status === "packed" && (
-                <div className="mt-5 grid grid-cols-1 gap-2 border-t border-line pt-4 sm:grid-cols-[minmax(0,160px)_minmax(0,220px)_auto]">
-                  <input aria-label={`${shipment.id} 택배사`} className="h-10 border border-line px-3 text-xs" disabled={!canShip} onChange={(event) => updateForm(shipment.id, "courier", event.target.value)} placeholder="택배사" value={form.courier} />
-                  <input aria-label={`${shipment.id} 송장번호`} className="h-10 border border-line px-3 text-xs" disabled={!canShip} onChange={(event) => updateForm(shipment.id, "trackingNumber", event.target.value)} placeholder="송장번호" value={form.trackingNumber} />
-                  <button className="h-10 bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40" disabled={!canShip || busyKey !== null} onClick={() => void mutateShipment(shipment, "ship")} type="button">송장 등록 · 발송 완료</button>
+                <div className="mt-5 border-t border-line pt-4">
+                  <button className="h-10 bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40" disabled={!canShip || busyKey !== null} onClick={() => openTrackingModal(shipment)} type="button">송장번호 입력</button>
                   {!canShip && <p className="text-xs text-amber-700 sm:col-span-3">미 출고된 상품이 존재합니다</p>}
                 </div>
               )}
@@ -700,44 +702,7 @@ export function OperatorShippingConsole({
                   <p className="flex items-center gap-2 text-xs font-bold">
                     <CheckCircle2 size={14} /> 발송 완료 · 송장 1개 · {formatAt(shipment.shippedAt)}
                   </p>
-                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,160px)_minmax(0,240px)_minmax(0,220px)_auto_auto]">
-                    <input
-                      aria-label={`${shipment.id} 수정할 택배사`}
-                      className="h-10 border border-line px-3 text-xs"
-                      onChange={(event) => updateForm(shipment.id, "courier", event.target.value)}
-                      value={form.courier}
-                    />
-                    <input
-                      aria-label={`${shipment.id} 수정할 송장번호`}
-                      className="h-10 border border-line px-3 font-mono text-xs"
-                      onChange={(event) => updateForm(shipment.id, "trackingNumber", event.target.value)}
-                      value={form.trackingNumber}
-                    />
-                    <input
-                      aria-label={`${shipment.id} 송장 정정 사유`}
-                      className="h-10 border border-line px-3 text-xs"
-                      maxLength={500}
-                      onChange={(event) => updateForm(shipment.id, "note", event.target.value)}
-                      placeholder="정정 사유"
-                      value={form.note}
-                    />
-                    <button
-                      className="h-10 border border-ink px-4 text-xs font-bold disabled:opacity-40"
-                      disabled={busyKey !== null}
-                      onClick={() => void mutateShipment(shipment, "tracking_update")}
-                      type="button"
-                    >
-                      송장 수정
-                    </button>
-                    <button
-                      className="h-10 border border-rose-300 px-4 text-xs font-bold text-rose-700 disabled:opacity-40"
-                      disabled={busyKey !== null}
-                      onClick={() => void mutateShipment(shipment, "tracking_delete")}
-                      type="button"
-                    >
-                      송장 삭제
-                    </button>
-                  </div>
+                  <button className="mt-3 h-10 border border-ink px-4 text-xs font-bold disabled:opacity-40" disabled={busyKey !== null} onClick={() => openTrackingModal(shipment)} type="button">송장 수정</button>
                 </div>
               )}
             </article>
@@ -820,6 +785,8 @@ export function OperatorShippingConsole({
         <p className="font-mono text-[11px] text-muted">{offset + 1}–{offset + shipments.length}</p>
         <button className="border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={shipments.length < PAGE_SIZE} onClick={() => changePage(offset + PAGE_SIZE)} type="button">다음</button>
       </div>}
+
+      {trackingModalShipment && <div aria-modal="true" className="fixed inset-0 z-[120] grid place-items-center bg-black/55 p-4" role="dialog"><div className="w-full max-w-lg border border-line bg-paper p-5 shadow-2xl"><div className="flex items-center justify-between border-b border-line pb-4"><div><p className="eyebrow text-muted">배송 관리</p><h2 className="mt-1 text-lg font-black">{trackingModalShipment.status === "packed" ? "송장번호 입력" : "송장 수정"}</h2></div><button aria-label="송장 모달 닫기" className="grid size-9 place-items-center" onClick={() => setTrackingModalShipment(null)} type="button"><X size={17} /></button></div><div className="mt-5 space-y-3"><input aria-label="택배사" className="h-11 w-full border border-line px-3 text-xs" onChange={(event) => updateForm(trackingModalShipment.id, "courier", event.target.value)} placeholder="택배사" value={forms[trackingModalShipment.id]?.courier ?? ""} /><input aria-label="송장번호" className="h-11 w-full border border-line px-3 font-mono text-xs" onChange={(event) => updateForm(trackingModalShipment.id, "trackingNumber", event.target.value)} placeholder="송장번호" value={forms[trackingModalShipment.id]?.trackingNumber ?? ""} />{trackingModalShipment.status === "shipped" && <input aria-label="송장 정정 사유" className="h-11 w-full border border-line px-3 text-xs" maxLength={500} onChange={(event) => updateForm(trackingModalShipment.id, "note", event.target.value)} placeholder="정정 사유" value={forms[trackingModalShipment.id]?.note ?? ""} />}<button className="h-11 w-full bg-ink text-xs font-bold text-paper disabled:opacity-40" disabled={busyKey !== null} onClick={async () => { await mutateShipment(trackingModalShipment, trackingModalShipment.status === "packed" ? "ship" : "tracking_update"); setTrackingModalShipment(null); }} type="button">저장</button></div></div></div>}
     </div>
   );
 }

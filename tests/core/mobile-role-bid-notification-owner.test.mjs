@@ -13,7 +13,7 @@ test("mobile shopping navigation stays buyer-first and exposes work mode separat
       source("src/components/mobile/MobileSiteHeader.tsx"),
       source("src/components/features/chat/ChatNotificationProvider.tsx"),
       source("src/app/(mobile)/m/account/page.tsx"),
-      source("src/app/(mobile)/m/account/settings/page.tsx"),
+      source("src/components/settings/SiteSettingsPage.tsx"),
     ]);
 
   assert.match(
@@ -31,10 +31,11 @@ test("mobile shopping navigation stays buyer-first and exposes work mode separat
   assert.match(header, /fallbackHref="\/m\/chat"/);
   assert.match(header, /allowedHrefPrefix="\/m\/chat"/);
   assert.match(header, /\[\["업무", roleNavigation\.centerHref\]/);
-  assert.match(header, /\["설정", "\/m\/account\/settings"\]/);
+  assert.match(header, /\["설정", "\/m\/settings"\]/);
   assert.match(chatLink, /allowedHrefPrefix/);
   assert.doesNotMatch(account, /\["설정"/);
-  assert.match(settings, /내 정보 \/ 설정/);
+  assert.match(settings, /사이트 설정/);
+  assert.match(settings, /MobilePwaControls detailed/);
 });
 
 test("successful bids close the mobile quick-bid sheet and immediately refresh active-bid navigation", async () => {

@@ -13,6 +13,7 @@ import {
 import { StatusNotice } from "@/components/ui/StatusNotice";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 import { fetchPublishedProducts } from "@/services/products";
+import { LoginReturnScrollRestorer } from "@/components/layout/LoginReturnScrollRestorer";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -57,6 +58,7 @@ export default async function MobileHomePage() {
       </section>
       {LIVE_AUCTION_ENABLED && <ProductRail basePath="/m" eyebrow="실시간 경매" href="/m/feed" products={auctions.slice(0, 6)} surface="mobile" title="오늘 밤의 경매" />}
       <ProductRail basePath="/m" eyebrow="즉시 구매" href="/m/shop" products={fixed} surface="mobile" title="지금 구매 가능한 상품" />
+      <LoginReturnScrollRestorer />
     </div>
   );
 }

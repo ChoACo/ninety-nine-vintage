@@ -5,7 +5,8 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
   const { data, error } = await auth.user
     .from("wishlist_items")
-    .select("product_id, created_at")
+    .select("product_id, created_at, products!inner(sale_type)")
+    .eq("products.sale_type", "auction")
     .order("created_at", { ascending: false });
   if (error) return commerceJson({ error: "wishlist_unavailable" }, 503);
   return commerceJson({ productIds: (data ?? []).map((item) => item.product_id), items: data ?? [] });
@@ -18,11 +19,13 @@ export async function POST(request: Request) {
   if (!body?.productId) return commerceJson({ error: "상품을 선택해 주세요." }, 400);
   const { data: product } = await auth.user
     .from("products")
-    .select("id")
+    .select("id, sale_type")
     .eq("id", body.productId)
     .eq("status", "active")
     .maybeSingle();
-  if (!product) return commerceJson({ error: "상품을 찾을 수 없습니다." }, 404);
+  if (!product || product.sale_type !== "auction") {
+    return commerceJson({ error: "찜은 경매 상품만 이용할 수 있습니다." }, 400);
+  }
   const { error } = await auth.user.from("wishlist_items").upsert(
     { member_id: auth.userId, product_id: body.productId },
     { onConflict: "member_id,product_id" },

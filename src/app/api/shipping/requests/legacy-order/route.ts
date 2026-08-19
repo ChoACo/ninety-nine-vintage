@@ -135,7 +135,7 @@ export async function POST(request: Request) {
     {
       p_order_id: body.orderId,
       p_address_id: body.addressId,
-      p_apply_shipping_credit: body.applyShippingCredit,
+      p_apply_shipping_credit: false,
       p_idempotency_key: body.idempotencyKey,
     },
   );

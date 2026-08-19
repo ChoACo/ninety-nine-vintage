@@ -9,8 +9,8 @@ import {
   MapPin,
   PackageCheck,
   RotateCcw,
-  Settings,
   ShoppingBag,
+  Settings,
   Truck,
 } from "lucide-react";
 import Link from "next/link";
@@ -49,20 +49,22 @@ const tasks = [
     true,
   ],
   [
-    "채팅·알림",
+    "채팅",
     "/m/chat",
     Bell,
-    [
-      ["문의 채팅", "/m/chat"],
-      ["알림 설정", "/m/account/settings"],
-    ],
+    [["문의 채팅", "/m/chat"]],
     true,
   ],
   [
-    "계정",
-    "/m/account/settings",
+    "설정",
+    "/m/account#account-settings",
     Settings,
-    [["계정·화면 설정", "/m/account/settings"]],
+    [
+      ["닉네임", "/m/account#account-settings"],
+      ["배송지", "/m/account/addresses"],
+      ["알림", "/m/account#account-settings"],
+      ["계정·계좌", "/m/account#account-settings"],
+    ],
     true,
   ],
 ] as const;

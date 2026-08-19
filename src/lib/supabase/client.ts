@@ -29,6 +29,9 @@ export function getSupabaseBrowserClient(): SupabaseClient<Database> {
   if (browserClient) return browserClient;
 
   const { url, publishableKey } = getSupabaseConfiguration();
+  const localTestStorageKey = /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::|\/)/.test(url)
+    ? "ninety-nine-local-test-browser-auth"
+    : null;
   browserClient = createClient<Database>(url, publishableKey, {
     auth: {
       persistSession: true,
@@ -36,6 +39,7 @@ export function getSupabaseBrowserClient(): SupabaseClient<Database> {
       // Authentication is completed only through the verified Kakao ID-token
       // callback. Never let URL fragments inject an unrelated Supabase session.
       detectSessionInUrl: false,
+      ...(localTestStorageKey ? { storageKey: localTestStorageKey } : {}),
     },
   });
 

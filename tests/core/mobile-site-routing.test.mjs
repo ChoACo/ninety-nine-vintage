@@ -41,6 +41,7 @@ test("path conversion is reversible, loop-safe, and leaves excluded surfaces alo
   assert.equal(toDesktopPath("/m"), "/home");
   assert.equal(toDesktopPath("/m/checkout"), "/cart");
   assert.equal(toDesktopPath("/m/account/settings"), "/account");
+  assert.equal(toDesktopPath("/m/settings"), "/settings");
   assert.equal(toDesktopPath("/m/account/orders"), "/account");
   assert.equal(toDesktopPath("/m/account/payments"), "/account");
   assert.equal(toDesktopPath("/shop"), "/shop");
@@ -49,18 +50,18 @@ test("path conversion is reversible, loop-safe, and leaves excluded surfaces alo
   for (const path of ["/api/products", "/_next/static/app.js", "/admin", "/webhook/portone", "/robots.txt", "/sitemap.xml", "/image.png"]) {
     assert.equal(isCustomerPagePath(path), false, `${path} must not auto-redirect`);
   }
-  for (const path of ["/", "/home", "/shop", "/auction/item", "/m/shop", "/m/account/settings"]) {
+  for (const path of ["/", "/home", "/shop", "/settings", "/m/shop", "/m/settings", "/m/account/settings"]) {
     assert.equal(isCustomerPagePath(path), true, `${path} must participate in UI mode routing`);
   }
 });
 
 test("proxy enforces device routing, expires legacy choices, and keeps rollout controls", async () => {
-  const [middleware, flags, footer, mobileHeader, mobileSettings] = await Promise.all([
+  const [middleware, flags, layout, mobileHeader, mobileSettings] = await Promise.all([
     source("src/proxy.ts"),
     source("src/lib/featureFlags.ts"),
-    source("src/components/layout/PcFooter.tsx"),
+    source("src/components/layout/PcLayout.tsx"),
     source("src/components/mobile/MobileSiteHeader.tsx"),
-    source("src/app/(mobile)/m/account/settings/page.tsx"),
+    source("src/app/(mobile)/m/settings/page.tsx"),
   ]);
 
   assert.match(middleware, /MOBILE_SITE_ENABLED[\s\S]*MOBILE_AUTO_REDIRECT_ENABLED/);
@@ -74,9 +75,10 @@ test("proxy enforces device routing, expires legacy choices, and keeps rollout c
   assert.doesNotMatch(middleware, /request\.cookies\.get/);
   assert.match(flags, /MOBILE_SITE_ENABLED[\s\S]*!== "false"/);
   assert.match(flags, /MOBILE_AUTO_REDIRECT_ENABLED[\s\S]*!== "false"/);
-  for (const surface of [footer, mobileHeader, mobileSettings]) {
+  for (const surface of [layout, mobileHeader, mobileSettings]) {
     assert.doesNotMatch(surface, /UiModeSwitcher|ui-mode/);
   }
+  assert.doesNotMatch(layout, /PcFooter/);
   await assert.rejects(source("src/app/api/ui-mode/route.ts"), { code: "ENOENT" });
   await assert.rejects(source("src/components/mobile/UiModeSwitcher.tsx"), { code: "ENOENT" });
 });

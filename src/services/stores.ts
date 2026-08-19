@@ -2,33 +2,90 @@ import "server-only";
 
 import { createSupabasePublicClient } from "@/lib/supabase/server";
 import { mapPublishedProduct, type PublishedProduct } from "@/services/products";
-import { getKstDateKey, getKstDateRange } from "@/lib/catalogDate";
+import { getKstDateKey, getKstDateRange, getRecentCatalogDates } from "@/lib/catalogDate";
 
 export interface PublicStore {
   id: string;
   slug: string;
   name: string;
   description: string;
+  mallImage: string | null;
+  mallInfo: string | null;
+}
+
+export interface StoreMallCard {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  mallImage: string | null;
+  mallInfo: string | null;
+  recentCount: number;
+  totalCount: number;
 }
 
 export async function fetchActiveStores(): Promise<PublicStore[]> {
   const verifier = createSupabasePublicClient();
-  const { data, error } = await verifier.from("stores").select("id, slug, name, description").eq("is_active", true).order("name");
+  const { data, error } = await verifier.from("stores").select("id, slug, name, description, mall_info, mall_image").eq("is_active", true).order("name");
   if (error) throw new Error("숍 목록을 불러오지 못했습니다.");
-  return (data ?? []).map((store) => ({ id: store.id, slug: store.slug, name: store.name, description: store.description }));
+  return (data ?? []).map((store) => ({ id: store.id, slug: store.slug, name: store.name, description: store.description, mallInfo: store.mall_info, mallImage: store.mall_image }));
+}
+
+export async function fetchStoreMallCards(): Promise<StoreMallCard[]> {
+  const verifier = createSupabasePublicClient();
+  const now = new Date().toISOString();
+  const recentWindow = getRecentCatalogDates(7);
+  const recentFrom = getKstDateRange(recentWindow[recentWindow.length - 1]).from;
+  const { data, error } = await verifier
+    .from("stores")
+    .select("id, slug, name, description, mall_info, mall_image")
+    .eq("is_active", true)
+    .order("name");
+  if (error) throw new Error("숍 목록을 불러오지 못했습니다.");
+  const rows = data ?? [];
+  const counts = await Promise.all(
+    rows.map(async (store) => {
+      const [totalQuery, recentQuery] = await Promise.all([
+        verifier
+          .from("products")
+          .select("id", { count: "exact", head: true })
+          .eq("store_id", store.id)
+          .eq("status", "active")
+          .lte("publish_at", now),
+        verifier
+          .from("products")
+          .select("id", { count: "exact", head: true })
+          .eq("store_id", store.id)
+          .eq("status", "active")
+          .gte("publish_at", recentFrom)
+          .lte("publish_at", now),
+      ]);
+      return {
+        id: store.id,
+        slug: store.slug,
+        name: store.name,
+        description: store.description,
+        mallInfo: store.mall_info,
+        mallImage: store.mall_image,
+        recentCount: recentQuery.count ?? 0,
+        totalCount: totalQuery.count ?? 0,
+      };
+    }),
+  );
+  return counts;
 }
 
 export async function fetchStoreBySlug(slug: string): Promise<PublicStore | null> {
   const verifier = createSupabasePublicClient();
   const { data, error } = await verifier
     .from("stores")
-    .select("id, slug, name, description")
+    .select("id, slug, name, description, mall_info, mall_image")
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
   if (error) throw new Error("숍 정보를 불러오지 못했습니다.");
   return data
-    ? { id: data.id, slug: data.slug, name: data.name, description: data.description }
+    ? { id: data.id, slug: data.slug, name: data.name, description: data.description, mallInfo: data.mall_info, mallImage: data.mall_image }
     : null;
 }
 

@@ -25,6 +25,7 @@ interface Transfer {
   bank_name_snapshot: string;
   account_number_snapshot: string;
   status: string;
+  payment_due_at?: string | null;
 }
 
 interface LegacyPaymentHistory {
@@ -41,6 +42,9 @@ interface Order {
   created_at: string;
   commerce_order_items?: OrderItem[];
   transfer?: Transfer | null;
+  direct_ship?: boolean;
+  shipping_address_snapshot?: { address?: string; label?: string; recipientName?: string } | null;
+  payment_due_at?: string | null;
   legacyPaymentHistory?: LegacyPaymentHistory | null;
   paymentConfirmation?: {
     eligibleAt: string | null;
@@ -64,6 +68,7 @@ const statusLabels: Record<string, string> = {
 };
 
 function statusLabel(order: Order): string {
+  if (order.direct_ship && order.status === "paid") return "결제 완료·배송 접수 중";
   return statusLabels[order.status] ?? "상태 확인 중";
 }
 
@@ -377,7 +382,7 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
                     <span>
                       {order.paymentConfirmation.request?.status === "open"
                         ? `입금 확인 요청됨 · 재알림 ${order.paymentConfirmation.request.reminder_count}회`
-                        : "12시간 이상 확인되지 않았다면 소유자에게 확인을 요청할 수 있습니다."}
+                        : `${order.direct_ship ? "6시간" : "12시간"} 이내 입금해야 하며, 반복 미입금 시 구매·입찰 이용이 제한될 수 있습니다.`}
                     </span>
                     <button
                       className="shrink-0 bg-ink px-3 py-2 font-bold text-paper disabled:opacity-50"

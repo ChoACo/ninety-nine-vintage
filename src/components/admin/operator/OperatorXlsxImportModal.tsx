@@ -34,7 +34,7 @@ import {
   PRODUCT_IMAGE_HEIC_CONVERSION_NOTE,
   isSupportedProductImageMimeType,
 } from "@/lib/supabase/productImagePolicy";
-import { formatKRW, getNextAuctionPublishAt } from "@/utils/formatters";
+import { formatKRW } from "@/utils/formatters";
 
 interface StoreOption {
   id: string;
@@ -62,7 +62,7 @@ export interface OperatorXlsxImportModalProps {
 }
 
 export interface XlsxRegistrationOptions {
-  publicationMode: "now" | "next-day-10";
+  publicationMode: "now";
   saleType: "auction" | "fixed";
 }
 
@@ -115,7 +115,7 @@ export function OperatorXlsxImportModal({
   const [storeId, setStoreId] = useState("");
   const [bidIncrement, setBidIncrement] = useState("1000");
   const [publicationMode, setPublicationMode] =
-    useState<XlsxRegistrationOptions["publicationMode"]>("next-day-10");
+    useState<XlsxRegistrationOptions["publicationMode"]>("now");
   const [saleType, setSaleType] =
     useState<XlsxRegistrationOptions["saleType"]>("auction");
   const [excludedRowNumbers, setExcludedRowNumbers] = useState<Set<number>>(
@@ -191,7 +191,7 @@ export function OperatorXlsxImportModal({
     setImageFiles([]);
     setStoreId(stores[0]?.id ?? "");
     setBidIncrement("1000");
-    setPublicationMode("next-day-10");
+    setPublicationMode("now");
     setSaleType("auction");
     setExcludedRowNumbers(new Set());
     setConfirmed(false);
@@ -317,10 +317,7 @@ export function OperatorXlsxImportModal({
     }
 
     const finalPreview = buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
-      publishAt:
-        publicationMode === "now"
-          ? new Date().toISOString()
-          : getNextAuctionPublishAt(new Date()).toISOString(),
+      publishAt: new Date().toISOString(),
       bidIncrement: Number(bidIncrement),
       excludedRowNumbers: [...excludedRowNumbers],
       saleType,
@@ -515,9 +512,6 @@ export function OperatorXlsxImportModal({
                   }}
                   value={publicationMode}
                 >
-                  <option value="next-day-10">
-                    다음 날 오전 10시 등록 (기본)
-                  </option>
                   <option value="now">즉시 등록</option>
                 </select>
               </label>
@@ -526,8 +520,8 @@ export function OperatorXlsxImportModal({
               {selectedStoreCanPublish
                 ? publicationMode === "now"
                   ? "등록이 끝난 상품은 즉시 공개됩니다."
-                  : "상품은 다음 날 오전 10시 공개로 예약됩니다."
-                : "공개 권한이 없으면 상품은 초안으로 저장됩니다."} 숍 선택지는 현재 계정의 서버 검증 권한 범위만 표시됩니다.
+                : "상품별 공개 시각은 상품 데이터의 공개 시각을 따릅니다."
+                : "공개 권한이 없으면 상품은 등록 대기로 저장됩니다."} 숍 선택지는 현재 계정의 서버 검증 권한 범위만 표시됩니다.
             </p>
           </section>
 

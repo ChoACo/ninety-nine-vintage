@@ -34,6 +34,95 @@ export type Database = {
   }
   public: {
     Tables: {
+      staff_board_comments: {
+        Row: {
+          author_id: string | null
+          author_role: string
+          body: string
+          created_at: string
+          id: string
+          post_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_role: string
+          body: string
+          created_at?: string
+          id?: string
+          post_id: string
+        }
+        Update: {
+          author_id?: string | null
+          author_role?: string
+          body?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_board_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_board_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "staff_board_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_board_posts: {
+        Row: {
+          author_id: string | null
+          author_role: string
+          body: string
+          created_at: string
+          id: string
+          image_paths: string[]
+          is_pinned: boolean
+          kind: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_role: string
+          body: string
+          created_at?: string
+          id?: string
+          image_paths?: string[]
+          is_pinned?: boolean
+          kind: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string | null
+          author_role?: string
+          body?: string
+          created_at?: string
+          id?: string
+          image_paths?: string[]
+          is_pinned?: boolean
+          kind?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_board_posts_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       account_access_roles: {
         Row: {
           created_at: string
@@ -889,6 +978,7 @@ export type Database = {
           order_id: string
           requested_at: string
           status: string
+          payment_due_at: string | null
           version: number
         }
         Insert: {
@@ -902,6 +992,7 @@ export type Database = {
           order_id: string
           requested_at?: string
           status?: string
+          payment_due_at?: string | null
           version?: number
         }
         Update: {
@@ -915,6 +1006,7 @@ export type Database = {
           order_id?: string
           requested_at?: string
           status?: string
+          payment_due_at?: string | null
           version?: number
         }
         Relationships: [
@@ -939,7 +1031,11 @@ export type Database = {
           created_at: string
           id: string
           idempotency_key: string
+          direct_ship: boolean
           member_id: string
+          payment_due_at: string | null
+          shipping_address_id: string | null
+          shipping_address_snapshot: Json | null
           shipping_credit_applied: boolean
           shipping_fee: number
           shipping_region: string | null
@@ -952,7 +1048,11 @@ export type Database = {
           created_at?: string
           id?: string
           idempotency_key: string
+          direct_ship?: boolean
           member_id: string
+          payment_due_at?: string | null
+          shipping_address_id?: string | null
+          shipping_address_snapshot?: Json | null
           shipping_credit_applied?: boolean
           shipping_fee?: number
           shipping_region?: string | null
@@ -965,7 +1065,11 @@ export type Database = {
           created_at?: string
           id?: string
           idempotency_key?: string
+          direct_ship?: boolean
           member_id?: string
+          payment_due_at?: string | null
+          shipping_address_id?: string | null
+          shipping_address_snapshot?: Json | null
           shipping_credit_applied?: boolean
           shipping_fee?: number
           shipping_region?: string | null
@@ -6922,6 +7026,8 @@ export type Database = {
           home_fulfillment_center_id: string | null
           id: string
           is_active: boolean
+          mall_image: string | null
+          mall_info: string | null
           name: string
           operator_id: string
           regular_shipping_fee: number | null
@@ -6937,6 +7043,8 @@ export type Database = {
           home_fulfillment_center_id?: string | null
           id?: string
           is_active?: boolean
+          mall_image?: string | null
+          mall_info?: string | null
           name: string
           operator_id: string
           regular_shipping_fee?: number | null
@@ -6952,6 +7060,8 @@ export type Database = {
           home_fulfillment_center_id?: string | null
           id?: string
           is_active?: boolean
+          mall_image?: string | null
+          mall_info?: string | null
           name?: string
           operator_id?: string
           regular_shipping_fee?: number | null
@@ -7729,6 +7839,27 @@ export type Database = {
               p_idempotency_key: string
               p_include_shipping_fee: boolean
               p_product_ids: string[]
+              p_shipping_address_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_apply_shipping_credit: boolean
+              p_idempotency_key: string
+              p_include_shipping_fee: boolean
+              p_product_ids: string[]
+              p_shipping_region: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_apply_shipping_credit: boolean
+              p_idempotency_key: string
+              p_include_shipping_fee: boolean
+              p_product_ids: string[]
+              p_shipping_address_id: string
               p_shipping_region: string
             }
             Returns: Json

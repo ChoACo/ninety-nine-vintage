@@ -70,6 +70,19 @@ export async function GET(request: Request) {
     .lte("publish_at", new Date().toISOString());
   if (productError) return commerceJson({ error: "cart_unavailable" }, 503);
   const liveIds = (products ?? []).map((product) => product.id);
+  if (liveIds.length === 0) {
+    return commerceJson({
+      items: [],
+      paymentMode,
+      productIds: [],
+      reservations: [],
+      serverTime: reservations[0]?.server_time ?? null,
+      shippingFee: 0,
+      shippingCharges: [],
+      quoteTotal: 0,
+      staleProductIds: ids,
+    });
+  }
   const shippingRegion = new URL(request.url).searchParams.get("shippingRegion") === "remote_area"
     ? "remote_area"
     : "regular";

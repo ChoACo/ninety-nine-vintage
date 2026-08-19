@@ -16,14 +16,11 @@ function currentTheme(): ColorTheme {
   return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
 
-function systemTheme(): ColorTheme {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-
 function applyTheme(theme: ColorTheme, persist: boolean) {
   const root = document.documentElement;
   root.dataset.theme = theme;
   root.style.colorScheme = theme;
+  root.style.backgroundColor = THEME_COLORS[theme];
   document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute("content", THEME_COLORS[theme]);
   if (persist) {
     try {
@@ -42,33 +39,23 @@ export function ThemeToggle({ className = "", showLabel = false }: ThemeTogglePr
   const [theme, setTheme] = useState<ColorTheme>("light");
 
   useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
     const syncFromDocument = () => setTheme(currentTheme());
-    const syncFromSystem = () => {
-      let saved: string | null = null;
-      try {
-        saved = localStorage.getItem(STORAGE_KEY);
-      } catch {}
-      if (saved !== "light" && saved !== "dark") applyTheme(systemTheme(), false);
-    };
     const syncFromStorage = (event: StorageEvent) => {
       if (event.key !== STORAGE_KEY) return;
-      applyTheme(event.newValue === "light" || event.newValue === "dark" ? event.newValue : systemTheme(), false);
+      applyTheme(event.newValue === "dark" ? "dark" : "light", false);
     };
 
     syncFromDocument();
     window.addEventListener(THEME_EVENT, syncFromDocument);
     window.addEventListener("storage", syncFromStorage);
-    media.addEventListener("change", syncFromSystem);
     return () => {
       window.removeEventListener(THEME_EVENT, syncFromDocument);
       window.removeEventListener("storage", syncFromStorage);
-      media.removeEventListener("change", syncFromSystem);
     };
   }, []);
 
   const dark = theme === "dark";
-  const label = dark ? "라이트 모드로 전환" : "다크 모드로 전환";
+  const label = dark ? "모던 모드로 전환" : "다크 모드로 전환";
 
   return (
     <button
@@ -80,7 +67,7 @@ export function ThemeToggle({ className = "", showLabel = false }: ThemeTogglePr
       type="button"
     >
       {dark ? <Sun aria-hidden="true" size={16} /> : <Moon aria-hidden="true" size={16} />}
-      {showLabel && <span>{dark ? "라이트 모드" : "다크 모드"}</span>}
+      {showLabel && <span>{dark ? "모던 모드" : "다크 모드"}</span>}
     </button>
   );
 }

@@ -1,26 +1,26 @@
 "use client";
 
-import { Building2, LogIn, LogOut, UserRound } from "lucide-react";
+import { Building2, LogIn, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
-import { disableWebPush } from "@/lib/webPush/client";
 
 export function AuthStatus({
   basePath = "",
   showWorkLink = true,
+  showMyLink = true,
+  className = "",
 }: {
   basePath?: "" | "/m";
   showWorkLink?: boolean;
+  showMyLink?: boolean;
+  className?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const { loading, session } = useSupabaseSession();
   const access = useAdminNavigationAccess();
-  const [busy, setBusy] = useState(false);
   const fallbackReturnTo = pathname.startsWith(`${basePath}/account/login`)
     ? `${basePath}/account`
     : pathname;
@@ -47,11 +47,15 @@ export function AuthStatus({
       : access.roleCode === "owner"
         ? { href: "/admin/owner", label: "업무" }
         : null;
-  return <div className="flex shrink-0 items-center gap-1">
-    {showWorkLink && workLink && (
-      <Link aria-label={workLink.label} className="inline-flex h-10 shrink-0 items-center gap-2 border border-line px-3 text-[11px] font-bold whitespace-nowrap" href={workLink.href}><Building2 size={15} /> {workLink.label}</Link>
+  const hasWorkLink = Boolean(showWorkLink && workLink);
+  const hasMyLink = Boolean(showMyLink);
+  if (!hasWorkLink && !hasMyLink) return null;
+  return <div className={`flex shrink-0 items-center gap-1 ${className}`}>
+    {hasWorkLink && workLink && (
+      <Link aria-label={workLink.label} className="inline-flex h-10 shrink-0 items-center gap-2 border border-line px-3 text-[11px] font-bold whitespace-nowrap text-muted transition-colors hover:border-ink hover:text-ink" href={workLink.href}><Building2 size={15} /> {workLink.label}</Link>
     )}
-    <Link aria-label="MY" className="inline-flex h-10 shrink-0 items-center gap-2 border border-line px-3 text-[11px] font-bold whitespace-nowrap" href={`${basePath}/account`}><UserRound size={15} /> MY</Link>
-    <button aria-label="로그아웃" className="inline-flex h-10 shrink-0 items-center gap-2 border border-line px-3 text-[11px] font-bold whitespace-nowrap disabled:opacity-40" disabled={busy} onClick={() => { setBusy(true); void (async () => { try { const client = getSupabaseBrowserClient(); await disableWebPush(session.access_token); await Promise.race([Promise.allSettled([client.auth.signOut(), fetch("/api/auth/kakao/logout", { method: "POST", credentials: "include" })]), new Promise((resolve) => window.setTimeout(resolve, 2_000))]); } finally { window.location.assign(`${basePath}/account/login`); } })(); }} type="button"><LogOut size={15} /> 로그아웃</button>
+    {hasMyLink && (
+      <Link aria-label="MY" className="inline-flex h-10 shrink-0 items-center gap-2 border border-line px-3 text-[11px] font-bold whitespace-nowrap text-muted transition-colors hover:border-ink hover:text-ink" href={`${basePath}/account`}><UserRound size={15} /> MY</Link>
+    )}
   </div>;
 }

@@ -27,18 +27,11 @@ test("global toast host is mounted in the root layout and backed by a store", as
   assert.match(layout, /<GlobalToastHost \/>/);
 });
 
-test("cart hold limit surfaces a friendly toast from the reservation client", async () => {
+test("cart no longer exposes an inventory hold limit", async () => {
   const client = await source("src/lib/commerce/client.ts");
-
-  assert.match(
-    client,
-    /export const CART_HOLD_LIMIT_MESSAGE =\s*"한 번에 최대 3개까지만 구매 점유가 가능합니다\. 기존 장바구니를 비워주세요\."/,
-  );
-  assert.match(client, /payload\?\.error\?\.includes\("최대 3개"\)/);
-  assert.match(client, /useToastStore\.getState\(\)\.pushToast\("error", CART_HOLD_LIMIT_MESSAGE, \{/);
-  assert.match(client, /action: \{ href: `\$\{cartBasePath\(\)\}\/cart`, label: "장바구니 보기" \}/);
-  assert.match(client, /durationMs: 7_000/);
-  assert.match(client, /throw new Error\(CART_HOLD_LIMIT_MESSAGE\)/);
+  assert.doesNotMatch(client, /CART_HOLD_LIMIT_MESSAGE/);
+  assert.doesNotMatch(client, /15분/);
+  assert.match(client, /reserveCartProduct/);
 });
 
 test("bid rate limit helper detects 429 and starts a three-second cooldown", async () => {

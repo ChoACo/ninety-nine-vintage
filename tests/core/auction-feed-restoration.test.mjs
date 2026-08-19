@@ -148,6 +148,17 @@ test("product realtime snapshots expose only auction policy fields", () => {
   }), null);
 });
 
+test("feed refreshes only the changed product and never polls the whole catalog", async () => {
+  const grid = await source("src/components/features/auction/AuctionFeedGrid.tsx");
+  assert.doesNotMatch(grid, /window\.setInterval/);
+  assert.doesNotMatch(grid, /setRefreshNonce/);
+  assert.match(grid, /AUCTION_BID_SUCCEEDED_EVENT/);
+  assert.match(grid, /event: "\*"/);
+  assert.match(grid, /\/api\/products\/\$\{encodeURIComponent\(productId\)\}/);
+  assert.match(grid, /current\.filter\(\(product\) => product\.id !== productId\)/);
+  assert.match(grid, /next\[index\] = merged/);
+});
+
 test("auction phase and countdown use the supplied synchronized clock", () => {
   const product = {
     bidLockedAt: null,
@@ -223,14 +234,22 @@ test("restored feed UI uses separated desktop and mobile routes with authoritati
     source("src/services/products.ts"),
     source("src/components/features/auction/detail/AuctionDetailView.tsx"),
   ]);
-  assert.match(feedPage, /className="flex items-start gap-10"/);
-  assert.match(feedPage, /surface="desktop"/);
+  assert.match(feedPage, /<AuctionFilterSidebar saleType="auction" surface="desktop" \/>/);
+  assert.doesNotMatch(feedPage, /className="flex items-start gap-10"/);
+  assert.doesNotMatch(feedPage, /StoreMallNavigator/);
+  assert.doesNotMatch(feedPage, /fetchActiveStores/);
   assert.match(mobileFeedPage, /basePath="\/m"/);
   assert.match(mobileFeedPage, /surface="mobile"/);
+  assert.doesNotMatch(mobileFeedPage, /StoreMallNavigator/);
   assert.match(mobileBidPage, /fetchPublishedProduct\(id\)/);
   assert.match(mobileBidPage, /product\.saleType !== "auction"\) notFound\(\)/);
   assert.match(activeBids, /로그인 상태가 만료되었습니다\. 다시 로그인해 주세요\./);
   assert.match(grid, /paginateAuctionFeed\(visibleCards, page\)/);
+  assert.match(sidebar, /센터별로 보기/);
+  assert.doesNotMatch(sidebar, /운영 센터/);
+  assert.match(sidebar, /<PremiumDialog/);
+  assert.match(sidebar, /aria-expanded=\{filterOpen\}[\s\S]*aria-haspopup="dialog"/);
+  assert.doesNotMatch(sidebar, /filterOpen &&\s*<PremiumDialog/);
   assert.match(sidebar, /상품명·설명 검색/);
   assert.match(sidebar, /브랜드 카테고리/);
   assert.match(sidebar, /성별 카테고리/);
@@ -258,7 +277,7 @@ test("restored feed UI uses separated desktop and mobile routes with authoritati
   assert.match(interceptedBid, /<ModalShell label="실시간 경매 입찰">/);
   assert.match(interceptedBid, /<AuctionBidRoute productId=\{id\} \/>/);
   assert.match(grid, /table: "products"/);
-  assert.match(grid, /event: "UPDATE"/);
+  assert.match(grid, /event: "\*"/);
   assert.match(grid, /antiSnipingBaseClosesAt: snapshot\.antiSnipingBaseClosesAt/);
   assert.match(grid, /antiSnipingExtendedAt: snapshot\.antiSnipingExtendedAt/);
   assert.match(grid, /antiSnipingExtensionCount: snapshot\.antiSnipingExtensionCount/);

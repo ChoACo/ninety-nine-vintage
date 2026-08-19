@@ -11,6 +11,7 @@ interface CommerceCheckoutBody {
   expectedPaymentMode?: unknown;
   includeShippingFee?: unknown;
   shippingRegion?: unknown;
+  shippingAddressId?: unknown;
 }
 
 interface ManualTransferCheckoutResult {
@@ -85,6 +86,7 @@ async function checkoutWithManualTransfer(
   idempotencyKey: string,
   includeShippingFee: boolean,
   shippingRegion: "regular" | "remote_area",
+  shippingAddressId: string,
 ) {
   try {
     await getManualTransferAccount(auth.admin);
@@ -114,6 +116,7 @@ async function checkoutWithManualTransfer(
       p_apply_shipping_credit: false,
       p_include_shipping_fee: includeShippingFee,
       p_shipping_region: shippingRegion,
+      p_shipping_address_id: shippingAddressId,
     },
   );
   if (error) {
@@ -145,8 +148,9 @@ export async function POST(request: Request) {
     : "";
   const includeShippingFee = body?.includeShippingFee === true;
   const shippingRegion = body?.shippingRegion === "remote_area" ? "remote_area" : "regular";
+  const shippingAddressId = typeof body?.shippingAddressId === "string" ? body.shippingAddressId.trim() : "";
 
-  if (productIds.length === 0 || !idempotencyKey || idempotencyKey.length > 128) {
+  if (productIds.length === 0 || !idempotencyKey || idempotencyKey.length > 128 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(shippingAddressId)) {
     return commerceJson({ error: "상품과 주문 요청 키가 필요합니다." }, 400);
   }
   if (body?.expectedPaymentMode !== "manual_transfer") {
@@ -158,5 +162,6 @@ export async function POST(request: Request) {
     idempotencyKey,
     includeShippingFee,
     shippingRegion,
+    shippingAddressId,
   );
 }

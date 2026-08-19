@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { AccountDashboard } from "@/components/features/account/AccountDashboard";
 import { MemberAccountBoundary } from "@/components/features/account/MemberAccountBoundary";
+import { StandaloneBackModal } from "@/components/layout/StandaloneBackModal";
 
 export const metadata: Metadata = { title: "찜", robots: { follow: false, index: false } };
 
 export default function MobileSavedPage() {
   return (
-    <MemberAccountBoundary basePath="/m" returnTo="/m/saved">
+<MemberAccountBoundary basePath="/m" returnTo="/m/saved">
+      <StandaloneBackModal />
       <div>
         <header className="mb-6 border-b border-ink pb-4">
           <p className="eyebrow text-muted">쇼핑 / 찜</p>

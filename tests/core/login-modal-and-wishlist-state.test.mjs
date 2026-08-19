@@ -51,20 +51,30 @@ test("wishlist empty copy distinguishes session and loading states", async () =>
 });
 
 test("member account pages redirect guests before rendering private dashboards", async () => {
-  const [boundary, desktopAccount, mobileAccount, mobileSection, settings] =
+  const [boundary, desktopAccount, mobileAccount, mobileSection, legacySettings, settings] =
     await Promise.all([
       source("src/components/features/account/MemberAccountBoundary.tsx"),
       source("src/app/(shop)/account/page.tsx"),
       source("src/app/(mobile)/m/account/page.tsx"),
       source("src/app/(mobile)/m/account/[section]/page.tsx"),
       source("src/app/(mobile)/m/account/settings/page.tsx"),
+      source("src/app/(mobile)/m/settings/page.tsx"),
     ]);
   assert.match(boundary, /if \(!loading && !session\)/);
   assert.match(boundary, /router\.replace/);
   assert.match(boundary, /account\/login\?next=/);
   assert.match(boundary, /if \(loading \|\| !session\)/);
   assert.match(desktopAccount, /<MemberAccountBoundary>/);
-  for (const mobilePage of [mobileAccount, mobileSection, settings]) {
+  for (const mobilePage of [mobileAccount, mobileSection]) {
     assert.match(mobilePage, /<MemberAccountBoundary basePath="\/m"/);
   }
+  assert.match(legacySettings, /redirect\("\/m\/settings"\)/);
+  assert.doesNotMatch(settings, /MemberAccountBoundary/);
+});
+
+test("wishlist API is auction-only", async () => {
+  const route = await source("src/app/api/wishlist/route.ts");
+  assert.match(route, /products!inner\(sale_type\)/);
+  assert.match(route, /eq\("products\.sale_type", "auction"\)/);
+  assert.match(route, /product\.sale_type !== "auction"/);
 });

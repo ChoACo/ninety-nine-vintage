@@ -182,9 +182,12 @@ test("fixed navigation and operator dialogs share the accessible portaled lifecy
   assert.doesNotMatch(mobileHeader, /document\.body\.style\.overflow/);
 
   assert.match(mobileFilters, /<PremiumDialog/);
-  assert.match(mobileFilters, /aria-expanded=\{mobileOpen\}[\s\S]*aria-haspopup="dialog"/);
+  assert.match(mobileFilters, /aria-expanded=\{filterOpen\}[\s\S]*aria-haspopup="dialog"/);
   assert.match(mobileFilters, /placement="sheet-bottom"/);
-  assert.doesNotMatch(mobileFilters, /mobileOpen &&\s*<PremiumDialog/);
+  assert.match(mobileFilters, /placement="center"/);
+  assert.match(mobileFilters, /센터별로 보기/);
+  assert.doesNotMatch(mobileFilters, /운영 센터/);
+  assert.doesNotMatch(mobileFilters, /filterOpen &&\s*<PremiumDialog/);
 
   assert.match(operatorImport, /<PremiumDialog/);
   assert.match(operatorImport, /closeDisabled=\{isSubmitting\}/);

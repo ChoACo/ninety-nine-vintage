@@ -1,8 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  hasSupportedProductImageSignature,
+  isSupportedProductImageMimeType,
+  PRODUCT_IMAGE_FORMAT_LABEL,
+} from "@/lib/supabase/productImagePolicy";
 
 type Store = {
   id: string;
@@ -18,6 +24,8 @@ type Store = {
   nextSettlementEstimate: number;
   regularShippingFee: number | null;
   remoteAreaShippingFee: number | null;
+  mallImage: string | null;
+  mallInfo: string | null;
   paidTotal: number;
   payoutAccount: {
     bankName: string;
@@ -39,6 +47,74 @@ type Store = {
     batchId: string | null;
   }>;
 };
+
+const STORE_MALL_IMAGES_BUCKET = "store-mall-images";
+const MAX_MALL_IMAGE_BYTES = 10 * 1024 * 1024;
+
+function getImageExtension(file: File): string {
+  const fileExtension = file.name
+    .split(".")
+    .pop()
+    ?.toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+  if (fileExtension && fileExtension.length <= 8) return fileExtension;
+
+  const mimeExtension = file.type.split("/")[1]?.replace("jpeg", "jpg");
+  return mimeExtension?.replace(/[^a-z0-9]/g, "") || "img";
+}
+
+function MallInfoEditor({ store, save }: { store: Store; save: (body: Record<string, unknown>) => Promise<void> }) {
+  const [info, setInfo] = useState(store.mallInfo ?? "");
+  const [imageUrl, setImageUrl] = useState(store.mallImage ?? "");
+  const [pickedFile, setPickedFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function persist() {
+    if (busy) return;
+    setBusy(true);
+    setUploadError("");
+    try {
+      let nextImage = imageUrl;
+      if (pickedFile) {
+        if (!isSupportedProductImageMimeType(pickedFile.type)) throw new Error(`${PRODUCT_IMAGE_FORMAT_LABEL} 이미지만 업로드할 수 있어요.`);
+        if (pickedFile.size <= 0 || pickedFile.size > MAX_MALL_IMAGE_BYTES) throw new Error("센터몰 이미지는 10MB 이하여야 합니다.");
+        if (!(await hasSupportedProductImageSignature(pickedFile))) throw new Error("이미지 파일의 실제 형식을 확인해 주세요.");
+        const client = getSupabaseBrowserClient();
+        const uniqueName = `${Date.now()}-${crypto.randomUUID()}`;
+        const path = `${store.id}/mall-${uniqueName}.${getImageExtension(pickedFile)}`;
+        const { data, error } = await client.storage.from(STORE_MALL_IMAGES_BUCKET).upload(path, pickedFile, { cacheControl: "31536000", contentType: pickedFile.type, upsert: false });
+        if (error || !data) throw new Error("센터몰 이미지 업로드에 실패했어요.");
+        const { data: publicUrlData } = client.storage.from(STORE_MALL_IMAGES_BUCKET).getPublicUrl(data.path);
+        nextImage = publicUrlData.publicUrl;
+      }
+      await save({ action: "save_mall", storeId: store.id, mallInfo: info.trim() || null, mallImage: nextImage || null });
+      setPickedFile(null);
+      if (inputRef.current) inputRef.current.value = "";
+      setImageUrl(nextImage);
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "센터몰 정보 저장에 실패했어요.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="mt-5 border-t border-line pt-4">
+    <h3 className="text-xs font-black">센터몰 정보 · 이미지</h3>
+    <p className="mt-1 text-[10px] text-muted">홈 페이지 센터몰 그리드에 표시할 한 줄 소개와 대표 이미지를 설정합니다.</p>
+    <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+      <label className="text-[10px] font-bold">센터몰 정보<input className="mt-1 w-full border border-line bg-paper p-2 text-xs" maxLength={200} onChange={(e) => setInfo(e.target.value)} placeholder="예) 오래된 시간의 멋을 편하게 즐기는 빈티지 셀렉샵" type="text" value={info} /></label>
+      <label className="text-[10px] font-bold">대표 이미지<input className="mt-1 w-full border border-line bg-paper p-2 text-xs" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" onChange={(e) => setPickedFile(e.target.files?.[0] ?? null)} ref={inputRef} type="file" /></label>
+    </div>
+    <div className="mt-3 flex flex-wrap items-center gap-3">
+      {imageUrl && <img alt="센터몰 대표 이미지" className="h-16 w-24 rounded-lg object-cover" src={imageUrl} />}
+      <button className="bg-ink p-2 text-xs font-bold text-paper disabled:opacity-40" disabled={busy} onClick={() => void persist()} type="button">센터몰 정보 저장</button>
+    </div>
+    {uploadError && <p className="mt-2 text-xs font-bold text-red-600">{uploadError}</p>}
+  </div>;
+}
 
 function ShippingFeeEditor({ store, save }: { store: Store; save: (body: Record<string, unknown>) => Promise<void> }) {
   const [regular, setRegular] = useState(String(store.regularShippingFee ?? ""));
@@ -107,7 +183,7 @@ export function OperatorPlatformConsole() {
       <section className="grid gap-3 md:grid-cols-2">
         <article className="border border-line p-4 text-xs">
           <h2 className="font-black">기본 3만원</h2>
-          <p className="mt-2 leading-5 text-muted">즉시 공개 하루 30개 · 예약 공개 하루 40개 · 초안과 예약 대기 합계 100개</p>
+          <p className="mt-2 leading-5 text-muted">즉시 공개 하루 30개 · 예약 공개 하루 40개 · 등록 대기와 예약 대기 합계 100개</p>
         </article>
         <article className="border border-ink bg-surface p-4 text-xs">
           <h2 className="font-black">프리미엄 5만원</h2>
@@ -135,6 +211,7 @@ export function OperatorPlatformConsole() {
           </div>
           {store.payoutAccount && <p className="mt-2 text-xs text-muted">{store.payoutAccount.bankName} {store.payoutAccount.accountNumberMasked} · {store.payoutAccount.status}</p>}
           <ShippingFeeEditor save={action} store={store} />
+          <MallInfoEditor save={action} store={store} />
           <div className="mt-5 grid gap-2 sm:grid-cols-4">
             <p className="border border-line p-3 text-xs">총 정산 매출<br /><strong>{store.totalSettlementSales.toLocaleString("ko-KR")}원</strong></p>
             <p className="border border-line p-3 text-xs">이번 주 매출<br /><strong>{store.weeklySales.toLocaleString("ko-KR")}원</strong></p>

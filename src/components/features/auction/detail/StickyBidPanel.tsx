@@ -244,14 +244,14 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
             "로그인 세션을 확인하지 못했습니다. 다시 로그인해 주세요.",
           );
         }
-        const reservation = await reserveCartProduct(item.id, session.user.id);
+        await reserveCartProduct(item.id, session.user.id);
         addToCart(item.id);
         if (intent === "buy") {
           router.push(basePath === "/m" ? `/m/checkout?productId=${item.id}` : "/cart");
         } else {
           setBuyNoticeKind("success");
           setBuyNotice(
-            `로그인 후 장바구니에 담았습니다. ${new Date(reservation.reservedUntil).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}까지 재고가 점유됩니다.`,
+            "로그인 후 장바구니에 담았습니다. 구매 가능 여부는 결제 시 다시 확인됩니다.",
           );
         }
       } catch (error) {
@@ -367,12 +367,12 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
         );
         return;
       }
-      const reservation = await reserveCartProduct(item.id, session.user.id);
+      await reserveCartProduct(item.id, session.user.id);
       addToCart(item.id);
       setCartReserved(true);
       setBuyNoticeKind("success");
       setBuyNotice(
-        `장바구니에 담았습니다. ${new Date(reservation.reservedUntil).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}까지 15분간 재고가 점유됩니다.`,
+        "장바구니에 담았습니다. 구매 가능 여부는 결제 시 다시 확인됩니다.",
       );
     } catch (error) {
       setCartReserved(false);
@@ -734,14 +734,14 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
           {buyNotice}
         </p>
       )}
-      <button
+      {item.saleType === "auction" && <button
         className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 text-xs font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95 disabled:opacity-50"
         onClick={() => void updateWishlist()}
         type="button"
       >
         <Heart fill={liked ? "currentColor" : "none"} size={15} />{" "}
         {liked ? "찜 해제" : "관심 상품 담기"}
-      </button>
+      </button>}
       <button
         className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 text-xs font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95 disabled:opacity-50"
         onClick={() => setInquiryOpen(true)}

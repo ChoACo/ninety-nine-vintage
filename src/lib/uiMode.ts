@@ -13,6 +13,7 @@ const CUSTOMER_ROOT_SEGMENTS = new Set([
   "payment",
   "privacy",
   "refund",
+  "settings",
   "shop",
   "sold",
   "stores",

@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @config "../../tailwind.config.ts";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   color-scheme: light;
   --theme-paper: 251 250 247;
@@ -85,6 +87,74 @@ html[data-theme="dark"] {
   --color-blue-50: #1e2e46;
   --color-blue-200: #3f628e;
   --color-blue-900: #bed7ff;
+}
+
+/* Light is the default boot palette. Dark is applied only when the user
+   explicitly opts in via the theme toggle, so a delayed or failed
+   initialization can never reveal a dark flash to a user in light mode. */
+html[data-theme="light"] {
+  color-scheme: light;
+  --theme-paper: 251 250 247;
+  --theme-surface: 241 239 234;
+  --theme-ink: 9 9 11;
+  --theme-muted: 113 113 122;
+  --theme-line: 229 226 220;
+  --theme-inverse: 24 24 27;
+  --theme-scrollbar: 212 208 200;
+  --theme-card-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  --theme-lift-shadow: 0 14px 30px rgb(9 9 11 / 0.10);
+  --theme-mobile-cta-shadow: 0 -8px 20px rgb(255 255 255 / 0.80);
+  --store-card-1: #c7b9a5;
+  --store-card-2: #9fa9a2;
+  --store-card-3: #b8a7a1;
+
+  --color-white: #ffffff;
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #52525b;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
+  --color-zinc-950: #09090b;
+  --color-red-50: #fef2f2;
+  --color-red-100: #fee2e2;
+  --color-red-200: #fecaca;
+  --color-red-300: #fca5a5;
+  --color-red-700: #b91c1c;
+  --color-red-800: #991b1b;
+  --color-red-900: #7f1d1d;
+  --color-rose-50: #fff1f2;
+  --color-rose-200: #fecdd3;
+  --color-rose-300: #fda4af;
+  --color-rose-600: #e11d48;
+  --color-rose-700: #be123c;
+  --color-rose-800: #9f1239;
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+  --color-amber-900: #78350f;
+  --color-amber-950: #451a03;
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-emerald-900: #064e3b;
+  --color-sky-50: #f0f9ff;
+  --color-sky-200: #bae6fd;
+  --color-sky-700: #0369a1;
+  --color-sky-800: #075985;
+  --color-sky-900: #0c4a6e;
+  --color-blue-50: #eff6ff;
+  --color-blue-200: #bfdbfe;
+  --color-blue-900: #1e3a8a;
 }
 
 /* Photo and broadcast stages intentionally keep a cinematic palette in both

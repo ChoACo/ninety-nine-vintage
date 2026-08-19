@@ -21,39 +21,50 @@ function contrast(first, second) {
 }
 
 test("global theme initializes before hydration and persists an accessible user choice", async () => {
-  const [layout, toggle, desktopHeader, mobileHeader, adminLayout] = await Promise.all([
+  const [layout, toggle, settings, desktopHeader, mobileHeader, adminLayout] = await Promise.all([
     source("src/app/layout.tsx"),
     source("src/components/layout/ThemeToggle.tsx"),
+    source("src/components/settings/SiteSettingsPage.tsx"),
     source("src/components/layout/PcHeader.tsx"),
     source("src/components/mobile/MobileSiteHeader.tsx"),
     source("src/app/(admin)/admin/layout.tsx"),
   ]);
 
-  assert.match(layout, /prefers-color-scheme: dark/);
+  assert.match(layout, /let theme = "light"/);
+  assert.doesNotMatch(layout, /matchMedia\("\(prefers-color-scheme: dark\)"\)/);
   assert.match(layout, /localStorage\.getItem\(storageKey\)/);
   assert.match(layout, /root\.dataset\.theme = theme/);
   assert.match(layout, /suppressHydrationWarning/);
   assert.match(layout, /name="color-scheme"/);
+assert.match(layout, /content="#fbfaf7" name="theme-color"/);
+  assert.match(layout, /backgroundColor: "#fbfaf7", colorScheme: "light"/);
   assert.match(layout, /dangerouslySetInnerHTML/);
   assert.match(toggle, /localStorage\.setItem\(STORAGE_KEY, theme\)/);
   assert.match(toggle, /aria-label=\{label\}/);
   assert.match(toggle, /aria-pressed=\{dark\}/);
+assert.match(toggle, /dark \? "모던 모드" : "다크 모드"/);
+  assert.doesNotMatch(settings, /<ThemeToggle/);
   assert.match(desktopHeader, /<ThemeToggle/);
-  assert.match(mobileHeader, /<ThemeToggle[^>]*showLabel/);
-  assert.match(adminLayout, /<ThemeToggle/);
+  assert.match(mobileHeader, /<ThemeToggle/);
+  assert.doesNotMatch(adminLayout, /<ThemeToggle/);
 });
 
 test("dark palette uses layered non-black surfaces with readable contrast", async () => {
   const css = await source("src/app/globals.css");
   const tailwind = await source("tailwind.config.ts");
   const darkBlock = css.match(/html\[data-theme="dark"\]\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const rootBlock = css.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const modernBlock = css.match(/html\[data-theme="light"\]\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
 
-  assert.match(css, /:root\s*\{/);
-  assert.match(css, /color-scheme: dark/);
+assert.match(css, /:root\s*\{/);
+  assert.match(rootBlock, /color-scheme: light/);
+  assert.match(rootBlock, /--theme-paper:\s*251 250 247/);
   assert.match(darkBlock, /--theme-paper:\s*21 24 28/);
   assert.match(darkBlock, /--theme-surface:\s*31 36 42/);
   assert.match(darkBlock, /--theme-line:\s*64 71 80/);
   assert.match(css, /--store-card-1:\s*#554b40/);
+  assert.match(modernBlock, /color-scheme: light/);
+  assert.match(modernBlock, /--theme-paper:\s*251 250 247/);
   assert.match(css, /\.theme-invariant-dark/);
   assert.ok(contrast([21, 24, 28], [241, 236, 226]) >= 7, "paper and ink must meet enhanced contrast");
   assert.ok(contrast([21, 24, 28], [174, 181, 191]) >= 4.5, "muted text must remain readable");
@@ -64,11 +75,12 @@ test("dark palette uses layered non-black surfaces with readable contrast", asyn
 });
 
 test("legacy fixed light surfaces and status notices have dark palette coverage", async () => {
-  const [css, middleware, home, storeExperience, gallery, ticker] = await Promise.all([
+  const [css, middleware, home, storeExperience, storeInfo, gallery, ticker] = await Promise.all([
     source("src/app/globals.css"),
     source("src/proxy.ts"),
     source("src/app/(shop)/home/page.tsx"),
     source("src/components/features/catalog/StoreMallExperience.tsx"),
+    source("src/components/features/catalog/StoreMallStoreInfo.tsx"),
     source("src/components/features/auction/AuctionGalleryModal.tsx"),
     source("src/components/layout/LiveTickerBar.tsx"),
   ]);
@@ -83,7 +95,7 @@ test("legacy fixed light surfaces and status notices have dark palette coverage"
   }
   assert.doesNotMatch(home, /\["#c7b9a5", "#9fa9a2", "#b8a7a1"\]/);
   assert.doesNotMatch(home, /var\(--store-card-/);
-  assert.match(storeExperience, /bg-\[var\(--store-card-1\)\]/);
+  assert.match(storeInfo, /bg-\[var\(--store-card-1\)\]/);
   assert.match(gallery, /theme-invariant-dark/);
   assert.match(ticker, /theme-invariant-dark/);
   assert.match(middleware, /@media\(prefers-color-scheme:dark\)/);

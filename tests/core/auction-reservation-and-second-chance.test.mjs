@@ -97,44 +97,20 @@ test("auction countdown and soft close remain anchored to the database clock", a
   );
 });
 
-test("cart reservation migration installs a non-extendable exclusive 15-minute hold", async () => {
+test("cart migration keeps saved fixed-price items without inventory holds", async () => {
   const migration = await source(
-    "supabase/migrations/20260721060000_auction_second_chance_and_cart_reservations.sql",
+    "supabase/migrations/20260819160109_cart_list_without_holds.sql",
   );
 
+  assert.match(migration, /alter column reserved_until drop not null/i);
+  assert.match(migration, /drop index if exists public\.cart_items_product_reservation_key/i);
+  assert.match(migration, /grant select, insert, update, delete on table public\.cart_items to authenticated/i);
   assert.match(
     migration,
-    /alter table public\.cart_items[\s\S]*add column if not exists reserved_until timestamptz/i,
+    /create or replace function public\.reserve_fixed_product_for_cart\([\s\S]*p\.sale_type = 'fixed'/i,
   );
-  assert.match(
-    migration,
-    /create unique index if not exists cart_items_product_reservation_key\s+on public\.cart_items \(product_id\)/i,
-  );
-  assert.match(
-    migration,
-    /revoke insert, update, delete, truncate on table public\.cart_items\s+from anon, authenticated/i,
-  );
-  assert.match(
-    migration,
-    /create or replace function public\.reserve_fixed_product_for_cart\([\s\S]*from public\.products as products[\s\S]*for update/i,
-  );
-  assert.match(migration, /v_now \+ interval '15 minutes'/i);
-  assert.match(
-    migration,
-    /Repeated clicks are idempotent and cannot extend an unexpired hold\.[\s\S]*return query select\s+v_reservation\.product_id,\s+v_reservation\.reserved_until/i,
-  );
-  assert.match(
-    migration,
-    /if found and v_reservation\.member_id <> v_member_id then[\s\S]*errcode = '23505'/i,
-  );
-  assert.match(
-    migration,
-    /create trigger commerce_order_items_consume_cart_reservation\s+before insert on public\.commerce_order_items/i,
-  );
-  assert.match(
-    migration,
-    /revoke execute on function public\.claim_fixed_price_product\(uuid\)\s+from anon, authenticated, service_role/i,
-  );
+  assert.doesNotMatch(migration, /interval '15 minutes'/i);
+  assert.match(migration, /delete from public\.cart_items where product_id = new\.product_id and member_id = v_member_id/i);
 });
 
 test("cart API can only reserve and release inventory through authoritative RPCs", async () => {
@@ -147,9 +123,11 @@ test("cart API can only reserve and release inventory through authoritative RPCs
   assert.doesNotMatch(route, /from\("cart_items"\)[\s\S]{0,120}\.delete\(\)/);
   assert.match(route, /reservedUntil: data\.reserved_until/);
   assert.match(route, /serverTime: data\.server_time/);
+  assert.match(route, /if \(liveIds\.length === 0\)/);
+  assert.match(route, /staleProductIds: ids/);
 });
 
-test("the storefront surfaces the server-based 15-minute hold and blocks expired checkout", async () => {
+test("the storefront keeps cart membership independent from inventory availability", async () => {
   const [client, detailPanel, cartView] = await Promise.all([
     source("src/lib/commerce/client.ts"),
     source("src/components/features/auction/detail/StickyBidPanel.tsx"),
@@ -167,27 +145,11 @@ test("the storefront surfaces the server-based 15-minute hold and blocks expired
     detailPanel,
     /await reserveCartProduct\(item\.id, session\.user\.id\)/,
   );
-  assert.match(detailPanel, /까지 15분간 재고가 점유됩니다/);
-  assert.match(
-    cartView,
-    /const reservationNow = reservationClock \+ serverClockOffset/,
-  );
-  assert.match(
-    cartView,
-    /const reservationExpired\s*=\s*!hasPendingCheckout\s*&&\s*products\.some/,
-  );
-  assert.match(
-    cartView,
-    /서버 시간을 기준으로 15분 동안 내\s*계정에만 임시 점유됩니다/,
-  );
-  assert.match(
-    cartView,
-    /reservationExpired \|\|[\s\S]*paymentMode !== "manual_transfer"/,
-  );
-  assert.match(
-    cartView,
-    /aria-live="assertive"[\s\S]*재고 점유 시간이 만료되었습니다/,
-  );
+  assert.match(detailPanel, /구매 가능 여부는 결제 시 다시 확인됩니다/);
+  assert.doesNotMatch(cartView, /15분 동안/);
+  assert.doesNotMatch(cartView, /reservationExpired/);
+  assert.match(cartView, /channel\("member-cart-product-events"\)/);
+  assert.match(cartView, /cartIdsRef\.current\.includes\(productId\)/);
 });
 
 test("operator retry is an exact product-scoped mirror of the scheduled offer processor", async () => {

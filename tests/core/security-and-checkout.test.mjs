@@ -202,8 +202,12 @@ test("Kakao returnTo accepts only same-origin application paths", () => {
 test("Kakao login restores the requested page and only rejects authentication routes", () => {
   assert.equal(resolveKakaoPostLoginReturnTo("/home"), "/home");
   assert.equal(resolveKakaoPostLoginReturnTo("/m/home"), "/m/home");
-  assert.equal(resolveKakaoPostLoginReturnTo("/cart?from=login"), "/cart?from=login");
-  assert.equal(resolveKakaoPostLoginReturnTo("/account/login?next=%2Fhome"), "/account");
+  assert.equal(resolveKakaoPostLoginReturnTo("/feed"), "/feed");
+  assert.equal(resolveKakaoPostLoginReturnTo("/feed?category=vintage&page=2"), "/feed?category=vintage&page=2");
+  assert.equal(resolveKakaoPostLoginReturnTo("/m/shop?q=%EB%B0%94%EC%8B%9C"), "/m/shop?q=%EB%B0%94%EC%8B%9C");
+  assert.equal(resolveKakaoPostLoginReturnTo("/cart?from=login"), "/home");
+  assert.equal(resolveKakaoPostLoginReturnTo("/account/login?next=%2Fhome"), "/home");
+  assert.equal(resolveKakaoPostLoginReturnTo("/m/account"), "/m/home");
 });
 
 test("Kakao concurrent login flows use isolated scoped cookies", () => {
@@ -300,7 +304,7 @@ test("Kakao callback hides identity and commerce surfaces until profile validati
   assert.match(headerSource, /pathname\s*===\s*"\/auth\/callback"/);
   assert.match(
     headerSource,
-    /authenticating\s*\?\s*<span[\s\S]*?로그인 상태 확인 중[\s\S]*?:\s*<>[\s\S]*?<AuthStatus\s*\/>[\s\S]*?<CommerceToolbar\s*\/>/,
+    /authenticating\s*\?\s*<span[\s\S]*?로그인 상태 확인 중[\s\S]*?:\s*session\s*\?\s*<CommerceToolbar/,
   );
   assert.doesNotMatch(callbackSource, /getMyNicknameState\(\)/);
   assert.match(callbackSource, /resolveKakaoPostLoginReturnTo/);
@@ -318,9 +322,11 @@ test("public shop surfaces expose shopper controls while admin links remain sess
     policyPage,
     homePage,
     storePage,
-    storeService,
+storeService,
     adminLayout,
     storeExperience,
+    storeTabs,
+    logoutHelper,
   ] = await Promise.all([
     readFile(new URL("src/components/layout/AuthStatus.tsx", rootUrl), "utf8"),
     readFile(new URL("src/components/layout/PcHeader.tsx", rootUrl), "utf8"),
@@ -338,6 +344,8 @@ test("public shop surfaces expose shopper controls while admin links remain sess
     readFile(new URL("src/services/stores.ts", rootUrl), "utf8"),
     readFile(new URL("src/app/(admin)/admin/layout.tsx", rootUrl), "utf8"),
     readFile(new URL("src/components/features/catalog/StoreMallExperience.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/components/features/catalog/StoreMallTabs.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/lib/auth/logout.ts", rootUrl), "utf8"),
   ]);
 
   assert.match(authStatus, /useSupabaseSession\(\)/);
@@ -347,8 +355,10 @@ test("public shop surfaces expose shopper controls while admin links remain sess
     /href: "\/admin\/operator", label: "업무"/,
   );
   assert.match(authStatus, /href: "\/admin\/employee", label: "업무"/);
-  assert.match(authStatus, /aria-label="로그아웃"/);
-  assert.match(authStatus, /window\.location\.assign\(`\$\{basePath\}\/account\/login`\)/);
+  assert.doesNotMatch(authStatus, /aria-label="로그아웃"/);
+  assert.match(logoutHelper, /window\.location\.assign\(`\$\{basePath\}\/home`\)/);
+  assert.match(logoutHelper, /disableWebPush\(accessToken\)/);
+  assert.match(logoutHelper, /\/api\/auth\/kakao\/logout/);
   for (const source of [authStatus, accountPage]) {
     assert.doesNotMatch(source, /\/api\/account\/session/);
   }
@@ -375,7 +385,7 @@ test("public shop surfaces expose shopper controls while admin links remain sess
   assert.doesNotMatch(homePage, /String\(index \+ 1\)\.padStart\(2, "0"\)/);
   assert.doesNotMatch(homePage, /엄선된 숍|전체 숍 보기/);
   assert.match(storeExperience, /공식 판매 센터몰/);
-  assert.match(storeExperience, /센터 정보[\s\S]*문의하기/);
+  assert.match(storeTabs, /정보[\s\S]*문의하기/);
 });
 
 test.skip("retired provider payment ID behavior", () => {

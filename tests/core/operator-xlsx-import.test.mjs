@@ -135,7 +135,8 @@ test("operator XLSX UI validates products, supports per-product deletion, and re
   assert.match(modal, /setSaleType/);
   assert.match(modal, /실시간 경매/);
   assert.match(modal, /즉시 구매/);
-  assert.match(modal, /다음 날 오전 10시 등록 \(기본\)/);
+  assert.doesNotMatch(modal, /다음 날 오전 10시 등록 \(기본\)/);
+  assert.match(modal, /상품별 공개 시각은 상품 데이터의 공개 시각을 따릅니다/);
   assert.match(modal, /즉시 등록/);
 
   assert.match(consoleSource, /uploadProductImages\(/);

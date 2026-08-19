@@ -26,6 +26,10 @@ import {
   mergeCatalogProductBatch,
 } from "@/lib/catalog/pagination";
 import { getCatalogImageUrl } from "@/lib/images";
+import {
+  AUCTION_BID_SUCCEEDED_EVENT,
+  type AuctionBidSucceededDetail,
+} from "@/lib/auction/bidEvents";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 import { getDailyAuctionPhase } from "@/utils/auctionBidPolicy";
@@ -95,6 +99,16 @@ interface ProductCatalogResponse {
     returned: number;
   };
   products?: ProductPayload[];
+}
+
+interface ProductDetailResponse {
+  product?: ProductPayload;
+}
+
+function getRealtimeProductId(value: unknown) {
+  if (!value || typeof value !== "object") return null;
+  const id = (value as Record<string, unknown>).id;
+  return typeof id === "string" && id.length > 0 ? id : null;
 }
 
 async function fetchCompleteProductCatalog(input: {
@@ -203,9 +217,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
     const requested = Number(routeSearchParams.get("page"));
     return Number.isSafeInteger(requested) && requested > 0 ? requested : 1;
   });
-  const [refreshNonce, setRefreshNonce] = useState(0);
-  const catalogRequestKey =
-    `${saleType}:${showSoldOnly ? "sold" : "active"}:${refreshNonce}`;
+  const catalogRequestKey = `${saleType}:${showSoldOnly ? "sold" : "active"}`;
   const [settledCatalogKey, setSettledCatalogKey] = useState(
     () => initialProducts !== undefined && !showSoldOnly ? catalogRequestKey : "",
   );
@@ -218,7 +230,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
   const refreshAccountBids = accountBids.refresh;
 
   const lastRouteQuery = useRef(routeQuery);
-  const realtimeRefreshTimer = useRef<number | null>(null);
+  const productRefreshTimers = useRef(new Map<string, number>());
 
   useEffect(() => {
     if (routeQuery === lastRouteQuery.current) return;
@@ -296,8 +308,53 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
     return () => controller.abort();
   }, [catalogRequestKey, initialProducts, query, saleType, showSoldOnly]);
 
+  const refreshProductById = useCallback(async (productId: string) => {
+    try {
+      const response = await fetch(`/api/products/${encodeURIComponent(productId)}`, {
+        cache: "no-store",
+      });
+      if (response.status === 404) {
+        setProducts((current) => current.filter((product) => product.id !== productId));
+        return;
+      }
+      if (!response.ok) return;
+      const payload = await response.json() as ProductDetailResponse;
+      const nextProduct = payload.product;
+      if (!nextProduct || nextProduct.saleType !== saleType) {
+        setProducts((current) => current.filter((product) => product.id !== productId));
+        return;
+      }
+      setProducts((current) => {
+        const index = current.findIndex((product) => product.id === productId);
+        if (index < 0) return [...current, nextProduct];
+        const existing = current[index];
+        const merged = {
+          ...existing,
+          ...nextProduct,
+          storeTier: nextProduct.storeTier ?? existing.storeTier,
+        };
+        const next = [...current];
+        next[index] = merged;
+        return next;
+      });
+    } catch {
+      // A transient single-product refresh failure must not replace or flash the feed.
+    }
+  }, [saleType]);
+
+  const scheduleProductRefresh = useCallback((productId: string) => {
+    const currentTimer = productRefreshTimers.current.get(productId);
+    if (currentTimer !== undefined) window.clearTimeout(currentTimer);
+    const timer = window.setTimeout(() => {
+      productRefreshTimers.current.delete(productId);
+      void refreshProductById(productId);
+    }, 500);
+    productRefreshTimers.current.set(productId, timer);
+  }, [refreshProductById]);
+
   useEffect(() => {
-    if (!LIVE_AUCTION_ENABLED || saleType !== "auction" || showSoldOnly) return;
+    if (showSoldOnly || (saleType === "auction" && !LIVE_AUCTION_ENABLED)) return;
+    const refreshTimers = productRefreshTimers.current;
     let client: ReturnType<typeof getSupabaseBrowserClient>;
     try {
       client = getSupabaseBrowserClient();
@@ -305,46 +362,54 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
       return;
     }
     const channel = client
-      .channel("live-auction-feed-products")
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "products" }, (payload) => {
+      .channel(`live-${saleType}-feed-products`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, (payload) => {
+        const productId = getRealtimeProductId(payload.new) ?? getRealtimeProductId(payload.old);
+        if (!productId) return;
+        if (payload.eventType === "DELETE") {
+          setProducts((current) => current.filter((product) => product.id !== productId));
+          return;
+        }
         const snapshot = parseAuctionProductRealtimeSnapshot(payload.new);
-        if (!snapshot) return;
-        setProducts((current) => current.map((product) => product.id === snapshot.id ? {
-          ...product,
-          antiSnipingBaseClosesAt: snapshot.antiSnipingBaseClosesAt,
-          antiSnipingExtendedAt: snapshot.antiSnipingExtendedAt,
-          antiSnipingExtensionCount: snapshot.antiSnipingExtensionCount,
-          bidLockedAt: snapshot.bidLockedAt,
-          closesAt: snapshot.closesAt,
-          currentPrice: snapshot.currentPrice,
-          finalBidAmount: snapshot.finalBidAmount,
-          participantCount: snapshot.participantCount,
-          publishAt: snapshot.publishAt,
-          status: snapshot.status,
-        } : product));
-        if (realtimeRefreshTimer.current !== null) window.clearTimeout(realtimeRefreshTimer.current);
-        realtimeRefreshTimer.current = window.setTimeout(() => {
-          realtimeRefreshTimer.current = null;
-          setRefreshNonce((value) => value + 1);
-          if (accountBidCapability === "eligible_member") refreshAccountBids();
-        }, 800);
+        if (snapshot) {
+          setProducts((current) => current.map((product) => product.id === snapshot.id ? {
+            ...product,
+            antiSnipingBaseClosesAt: snapshot.antiSnipingBaseClosesAt,
+            antiSnipingExtendedAt: snapshot.antiSnipingExtendedAt,
+            antiSnipingExtensionCount: snapshot.antiSnipingExtensionCount,
+            bidLockedAt: snapshot.bidLockedAt,
+            closesAt: snapshot.closesAt,
+            currentPrice: snapshot.currentPrice,
+            finalBidAmount: snapshot.finalBidAmount,
+            participantCount: snapshot.participantCount,
+            publishAt: snapshot.publishAt,
+            status: snapshot.status,
+          } : product));
+        }
+        scheduleProductRefresh(productId);
+        if (saleType === "auction" && accountBidCapability === "eligible_member") {
+          refreshAccountBids();
+        }
       })
       .subscribe();
     return () => {
-      if (realtimeRefreshTimer.current !== null) window.clearTimeout(realtimeRefreshTimer.current);
-      realtimeRefreshTimer.current = null;
+      for (const timer of refreshTimers.values()) window.clearTimeout(timer);
+      refreshTimers.clear();
       void client.removeChannel(channel);
     };
-  }, [accountBidCapability, refreshAccountBids, saleType, showSoldOnly]);
+  }, [accountBidCapability, refreshAccountBids, saleType, scheduleProductRefresh, showSoldOnly]);
 
   useEffect(() => {
-    if (!LIVE_AUCTION_ENABLED || saleType !== "auction" || showSoldOnly) return;
-    const refresh = window.setInterval(() => {
-      setRefreshNonce((value) => value + 1);
-      if (accountBidCapability === "eligible_member") refreshAccountBids();
-    }, 30_000);
-    return () => window.clearInterval(refresh);
-  }, [accountBidCapability, refreshAccountBids, saleType, showSoldOnly]);
+    if (saleType !== "auction" || showSoldOnly) return;
+    const receiveBidSuccess = (event: Event) => {
+      const productId = (event as CustomEvent<AuctionBidSucceededDetail>).detail?.productId;
+      if (!productId) return;
+      scheduleProductRefresh(productId);
+      refreshAccountBids();
+    };
+    window.addEventListener(AUCTION_BID_SUCCEEDED_EVENT, receiveBidSuccess);
+    return () => window.removeEventListener(AUCTION_BID_SUCCEEDED_EVENT, receiveBidSuccess);
+  }, [refreshAccountBids, saleType, scheduleProductRefresh, showSoldOnly]);
 
   const orderedProducts = useMemo(() => { const ranked = [...products].sort((left, right) => {
     const leftDate = getKoreanFeedDateKey(left.publishAt);
@@ -474,7 +539,6 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
   const effectiveSelectedGender = CATALOG_GENDERS.includes(selectedGender) ? selectedGender : "all";
   const bidStateByProduct = useMemo(() => new Map(accountBids.items.map((item) => [item.productId, item.state])), [accountBids.items]);
   const handleBidPlaced = useCallback(() => {
-    setRefreshNonce((value) => value + 1);
     refreshAccountBids();
   }, [refreshAccountBids]);
 

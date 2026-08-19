@@ -53,6 +53,21 @@ test("simple mode exposes only the five consumer core destinations", async () =>
   assert.match(adminLayout, /flex-col[\s\S]*sm:flex-row/);
 });
 
+test("simple mode can be changed only from the standalone settings page", async () => {
+  const [settings, pcHeader, mobileHeader, account] = await Promise.all([
+    source("src/components/settings/SiteSettingsPage.tsx"),
+    source("src/components/layout/PcHeader.tsx"),
+    source("src/components/mobile/MobileSiteHeader.tsx"),
+    source("src/components/features/account/DesktopAccountContent.tsx"),
+  ]);
+
+  assert.match(settings, /<SimpleModeToggle detailed/);
+  for (const surface of [pcHeader, mobileHeader, account]) {
+    assert.doesNotMatch(surface, /<SimpleModeToggle/);
+    assert.doesNotMatch(surface, /simpleMode\.toggle\(/);
+  }
+});
+
 test("mobile account tabs render dedicated views and tolerate partial API failures", async () => {
   const [sectionPage, dashboard] = await Promise.all([
     source("src/app/(mobile)/m/account/[section]/page.tsx"),

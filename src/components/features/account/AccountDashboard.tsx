@@ -6,6 +6,7 @@ import {
   ExternalLink,
   Heart,
   LogIn,
+  LogOut,
   PackageCheck,
   ReceiptText,
   Truck,
@@ -17,6 +18,7 @@ import type { Session } from "@supabase/supabase-js";
 import { CombinedAuctionPayment } from "@/components/features/account/CombinedAuctionPayment";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
+import { logoutBrowserSession } from "@/lib/auth/logout";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 
 interface ProductSummary {
@@ -211,12 +213,14 @@ function refundTitle(refund: ManualRefund) {
 function AccountDashboardForSession({
   basePath,
   loading,
+  onNavigate,
   session,
   surface,
   view,
 }: {
   basePath: "" | "/m";
   loading: boolean;
+  onNavigate?: (view: AccountDashboardView) => void;
   session: Session | null;
   surface: "desktop" | "mobile";
   view: AccountDashboardView;
@@ -233,7 +237,7 @@ function AccountDashboardForSession({
   const [refunds, setRefunds] = useState<ManualRefund[]>([]);
   const [liked, setLiked] = useState<ProductSummary[]>([]);
   const [likedCount, setLikedCount] = useState(0);
-  const [credits, setCredits] = useState(0);
+  const [credits] = useState(0);
   const [now, setNow] = useState(0);
   const [paymentServerTime, setPaymentServerTime] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
@@ -254,8 +258,9 @@ function AccountDashboardForSession({
     postalCode: "",
     address: "",
   });
-  const [shippingMessage, setShippingMessage] = useState("");
-  const [memberAccessRequired, setMemberAccessRequired] = useState(false);
+const [shippingMessage, setShippingMessage] = useState("");
+    const [logoutBusy, setLogoutBusy] = useState(false);
+    const [memberAccessRequired, setMemberAccessRequired] = useState(false);
   const [trackingShipment, setTrackingShipment] = useState<InventoryShipment | null>(null);
   const [showAllStorage, setShowAllStorage] = useState(false);
   const [creditQuantity, setCreditQuantity] = useState(1);
@@ -269,7 +274,6 @@ function AccountDashboardForSession({
   const [refundMessage, setRefundMessage] = useState("");
   const [refundBusyId, setRefundBusyId] = useState<string | null>(null);
   const [refundDrafts, setRefundDrafts] = useState<Record<string, RefundAccountDraft>>({});
-  const [applyShippingCredit, setApplyShippingCredit] = useState(true);
   const [dataStatus, setDataStatus] = useState<
     "idle" | "loading" | "ready" | "error"
   >(token ? "loading" : "idle");
@@ -290,7 +294,6 @@ function AccountDashboardForSession({
           storageResponse,
           shipmentResponse,
           refundResponse,
-          creditResponse,
           wishlistResponse,
           addressResponse,
           legacyOrdersResponse,
@@ -298,7 +301,6 @@ function AccountDashboardForSession({
           fetch("/api/account/storage", { headers, cache: "no-store" }),
           fetch("/api/account/shipments", { headers, cache: "no-store" }),
           fetch("/api/account/refunds", { headers, cache: "no-store" }),
-          fetch("/api/shipping/credits", { headers, cache: "no-store" }),
           fetch("/api/wishlist", { headers, cache: "no-store" }),
           fetch("/api/account/addresses", { headers, cache: "no-store" }),
           fetch("/api/account/legacy-eligible-orders", { headers, cache: "no-store" }),
@@ -308,7 +310,6 @@ function AccountDashboardForSession({
             storageResponse,
             shipmentResponse,
             refundResponse,
-            creditResponse,
             wishlistResponse,
             addressResponse,
             legacyOrdersResponse,
@@ -327,13 +328,6 @@ function AccountDashboardForSession({
           : {};
         const refundData = refundResponse.ok
           ? await refundResponse.json() as { refunds?: ManualRefund[] }
-          : {};
-        const creditData = creditResponse.ok
-          ? await creditResponse.json() as {
-          credits?: number;
-          payments?: ShippingCreditPayment[];
-          rememberedDepositorName?: string | null;
-        }
           : {};
         const wishlistData = wishlistResponse.ok
           ? await wishlistResponse.json() as { productIds?: string[] }
@@ -375,24 +369,16 @@ function AccountDashboardForSession({
             storageData.deadlineEnforcementExempt === true,
           );
           setRememberedDepositorName(
-            storageData.rememberedDepositorName ??
-              creditData.rememberedDepositorName ??
-              null,
+            storageData.rememberedDepositorName ?? null,
           );
           setCreditDepositorName(
-            storageData.rememberedDepositorName ??
-              creditData.rememberedDepositorName ??
-              "",
+            storageData.rememberedDepositorName ?? "",
           );
           setSelectedInventoryItemIds([]);
           setShipments(shipmentData.shipments ?? []);
           setLegacyEligibleOrders(legacyOrdersData.orders ?? []);
           setSelectedOrderId("");
           setRefunds(refundData.refunds ?? []);
-          setCredits(Number(creditData.credits ?? 0));
-          setCreditPayments(creditData.payments ?? []);
-          setCreditPayment(creditData.payments?.[0] ?? null);
-          setApplyShippingCredit(Number(creditData.credits ?? 0) > 0);
           setLiked(allProducts.filter((product) => ids.includes(product.id)));
           setLikedCount(ids.length);
           setAddresses(addressData.addresses ?? []);
@@ -405,7 +391,6 @@ function AccountDashboardForSession({
             storageResponse,
             shipmentResponse,
             refundResponse,
-            creditResponse,
             wishlistResponse,
             addressResponse,
             legacyOrdersResponse,
@@ -687,10 +672,7 @@ function AccountDashboardForSession({
     );
   }
   const requestShipping = async () => {
-    if (credits < 1) {
-      setShippingMessage("배송 크레딧이 없어 배송을 신청할 수 없습니다. 먼저 배송 크레딧을 결제해 주세요.");
-      return;
-    }
+    const shippingSettlement = "manual_transfer";
     const useV2 = selectedShippingMode === "v2";
     if (
       !token ||
@@ -704,8 +686,8 @@ function AccountDashboardForSession({
     }
     const selectedIds = [...selectedInventoryItemIds].sort();
     const idempotencyScope = useV2
-      ? `v2:${selectedIds.join(",")}:${selectedAddressId}:${applyShippingCredit ? "shipping_credit" : "manual_transfer"}`
-      : `legacy:${selectedLegacyOrder?.sourceId}:${selectedAddressId}:${applyShippingCredit ? "shipping_credit" : "manual_transfer"}`;
+      ? `v2:${selectedIds.join(",")}:${selectedAddressId}:${shippingSettlement}`
+      : `legacy:${selectedLegacyOrder?.sourceId}:${selectedAddressId}:${shippingSettlement}`;
     const idempotencyKey =
       shippingRequestKeys.current.get(idempotencyScope) ?? crypto.randomUUID();
     shippingRequestKeys.current.set(idempotencyScope, idempotencyKey);
@@ -721,13 +703,13 @@ function AccountDashboardForSession({
           ? {
               inventoryItemIds: selectedIds,
               addressId: selectedAddressId,
-              applyShippingCredit,
+              applyShippingCredit: false,
               idempotencyKey,
             }
           : {
               orderId: selectedLegacyOrder?.sourceId,
               addressId: selectedAddressId,
-              applyShippingCredit,
+              applyShippingCredit: false,
               idempotencyKey,
             }),
       },
@@ -783,10 +765,6 @@ function AccountDashboardForSession({
       addressSnapshot: null,
       items: requestedItems,
     }, ...current.filter((currentShipment) => currentShipment.id !== shipment.shipment_id)]);
-    if (shipment.settlement_method === "shipping_credit") {
-      setCredits((current) => Math.max(0, current - 1));
-      setApplyShippingCredit(credits > 1);
-    }
     const payment = shipment.payment as ShipmentPayment | null;
     const expectedAmount = payment?.expectedAmount ?? payment?.expected_amount;
     const bankName = payment?.bankNameSnapshot ?? payment?.bank_name_snapshot;
@@ -796,9 +774,7 @@ function AccountDashboardForSession({
         ? `배송 신청을 접수했습니다. ${expectedAmount.toLocaleString("ko-KR")}원 · ${bankName} ${accountNumber}로 입금해 주세요.`
         : shipment.settlement_method === "waiver"
           ? "배송 신청을 접수했습니다. 보유한 무료 배송 권한이 자동 적용되었습니다."
-          : shipment.settlement_method === "shipping_credit"
-            ? "배송 신청을 접수했습니다. 배송 크레딧이 적용되었습니다."
-            : "배송 신청을 접수했습니다. 배송비 결제 상태를 확인해 주세요.",
+          : "배송 신청을 접수했습니다. 배송비 입금 확인 후 출고됩니다.",
     );
   };
   const requestShippingCredits = async () => {
@@ -989,6 +965,17 @@ function AccountDashboardForSession({
       setRefundBusyId(null);
     }
   };
+  const logout = () => {
+    if (logoutBusy || !token) return;
+    setLogoutBusy(true);
+    void (async () => {
+      try {
+        await logoutBrowserSession(token, basePath);
+      } finally {
+        setLogoutBusy(false);
+      }
+    })();
+  };
   return (
     <div className={surface === "desktop" ? "space-y-14" : "space-y-10"} data-account-dashboard-view={view}>
       <div hidden={!showOverview} className={`flex justify-between gap-5 border-b border-ink pb-8 ${surface === "desktop" ? "flex-row items-end" : "flex-col"}`}>
@@ -1002,9 +989,12 @@ function AccountDashboardForSession({
           </p>
         </div>
         {token ? (
-          <span className="flex w-fit items-center gap-2 border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800">
-            <UserRound size={15} /> 로그인 상태
-          </span>
+          <div className="flex w-fit flex-wrap items-center gap-2">
+            <button aria-label="로그아웃하기" className="inline-flex items-center gap-2 border border-line bg-paper px-4 py-3 text-xs font-bold disabled:opacity-40" disabled={logoutBusy} onClick={logout} type="button"><LogOut size={15} /> 로그아웃하기</button>
+            <span className="flex items-center gap-2 border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800">
+              <UserRound size={15} /> 로그인 상태
+            </span>
+          </div>
         ) : loading ? (
           <span
             aria-label="로그인 상태 확인 중"
@@ -1031,20 +1021,19 @@ function AccountDashboardForSession({
         </div>
       )}
       <div hidden={!showOverview} className={`grid gap-px border border-line bg-line ${surface === "desktop" ? "grid-cols-4" : "grid-cols-2"}`}>
-        {visibleCards.map(([label, value, description, href, Icon]) => (
-          <Link
-            className={`group bg-paper transition-colors hover:bg-surface ${surface === "desktop" ? "p-5" : "p-4"}`}
-            href={href}
-            key={label}
-          >
+        {visibleCards.map(([label, value, description, href, Icon]) => {
+          const cardView: AccountDashboardView = label === "낙찰품 결제" ? "payments" : label === "보관 중인 상품" ? "storage" : label === "배송 내역" ? "shipping" : "saved";
+          const cardClassName = `group bg-paper text-left transition-colors hover:bg-surface ${surface === "desktop" ? "p-5" : "p-4"}`;
+          const cardContent = <>
             <Icon size={17} />
             <p className={`text-xs text-muted ${surface === "desktop" ? "mt-8" : "mt-6"}`}>{label}</p>
             <p className="mt-2 font-mono text-3xl font-bold">{memberAccessRequired ? "—" : value}</p>
             <p className="mt-2 text-[11px] text-muted group-hover:text-ink">
               {description}
             </p>
-          </Link>
-        ))}
+          </>;
+          return onNavigate ? <button className={`w-full ${cardClassName}`} key={label} onClick={() => onNavigate(cardView)} type="button">{cardContent}</button> : <Link className={cardClassName} href={href} key={label}>{cardContent}</Link>;
+        })}
       </div>
       <section hidden={!showPayments} id="auction-payments">
         <div className="mb-5 border-b border-ink pb-4">
@@ -1311,10 +1300,7 @@ function AccountDashboardForSession({
                   ? `선택 주문 상품 ${selectedLegacyOrder.items.length}개 전체`
                   : `선택 가능 상품 ${requestEligibleItems.length}개 · 기존 주문 ${legacyEligibleOrders.length}건`}
             </p>
-            <div
-              className="mt-5 border border-line bg-paper p-4"
-              id="shipping-credit"
-            >
+            <div className="mt-5 hidden border border-line bg-paper p-4" id="shipping-credit">
               <div className="flex items-end justify-between gap-3">
                 <div>
                   <p className="eyebrow text-muted">배송 크레딧</p>
@@ -1451,7 +1437,8 @@ function AccountDashboardForSession({
                 })()}
               </div>
             )}
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            <p className="mt-3 text-[11px] text-muted">배송지 변경·추가·삭제는 통합 작업공간의 설정 → 배송지에서 관리합니다.</p>
+            <div className="mt-3 hidden grid grid-cols-3 gap-2">
               <button
                 className="border border-ink px-3 py-2 text-xs font-bold"
                 onClick={openAddressCreate}
@@ -1486,16 +1473,13 @@ function AccountDashboardForSession({
             className="mt-4 h-11 w-full bg-ink text-xs font-bold text-paper disabled:opacity-40"
             disabled={
               !token ||
-              credits < 1 ||
               !selectedShippingMode ||
               !selectedAddressId
             }
             onClick={() => void requestShipping()}
             type="button"
           >
-            {selectedShippingMode === "legacy"
-              ? credits < 1 ? "배송 크레딧 필요" : "선택 주문 전체 배송 신청"
-              : credits < 1 ? "배송 크레딧 필요" : "선택 상품 배송 신청"}
+            {selectedShippingMode === "legacy" ? "선택 주문 전체 배송 신청" : "선택 상품 배송 신청"}
           </button>
           {shippingMessage && (
             <p aria-live="polite" className="mt-3 text-xs text-emerald-700">
@@ -1965,10 +1949,12 @@ function AccountDashboardForSession({
 
 export function AccountDashboard({
   basePath = "",
+  onNavigate,
   surface = "mobile",
   view = "full",
 }: {
   basePath?: "" | "/m";
+  onNavigate?: (view: AccountDashboardView) => void;
   surface?: "desktop" | "mobile";
   view?: AccountDashboardView;
 }) {
@@ -1981,6 +1967,7 @@ export function AccountDashboard({
       basePath={basePath}
       key={identityKey}
       loading={loading}
+      onNavigate={onNavigate}
       session={session}
       surface={surface}
       view={view}

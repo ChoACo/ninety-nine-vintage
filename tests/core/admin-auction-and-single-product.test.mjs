@@ -102,7 +102,8 @@ test("single product registration is separate, scheduled by saved hourly prefere
   assert.match(route, /normalizeProductBrand\("빈티지"\)/);
   assert.match(route, /const gender = \["남성", "여성", "공용"\]/);
   assert.match(route, /const category = text\(body\?\.category, "기타"\)/);
-  assert.match(route, /getRelativeKoreanDateTime\(1,\s*"10:00:00"/);
+  assert.doesNotMatch(route, /getRelativeKoreanDateTime\(1,\s*"10:00:00"/);
+  assert.match(route, /nextKoreanScheduledHour\(scheduledHourKst\)/);
   assert.match(route, /value\.length > 15/);
   assert.match(route, /p_permission:\s*"publish_products"/);
   assert.match(route, /size_label:\s*text\(body\?\.sizeLabel\)/);

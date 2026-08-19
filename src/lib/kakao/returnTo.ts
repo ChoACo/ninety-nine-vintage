@@ -6,6 +6,17 @@ const AUTHENTICATION_PATHS = new Set([
   "/m/account/login",
   "/m/auth/callback",
 ]);
+// Only the shared browsing surfaces may be restored after login. Every other
+// page routes the member to home so filters, the viewed product, pagination
+// and the scroll position are never mixed across unrelated screens.
+const POST_LOGIN_RETURN_PATHS = new Set([
+  "/home",
+  "/feed",
+  "/shop",
+  "/m/home",
+  "/m/feed",
+  "/m/shop",
+]);
 
 function isAuthenticationPath(pathname: string): boolean {
   const normalized =
@@ -28,16 +39,17 @@ export function resolveKakaoPostLoginReturnTo(
   requestedReturnTo: string,
 ): string {
   const pathname = applicationPathname(requestedReturnTo);
-  const accountPath =
+  const homePath =
     pathname === "/m" || pathname?.startsWith("/m/")
-      ? "/m/account"
-      : "/account";
+      ? "/m/home"
+      : "/home";
 
   if (
     !pathname ||
-    isAuthenticationPath(pathname)
+    isAuthenticationPath(pathname) ||
+    !POST_LOGIN_RETURN_PATHS.has(pathname)
   ) {
-    return accountPath;
+    return homePath;
   }
 
   return requestedReturnTo;

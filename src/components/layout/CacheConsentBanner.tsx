@@ -3,7 +3,7 @@
 import { Check, Database, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { CACHE_CONSENT_EVENT, clearCacheConsent, readCacheConsent, writeCacheConsent, type CacheConsent } from "@/lib/cacheConsent";
+import { CACHE_CONSENT_EVENT, readCacheConsent, writeCacheConsent, type CacheConsent } from "@/lib/cacheConsent";
 
 const CACHE_PREFIX = "ninetynine-public-";
 const CACHE_CONSENT_NAME = "ninetynine-cache-consent-v1";
@@ -77,7 +77,48 @@ export function CacheConsentBanner({ surface = "mobile" }: { surface?: "desktop"
 
 export function CacheConsentSettings() {
   const consent = useSyncExternalStore(subscribeToConsent, readCacheConsent, () => "unknown" as CacheConsent);
-  if (consent === "unknown") return null;
-  const reset = () => { clearCacheConsent(); void clearPublicCache().catch(() => undefined); };
-  return <button className="text-left text-xs text-muted underline" onClick={reset} type="button">캐시 설정 변경</button>;
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const updateConsent = async (nextConsent: Exclude<CacheConsent, "unknown">) => {
+    setBusy(true);
+    setMessage("");
+    try {
+      writeCacheConsent(nextConsent);
+      if (nextConsent === "accepted") {
+        await registerPublicCache();
+        setMessage("공개 캐시를 사용하도록 설정했습니다.");
+      } else {
+        await clearPublicCache();
+        setMessage("공개 캐시를 사용하지 않으며 저장된 캐시를 비웠습니다.");
+      }
+    } catch {
+      setMessage("캐시 설정을 변경하지 못했습니다. 브라우저 설정을 확인해 주세요.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const clearStoredCache = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      await clearPublicCache();
+      setMessage("기기에 저장된 공개 캐시를 비웠습니다.");
+    } catch {
+      setMessage("저장된 캐시를 비우지 못했습니다. 브라우저 설정을 확인해 주세요.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const status = consent === "accepted" ? "사용 중" : consent === "declined" ? "사용 안 함" : "아직 선택하지 않음";
+  return (
+    <div className="max-w-md">
+      <p className="text-xs font-bold">현재 상태: <span className="text-muted">{status}</span></p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        <button aria-pressed={consent === "accepted"} className="min-h-11 border border-line px-3 text-xs font-bold disabled:opacity-50" disabled={busy} onClick={() => void updateConsent("accepted")} type="button">캐시 사용</button>
+        <button aria-pressed={consent === "declined"} className="min-h-11 border border-line px-3 text-xs font-bold disabled:opacity-50" disabled={busy} onClick={() => void updateConsent("declined")} type="button">사용 안 함</button>
+        <button className="min-h-11 border border-line px-3 text-xs font-bold disabled:opacity-50" disabled={busy} onClick={() => void clearStoredCache()} type="button">저장 캐시 비우기</button>
+      </div>
+      {message && <p aria-live="polite" className="mt-3 text-xs leading-5 text-muted">{message}</p>}
+    </div>
+  );
 }

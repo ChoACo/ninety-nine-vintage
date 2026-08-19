@@ -246,8 +246,7 @@ export function CombinedAuctionPayment({
               <span>
                 <span className="block text-xs font-black">택배비 포함 결제</span>
                 <span className="mt-1 block text-[11px] leading-5 text-muted">
-                  기본 선택입니다. 포함하면 결제 확인 후 배송 크레딧으로
-                  적립되며, 원하지 않으면 선택을 해제할 수 있습니다.
+                  결제 확인 후 배송 접수에 사용할 배송비를 함께 결제합니다.
                 </span>
               </span>
             </label>
@@ -332,7 +331,7 @@ export function CombinedAuctionPayment({
                 </p>
                 {transfer.includeShippingFee && (
                   <p className="mt-1 flex justify-between gap-4">
-                    <span>+택배비 · 크레딧 {transfer.shippingCreditQuantity}개</span>
+                    <span>+택배비</span>
                     <span>{transfer.shippingFee.toLocaleString("ko-KR")}원</span>
                   </p>
                 )}

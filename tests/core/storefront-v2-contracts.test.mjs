@@ -172,6 +172,11 @@ test("the cache banner opts in only public assets and excludes private commerce 
   assert.match(banner, /계정·주문·결제 정보는 저장하지 않습니다/);
   assert.match(banner, /writeCacheConsent\("accepted"\)/);
   assert.match(banner, /writeCacheConsent\("declined"\)/);
+  assert.match(banner, /현재 상태:/);
+  assert.match(banner, /캐시 사용/);
+  assert.match(banner, /사용 안 함/);
+  assert.match(banner, /저장 캐시 비우기/);
+  assert.match(banner, /await clearPublicCache\(\)/);
   assert.match(worker, /if \(request\.destination === "document"\) return false/);
   assert.match(worker, /url\.pathname\.startsWith\("\/api\/products"\)/);
   assert.doesNotMatch(worker, /\/api\/(?:account|cart|orders|payments)/);

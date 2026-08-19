@@ -155,7 +155,7 @@ function importedConditionGrade(condition: string | null) {
   return "A";
 }
 function productStatusLabel(status: string) {
-  if (status === "pending") return "초안";
+  if (status === "pending") return "등록 대기";
   if (status === "active") return "공개 중";
   if (status === "closed") return "마감";
   if (status === "sold") return "판매 완료";
@@ -202,7 +202,7 @@ async function publishProductNow(accessToken: string, productId: string) {
     && result.skipped_count === 0
     && result.published_ids.includes(productId)
     && !result.skipped_ids.includes(productId);
-  if (!published) throw new Error("상품이 공개되지 않아 초안으로 보존했습니다.");
+  if (!published) throw new Error("상품 공개 결과를 확인하지 못했습니다.");
   return result;
 }
 
@@ -669,7 +669,7 @@ export function OperatorProductsConsole({
         : `“${snapshot.form.title}” 단품 등록을 완료했습니다.`;
       if (snapshot.canPublishImmediately) {
         if (!payload.product?.id) {
-          message = `“${snapshot.form.title}” 상품은 등록했지만 즉시 공개 결과를 확인하지 못했습니다. 초안 목록을 확인해 주세요.`;
+          message = `“${snapshot.form.title}” 상품은 등록했지만 즉시 공개 결과를 확인하지 못했습니다. 등록 대기 목록을 확인해 주세요.`;
         } else {
           try {
             await publishProductNow(snapshot.accessToken, payload.product.id);
@@ -816,7 +816,7 @@ export function OperatorProductsConsole({
       let message = "상품 정보를 저장했습니다.";
       if (shouldPublishAfterSave) {
         if (!payload.product?.id) {
-          message = "상품 정보는 저장했지만 즉시 공개 결과를 확인하지 못했습니다. 초안 목록을 확인해 주세요.";
+          message = "상품 정보는 저장했지만 즉시 공개 결과를 확인하지 못했습니다. 등록 대기 목록을 확인해 주세요.";
         } else {
           try {
             await publishProductNow(token, payload.product.id);
@@ -886,7 +886,7 @@ export function OperatorProductsConsole({
     if (!token || busy || !isManageableProductStatus(product.status)) return;
     const confirmation = product.status === "active"
       ? `공개 중인 “${product.title}” 상품을 삭제할까요? 사이트에서 즉시 사라집니다. 입찰·주문 이력이 있으면 삭제되지 않습니다.`
-      : `“${product.title}” 초안을 삭제할까요?`;
+      : `“${product.title}” 등록 대기 상품을 삭제할까요?`;
     if (!window.confirm(confirmation)) return;
     setBusy(true); setNotice("");
     try {
@@ -1160,10 +1160,10 @@ export function OperatorProductsConsole({
         }
       }
       setNotice(canPublish && options.publicationMode === "now"
-        ? `${published}개 엑셀 상품을 즉시 공개했습니다.${published < count ? ` ${count - published}개는 초안으로 남았습니다.` : ""}`
+        ? `${published}개 엑셀 상품을 즉시 공개했습니다.${published < count ? ` ${count - published}개는 등록 대기로 남았습니다.` : ""}`
         : canPublish
-          ? `${count}개 엑셀 상품을 다음 날 오전 10시 공개로 예약했습니다.`
-        : `${count}개 엑셀 상품을 초안으로 저장했습니다.`);
+          ? `${count}개 엑셀 상품을 상품별 공개 시각 기준으로 등록했습니다.`
+        : `${count}개 엑셀 상품을 등록 대기로 저장했습니다.`);
       try {
         await load(token);
       } catch {
@@ -1185,7 +1185,7 @@ export function OperatorProductsConsole({
 
   return <div className="space-y-8">
     <SectionHeading
-      description={view === "active" ? "현재 공개 중인 상품만 판매 방식별로 나누어 관리합니다." : "신규 상품을 등록하고 업로드 예정 상품과 초안을 따로 관리합니다."}
+      description={view === "active" ? "현재 공개 중인 상품만 판매 방식별로 나누어 관리합니다." : "신규 상품을 등록하고 업로드 예정 상품과 등록 대기 상품을 관리합니다."}
       eyebrow={view === "active" ? "운영자 / 상품" : "운영자 / 상품 등록"}
       title={view === "active" ? "진행 중 상품" : "상품 등록"}
       variant="page"
@@ -1217,10 +1217,10 @@ export function OperatorProductsConsole({
       </nav>
     ) : (
       <nav aria-label="상품 등록 상태" className="grid grid-cols-2 border border-ink">
-        {(["scheduled", "draft"] as const).map((stage) => <button aria-pressed={registrationStage === stage} className={`min-h-12 px-4 text-xs font-black ${registrationStage === stage ? "bg-ink text-paper" : "bg-paper text-ink"}`} key={stage} onClick={() => setRegistrationStage(stage)} type="button">{stage === "scheduled" ? "업로드 예정" : "초안"} <span className="ml-1 font-mono">{registrationCounts[stage]}</span></button>)}
+        {(["scheduled", "draft"] as const).map((stage) => <button aria-pressed={registrationStage === stage} className={`min-h-12 px-4 text-xs font-black ${registrationStage === stage ? "bg-ink text-paper" : "bg-paper text-ink"}`} key={stage} onClick={() => setRegistrationStage(stage)} type="button">{stage === "scheduled" ? "업로드 예정" : "등록 대기"} <span className="ml-1 font-mono">{registrationCounts[stage]}</span></button>)}
       </nav>
     )}
-    {view === "registration" && products.some((product) => product.brand_source === "inferred" && product.status === "pending") && <StatusNotice>초안 중 제목에서 임시 추론한 브랜드가 있습니다. 수정 저장하면 확인된 브랜드로 전환됩니다.</StatusNotice>}
+    {view === "registration" && products.some((product) => product.brand_source === "inferred" && product.status === "pending") && <StatusNotice>등록 대기 상품 중 제목에서 임시 추론한 브랜드가 있습니다. 수정 저장하면 확인된 브랜드로 전환됩니다.</StatusNotice>}
     {view === "registration" && products.some((product) => product.brand_source === "inferred" && product.status === "pending") && <section className="border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-bold text-amber-900">브랜드 확인 필요</p><div className="mt-3 flex flex-wrap gap-2">{products.filter((product) => product.brand_source === "inferred" && product.status === "pending").map((product) => <button className="border border-amber-300 bg-paper px-3 py-2 text-left text-[11px] text-amber-900 disabled:cursor-not-allowed disabled:opacity-40" disabled={!permissions.canMutate} key={product.id} onClick={() => edit(product)} type="button"><span className="font-bold">{product.brand}</span> · {product.title}</button>)}</div></section>}
     {(editingId || (view === "registration" && singleCreateOpen)) && (
       <form className="grid grid-cols-1 gap-3 border border-ink bg-surface p-4 sm:grid-cols-2 sm:p-6" onSubmit={submit}>
@@ -1246,7 +1246,7 @@ export function OperatorProductsConsole({
         {!editingId && (
           <section className="border border-line bg-paper p-4 sm:col-span-2">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-              <div><p className="text-xs font-black">1. 상품 사진 선택</p><p className="mt-1 text-[11px] text-muted">최대 15장 · 표시된 순서대로 저장{quickAiBusy ? " · AI 분석 중…" : ""}</p>{selectedEntitlements && <p className="mt-1 text-[10px] font-bold text-muted">AI {selectedEntitlements.aiUsed}/{selectedEntitlements.aiDailyLimit ?? "전체 한도"} · 즉시 공개 {selectedEntitlements.immediatePublished ?? 0}/{selectedEntitlements.immediateDailyLimit ?? 30} · 예약 공개 {selectedEntitlements.scheduledPublished ?? 0}/{selectedEntitlements.scheduledDailyLimit ?? 40} · 초안·예약 대기 {selectedEntitlements.pendingInventoryUsed ?? selectedEntitlements.productsCreated}/{selectedEntitlements.pendingInventoryLimit ?? selectedEntitlements.productDailyLimit ?? 100}</p>}</div>
+              <div><p className="text-xs font-black">1. 상품 사진 선택</p><p className="mt-1 text-[11px] text-muted">최대 15장 · 표시된 순서대로 저장{quickAiBusy ? " · AI 분석 중…" : ""}</p>{selectedEntitlements && <p className="mt-1 text-[10px] font-bold text-muted">AI {selectedEntitlements.aiUsed}/{selectedEntitlements.aiDailyLimit ?? "전체 한도"} · 즉시 공개 {selectedEntitlements.immediatePublished ?? 0}/{selectedEntitlements.immediateDailyLimit ?? 30} · 예약 공개 {selectedEntitlements.scheduledPublished ?? 0}/{selectedEntitlements.scheduledDailyLimit ?? 40} · 등록 대기·예약 대기 {selectedEntitlements.pendingInventoryUsed ?? selectedEntitlements.productsCreated}/{selectedEntitlements.pendingInventoryLimit ?? selectedEntitlements.productDailyLimit ?? 100}</p>}</div>
               <div className="flex flex-wrap gap-2">
                 <Button disabled={!token || !form.storeId || singleImages.length === 0 || quickAiBusy} onClick={() => void runQuickAi()} type="button" variant="primary"><Sparkles size={15} /> {quickAiBusy ? "AI 분석 중" : "AI 자동 보정"}</Button>
                 <label className="inline-flex cursor-pointer items-center justify-center gap-2 border border-ink px-4 py-3 text-xs font-bold">
@@ -1349,7 +1349,7 @@ export function OperatorProductsConsole({
             <TextArea aria-label="점검·하자 메모" className="min-h-20 sm:col-span-2" disabled={!productFieldsEditable} onChange={(event) => update("inspectionNotes", event.target.value)} placeholder="오염·수선·사용감 등 객관적인 상태 정보를 한 줄씩 입력" ref={inspectionNotesRef} value={form.inspectionNotes} />
             <TextArea aria-label="이미지 URL" className="min-h-20 sm:col-span-2" disabled={!productFieldsEditable} onChange={(event) => update("imageUrls", event.target.value)} placeholder="이미지 URL을 줄바꿈 또는 쉼표로 입력" required value={form.imageUrls} />
             <p className="text-[11px] leading-5 text-amber-800 sm:col-span-2">기존 상품 수정 시에만 현재 이미지 URL을 유지하거나 변경할 수 있습니다.</p>
-            <div className="flex flex-col gap-2 sm:flex-row"><TextInput aria-label="입찰 단위" disabled={!saleSetupEditable} min="1" onChange={(event) => update("bidIncrement", event.target.value)} placeholder="입찰 단위" type="number" value={form.bidIncrement} /><SelectInput aria-label="공개 상태" disabled={!saleSetupEditable} onChange={(event) => update("status", event.target.value)} value={form.status}><option value="pending">초안으로 저장</option>{(form.status === "active" || stores.find((store) => store.id === form.storeId)?.canPublish) && <option value="active">{editingProduct?.status === "active" ? "현재 공개 중" : "저장 후 즉시 공개"}</option>}</SelectInput></div>
+            <div className="flex flex-col gap-2 sm:flex-row"><TextInput aria-label="입찰 단위" disabled={!saleSetupEditable} min="1" onChange={(event) => update("bidIncrement", event.target.value)} placeholder="입찰 단위" type="number" value={form.bidIncrement} /><SelectInput aria-label="공개 상태" disabled={!saleSetupEditable} onChange={(event) => update("status", event.target.value)} value={form.status}><option value="pending">등록 대기로 저장</option>{(form.status === "active" || stores.find((store) => store.id === form.storeId)?.canPublish) && <option value="active">{editingProduct?.status === "active" ? "현재 공개 중" : "저장 후 즉시 공개"}</option>}</SelectInput></div>
           </>
         ) : (
           <>

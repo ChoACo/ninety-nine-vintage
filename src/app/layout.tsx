@@ -4,6 +4,7 @@ import { ChatNotificationProvider } from "@/components/features/chat/ChatNotific
 import { GlobalToastHost } from "@/components/features/notifications/GlobalToastHost";
 import { NotificationExperienceProvider } from "@/components/features/notifications/NotificationExperienceProvider";
 import { SimpleModeProvider } from "@/components/features/accessibility/SimpleModeProvider";
+import { ReturnScrollCapture } from "@/components/layout/ReturnScrollCapture";
 import "./globals.css";
 
 const themeInitializationScript = `
@@ -16,7 +17,7 @@ const themeInitializationScript = `
     const saved = localStorage.getItem(storageKey);
     theme = saved === "light" || saved === "dark"
       ? saved
-      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      : "light";
   } catch {}
   root.dataset.theme = theme;
   try {
@@ -27,6 +28,7 @@ const themeInitializationScript = `
     root.dataset.simpleMode = "off";
   }
   root.style.colorScheme = theme;
+  root.style.backgroundColor = theme === "dark" ? "#15181c" : "#fbfaf7";
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", theme === "dark" ? "#15181c" : "#fbfaf7");
 })();`;
@@ -52,7 +54,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ko" suppressHydrationWarning>
+    <html lang="ko" style={{ backgroundColor: "#fbfaf7", colorScheme: "light" }} suppressHydrationWarning>
       <head>
         <meta content="light dark" name="color-scheme" />
         <meta content="#fbfaf7" name="theme-color" />
@@ -69,6 +71,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </NotificationExperienceProvider>
         </SimpleModeProvider>
         <GlobalToastHost />
+        <ReturnScrollCapture />
       </body>
     </html>
   );

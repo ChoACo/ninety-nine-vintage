@@ -1,9 +1,6 @@
 import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
 import { normalizeProductBrand } from "@/lib/catalog/brand";
-import {
-  getNextAuctionDeadline,
-  getRelativeKoreanDateTime,
-} from "@/utils/formatters";
+import { getNextAuctionDeadline } from "@/utils/formatters";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -158,9 +155,7 @@ export async function POST(request: Request) {
   const publishAt = singleRegistration
     ? publicationMode === "now"
       ? new Date().toISOString()
-      : body?.publicationMode === "next-day-10"
-        ? new Date(getRelativeKoreanDateTime(1, "10:00:00", new Date())).toISOString()
-        : nextKoreanScheduledHour(scheduledHourKst)
+      : nextKoreanScheduledHour(scheduledHourKst)
     : text(body?.publishAt, new Date().toISOString());
   const closesAt = singleRegistration
     ? saleType === "fixed"

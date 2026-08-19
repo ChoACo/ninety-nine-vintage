@@ -10,7 +10,7 @@ test("first-login nickname setup is limited to Kakao account hubs and every late
     source("src/app/layout.tsx"),
     source("src/app/(shop)/account/page.tsx"),
     source("src/app/(mobile)/m/account/page.tsx"),
-    source("src/app/(mobile)/m/account/settings/page.tsx"),
+    source("src/app/(mobile)/m/settings/page.tsx"),
     source("src/components/account/NicknameGate.tsx"),
     source("src/components/account/NicknameSettings.tsx"),
     source("src/components/admin/owner/OwnerNicknameReviewPanel.tsx"),

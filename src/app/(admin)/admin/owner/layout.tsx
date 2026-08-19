@@ -1,4 +1,5 @@
 import { AdminWorkspaceShell } from "@/components/admin/AdminWorkspaceShell";
+import { StandaloneBackModal } from "@/components/layout/StandaloneBackModal";
 
 const navigation = [
   { exact: true, href: "/admin/owner", label: "운영 현황", description: "사이트 전체 상태와 우선 업무" },
@@ -7,6 +8,7 @@ const navigation = [
   { href: "/admin/owner/stores", label: "매장·직원", description: "매장과 업무 권한" },
   { href: "/admin/owner/members", label: "회원", description: "회원 상태와 권한" },
   { href: "/admin/owner/onboarding", label: "입점 상담", description: "판매 신청 문의" },
+  { href: "/admin/owner/community", label: "공지·소통", description: "운영 안내와 질문·답변" },
   { href: "/admin/owner/platform", label: "정산", description: "그룹·멤버십·정산" },
   { href: "/admin/owner/site-status", label: "시스템", description: "사이트·연동·운영 도구" },
 ] as const;
@@ -14,6 +16,7 @@ const navigation = [
 export default function OwnerLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <AdminWorkspaceShell
+      contentHeader={<StandaloneBackModal />}
       description="매장 운영과 결제·환불·권한·시스템 정책을 관리합니다."
       eyebrow="Site administration"
       navigation={navigation}

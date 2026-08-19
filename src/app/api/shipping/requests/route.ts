@@ -152,36 +152,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!body.applyShippingCredit) {
-    return commerceJson(
-      {
-        error: "shipping_credit_required",
-        message: "배송 크레딧이 있어야 배송을 신청할 수 있습니다.",
-      },
-      403,
-    );
-  }
-  const { data: account, error: accountError } = await auth.admin
-    .from("member_accounts")
-    .select("shipping_credit_count")
-    .eq("member_id", auth.userId)
-    .maybeSingle();
-  if (
-    accountError ||
-    !account ||
-    !Number.isSafeInteger(account.shipping_credit_count) ||
-    account.shipping_credit_count < 1
-  ) {
-    return commerceJson(
-      {
-        error: "shipping_credit_required",
-        message: "배송 크레딧이 없어 배송을 신청할 수 없습니다. 먼저 배송 크레딧을 결제해 주세요.",
-      },
-      403,
-    );
-  }
-
-  const settlement = "shipping_credit";
+  const settlement = "manual_transfer";
 
   const inventoryItemIds = body.inventoryItemIds;
   if (

@@ -66,10 +66,10 @@ test("service worker always shows mobile OS push and handles notification clicks
 });
 
 test("push subscription endpoints are authenticated and rebound to the current user", async () => {
-  const [route, client, authStatus] = await Promise.all([
+  const [route, client, logoutHelper] = await Promise.all([
     source("src/app/api/push/subscription/route.ts"),
     source("src/lib/webPush/client.ts"),
-    source("src/components/layout/AuthStatus.tsx"),
+    source("src/lib/auth/logout.ts"),
   ]);
 
   assert.match(route, /authenticateCommerceRequest\(request,\s*true\)/);
@@ -86,7 +86,7 @@ test("push subscription endpoints are authenticated and rebound to the current u
   assert.doesNotMatch(client, /registration\.showNotification\("NINETY-NINE 시험 알림"/);
   assert.match(client, /disableWebPush/);
   assert.match(client, /subscription\.unsubscribe/);
-  assert.match(authStatus, /await disableWebPush\(session\.access_token\)/);
+  assert.match(logoutHelper, /await disableWebPush\(accessToken\)/);
 });
 
 test("test notifications use the same durable inbox and outbox as real events", async () => {

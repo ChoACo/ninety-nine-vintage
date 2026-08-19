@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowUpRight, Clock3 } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { ProductRail } from "@/components/features/catalog/ProductRail";
 import {
   HomeFeaturedAuction,
@@ -12,7 +12,10 @@ import {
 } from "@/components/features/home/featuredAuction";
 import { StatusNotice } from "@/components/ui/StatusNotice";
 import { fetchPublishedProducts } from "@/services/products";
+import { StoreMallGrid } from "@/components/features/catalog/StoreMallGrid";
+import { fetchStoreMallCards, type StoreMallCard } from "@/services/stores";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
+import { LoginReturnScrollRestorer } from "@/components/layout/LoginReturnScrollRestorer";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -22,15 +25,17 @@ export const metadata: Metadata = {
 };
 
 async function loadHomeData() {
-  const [auctionResult, fixedResult] = await Promise.allSettled([
+  const [auctionResult, fixedResult, storeMallsResult] = await Promise.allSettled([
     LIVE_AUCTION_ENABLED
       ? fetchPublishedProducts({ limit: 100, saleType: "auction" })
       : Promise.resolve([]),
     fetchPublishedProducts({ limit: 6, saleType: "fixed" }),
+    fetchStoreMallCards(),
   ]);
   return {
     auctions: auctionResult.status === "fulfilled" ? auctionResult.value : [],
     fixed: fixedResult.status === "fulfilled" ? fixedResult.value : [],
+    storeMalls: storeMallsResult.status === "fulfilled" ? storeMallsResult.value : [],
     catalogUnavailable: fixedResult.status === "rejected",
   };
 }
@@ -41,9 +46,10 @@ interface HomePresentationProps {
   auctions: HomeProducts;
   fixed: HomeProducts;
   featuredAuctions: HomeFeaturedAuctionItem[];
+  storeMalls: StoreMallCard[];
 }
 
-function DesktopHome({ auctions, featuredAuctions, fixed }: HomePresentationProps) {
+function DesktopHome({ auctions, featuredAuctions, fixed, storeMalls }: HomePresentationProps) {
   return (
     <div className="space-y-16" data-home-presentation="desktop">
       <section className="theme-invariant-dark grid min-h-[560px] grid-cols-[1.05fr_.95fr] overflow-hidden bg-ink text-paper">
@@ -60,25 +66,22 @@ function DesktopHome({ auctions, featuredAuctions, fixed }: HomePresentationProp
         <HomeFeaturedAuction products={featuredAuctions} />
       </section>
 
-      <section className="grid grid-cols-2 gap-8 border-y border-line py-5">
-        <div className="flex items-center gap-3"><Clock3 size={16} /><div><p className="text-[10px] font-bold tracking-[0.14em] text-muted">즉시 구매</p><p className="mt-1 text-sm font-bold">상시 바로 구매</p></div></div>
-        <div><p className="text-[10px] font-bold tracking-[0.14em] text-muted">보관·묶음 배송</p><p className="mt-1 text-sm font-bold">소형 14일 · 대형 7일</p></div>
-      </section>
-
       {LIVE_AUCTION_ENABLED && <ProductRail compact eyebrow="실시간 경매" title="오늘 밤의 경매" products={auctions} />}
 
       <ProductRail compact eyebrow="즉시 구매" title="바로 구매 가능한 상품" products={fixed} href="/shop" />
 
-      <section className="grid grid-cols-2 gap-10 border-t border-ink pt-12">
+      <StoreMallGrid cards={storeMalls} />
+
+      <section className="grid grid-cols-2 items-start gap-10 border-t border-ink pt-12">
         <div><p className="text-[10px] font-bold tracking-[0.14em] text-muted">나인티 나인 안내</p><h2 className="mt-4 max-w-2xl text-4xl font-black leading-none tracking-[-.08em]">좋은 빈티지는<br />보관하는 시간까지 포함합니다.</h2></div>
-        <p className="self-end text-sm leading-6 text-muted">결제한 상품은 바로 보내지 않아도 됩니다. 다른 날의 낙찰품과 함께 배송을 요청하고, 하나의 박스로 시간을 묶어보세요.</p>
+        <p className="self-start text-sm leading-6 text-muted">결제한 상품은 바로 보내지 않아도 됩니다. 다른 날의 낙찰품과 함께 배송을 요청하고, 하나의 박스로 시간을 묶어보세요.</p>
       </section>
     </div>
   );
 }
 
 export default async function HomePage() {
-  const { auctions, fixed, catalogUnavailable } = await loadHomeData();
+  const { auctions, fixed, catalogUnavailable, storeMalls } = await loadHomeData();
   const featuredAuctions = shuffleFeaturedAuctionCandidates(
     selectFeaturedAuctionCandidates(auctions),
   ).map((product) => ({
@@ -92,7 +95,8 @@ export default async function HomePage() {
   return (
     <div>
       {catalogUnavailable && <StatusNotice className="mb-6 px-5 py-4 leading-5" variant="warning">상품 정보를 일시적으로 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</StatusNotice>}
-      <DesktopHome auctions={auctions.slice(0, 6)} featuredAuctions={featuredAuctions} fixed={fixed} />
+      <DesktopHome auctions={auctions.slice(0, 6)} featuredAuctions={featuredAuctions} fixed={fixed} storeMalls={storeMalls} />
+      <LoginReturnScrollRestorer />
     </div>
   );
 }

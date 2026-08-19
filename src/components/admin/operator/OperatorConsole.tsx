@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { OperatorSecondChanceButton } from "@/components/admin/operator/OperatorSecondChanceButton";
-import { OwnerNicknameReviewPanel } from "@/components/admin/owner/OwnerNicknameReviewPanel";
 import { LocalTestMemberSwitcher } from "@/components/admin/LocalTestMemberSwitcher";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -30,7 +29,7 @@ interface ProductResponse {
 }
 
 function productStatusLabel(status: string) {
-  if (status === "pending") return "초안";
+  if (status === "pending") return "등록 대기";
   if (status === "active") return "공개 중";
   if (status === "closed") return "마감";
   if (status === "sold") return "판매 완료";
@@ -245,7 +244,6 @@ export function OperatorConsole({
         </section>
 
       </div>
-      <OwnerNicknameReviewPanel />
     </div>
   );
 }

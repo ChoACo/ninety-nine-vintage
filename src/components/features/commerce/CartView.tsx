@@ -96,6 +96,17 @@ interface StoredCheckoutRequest {
   includeShippingFee: boolean;
   shippingFeeQuote: number;
   shippingRegion: "regular" | "remote_area";
+  shippingAddressId: string;
+}
+
+interface ShippingAddress {
+  address: string;
+  id: string;
+  is_default: boolean;
+  label: string;
+  phone: string;
+  postal_code: string;
+  recipient_name: string;
 }
 
 const UUID_PATTERN =
@@ -346,6 +357,7 @@ function readStoredCheckoutRequest(options?: {
         includeShippingFee: parsed.includeShippingFee === true,
         shippingFeeQuote: Number(parsed.shippingFeeQuote ?? 0),
         shippingRegion: parsed.shippingRegion === "remote_area" ? "remote_area" : "regular",
+        shippingAddressId: typeof parsed.shippingAddressId === "string" ? parsed.shippingAddressId : "",
       };
     }
   } catch {
@@ -397,18 +409,6 @@ function toCartProduct(product: PublishedFixedProduct): CartProduct {
   };
 }
 
-function reservationRemainingLabel(
-  expiresAt: string | null | undefined,
-  now: number,
-) {
-  const remaining = expiresAt ? Date.parse(expiresAt) - now : 0;
-  if (!Number.isFinite(remaining) || remaining <= 0) return "재고 점유 만료";
-  const totalSeconds = Math.ceil(remaining / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `재고 점유 ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")} 남음`;
-}
-
 export function CartView({ basePath = "", selectedProductId, surface = "mobile" }: { basePath?: "" | "/m"; selectedProductId?: string; surface?: "desktop" | "mobile" }) {
   const hydrate = useCommerceStore((state) => state.hydrate);
   const cartIds = useCommerceStore((state) => state.cartIds);
@@ -428,13 +428,13 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
     "success",
   );
   const [staleCount, setStaleCount] = useState(0);
-  const [serverClockOffset, setServerClockOffset] = useState(0);
-  const [reservationClock, setReservationClock] = useState(() => Date.now());
   const [paymentMode, setPaymentMode] = useState<CartPaymentMode>("loading");
   const [shippingFee, setShippingFee] = useState(0);
   const [shippingCharges, setShippingCharges] = useState<ShippingCharge[]>([]);
   const [includeShippingFee, setIncludeShippingFee] = useState(true);
   const [shippingRegion, setShippingRegion] = useState<"regular" | "remote_area">("regular");
+  const [shippingAddresses, setShippingAddresses] = useState<ShippingAddress[]>([]);
+  const [shippingAddressId, setShippingAddressId] = useState("");
   const [heldCheckoutIds, setHeldCheckoutIds] = useState<string[]>([]);
   const [releaseCheckoutAllowed, setReleaseCheckoutAllowed] = useState(false);
   const [restoredCheckoutProducts, setRestoredCheckoutProducts] = useState<
@@ -444,6 +444,8 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const authGeneration = useRef(0);
   const authUserId = useRef<string | null>(null);
   const cartOwnerId = useRef<string | null>(null);
+  const cartIdsRef = useRef<string[]>([]);
+  const cartRefreshRef = useRef<(() => void) | null>(null);
   const checkoutOperationSequence = useRef(0);
   const activeCheckoutOperation = useRef<number | null>(null);
   const invalidateCheckoutRequest = () => {
@@ -455,17 +457,12 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   };
 
   useEffect(() => {
-    hydrate();
-  }, [hydrate]);
+    cartIdsRef.current = cartIds;
+  }, [cartIds]);
 
   useEffect(() => {
-    if (liveProducts.length === 0) return;
-    const timer = window.setInterval(
-      () => setReservationClock(Date.now()),
-      1000,
-    );
-    return () => window.clearInterval(timer);
-  }, [liveProducts.length]);
+    hydrate();
+  }, [hydrate]);
 
   useEffect(() => {
     let disposed = false;
@@ -485,10 +482,11 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
       setLiveProducts([]);
       replaceCart([]);
       setStaleCount(0);
-      setServerClockOffset(0);
       setPaymentMode("loading");
       setShippingFee(0);
       setShippingCharges([]);
+      setShippingAddresses([]);
+      setShippingAddressId("");
       setIncludeShippingFee(true);
       setMessage("");
       setMessageKind("success");
@@ -496,6 +494,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
     };
 
     const loadSession = async (session: Session | null) => {
+      cartRefreshRef.current = () => { void loadSession(session); };
       const sequence = ++loadSequence;
       const nextUserId = session?.user.id ?? null;
       const identityChanged = authUserId.current !== nextUserId;
@@ -503,6 +502,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
       authUserId.current = nextUserId;
 
       if (!session?.access_token) {
+        cartRefreshRef.current = null;
         clearMemberState();
         setAccess("guest");
         setProductsLoading(false);
@@ -545,6 +545,13 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
 
         if (!isCurrent()) return;
         setAccess("member");
+        const addressResponse = await fetch("/api/account/addresses", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+        const addressPayload = addressResponse.ok ? await addressResponse.json() as { addresses?: ShippingAddress[] } : { addresses: [] };
+        if (isCurrent()) {
+          const addresses = Array.isArray(addressPayload.addresses) ? addressPayload.addresses : [];
+          setShippingAddresses(addresses);
+          setShippingAddressId((current) => addresses.some((address) => address.id === current) ? current : addresses.find((address) => address.is_default)?.id ?? addresses[0]?.id ?? "");
+        }
         const response = await fetch(`/api/cart?shippingRegion=${shippingRegion}`, {
           headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
@@ -570,7 +577,6 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
         const payload = (await response.json()) as {
           paymentMode?: unknown;
           productIds?: string[];
-          serverTime?: string | null;
           staleProductIds?: string[];
           items?: PublishedFixedProduct[];
           shippingFee?: unknown;
@@ -598,14 +604,6 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
         if (!activeRequest) {
           setShippingCharges(Array.isArray(payload.shippingCharges) ? payload.shippingCharges : []);
         }
-        const serverTime =
-          typeof payload.serverTime === "string"
-            ? Date.parse(payload.serverTime)
-            : Number.NaN;
-        setServerClockOffset(
-          Number.isFinite(serverTime) ? serverTime - Date.now() : 0,
-        );
-        setReservationClock(Date.now());
         const ids =
           payload.productIds ?? cartProducts.map((product) => product.id);
         setLiveProducts(cartProducts);
@@ -670,6 +668,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
       );
       return () => {
         disposed = true;
+        cartRefreshRef.current = null;
         loadSequence += 1;
         authGeneration.current += 1;
         listener.subscription.unsubscribe();
@@ -678,11 +677,37 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
       handleUnconfirmedSessionReadFailure();
       return () => {
         disposed = true;
+        cartRefreshRef.current = null;
         loadSequence += 1;
         authGeneration.current += 1;
       };
     }
   }, [replaceCart, shippingRegion]);
+
+  useEffect(() => {
+    if (access !== "member") return;
+    let client: ReturnType<typeof getSupabaseBrowserClient>;
+    try {
+      client = getSupabaseBrowserClient();
+    } catch {
+      return;
+    }
+    const channel = client
+      .channel("member-cart-product-events")
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, (payload) => {
+        const record = payload.new && typeof payload.new === "object"
+          ? payload.new as Record<string, unknown>
+          : payload.old && typeof payload.old === "object"
+            ? payload.old as Record<string, unknown>
+            : null;
+        const productId = typeof record?.id === "string" ? record.id : null;
+        if (productId && cartIdsRef.current.includes(productId)) {
+          cartRefreshRef.current?.();
+        }
+      })
+      .subscribe();
+    return () => { void client.removeChannel(channel); };
+  }, [access]);
 
   const products = useMemo(() => {
     // A prepared order is immutable. While it is pending, show and retry only
@@ -704,16 +729,6 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const expectedTotal =
     productTotal + (includeShippingFee ? shippingFee : 0);
   const hasPendingCheckout = heldCheckoutIds.length > 0;
-  const reservationNow = reservationClock + serverClockOffset;
-  const reservationExpired =
-    !hasPendingCheckout &&
-    products.some((product) => {
-      const expiresAt = product.reservationExpiresAt
-        ? Date.parse(product.reservationExpiresAt)
-        : Number.NaN;
-      return Number.isFinite(expiresAt) && expiresAt <= reservationNow;
-    });
-
   const checkout = async () => {
     if (
       busy ||
@@ -726,6 +741,11 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
       setMessage(
         "수동 계좌이체 설정을 확인하지 못했습니다. 잠시 후 새로고침해 주세요.",
       );
+      return;
+    }
+    if (!shippingAddressId) {
+      setMessageKind("error");
+      setMessage("즉시구매는 결제와 함께 배송지를 선택해야 합니다.");
       return;
     }
     const expectedPaymentMode = paymentMode;
@@ -777,6 +797,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           includeShippingFee: requestIncludesShipping,
           shippingFeeQuote: requestShippingFee,
           shippingRegion,
+          shippingAddressId,
         }),
         productIds,
         productSnapshots,
@@ -798,6 +819,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           expectedPaymentMode,
           includeShippingFee: currentRequest.includeShippingFee,
           shippingRegion: currentRequest.shippingRegion,
+          shippingAddressId: currentRequest.shippingAddressId,
         }),
       });
       const payload = (await response.json().catch(() => null)) as unknown;
@@ -920,13 +942,11 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
 
   const checkoutDisabled =
     busy ||
-    reservationExpired ||
-    paymentMode !== "manual_transfer";
+    paymentMode !== "manual_transfer" ||
+    !shippingAddressId;
   const checkoutButtonLabel = busy
     ? "결제 준비 중..."
-    : reservationExpired
-      ? "재고 점유 만료"
-      : paymentMode === "manual_transfer"
+    : paymentMode === "manual_transfer"
         ? "주문하고 입금계좌 확인"
         : "결제 설정 확인 중";
 
@@ -950,21 +970,6 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
         >
           판매가 완료되었거나 공개가 종료된 상품 {staleCount}개를 장바구니에서
           제외했습니다.
-        </div>
-      )}
-      {products.length > 0 && !hasPendingCheckout && (
-        <div className="border border-sky-200 bg-sky-50 px-4 py-3 text-xs leading-5 text-sky-900">
-          장바구니에 담은 한 점 상품은 서버 시간을 기준으로 15분 동안 내
-          계정에만 임시 점유됩니다. 시간이 끝나기 전에 결제를 시작해 주세요.
-        </div>
-      )}
-      {reservationExpired && (
-        <div
-          aria-live="assertive"
-          className="border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-800"
-        >
-          재고 점유 시간이 만료되었습니다. 새로고침 후 아직 구매 가능한 상품을
-          다시 담아 주세요.
         </div>
       )}
       {hasPendingCheckout && !busy && (
@@ -1068,16 +1073,6 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                       <p className="mt-2 text-xs text-muted">
                         {product.size} · {conditionLabels[product.condition]}
                       </p>
-                      {!hasPendingCheckout && (
-                        <p
-                          className={`mt-2 font-mono text-[10px] font-bold ${product.reservationExpiresAt && Date.parse(product.reservationExpiresAt) <= reservationNow ? "text-red-700" : "text-sky-700"}`}
-                        >
-                          {reservationRemainingLabel(
-                            product.reservationExpiresAt,
-                            reservationNow,
-                          )}
-                        </p>
-                      )}
                     </div>
                     <button
                       aria-label="장바구니에서 삭제"
@@ -1127,7 +1122,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                 <span>
                   배송비 함께 결제
                   <small className="mt-1 block font-normal text-muted">
-                    기본 선택 · 이후 배송 신청 시 다시 청구하지 않습니다.
+                  센터별 배송 단위 기준으로 주문과 함께 결제합니다.
                   </small>
                 </span>
               </label>
@@ -1152,6 +1147,11 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                 <option value="remote_area">제주 및 도서산간 지역 택배</option>
               </select>
             </label>
+            <label className="mt-3 block text-xs font-bold">
+              배송지 선택 <span className="font-normal text-red-600">(필수)</span>
+              {shippingAddresses.length > 0 ? <select className="mt-1 h-11 w-full border border-line bg-paper px-3" disabled={busy || hasPendingCheckout} onChange={(event) => { invalidateCheckoutRequest(); setShippingAddressId(event.target.value); }} value={shippingAddressId}><option value="">배송지를 선택해 주세요</option>{shippingAddresses.map((address) => <option key={address.id} value={address.id}>{address.label} · {address.recipient_name} · {address.address}</option>)}</select> : <span className="mt-1 block border border-amber-200 bg-amber-50 px-3 py-3 text-[11px] font-normal leading-5 text-amber-900">저장된 배송지가 없습니다. MY의 보관·배송 → 배송지 관리에서 먼저 등록해 주세요.</span>}
+            </label>
+            <p className="mt-3 border border-amber-200 bg-amber-50 px-3 py-3 text-[11px] leading-5 text-amber-900">즉시구매는 구매 시 선택한 배송지로 결제 확인 후 바로 배송 접수됩니다. 입금은 주문 후 최대 6시간 이내에 완료해야 하며, 미입금 취소가 반복되면 구매·입찰 이용이 제한될 수 있습니다.</p>
             {shippingCharges.length > 0 ? (
               <div className="mt-3 space-y-2 border border-line bg-paper p-3 text-[11px]">
                 <p className="font-bold">배송비 {shippingCharges.length}건</p>

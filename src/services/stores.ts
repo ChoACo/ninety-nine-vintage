@@ -27,7 +27,10 @@ export interface StoreMallCard {
 export async function fetchActiveStores(): Promise<PublicStore[]> {
   const verifier = createSupabasePublicClient();
   const { data, error } = await verifier.from("stores").select("id, slug, name, description, mall_info, mall_image").eq("is_active", true).order("name");
-  if (error) throw new Error("숍 목록을 불러오지 못했습니다.");
+  // Public mall pages should remain usable during a transient catalog read
+  // failure; the UI renders its empty-state instead of turning the whole page
+  // into a 500 response.
+  if (error) return [];
   return (data ?? []).map((store) => ({ id: store.id, slug: store.slug, name: store.name, description: store.description, mallInfo: store.mall_info, mallImage: store.mall_image }));
 }
 
@@ -41,7 +44,9 @@ export async function fetchStoreMallCards(): Promise<StoreMallCard[]> {
     .select("id, slug, name, description, mall_info, mall_image")
     .eq("is_active", true)
     .order("name");
-  if (error) throw new Error("숍 목록을 불러오지 못했습니다.");
+  // Keep the public center-mall shell available during transient catalog
+  // read failures; callers render an empty-state when no cards are returned.
+  if (error) return [];
   const rows = data ?? [];
   const counts = await Promise.all(
     rows.map(async (store) => {

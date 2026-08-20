@@ -30,7 +30,8 @@ test("operator fulfillment uses direct-store storage with dated product grids", 
   assert.match(consoleSource, /상품 상세보기/);
   assert.match(consoleSource, /선택 상품 출고·보관 완료/);
   assert.doesNotMatch(consoleSource, /센터 입고|보관 위치|목적지/);
-  assert.match(layout, /href:\s*"\/admin\/operator\/fulfillment"/);
+  assert.match(layout, /href:\s*"\/admin\/operator\/sales"[\s\S]*label:\s*"판매 내역"/);
+  assert.doesNotMatch(layout, /href:\s*"\/admin\/operator\/fulfillment"/);
   assert.doesNotMatch(layout, /\/admin\/operator\/center/);
 
   assert.match(migration, /current_stage = 'center_stored'/);

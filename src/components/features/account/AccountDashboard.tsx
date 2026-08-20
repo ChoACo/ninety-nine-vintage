@@ -177,19 +177,6 @@ interface Address {
   address: string;
   is_default: boolean;
 }
-interface ShippingCreditPayment {
-  account_number_snapshot: string;
-  bank_name_snapshot: string;
-  credit_quantity: number;
-  depositor_name: string | null;
-  expected_amount: number;
-  id: string;
-  requested_at: string;
-  status: string;
-  unit_amount?: number;
-  version: number;
-}
-
 export type AccountDashboardView =
   | "full"
   | "overview"
@@ -237,7 +224,6 @@ function AccountDashboardForSession({
   const [refunds, setRefunds] = useState<ManualRefund[]>([]);
   const [liked, setLiked] = useState<ProductSummary[]>([]);
   const [likedCount, setLikedCount] = useState(0);
-  const [credits] = useState(0);
   const [now, setNow] = useState(0);
   const [paymentServerTime, setPaymentServerTime] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
@@ -263,14 +249,6 @@ const [shippingMessage, setShippingMessage] = useState("");
     const [memberAccessRequired, setMemberAccessRequired] = useState(false);
   const [trackingShipment, setTrackingShipment] = useState<InventoryShipment | null>(null);
   const [showAllStorage, setShowAllStorage] = useState(false);
-  const [creditQuantity, setCreditQuantity] = useState(1);
-  const [creditPayment, setCreditPayment] =
-    useState<ShippingCreditPayment | null>(null);
-  const [creditPayments, setCreditPayments] = useState<ShippingCreditPayment[]>([]);
-  const [creditDepositorOpen, setCreditDepositorOpen] = useState(false);
-  const [creditDepositorName, setCreditDepositorName] = useState("");
-  const [creditCancelBusyId, setCreditCancelBusyId] = useState<string | null>(null);
-  const [creditPurchaseBusy, setCreditPurchaseBusy] = useState(false);
   const [refundMessage, setRefundMessage] = useState("");
   const [refundBusyId, setRefundBusyId] = useState<string | null>(null);
   const [refundDrafts, setRefundDrafts] = useState<Record<string, RefundAccountDraft>>({});
@@ -370,9 +348,6 @@ const [shippingMessage, setShippingMessage] = useState("");
           );
           setRememberedDepositorName(
             storageData.rememberedDepositorName ?? null,
-          );
-          setCreditDepositorName(
-            storageData.rememberedDepositorName ?? "",
           );
           setSelectedInventoryItemIds([]);
           setShipments(shipmentData.shipments ?? []);
@@ -634,8 +609,6 @@ const [shippingMessage, setShippingMessage] = useState("");
     }
   };
   const shippingRequestKeys = useRef(new Map<string, string>());
-  const shippingCreditRequestKeys = useRef(new Map<number, string>());
-  const shippingCreditCancelKeys = useRef(new Map<string, string>());
   const refundAccountKeys = useRef(new Map<string, string>());
   if (loading || (token && dataStatus === "loading")) {
     return (
@@ -776,117 +749,6 @@ const [shippingMessage, setShippingMessage] = useState("");
           ? "배송 신청을 접수했습니다. 보유한 무료 배송 권한이 자동 적용되었습니다."
           : "배송 신청을 접수했습니다. 배송비 입금 확인 후 출고됩니다.",
     );
-  };
-  const requestShippingCredits = async () => {
-    if (!token || creditPurchaseBusy) return;
-    if (
-      !Number.isSafeInteger(creditQuantity) ||
-      creditQuantity < 1 ||
-      creditQuantity > 20
-    ) {
-      setShippingMessage("배송 크레딧은 1~20개까지 신청할 수 있습니다.");
-      return;
-    }
-    const depositorName = creditDepositorName.trim();
-    if (depositorName.length < 1 || depositorName.length > 80) {
-      setShippingMessage("입금자명을 확인해 주세요.");
-      return;
-    }
-    const idempotencyKey =
-      shippingCreditRequestKeys.current.get(creditQuantity) ??
-      crypto.randomUUID();
-    shippingCreditRequestKeys.current.set(creditQuantity, idempotencyKey);
-    setCreditPurchaseBusy(true);
-    setShippingMessage("");
-    try {
-      const response = await fetch("/api/shipping/credits", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          depositorName,
-          idempotencyKey,
-          quantity: creditQuantity,
-        }),
-      });
-      const payload = await response.json().catch(() => null) as {
-        error?: string;
-        payment?: ShippingCreditPayment;
-      } | null;
-      if (!response.ok || !payload?.payment) {
-        throw new Error(
-          payload?.error ?? "배송 크레딧 결제를 신청하지 못했습니다.",
-        );
-      }
-      const requestedPayment = payload.payment;
-      shippingCreditRequestKeys.current.delete(creditQuantity);
-      setCreditPayment(requestedPayment);
-      setCreditPayments((current) => [
-        requestedPayment,
-        ...current.filter((payment) => payment.id !== requestedPayment.id),
-      ]);
-      setRememberedDepositorName(depositorName);
-      setCreditDepositorOpen(false);
-      setShippingMessage(
-        `배송 크레딧 ${requestedPayment.credit_quantity}개 결제를 신청했습니다.`,
-      );
-    } catch (error) {
-      setShippingMessage(
-        error instanceof Error
-          ? error.message
-          : "배송 크레딧 결제를 신청하지 못했습니다.",
-      );
-    } finally {
-      setCreditPurchaseBusy(false);
-    }
-  };
-  const cancelShippingCreditPayment = async (
-    payment: ShippingCreditPayment,
-  ) => {
-    if (
-      !token ||
-      creditCancelBusyId ||
-      !window.confirm("이 배송 크레딧 입금 신청을 취소할까요?")
-    ) return;
-    const idempotencyKey =
-      shippingCreditCancelKeys.current.get(payment.id) ?? crypto.randomUUID();
-    shippingCreditCancelKeys.current.set(payment.id, idempotencyKey);
-    setCreditCancelBusyId(payment.id);
-    setShippingMessage("");
-    try {
-      const response = await fetch("/api/shipping/credits", {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          expectedVersion: payment.version,
-          idempotencyKey,
-          paymentId: payment.id,
-        }),
-      });
-      const payload = await response.json().catch(() => null) as {
-        error?: string;
-      } | null;
-      if (!response.ok) {
-        throw new Error(payload?.error ?? "배송 크레딧 입금 신청을 취소하지 못했습니다.");
-      }
-      shippingCreditCancelKeys.current.delete(payment.id);
-      setCreditPayments((current) => current.filter((item) => item.id !== payment.id));
-      setCreditPayment((current) => current?.id === payment.id ? null : current);
-      setShippingMessage("배송 크레딧 입금 신청을 취소했습니다.");
-    } catch (error) {
-      setShippingMessage(
-        error instanceof Error
-          ? error.message
-          : "배송 크레딧 입금 신청을 취소하지 못했습니다.",
-      );
-    } finally {
-      setCreditCancelBusyId(null);
-    }
   };
   const updateRefundDraft = (
     refundId: string,
@@ -1300,111 +1162,6 @@ const [shippingMessage, setShippingMessage] = useState("");
                   ? `선택 주문 상품 ${selectedLegacyOrder.items.length}개 전체`
                   : `선택 가능 상품 ${requestEligibleItems.length}개 · 기존 주문 ${legacyEligibleOrders.length}건`}
             </p>
-            <div className="mt-5 hidden border border-line bg-paper p-4" id="shipping-credit">
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <p className="eyebrow text-muted">배송 크레딧</p>
-                  <h3 className="mt-1 text-sm font-black">현재 {credits}회</h3>
-                </div>
-                <p className="text-right text-[10px] leading-4 text-muted">
-                  배송 신청에 사용하거나
-                  <br />
-                  필요한 만큼 충전
-                </p>
-              </div>
-              <label
-                className="mt-4 block text-xs font-bold"
-                htmlFor="shipping-credit-quantity"
-              >
-                필요한 크레딧 수량
-              </label>
-              <div className="mt-2 flex gap-2">
-                <input
-                  className="h-10 min-w-0 flex-1 border border-line px-3 text-sm"
-                  id="shipping-credit-quantity"
-                  inputMode="numeric"
-                  max={20}
-                  min={1}
-                  onChange={(event) => {
-                    setCreditQuantity(Number(event.target.value));
-                    setCreditPayment(null);
-                  }}
-                  type="number"
-                  value={creditQuantity}
-                />
-                <button
-                  className="bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40"
-                  disabled={!token || creditPurchaseBusy}
-                  onClick={() => {
-                    setCreditDepositorName(
-                      rememberedDepositorName ?? creditDepositorName,
-                    );
-                    setCreditDepositorOpen(true);
-                  }}
-                  type="button"
-                >
-                  결제 신청
-                </button>
-              </div>
-              <p className="mt-2 text-[11px] leading-5 text-muted">
-                1~20개 중 필요한 만큼만 별도로 결제 신청할 수 있습니다.
-              </p>
-              {creditPayment && creditPayments.length === 0 && (
-                <div className="mt-4 border border-ink bg-surface p-3 text-xs leading-6">
-                  <p className="font-black">
-                    {creditPayment.credit_quantity}개 · 총{" "}
-                    {creditPayment.expected_amount.toLocaleString("ko-KR")}원
-                  </p>
-                  <p>
-                    {creditPayment.bank_name_snapshot}{" "}
-                    {creditPayment.account_number_snapshot}
-                  </p>
-                  <p className="text-muted">
-                    개당 {Math.round(
-                      creditPayment.expected_amount /
-                        creditPayment.credit_quantity,
-                    ).toLocaleString("ko-KR")}원 ·
-                    입금 확인 후 적립
-                  </p>
-                </div>
-              )}
-              {creditPayments.length > 0 && (
-                <div className="mt-4 divide-y divide-line border-y border-line">
-                  {creditPayments.map((payment) => (
-                    <article className="py-3 text-xs" key={payment.id}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-black">
-                            {payment.credit_quantity}개 ·{" "}
-                            {payment.expected_amount.toLocaleString("ko-KR")}원
-                          </p>
-                          <p className="mt-1 text-muted">
-                            입금자명 {payment.depositor_name ?? "확인 필요"} ·{" "}
-                            {payment.status === "partially_paid"
-                              ? "일부 입금 확인"
-                              : "입금 대기"}
-                          </p>
-                          <p className="mt-1">
-                            {payment.bank_name_snapshot}{" "}
-                            {payment.account_number_snapshot}
-                          </p>
-                        </div>
-                        {payment.status === "awaiting_transfer" && (
-                          <button
-                            className="shrink-0 border border-rose-300 px-3 py-2 text-[10px] font-bold text-rose-700 disabled:opacity-40"
-                            disabled={Boolean(creditCancelBusyId)}
-                            onClick={() => void cancelShippingCreditPayment(payment)}
-                            type="button"
-                          >
-                            {creditCancelBusyId === payment.id ? "취소 중" : "신청 취소"}
-                          </button>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </div>
             <p className="mt-4 text-xs font-bold">배송지 선택</p>
             <select
               aria-label="배송지"
@@ -1851,65 +1608,6 @@ const [shippingMessage, setShippingMessage] = useState("");
               </div>
             </div>
           )}
-        </div>
-      </PremiumDialog>
-      <PremiumDialog
-        closeDisabled={creditPurchaseBusy}
-        labelledBy="shipping-credit-depositor-title"
-        onClose={() => setCreditDepositorOpen(false)}
-        open={creditDepositorOpen}
-        panelClassName="max-w-md"
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-line p-5">
-          <div>
-            <p className="eyebrow text-muted">배송 크레딧 결제</p>
-            <h2 className="mt-2 text-xl font-black" id="shipping-credit-depositor-title">
-              입금자명 확인
-            </h2>
-          </div>
-          <button
-            aria-label="입금자명 확인 창 닫기"
-            className="p-2"
-            disabled={creditPurchaseBusy}
-            onClick={() => setCreditDepositorOpen(false)}
-            type="button"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-5">
-          <p className="text-xs leading-5 text-muted">
-            상품 결제와 같은 입금자명을 기억합니다. 실제 송금할 이름과 같은지 확인해 주세요.
-          </p>
-          <label className="mt-5 block text-xs font-black" htmlFor="shipping-credit-depositor-name">
-            입금자명
-          </label>
-          <input
-            autoFocus
-            className="mt-2 h-11 w-full border border-line px-3 text-sm"
-            id="shipping-credit-depositor-name"
-            maxLength={80}
-            onChange={(event) => setCreditDepositorName(event.target.value)}
-            placeholder="입금자명"
-            value={creditDepositorName}
-          />
-          <div className="mt-4 border border-line bg-surface p-4">
-            <p className="text-xs text-muted">신청 수량 / 결제 예정 금액</p>
-            <p className="mt-2 font-mono text-lg font-black">
-              {creditQuantity}개
-              {creditPayment?.unit_amount
-                ? ` · ${(creditPayment.unit_amount * creditQuantity).toLocaleString("ko-KR")}원`
-                : ""}
-            </p>
-          </div>
-          <button
-            className="mt-5 h-11 w-full bg-ink text-xs font-black text-paper disabled:opacity-40"
-            disabled={creditPurchaseBusy || creditDepositorName.trim().length === 0}
-            onClick={() => void requestShippingCredits()}
-            type="button"
-          >
-            {creditPurchaseBusy ? "신청 중" : "입금자명 확인 후 결제 신청"}
-          </button>
         </div>
       </PremiumDialog>
       <PremiumDialog

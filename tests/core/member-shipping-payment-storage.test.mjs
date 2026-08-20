@@ -37,23 +37,19 @@ test("member checkout defaults to shipping and keeps payment and deposit-info di
   );
 });
 
-test("shipping credits accept an explicit quantity and remain one payment request", async () => {
+test("standalone shipping credits are retired while historical ledger contracts remain", async () => {
   const [route, dashboard, migration] = await Promise.all([
     source("src/app/api/shipping/credits/route.ts"),
     source("src/components/features/account/AccountDashboard.tsx"),
     source("supabase/migrations/20260724050537_member_shipping_payment_and_storage_experience.sql"),
   ]);
 
-  assert.match(route, /quantity < 1 \|\|[\s\S]*quantity > 20/);
-  assert.match(route, /request_my_shipping_credit_payment/);
-  assert.match(route, /p_depositor_name:\s*depositorName/);
-  assert.match(route, /cancel_my_shipping_credit_payment/);
-  assert.match(route, /method: "DELETE"|export async function DELETE/);
-  assert.match(dashboard, /필요한 크레딧 수량/);
-  assert.match(dashboard, /requestShippingCredits/);
-  assert.match(dashboard, /입금 확인 후 적립/);
-  assert.match(dashboard, /입금자명 확인/);
-  assert.match(dashboard, /신청 취소/);
+  assert.match(route, /shipping_credit_retired/);
+  assert.match(route, /export async function GET/);
+  assert.match(route, /export async function POST/);
+  assert.match(route, /export async function DELETE/);
+  assert.match(route, /410/);
+  assert.doesNotMatch(dashboard, /필요한 크레딧 수량|requestShippingCredits|입금 확인 후 적립/);
   assert.match(migration, /add column credit_quantity integer not null default 1/i);
   assert.match(migration, /confirm_prepaid_shipping_credit_payment/i);
   assert.match(
@@ -96,7 +92,8 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   assert.match(addressRoute, /export async function PATCH/);
   assert.match(addressRoute, /export async function DELETE/);
   assert.match(dashboard, /col-start-2 row-start-1[\s\S]*id="storage"/);
-  assert.match(dashboard, /col-start-1 row-start-1[\s\S]*id="shipping-request"[\s\S]*id="shipping-credit"/);
+  assert.match(dashboard, /col-start-1 row-start-1[\s\S]*id="shipping-request"/);
+  assert.doesNotMatch(dashboard, /id="shipping-credit"/);
   assert.match(dashboard, /<details[^>]*id="refunds"/);
   assert.match(
     dashboard,

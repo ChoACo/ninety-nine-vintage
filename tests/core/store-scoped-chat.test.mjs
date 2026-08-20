@@ -101,7 +101,8 @@ test("member and operator surfaces expose store selection and direct member chat
   assert.match(operatorPanel, /storeId/);
   assert.match(storagePanel, /채팅하기/);
   assert.match(storagePanel, /\/admin\/operator\/chat\?memberId=/);
-  assert.match(operatorLayout, /회원 채팅/);
+  assert.doesNotMatch(operatorLayout, /회원 채팅/);
+  assert.match(operatorLayout, /label:\s*"공지"/);
   assert.match(workspaceShell, /href="\/account"/);
   assert.match(localAccounts, /slot === "operator-secondary" \? 1 : 0/);
 });

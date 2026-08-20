@@ -75,11 +75,10 @@ assert.match(css, /:root\s*\{/);
 });
 
 test("legacy fixed light surfaces and status notices have dark palette coverage", async () => {
-  const [css, middleware, home, storeExperience, storeInfo, gallery, ticker] = await Promise.all([
+  const [css, middleware, home, storeInfo, gallery, ticker] = await Promise.all([
     source("src/app/globals.css"),
     source("src/proxy.ts"),
     source("src/app/(shop)/home/page.tsx"),
-    source("src/components/features/catalog/StoreMallExperience.tsx"),
     source("src/components/features/catalog/StoreMallStoreInfo.tsx"),
     source("src/components/features/auction/AuctionGalleryModal.tsx"),
     source("src/components/layout/LiveTickerBar.tsx"),

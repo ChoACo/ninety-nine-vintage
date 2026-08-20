@@ -94,12 +94,12 @@ test("employee and operator navigation use direct-store fulfillment without cent
   }
   assert.doesNotMatch(employeeLayout, /\/admin\/employee\/center/);
   assert.doesNotMatch(operatorLayout, /\/admin\/operator\/center/);
-  assert.match(operatorLayout, /출고·보관부터 송장까지/);
+  assert.match(operatorLayout, /상품 등록부터 배송과 정산까지/);
   assert.doesNotMatch(operatorLayout, /\/admin\/operator\/payments/);
   assert.match(operatorLayout, /\/admin\/operator\/platform/);
   assert.doesNotMatch(operatorLayout, /\/admin\/operator\/members/);
-  assert.match(operatorLayout, /\/admin\/operator\/chat/);
-  assert.match(operatorLayout, /회원 채팅/);
+  assert.match(operatorLayout, /\/admin\/operator\/sales/);
+  assert.match(operatorLayout, /\/admin\/operator\/community/);
   assert.match(
     header,
     /href: "\/admin\/operator", label: "업무"/,

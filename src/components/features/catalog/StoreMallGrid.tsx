@@ -2,6 +2,7 @@ import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { CatalogImage } from "@/components/ui/CatalogImage";
 import type { StoreMallCard } from "@/services/stores";
 
 const CARD_SURFACES = ["var(--store-card-1)", "var(--store-card-2)", "var(--store-card-3)"] as const;
@@ -26,7 +27,7 @@ export function StoreMallGrid({ basePath = "", cards }: { basePath?: "" | "/m"; 
               >
                 {hasImage && (
                   <>
-                    <img alt={card.name} className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]" src={card.mallImage as string} />
+                    <CatalogImage alt={card.name} className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]" height={600} src={card.mallImage} width={800} />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/5" />
                   </>
                 )}

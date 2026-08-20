@@ -94,7 +94,7 @@ test("read RPC volatility matches volatile clocks and manifest validation", asyn
   }
 });
 
-test("buyer shipping API keeps exact legacy and v2 paths and requires a shipping credit", async () => {
+test("buyer shipping API keeps exact legacy and v2 paths and uses manual transfer", async () => {
   const [memberRoute, storageRoute, shipmentHistoryRoute, hiddenTestRoute] =
     await Promise.all([
       source("src/app/api/shipping/requests/route.ts"),
@@ -106,9 +106,9 @@ test("buyer shipping API keeps exact legacy and v2 paths and requires a shipping
   assert.match(memberRoute, /authenticateMemberCommerceRequest\(request,\s*true\)/);
   assert.match(memberRoute, /auth\.user as unknown as RpcClient/);
   assert.match(memberRoute, /"request_inventory_shipment"/);
-  assert.match(memberRoute, /\.from\("member_accounts"\)/);
-  assert.match(memberRoute, /shipping_credit_required/);
-  assert.match(memberRoute, /const settlement = "shipping_credit"/);
+  assert.doesNotMatch(memberRoute, /\.from\("member_accounts"\)/);
+  assert.doesNotMatch(memberRoute, /shipping_credit_required/);
+  assert.match(memberRoute, /const settlement = "manual_transfer"/);
   assert.doesNotMatch(memberRoute, /"request_commerce_order_shipment"/);
   assert.doesNotMatch(memberRoute, /p_order_id:\s*body\.orderId/);
   assert.match(memberRoute, /p_inventory_item_ids:\s*\[\.\.\.inventoryItemIds\]\.sort\(\)/);

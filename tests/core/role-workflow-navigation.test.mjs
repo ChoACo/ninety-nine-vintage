@@ -34,13 +34,12 @@ test("staff navigation follows each role's core work sequence", async () => {
     ]);
 
   for (const label of [
-    "오늘의 할 일",
-    "상품 관리",
-    "주문·낙찰",
-    "준비·배송",
-    "회원 채팅",
-    "매출·정산",
+    "오늘 할 일",
+    "판매 중 상품",
+    "상품 등록",
+    "판매 내역",
     "매장 설정",
+    "공지",
   ]) {
     assert.match(operatorLayout, new RegExp(`label: "${label}"`));
   }

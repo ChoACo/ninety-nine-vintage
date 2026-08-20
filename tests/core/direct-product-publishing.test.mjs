@@ -33,7 +33,7 @@ test("product management treats pending as a draft and keeps one batch input", a
   ]);
 
   assert.match(consoleSource, /status:\s*"active"/);
-  assert.match(consoleSource, /초안으로 저장/);
+  assert.match(consoleSource, /등록 대기로 저장/);
   assert.match(consoleSource, /await publishProductNow\(token, productId\)/);
   assert.match(consoleSource, /점검·하자 메모/);
   assert.doesNotMatch(consoleSource, /실측|measurementShoulder|measurements:\s*\{/);

@@ -15,7 +15,7 @@ test("operator revenue is summarized on the dashboard and retains a guarded deta
     source("supabase/migrations/20260814053132_scope_store_financial_report.sql"),
   ]);
 
-  assert.match(layout, /href:\s*"\/admin\/operator\/revenue"/);
+  assert.doesNotMatch(layout, /href:\s*"\/admin\/operator\/revenue"/);
   assert.match(dashboard, /href="\/admin\/operator\/revenue"/);
   assert.match(dashboard, /\/api\/admin\/operator\/revenue\?from=/);
   assert.match(dashboard, /이번 달 순매출/);
@@ -71,12 +71,12 @@ test("operator center uses one task-oriented navigation with compatible shipping
 
   assert.match(layout, /<AdminWorkspaceShell/);
   assert.doesNotMatch(layout, /운영자 대분류|운영자 상단 탭|소분류/);
-  for (const label of ["오늘의 할 일", "상품 관리", "상품 등록", "주문·낙찰", "준비·배송", "회원 채팅", "매출·정산", "매장 설정"]) {
+  for (const label of ["오늘 할 일", "판매 중 상품", "상품 등록", "판매 내역", "매장 설정", "공지"]) {
     assert.match(layout, new RegExp(`label:\\s*"${label}"`));
   }
-  assert.match(layout, /matchPrefixes:[\s\S]*shipping[\s\S]*exceptions/);
+  assert.doesNotMatch(layout, /matchPrefixes:/);
   assert.match(dashboard, /오늘 \/ 업무 목록/);
-  assert.ok(layout.indexOf('label: "준비·배송"') > -1);
+  assert.ok(layout.indexOf('label: "판매 내역"') > -1);
   assert.match(requestPage, /<OperatorShippingConsole\s*\/>/);
   assert.match(completedPage, /<OperatorShippingConsole view="completed"\s*\/>/);
   assert.match(historyPage, /<OperatorShippingConsole view="history"\s*\/>/);

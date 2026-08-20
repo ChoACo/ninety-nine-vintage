@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
+import { CatalogImage } from "@/components/ui/CatalogImage";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   hasSupportedProductImageSignature,
@@ -109,7 +110,7 @@ function MallInfoEditor({ store, save }: { store: Store; save: (body: Record<str
       <label className="text-[10px] font-bold">대표 이미지<input className="mt-1 w-full border border-line bg-paper p-2 text-xs" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" onChange={(e) => setPickedFile(e.target.files?.[0] ?? null)} ref={inputRef} type="file" /></label>
     </div>
     <div className="mt-3 flex flex-wrap items-center gap-3">
-      {imageUrl && <img alt="센터몰 대표 이미지" className="h-16 w-24 rounded-lg object-cover" src={imageUrl} />}
+      {imageUrl && <CatalogImage alt="센터몰 대표 이미지" className="h-16 w-24 rounded-lg object-cover" height={64} src={imageUrl} width={96} />}
       <button className="bg-ink p-2 text-xs font-bold text-paper disabled:opacity-40" disabled={busy} onClick={() => void persist()} type="button">센터몰 정보 저장</button>
     </div>
     {uploadError && <p className="mt-2 text-xs font-bold text-red-600">{uploadError}</p>}

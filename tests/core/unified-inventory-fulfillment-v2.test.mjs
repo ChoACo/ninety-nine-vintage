@@ -822,9 +822,9 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
   assert.match(shippingRoute, /p_inventory_item_ids:\s*\[\.\.\.inventoryItemIds\]\.sort\(\)/);
   assert.match(shippingRoute, /hasExactKeys\(body,\s*LEGACY_BODY_KEYS\)/);
   assert.match(shippingRoute, /hasExactKeys\(body,\s*V2_BODY_KEYS\)/);
-  assert.match(shippingRoute, /\.from\("member_accounts"\)/);
-  assert.match(shippingRoute, /shipping_credit_required/);
-  assert.match(shippingRoute, /const settlement = "shipping_credit"/);
+  assert.doesNotMatch(shippingRoute, /\.from\("member_accounts"\)/);
+  assert.doesNotMatch(shippingRoute, /shipping_credit_required/);
+  assert.match(shippingRoute, /const settlement = "manual_transfer"/);
   assert.doesNotMatch(shippingRoute, /"request_commerce_order_shipment"/);
   assert.match(refundRoute, /"get_my_manual_refunds"/);
   assert.match(refundRoute, /shippingFeeRefunds/);

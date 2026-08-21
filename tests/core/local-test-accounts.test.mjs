@@ -6,7 +6,7 @@ const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 test("local test accounts stay dormant unless the isolated local-test launcher explicitly enables them", async () => {
-  const [config, route, actions, switcher, localDatabase, launcher, envExample, auth, login] = await Promise.all([
+  const [config, route, actions, switcher, localDatabase, launcher, envExample, auth, login, desktopLoginPage, interceptedLoginPage, mobileLoginPage] = await Promise.all([
     source("src/lib/localTestAccounts/config.ts"),
     source("src/app/api/local-test-accounts/route.ts"),
     source("src/components/features/account/LocalTestAccountActions.tsx"),
@@ -16,6 +16,9 @@ test("local test accounts stay dormant unless the isolated local-test launcher e
     source(".env.example"),
     source("src/lib/supabase/auth.ts"),
     source("src/components/features/account/LoginPrompt.tsx"),
+    source("src/app/(shop)/account/login/page.tsx"),
+    source("src/app/(shop)/@modal/(.)account/login/page.tsx"),
+    source("src/app/(mobile)/m/account/login/page.tsx"),
   ]);
 
   assert.match(config, /LOCAL_TEST_ACCOUNTS_ENABLED/);
@@ -81,4 +84,8 @@ test("local test accounts stay dormant unless the isolated local-test launcher e
   assert.match(localDatabase, /begin;[\s\S]*set local session_replication_role = replica[\s\S]*commit;/);
   assert.match(auth, /local_test_account === true/);
   assert.match(login, /canUseLocalTestAccounts\(\)/);
+  assert.match(login, /await connection\(\)/);
+  for (const page of [desktopLoginPage, interceptedLoginPage, mobileLoginPage]) {
+    assert.match(page, /export const dynamic = "force-dynamic"/);
+  }
 });

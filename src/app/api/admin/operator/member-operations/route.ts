@@ -11,6 +11,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function filterStoreScopedPayload(value: unknown, storeId: string, view: "storage" | "winners") {
+  if (!isRecord(value)) return value;
+  const collectionKey = view === "storage" ? "items" : "members";
+  const collection = value[collectionKey];
+  if (!Array.isArray(collection)) return value;
+  if (view === "storage") {
+    return {
+      ...value,
+      items: collection.filter((item) => isRecord(item) && item.originStoreId === storeId),
+    };
+  }
+  return {
+    ...value,
+    members: collection
+      .map((member) => {
+        if (!isRecord(member) || !Array.isArray(member.items)) return null;
+        const items = member.items.filter((item) => isRecord(item) && item.originStoreId === storeId);
+        return items.length > 0 ? { ...member, items } : null;
+      })
+      .filter((member) => member !== null),
+  };
+}
+
 export async function GET(request: Request) {
   const auth = await authenticateOperatorStoreRequest(request);
   if (!auth.ok) return auth.response;
@@ -54,6 +77,7 @@ export async function GET(request: Request) {
   ) {
     return commerceJson({ error: "member_operations_unavailable" }, 503);
   }
+  const scopedData = filterStoreScopedPayload(data, auth.selectedStoreId, view);
   const { data: chatStores } = auth.roleCode === "operator"
     ? await auth.admin
         .from("stores")
@@ -61,5 +85,5 @@ export async function GET(request: Request) {
         .eq("operator_id", auth.userId)
         .eq("is_active", true)
     : { data: [] };
-  return commerceJson({ ...data, chatStores: chatStores ?? [] });
+  return commerceJson({ ...(scopedData as Record<string, unknown>), chatStores: chatStores ?? [] });
 }

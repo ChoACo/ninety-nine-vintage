@@ -3,6 +3,7 @@ import { LoginPrompt } from "@/components/features/account/LoginPrompt";
 import { StandaloneBackModal } from "@/components/layout/StandaloneBackModal";
 
 export const metadata: Metadata = { title: "로그인", robots: { follow: false, index: false } };
+export const dynamic = "force-dynamic";
 
 function safeReturnTo(value: string | string[] | undefined) {
   const candidate = typeof value === "string" ? value : "/m/account";

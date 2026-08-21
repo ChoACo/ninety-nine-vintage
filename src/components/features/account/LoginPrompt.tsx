@@ -1,10 +1,11 @@
 import { MessageCircleMore, ShieldCheck } from "lucide-react";
+import { connection } from "next/server";
 import { canUseLocalTestAccounts } from "@/lib/localTestAccounts/config";
 import { GuestBrowseAction } from "./GuestBrowseAction";
 import { LocalTestAccountActions } from "./LocalTestAccountActions";
 import { LoginSessionBoundary } from "./LoginSessionBoundary";
 
-export function LoginPrompt({
+export async function LoginPrompt({
   dismissToPrevious = false,
   returnTo = "/account",
   surface = "desktop",
@@ -13,6 +14,7 @@ export function LoginPrompt({
   returnTo?: string;
   surface?: "desktop" | "mobile";
 }) {
+  await connection();
   const loginHref = `/api/auth/kakao/start?returnTo=${encodeURIComponent(returnTo)}`;
   const enableLocalTestAccounts = canUseLocalTestAccounts();
   return <LoginSessionBoundary returnTo={returnTo}>

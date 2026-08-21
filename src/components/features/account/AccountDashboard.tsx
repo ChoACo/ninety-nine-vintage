@@ -127,6 +127,9 @@ interface InventoryShipment {
   courier: string | null;
   trackingNumber: string | null;
   trackingUrl: string | null;
+  purchaseConfirmationDueAt: string | null;
+  purchaseConfirmedAt: string | null;
+  purchaseConfirmedBy: "member" | "automatic" | null;
   requestedAt: string | null;
   addressSnapshot: Record<string, unknown> | null;
   items: InventoryShipmentItem[];
@@ -204,6 +207,14 @@ export type AccountDashboardView =
   | "refunds"
   | "saved";
 
+type HomeAction = {
+  description: string;
+  label: string;
+  value: number;
+  view: "payments" | "storage" | "shipping";
+  Icon: typeof ReceiptText;
+};
+
 function refundKey(refund: ManualRefund) {
   return `${refund.refundKind}:${refund.id}`;
 }
@@ -214,6 +225,7 @@ function refundTitle(refund: ManualRefund) {
 
 function AccountDashboardForSession({
   basePath,
+  homeOnly,
   loading,
   onNavigate,
   session,
@@ -221,6 +233,7 @@ function AccountDashboardForSession({
   view,
 }: {
   basePath: "" | "/m";
+  homeOnly?: boolean;
   loading: boolean;
   onNavigate?: (view: AccountDashboardView) => void;
   session: Session | null;
@@ -253,6 +266,7 @@ function AccountDashboardForSession({
   const [paymentGroups, setPaymentGroups] = useState<AuctionPaymentCenterGroup[]>([]);
   const [centerShippingTokens, setCenterShippingTokens] = useState<CenterShippingToken[]>([]);
   const [selectedInventoryItemIds, setSelectedInventoryItemIds] = useState<string[]>([]);
+  const [shippingRequestOpen, setShippingRequestOpen] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [addressForm, setAddressForm] = useState({
     label: "집",
@@ -265,6 +279,8 @@ const [shippingMessage, setShippingMessage] = useState("");
     const [logoutBusy, setLogoutBusy] = useState(false);
     const [memberAccessRequired, setMemberAccessRequired] = useState(false);
   const [trackingShipment, setTrackingShipment] = useState<InventoryShipment | null>(null);
+  const [purchaseConfirmationShipment, setPurchaseConfirmationShipment] = useState<InventoryShipment | null>(null);
+  const [purchaseConfirmationBusy, setPurchaseConfirmationBusy] = useState(false);
   const [showAllStorage, setShowAllStorage] = useState(false);
   const [refundMessage, setRefundMessage] = useState("");
   const [refundBusyId, setRefundBusyId] = useState<string | null>(null);
@@ -478,7 +494,8 @@ const [shippingMessage, setShippingMessage] = useState("");
   const showStorage =
     view === "full" || view === "simple" || view === "storage";
   const showShippingRequest =
-    view === "full" || view === "simple" || view === "shipping-request";
+    view === "full" || view === "simple" || view === "shipping-request" ||
+    (view === "storage" && shippingRequestOpen);
   const showRefunds = view === "full" || view === "refunds";
   const showShipments =
     view === "full" || view === "simple" || view === "shipping";
@@ -753,6 +770,9 @@ const [shippingMessage, setShippingMessage] = useState("");
       courier: null,
       trackingNumber: null,
       trackingUrl: null,
+      purchaseConfirmationDueAt: null,
+      purchaseConfirmedAt: null,
+      purchaseConfirmedBy: null,
       requestedAt: new Date().toISOString(),
       addressSnapshot: null,
       items: requestedItems,
@@ -857,6 +877,18 @@ const [shippingMessage, setShippingMessage] = useState("");
       }
     })();
   };
+  const openShippingRequest = () => {
+    setShippingRequestOpen(true);
+    window.requestAnimationFrame(() => {
+      document.getElementById("shipping-request")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+  const homeActions: Array<HomeAction | null> = [
+    pendingAuctionWins.length > 0 ? { description: "결제 마감 전 입금을 진행해 주세요.", label: "낙찰품 결제", value: pendingAuctionWins.length, view: "payments", Icon: ReceiptText } : null,
+    visibleStorageItemCount > 0 ? { description: "배송 신청 전 보관 상품을 확인해 주세요.", label: "보관 상품 확인", value: visibleStorageItemCount, view: "storage", Icon: PackageCheck } : null,
+    shipments.length > 0 ? { description: "요청·발송 중인 배송 상태를 확인해 주세요.", label: "배송 현황 확인", value: shipments.length, view: "shipping", Icon: Truck } : null,
+  ];
+  const actionableHomeItems = homeActions.filter((item): item is HomeAction => item !== null);
   return (
     <div className={surface === "desktop" ? "space-y-14" : "space-y-10"} data-account-dashboard-view={view}>
       <div hidden={!showOverview} className={`flex justify-between gap-5 border-b border-ink pb-8 ${surface === "desktop" ? "flex-row items-end" : "flex-col"}`}>
@@ -901,7 +933,26 @@ const [shippingMessage, setShippingMessage] = useState("");
           {notice}
         </div>
       )}
-      <div hidden={!showOverview} className={`grid gap-px border border-line bg-line ${surface === "desktop" ? "grid-cols-4" : "grid-cols-2"}`}>
+      {homeOnly && showOverview && !loading && token && (
+        <section aria-labelledby="my-home-actions-title" className="border border-line bg-paper p-5 sm:p-7">
+          <div className="border-b border-line pb-4">
+            <p className="eyebrow text-muted">MY / 지금 할 일</p>
+            <h2 className="mt-2 text-xl font-black" id="my-home-actions-title">지금 처리해야 할 항목</h2>
+            <p className="mt-2 text-xs leading-5 text-muted">확인이 필요한 작업만 모아 보여드려요.</p>
+          </div>
+          <div className="mt-5 divide-y divide-line border-y border-line">
+            {actionableHomeItems.map(({ description, label, value, view: actionView, Icon }) => (
+              <button className="flex w-full items-center gap-4 py-4 text-left transition-colors hover:bg-surface" key={label} onClick={() => onNavigate?.(actionView)} type="button">
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-surface"><Icon size={17} /></span>
+                <span className="min-w-0 flex-1"><strong className="block text-sm font-black">{label}</strong><span className="mt-1 block text-xs text-muted">{description}</span></span>
+                <span className="font-mono text-lg font-bold">{value}</span>
+              </button>
+            ))}
+            {actionableHomeItems.length === 0 && <p className="py-10 text-center text-sm text-muted">지금 처리할 일이 없습니다.</p>}
+          </div>
+        </section>
+      )}
+      <div hidden={!showOverview || homeOnly} className={`grid gap-px border border-line bg-line ${surface === "desktop" ? "grid-cols-4" : "grid-cols-2"}`}>
         {visibleCards.map(([label, value, description, href, Icon]) => {
           const cardView: AccountDashboardView = label === "낙찰품 결제" ? "payments" : label === "보관 중인 상품" ? "storage" : label === "배송 내역" ? "shipping" : "saved";
           const cardClassName = `group bg-paper text-left transition-colors hover:bg-surface ${surface === "desktop" ? "p-5" : "p-4"}`;
@@ -990,7 +1041,7 @@ const [shippingMessage, setShippingMessage] = useState("");
                 보관 기간은 매장 보관 시작일부터 소형 2주, 대형 1주입니다.
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap justify-end gap-2">
               {(hasHiddenStorage || showAllStorage) && (
                 <button
                   className="text-xs font-bold underline"
@@ -1000,10 +1051,10 @@ const [shippingMessage, setShippingMessage] = useState("");
                   {showAllStorage ? "간략히 보기" : "전체보기"}
                 </button>
               )}
-              <Link className="text-xs font-bold underline" href={`${basePath}/chat`}>
+              <Link className="border border-line bg-paper px-3 py-2 text-xs font-bold hover:bg-surface" href={`${basePath}/chat`}>
                 배송 상담
               </Link>
-              {view === "storage" && <Link className="text-xs font-black underline" href={`${basePath}/account/shipping-request`}>배송 신청</Link>}
+              {view === "storage" && <button className="bg-ink px-3 py-2 text-xs font-bold text-paper disabled:opacity-40" onClick={openShippingRequest} type="button">배송 신청</button>}
             </div>
           </div>
           {centerShippingTokens.length > 0 && (
@@ -1386,15 +1437,11 @@ const [shippingMessage, setShippingMessage] = useState("");
                     </div>
                   )}
                 </div>
-                {shipment.trackingNumber && shipment.courier && (
-                  <button
-                    className="inline-flex w-fit items-center gap-1 border border-ink px-3 py-2 text-xs font-bold"
-                    onClick={() => setTrackingShipment(shipment)}
-                    type="button"
-                  >
-                    택배사 조회 <ExternalLink size={12} />
-                  </button>
-                )}
+                {shipment.trackingNumber && shipment.courier && <div className="flex flex-wrap gap-2">
+                  <button className="inline-flex w-fit items-center gap-1 border border-ink px-3 py-2 text-xs font-bold" onClick={() => setTrackingShipment(shipment)} type="button">택배사 조회 <ExternalLink size={12} /></button>
+                  {!shipment.purchaseConfirmedAt && shipment.purchaseConfirmationDueAt && <button className="bg-ink px-3 py-2 text-xs font-bold text-paper" onClick={() => setPurchaseConfirmationShipment(shipment)} type="button">구매 확정하기</button>}
+                  {shipment.purchaseConfirmedAt && <span className="px-3 py-2 text-xs font-bold text-emerald-700">구매 확정 완료</span>}
+                </div>}
               </div>
               <details className="mt-4 border border-line">
                 <summary className="cursor-pointer px-4 py-3 text-xs font-bold">
@@ -1651,6 +1698,30 @@ const [shippingMessage, setShippingMessage] = useState("");
           )}
         </div>
       </PremiumDialog>
+      <PremiumDialog labelledBy="purchase-confirmation-title" onClose={() => !purchaseConfirmationBusy && setPurchaseConfirmationShipment(null)} open={Boolean(purchaseConfirmationShipment)} panelClassName="max-w-md">
+        <div className="p-6">
+          <p className="eyebrow text-muted">배송 상품 확인</p>
+          <h2 className="mt-2 text-xl font-black" id="purchase-confirmation-title">구매를 확정할까요?</h2>
+          <p className="mt-4 text-sm leading-6">상품을 확인하고 구매 확정을 눌러주세요. 확정하면 거래가 완료되고 판매자 정산 절차가 시작되며 되돌릴 수 없습니다.</p>
+          <div className="mt-6 grid grid-cols-2 gap-2">
+            <button className="h-11 border border-ink text-xs font-bold" disabled={purchaseConfirmationBusy} onClick={() => setPurchaseConfirmationShipment(null)} type="button">취소</button>
+            <button className="h-11 bg-ink text-xs font-bold text-paper disabled:opacity-50" disabled={purchaseConfirmationBusy} onClick={async () => {
+              if (!token || !purchaseConfirmationShipment) return;
+              setPurchaseConfirmationBusy(true);
+              const targetId = purchaseConfirmationShipment.id;
+              try {
+                const response = await fetch("/api/account/shipments", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ shipmentId: targetId }) });
+                const payload = await response.json().catch(() => null) as { error?: string } | null;
+                if (!response.ok) throw new Error(payload?.error ?? "구매를 확정하지 못했습니다.");
+                setShipments((current) => current.map((item) => item.id === targetId ? { ...item, purchaseConfirmedAt: new Date().toISOString(), purchaseConfirmedBy: "member" } : item));
+                setPurchaseConfirmationShipment(null);
+                setShippingMessage("구매가 확정되었습니다.");
+              } catch (error) { setShippingMessage(error instanceof Error ? error.message : "구매를 확정하지 못했습니다."); }
+              finally { setPurchaseConfirmationBusy(false); }
+            }} type="button">{purchaseConfirmationBusy ? "확정 중..." : "확정하기"}</button>
+          </div>
+        </div>
+      </PremiumDialog>
       <PremiumDialog
         labelledBy="hanjin-tracking-title"
         onClose={() => setTrackingShipment(null)}
@@ -1688,11 +1759,13 @@ const [shippingMessage, setShippingMessage] = useState("");
 
 export function AccountDashboard({
   basePath = "",
+  homeOnly = false,
   onNavigate,
   surface = "mobile",
   view = "full",
 }: {
   basePath?: "" | "/m";
+  homeOnly?: boolean;
   onNavigate?: (view: AccountDashboardView) => void;
   surface?: "desktop" | "mobile";
   view?: AccountDashboardView;
@@ -1704,6 +1777,7 @@ export function AccountDashboard({
   return (
     <AccountDashboardForSession
       basePath={basePath}
+      homeOnly={homeOnly}
       key={identityKey}
       loading={loading}
       onNavigate={onNavigate}

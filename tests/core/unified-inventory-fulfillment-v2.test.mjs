@@ -699,6 +699,8 @@ test("payment API remains strict but mutations and navigation are owner-only", a
   assert.match(confirmRoute, /p_observed_ledger_entry_count:\s*body\.observedLedgerEntryCount/);
   assert.match(confirmRoute, /p_expected_version:\s*body\.expectedVersion/);
   assert.match(confirmRoute, /p_idempotency_key:\s*body\.idempotencyKey/);
+  assert.match(confirmRoute, /payment_fulfillment_conflict/);
+  assert.doesNotMatch(confirmRoute, /\["PT409",\s*"23505",\s*"40001"\]/);
   assert.doesNotMatch(confirmRoute, /\bamount\b\s*:\s*body\./i);
 
   assert.match(consoleSource, /type\s+PaymentKind\s*=\s*"commerce"\s*\|\s*"auction"\s*\|\s*"shipping_fee"/);
@@ -951,10 +953,14 @@ test("v2 operations return stable Korean problem contracts with CAS and business
   assert.match(ownerServer, /typeof body\.error === "string" && typeof body\.code !== "string"/);
   assert.match(ownerServer, /\? "로그인이 필요합니다\."/);
 
-  for (const route of [payments, confirm, fulfillment, shipping, exceptions, evidence, refunds, refundAccount]) {
+  for (const route of [payments, fulfillment, shipping, exceptions, evidence, refunds, refundAccount]) {
     assert.match(route, /\["PT409", "23505", "40001"\]/);
     assert.match(route, /error\.code === "55000"[\s\S]{0,500}\b422\b/);
   }
+  assert.match(confirm, /\["PT409", "40001"\]/);
+  assert.match(confirm, /error\.code === "23505"/);
+  assert.match(confirm, /payment_fulfillment_conflict/);
+  assert.match(confirm, /error\.code === "55000"[\s\S]{0,500}\b422\b/);
   assert.match(shipping, /code:\s*"UNRELEASED_ITEMS"/);
   assert.match(shipping, /blockedItemIds/);
   assert.doesNotMatch(shipping, /invalid_shipment_request[\s\S]{0,160},\s*400\)/);
@@ -1008,4 +1014,12 @@ test("v2 event and financial histories are append-only", async () => {
       ),
     );
   }
+});
+
+test("direct fixed-price shipping events are allowed by the shipment event contract", async () => {
+  const migration = await source(
+    "supabase/migrations/20260821150000_allow_direct_purchase_shipping_event.sql",
+  );
+  assert.match(migration, /direct_purchase_shipping_requested/);
+  assert.match(migration, /inventory_shipment_events_event_type_check/);
 });

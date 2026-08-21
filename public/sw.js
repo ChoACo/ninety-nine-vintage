@@ -1,4 +1,4 @@
-const CACHE_NAME = "ninetynine-public-v4";
+const CACHE_NAME = "ninetynine-public-v5";
 const CACHE_PREFIX = "ninetynine-public-";
 const CACHE_CONSENT_NAME = "ninetynine-cache-consent-v1";
 const CACHE_CONSENT_KEY = "/__cache-consent__";
@@ -27,6 +27,7 @@ async function cachePublicResponse(cache, request, response) {
 function isCacheable(request) {
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return false;
+  if (["localhost", "127.0.0.1", "::1"].includes(url.hostname)) return false;
   if (request.destination === "document") return false;
   return url.pathname.startsWith("/_next/static/")
     || url.pathname.startsWith("/_next/image")

@@ -178,6 +178,7 @@ test("the cache banner opts in only public assets and excludes private commerce 
   assert.match(banner, /저장 캐시 비우기/);
   assert.match(banner, /await clearPublicCache\(\)/);
   assert.match(worker, /if \(request\.destination === "document"\) return false/);
+  assert.match(worker, /\["localhost", "127\.0\.0\.1", "::1"\]\.includes\(url\.hostname\)/);
   assert.match(worker, /url\.pathname\.startsWith\("\/api\/products"\)/);
   assert.doesNotMatch(worker, /\/api\/(?:account|cart|orders|payments)/);
 });

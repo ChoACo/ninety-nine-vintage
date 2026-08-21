@@ -39,7 +39,6 @@ interface CombinedTransfer {
   expectedAmount: number;
   itemSubtotal: number;
   shippingFee: number;
-  shippingCreditQuantity: number;
   includeShippingFee: boolean;
   itemCount: number;
   bankName: string;
@@ -81,7 +80,6 @@ function isCombinedTransfer(value: unknown): value is CombinedTransfer {
     Number.isSafeInteger(Number(row.expectedAmount)) &&
     Number.isSafeInteger(Number(row.itemSubtotal)) &&
     Number.isSafeInteger(Number(row.shippingFee)) &&
-    Number.isSafeInteger(Number(row.shippingCreditQuantity)) &&
     typeof row.includeShippingFee === "boolean" &&
     Number.isSafeInteger(Number(row.itemCount)) &&
     typeof row.bankName === "string" &&

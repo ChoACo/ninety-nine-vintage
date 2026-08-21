@@ -7,6 +7,8 @@ import { CACHE_CONSENT_EVENT, readCacheConsent, writeCacheConsent, type CacheCon
 
 const CACHE_PREFIX = "ninetynine-public-";
 const CACHE_CONSENT_NAME = "ninetynine-cache-consent-v1";
+const isLoopbackHost = () =>
+  ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
 const subscribeToConsent = (onStoreChange: () => void) => {
   window.addEventListener(CACHE_CONSENT_EVENT, onStoreChange);
   window.addEventListener("storage", onStoreChange);
@@ -17,6 +19,7 @@ const subscribeToConsent = (onStoreChange: () => void) => {
 };
 
 async function registerPublicCache() {
+  if (isLoopbackHost()) return;
   if ("serviceWorker" in navigator) {
     const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
     const worker = registration.active || registration.waiting || registration.installing;

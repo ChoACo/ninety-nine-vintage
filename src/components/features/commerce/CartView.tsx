@@ -435,6 +435,18 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const [shippingRegion, setShippingRegion] = useState<"regular" | "remote_area">("regular");
   const [shippingAddresses, setShippingAddresses] = useState<ShippingAddress[]>([]);
   const [shippingAddressId, setShippingAddressId] = useState("");
+  const [addressEditorOpen, setAddressEditorOpen] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [addressBusy, setAddressBusy] = useState(false);
+  const [pendingDeleteAddressId, setPendingDeleteAddressId] = useState<string | null>(null);
+  const [addressForm, setAddressForm] = useState({
+    label: "집",
+    recipientName: "",
+    phone: "",
+    postalCode: "",
+    address: "",
+    isDefault: false,
+  });
   const [heldCheckoutIds, setHeldCheckoutIds] = useState<string[]>([]);
   const [releaseCheckoutAllowed, setReleaseCheckoutAllowed] = useState(false);
   const [restoredCheckoutProducts, setRestoredCheckoutProducts] = useState<
@@ -454,6 +466,101 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
     setRestoredCheckoutProducts([]);
     setReleaseCheckoutAllowed(false);
     clearStoredCheckoutRequest();
+  };
+
+  const openAddressCreate = () => {
+    setEditingAddressId(null);
+    setPendingDeleteAddressId(null);
+    setAddressForm({ label: "집", recipientName: "", phone: "", postalCode: "", address: "", isDefault: shippingAddresses.length === 0 });
+    setAddressEditorOpen(true);
+  };
+
+  const openAddressEdit = (address: ShippingAddress) => {
+    setEditingAddressId(address.id);
+    setPendingDeleteAddressId(null);
+    setAddressForm({
+      label: address.label,
+      recipientName: address.recipient_name,
+      phone: address.phone,
+      postalCode: address.postal_code,
+      address: address.address,
+      isDefault: address.is_default,
+    });
+    setAddressEditorOpen(true);
+  };
+
+  const reloadCheckoutAddresses = async (preferredId?: string) => {
+    const { data } = await getSupabaseBrowserClient().auth.getSession();
+    if (!data.session?.access_token) throw new Error("로그인 후 배송지를 관리할 수 있습니다.");
+    const response = await fetch("/api/account/addresses", {
+      headers: { Authorization: `Bearer ${data.session.access_token}` },
+      cache: "no-store",
+    });
+    const payload = await response.json().catch(() => null) as { addresses?: ShippingAddress[]; error?: string } | null;
+    if (!response.ok) throw new Error(payload?.error ?? "배송지 목록을 불러오지 못했습니다.");
+    const addresses = Array.isArray(payload?.addresses) ? payload.addresses : [];
+    setShippingAddresses(addresses);
+    setShippingAddressId((current) => preferredId && addresses.some((address) => address.id === preferredId)
+      ? preferredId
+      : addresses.some((address) => address.id === current)
+        ? current
+        : addresses.find((address) => address.is_default)?.id ?? addresses[0]?.id ?? "");
+  };
+
+  const saveCheckoutAddress = async () => {
+    if (addressBusy) return;
+    setAddressBusy(true);
+    try {
+      const { data } = await getSupabaseBrowserClient().auth.getSession();
+      if (!data.session?.access_token) throw new Error("로그인 후 배송지를 관리할 수 있습니다.");
+      const response = await fetch("/api/account/addresses", {
+        method: editingAddressId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` },
+        body: JSON.stringify({ id: editingAddressId ?? undefined, ...addressForm }),
+      });
+      const payload = await response.json().catch(() => null) as { address?: ShippingAddress; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "배송지를 저장하지 못했습니다.");
+      invalidateCheckoutRequest();
+      await reloadCheckoutAddresses(payload?.address?.id);
+      setAddressEditorOpen(false);
+      setMessageKind("success");
+      setMessage("배송지를 저장하고 결제 배송지로 선택했습니다.");
+    } catch (error) {
+      setMessageKind("error");
+      setMessage(error instanceof Error ? error.message : "배송지를 저장하지 못했습니다.");
+    } finally {
+      setAddressBusy(false);
+    }
+  };
+
+  const deleteCheckoutAddress = async (address: ShippingAddress) => {
+    if (addressBusy) return;
+    if (pendingDeleteAddressId !== address.id) {
+      setPendingDeleteAddressId(address.id);
+      return;
+    }
+    setAddressBusy(true);
+    try {
+      const { data } = await getSupabaseBrowserClient().auth.getSession();
+      if (!data.session?.access_token) throw new Error("로그인 후 배송지를 관리할 수 있습니다.");
+      const response = await fetch("/api/account/addresses", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` },
+        body: JSON.stringify({ id: address.id }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "배송지를 삭제하지 못했습니다.");
+      if (shippingAddressId === address.id) invalidateCheckoutRequest();
+      setPendingDeleteAddressId(null);
+      await reloadCheckoutAddresses();
+      setMessageKind("success");
+      setMessage("배송지를 삭제했습니다.");
+    } catch (error) {
+      setMessageKind("error");
+      setMessage(error instanceof Error ? error.message : "배송지를 삭제하지 못했습니다.");
+    } finally {
+      setAddressBusy(false);
+    }
   };
 
   useEffect(() => {
@@ -1147,10 +1254,47 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                 <option value="remote_area">제주 및 도서산간 지역 택배</option>
               </select>
             </label>
-            <label className="mt-3 block text-xs font-bold">
+            <div className="mt-3 block text-xs font-bold">
               배송지 선택 <span className="font-normal text-red-600">(필수)</span>
-              {shippingAddresses.length > 0 ? <select className="mt-1 h-11 w-full border border-line bg-paper px-3" disabled={busy || hasPendingCheckout} onChange={(event) => { invalidateCheckoutRequest(); setShippingAddressId(event.target.value); }} value={shippingAddressId}><option value="">배송지를 선택해 주세요</option>{shippingAddresses.map((address) => <option key={address.id} value={address.id}>{address.label} · {address.recipient_name} · {address.address}</option>)}</select> : <span className="mt-1 block border border-amber-200 bg-amber-50 px-3 py-3 text-[11px] font-normal leading-5 text-amber-900">저장된 배송지가 없습니다. MY의 보관·배송 → 배송지 관리에서 먼저 등록해 주세요.</span>}
-            </label>
+              <div className="mt-2 space-y-2">
+                {shippingAddresses.length > 0 ? shippingAddresses.map((address) => (
+                  <div className={`flex items-start gap-3 border p-3 ${shippingAddressId === address.id ? "border-ink bg-surface" : "border-line bg-paper"}`} key={address.id}>
+                    <input
+                      aria-label={`${address.label} 배송지 선택`}
+                      checked={shippingAddressId === address.id}
+                      className="mt-1"
+                      disabled={busy || hasPendingCheckout || addressBusy}
+                      name="checkout-shipping-address"
+                      onChange={() => { invalidateCheckoutRequest(); setShippingAddressId(address.id); }}
+                      type="radio"
+                    />
+                    <button className="min-w-0 flex-1 text-left" disabled={busy || hasPendingCheckout || addressBusy} onClick={() => { invalidateCheckoutRequest(); setShippingAddressId(address.id); }} type="button">
+                      <span className="block text-xs font-black">{address.label} · {address.recipient_name}{address.is_default && <span className="ml-2 border border-line px-1.5 py-0.5 text-[9px]">기본</span>}</span>
+                      <span className="mt-1 block text-[11px] font-normal leading-5 text-muted">{address.phone} · {address.postal_code ? `[${address.postal_code}] ` : ""}{address.address}</span>
+                    </button>
+                    <div className="flex shrink-0 gap-1">
+                      <button className="border border-line px-2 py-2 text-[10px] font-bold" disabled={busy || hasPendingCheckout || addressBusy} onClick={() => openAddressEdit(address)} type="button">수정</button>
+                      <button className={`border px-2 py-2 text-[10px] font-bold ${pendingDeleteAddressId === address.id ? "border-rose-700 bg-rose-700 text-white" : "border-rose-300 text-rose-700"}`} disabled={busy || hasPendingCheckout || addressBusy} onClick={() => void deleteCheckoutAddress(address)} type="button">{pendingDeleteAddressId === address.id ? "삭제 확인" : "삭제"}</button>
+                    </div>
+                  </div>
+                )) : <span className="block border border-amber-200 bg-amber-50 px-3 py-3 text-[11px] font-normal leading-5 text-amber-900">저장된 배송지가 없습니다. 아래에서 바로 추가해 주세요.</span>}
+                {!hasPendingCheckout && <button className="min-h-11 w-full border border-ink px-3 py-2 text-xs font-bold" disabled={busy || addressBusy} onClick={openAddressCreate} type="button">{shippingAddresses.length > 0 ? "배송지 추가" : "배송지 추가하고 선택"}</button>}
+              </div>
+            </div>
+            {addressEditorOpen && <div className="mt-3 border border-ink bg-surface p-4">
+              <p className="text-xs font-black">{editingAddressId ? "배송지 수정" : "새 배송지 추가"}</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <input aria-label="배송지 이름" className="border border-line bg-paper px-3 py-3 text-xs" disabled={addressBusy} onChange={(event) => setAddressForm({ ...addressForm, label: event.target.value })} placeholder="배송지 이름" value={addressForm.label} />
+                <input aria-label="수령인" className="border border-line bg-paper px-3 py-3 text-xs" disabled={addressBusy} onChange={(event) => setAddressForm({ ...addressForm, recipientName: event.target.value })} placeholder="수령인" value={addressForm.recipientName} />
+                <input aria-label="연락처" className="border border-line bg-paper px-3 py-3 text-xs" disabled={addressBusy} onChange={(event) => setAddressForm({ ...addressForm, phone: event.target.value })} placeholder="연락처" value={addressForm.phone} />
+                <input aria-label="우편번호" className="border border-line bg-paper px-3 py-3 text-xs" disabled={addressBusy} inputMode="numeric" maxLength={5} onChange={(event) => setAddressForm({ ...addressForm, postalCode: event.target.value.replace(/\D/gu, "") })} placeholder="우편번호 5자리" value={addressForm.postalCode} />
+                <input aria-label="주소" className="border border-line bg-paper px-3 py-3 text-xs sm:col-span-2" disabled={addressBusy} onChange={(event) => setAddressForm({ ...addressForm, address: event.target.value })} placeholder="주소" value={addressForm.address} />
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button className="min-h-11 flex-1 border border-line px-3 py-2 text-xs font-bold" disabled={addressBusy} onClick={() => setAddressEditorOpen(false)} type="button">취소</button>
+                <button className="min-h-11 flex-1 bg-ink px-3 py-2 text-xs font-bold text-paper" disabled={addressBusy} onClick={() => void saveCheckoutAddress()} type="button">{addressBusy ? "저장 중…" : editingAddressId ? "수정 저장" : "추가하고 선택"}</button>
+              </div>
+            </div>}
             <p className="mt-3 border border-amber-200 bg-amber-50 px-3 py-3 text-[11px] leading-5 text-amber-900">즉시구매는 구매 시 선택한 배송지로 결제 확인 후 바로 배송 접수됩니다. 입금은 주문 후 최대 6시간 이내에 완료해야 하며, 미입금 취소가 반복되면 구매·입찰 이용이 제한될 수 있습니다.</p>
             {shippingCharges.length > 0 ? (
               <div className="mt-3 space-y-2 border border-line bg-paper p-3 text-[11px]">

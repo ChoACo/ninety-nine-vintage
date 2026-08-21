@@ -112,6 +112,23 @@ test("owner scope preferences are reconciled to the owner support mode", async (
   assert.match(migration, /'accessMode', 'assigned'/);
 });
 
+test("assigned operators do not require an expiring store-selection session", async () => {
+  const migration = await source(
+    "supabase/migrations/20260821180008_restore_assigned_operator_store_scope.sql",
+  );
+  const scopeHelper = migration.match(
+    /create or replace function app_private\.operator_scope_allows_store[\s\S]*?\n\$\$;/i,
+  )?.[0] ?? "";
+  const permissionHelper = migration.match(
+    /create or replace function app_private\.has_exact_store_or_group_permission[\s\S]*?\n\$\$;/i,
+  )?.[0] ?? "";
+
+  assert.match(scopeHelper, /actor\.role_code = 'owner'[\s\S]*scope\.expires_at > clock_timestamp\(\)/i);
+  assert.match(scopeHelper, /actor\.role_code = 'operator'[\s\S]*assigned\.membership_role = 'operator'[\s\S]*assigned\.status = 'active'/i);
+  assert.match(permissionHelper, /operator_scope_allows_store\(p_store_id, p_user_id\)/i);
+  assert.doesNotMatch(permissionHelper, /require_active_operator_store_scope/i);
+});
+
 test("every operator API except scope selection requires the active selected store", async () => {
   const apiRoot = fileURLToPath(new URL("src/app/api/admin/operator/", rootUrl));
   const entries = await readdir(apiRoot, { recursive: true, withFileTypes: true });

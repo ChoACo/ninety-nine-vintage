@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, Clock3, Pencil, RefreshCw, RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import {
@@ -204,17 +204,30 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
   const [depositorNames, setDepositorNames] = useState<Record<string, string>>({});
   const [confirmationAmounts, setConfirmationAmounts] = useState<Record<string, string>>({});
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const busyKeyRef = useRef<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [cancellationTarget, setCancellationTarget] = useState<PaymentRow | null>(null);
   const [cancellationReason, setCancellationReason] = useState("");
   const [notice, setNotice] = useState("");
 
+  const beginBusy = (key: string) => {
+    if (busyKeyRef.current) return false;
+    busyKeyRef.current = key;
+    setBusyKey(key);
+    return true;
+  };
+
+  const endBusy = () => {
+    busyKeyRef.current = null;
+    setBusyKey(null);
+  };
+
   const load = useCallback(async (
     token: string | null,
     history: boolean,
     nextOffset: number,
-  ) => {
-    if (!token) return;
+  ): Promise<PaymentQueueResponse | null> => {
+    if (!token) return null;
     const query = new URLSearchParams({
       includeHistory: String(history),
       limit: String(PAGE_SIZE),
@@ -233,6 +246,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
     }
     setPayments(payload.payments);
     setServerTime(payload.serverTime);
+    return payload;
   }, []);
 
   useEffect(() => {
@@ -267,11 +281,15 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
     setExpandedKey(sessionKey(payment));
   };
 
-  const confirm = async (payment: PaymentRow) => {
-    if (!accessToken || !actorId || busyKey || payment.remainingAmount < 1) return;
+  const confirm = async (
+    payment: PaymentRow,
+    conflictRetry = false,
+    retryInput?: { depositorName: string; confirmationAmount: number },
+  ) => {
+    if (!accessToken || !actorId || (!conflictRetry && busyKeyRef.current) || payment.remainingAmount < 1) return;
     const key = sessionKey(payment);
-    const depositorName = (depositorNames[key] ?? payment.lastDepositorName ?? "").trim();
-    const confirmationAmount = Number(
+    const depositorName = (retryInput?.depositorName ?? depositorNames[key] ?? payment.lastDepositorName ?? "").trim();
+    const confirmationAmount = retryInput?.confirmationAmount ?? Number(
       (confirmationAmounts[key] ?? String(payment.remainingAmount)).replaceAll(",", ""),
     );
     if (
@@ -288,6 +306,8 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
       setNotice("입금자명을 입력해 주세요.");
       return;
     }
+    const ownsBusyLock = !conflictRetry;
+    if (ownsBusyLock && !beginBusy(key)) return;
     const receiptKind = payment.paymentKind === "shipping_fee"
       ? "shipping"
       : payment.paymentKind;
@@ -306,7 +326,6 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
       receiptScope,
       receiptFingerprint,
     );
-    setBusyKey(key);
     setNotice("");
     try {
       if (confirmationAmount !== payment.remainingAmount) {
@@ -372,8 +391,29 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
       });
       const payload = await response.json().catch(() => null) as unknown;
       if (response.status === 409) {
-        await load(accessToken, includeHistory, offset);
+        const latestQueue = await load(accessToken, includeHistory, offset);
+        const latest = latestQueue?.payments.find(
+          (candidate) => candidate.paymentKind === payment.paymentKind && candidate.paymentId === payment.paymentId,
+        );
+        if (latest?.remainingAmount === 0) {
+          setExpandedKey(null);
+          setNotice("입금 확인이 완료되었습니다. 최신 목록으로 갱신했습니다.");
+          return;
+        }
+        const snapshotChanged = latest && (
+          latest.version !== payment.version ||
+          latest.receivedAmount !== payment.receivedAmount ||
+          latest.ledgerEntryCount !== payment.ledgerEntryCount
+        );
+        if (!conflictRetry && latest && latest.remainingAmount > 0 && snapshotChanged) {
+          setNotice("최신 입금 상태를 확인하여 다시 처리 중입니다.");
+          await confirm(latest, true, { depositorName, confirmationAmount });
+          return;
+        }
         throw new Error("입금 상태가 변경되었습니다. 최신 목록을 확인해 주세요.");
+      }
+      if (response.status === 422) {
+        await load(accessToken, includeHistory, offset);
       }
       if (!response.ok || !isRecord(payload) || !isConfirmationResult(
         payload.payment,
@@ -398,15 +438,16 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "입금 확인을 처리하지 못했습니다.");
     } finally {
-      setBusyKey(null);
+      endBusy();
     }
   };
 
   const reverse = async (payment: PaymentRow) => {
-    if (!accessToken || !actorId || busyKey || !payment.reversibleLedgerId) return;
+    if (!accessToken || !actorId || busyKeyRef.current || !payment.reversibleLedgerId) return;
     const reason = window.prompt("입금 확인 취소 사유를 입력해 주세요.");
     if (!reason?.trim()) return;
     const key = `reverse:${payment.paymentKind}:${payment.paymentId}:${payment.reversibleLedgerId}`;
+    if (!beginBusy(key)) return;
     const reversalScope = `unified:${payment.paymentKind}:${payment.paymentId}:reversal`;
     const reversalFingerprint = await manualTransferReversalFingerprint({
       kind: payment.paymentKind === "shipping_fee"
@@ -423,7 +464,6 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
       reversalScope,
       reversalFingerprint,
     );
-    setBusyKey(key);
     setNotice("");
     try {
       const response = await fetch(
@@ -465,25 +505,26 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "입금 확인을 취소하지 못했습니다.");
     } finally {
-      setBusyKey(null);
+      endBusy();
     }
   };
 
   const openCancellation = (payment: PaymentRow) => {
-    if (busyKey || !canCancelPendingPayment(payment, ownerSurface)) return;
+    if (busyKeyRef.current || !canCancelPendingPayment(payment, ownerSurface)) return;
     setNotice("");
     setCancellationReason("");
     setCancellationTarget(payment);
   };
 
   const cancelPending = async (payment: PaymentRow, rawReason: string) => {
-    if (!accessToken || !actorId || busyKey || !canCancelPendingPayment(payment, ownerSurface)) return;
+    if (!accessToken || !actorId || busyKeyRef.current || !canCancelPendingPayment(payment, ownerSurface)) return;
     const reason = rawReason.trim();
     if (reason.length < 3) {
       setNotice("입금 요청 취소 사유를 3자 이상 입력해 주세요.");
       return;
     }
     const key = sessionKey(payment);
+    if (!beginBusy(key)) return;
     const cancellationScope = `unified:${payment.paymentKind}:${payment.paymentId}:cancel`;
     const cancellationFingerprint = await manualTransferCancellationFingerprint({
       kind: "commerce",
@@ -498,7 +539,6 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
       cancellationScope,
       cancellationFingerprint,
     );
-    setBusyKey(key);
     setNotice("");
     try {
       const response = await fetch(
@@ -539,7 +579,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "입금 요청을 취소하지 못했습니다.");
     } finally {
-      setBusyKey(null);
+      endBusy();
     }
   };
 

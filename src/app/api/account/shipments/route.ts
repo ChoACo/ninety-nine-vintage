@@ -3,7 +3,29 @@ import { authenticateMemberCommerceRequest, commerceJson } from "@/lib/commerce/
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type RpcClient = {
-  rpc: (name: string, args?: Record<string, never>) => Promise<{ data: unknown; error: { code?: string } | null }>;
+  rpc: (name: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>;
+};
+
+type ShipmentConfirmationRow = {
+  shipment_id: string;
+  confirmation_due_at: string | null;
+  confirmed_at: string | null;
+  confirmed_by_kind: "member" | "automatic" | null;
+};
+
+type ShipmentConfirmationQuery = {
+  select: (columns: string) => {
+    eq: (column: string, value: unknown) => {
+      in: (column: string, values: string[]) => Promise<{
+        data: ShipmentConfirmationRow[] | null;
+        error: { message?: string } | null;
+      }>;
+    };
+  };
+};
+
+type ShipmentConfirmationAdminClient = {
+  from: (table: "inventory_shipment_trade_confirmations") => ShipmentConfirmationQuery;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -70,5 +92,41 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
   const { data, error } = await (auth.user as unknown as RpcClient).rpc("get_my_inventory_shipments");
   if (error || !isShipmentOverview(data)) return commerceJson({ error: "shipment_history_unavailable" }, 503);
-  return commerceJson(data);
+  const shipmentIds = data.shipments.map((shipment) => String(shipment.id));
+  const confirmationResult = shipmentIds.length === 0
+    ? { data: [], error: null }
+    : await (auth.admin as unknown as ShipmentConfirmationAdminClient).from("inventory_shipment_trade_confirmations")
+        .select("shipment_id,confirmation_due_at,confirmed_at,confirmed_by_kind")
+        .eq("member_id", auth.userId)
+        .in("shipment_id", shipmentIds);
+  if (confirmationResult.error) return commerceJson({ error: "shipment_confirmation_unavailable" }, 503);
+  const confirmationByShipment = new Map((confirmationResult.data ?? []).map((row) => [row.shipment_id, row]));
+  return commerceJson({
+    shipments: data.shipments.map((shipment) => {
+      const confirmation = confirmationByShipment.get(String(shipment.id));
+      return {
+        ...shipment,
+        purchaseConfirmationDueAt: confirmation?.confirmation_due_at ?? null,
+        purchaseConfirmedAt: confirmation?.confirmed_at ?? null,
+        purchaseConfirmedBy: confirmation?.confirmed_by_kind ?? null,
+      };
+    }),
+  });
+}
+
+export async function POST(request: Request) {
+  const auth = await authenticateMemberCommerceRequest(request, true);
+  if (!auth.ok) return auth.response;
+  const body = await request.json().catch(() => null) as { shipmentId?: unknown } | null;
+  if (!body || !isUuid(body.shipmentId) || Object.keys(body).some((key) => key !== "shipmentId")) {
+    return commerceJson({ error: "invalid_purchase_confirmation" }, 422);
+  }
+  const { data, error } = await (auth.user as unknown as RpcClient).rpc(
+    "confirm_my_inventory_shipment_purchase",
+    { p_shipment_id: body.shipmentId },
+  );
+  if (error || data !== true) {
+    return commerceJson({ error: error?.message ?? "purchase_confirmation_failed" }, error?.code === "42501" ? 403 : 409);
+  }
+  return commerceJson({ confirmed: true });
 }

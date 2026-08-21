@@ -72,6 +72,10 @@ test("operator payments expose seven-day history, amount adjustment, and reversi
   assert.match(consoleSource, /manualTransferReceiptFingerprint/);
   assert.match(consoleSource, /manualTransferReversalFingerprint/);
   assert.match(consoleSource, /getOrCreatePendingManualTransferReceipt/);
+  assert.match(consoleSource, /busyKeyRef = useRef/);
+  assert.match(consoleSource, /if \(!beginBusy\(key\)\) return/);
+  assert.match(consoleSource, /latestQueue\?\.payments\.find/);
+  assert.match(consoleSource, /await confirm\(latest, true/);
   assert.doesNotMatch(consoleSource, /idempotencyStorageKey/);
 });
 

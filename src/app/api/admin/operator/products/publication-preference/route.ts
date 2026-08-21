@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     publicationMode: data.publication_mode,
     scheduledHourKst: data.scheduled_hour_kst,
     updatedAt: data.updated_at,
-  } : { publicationMode: "scheduled", scheduledHourKst: 10, updatedAt: null } });
+  } : { publicationMode: "now", scheduledHourKst: 10, updatedAt: null } });
 }
 
 export async function PUT(request: Request) {

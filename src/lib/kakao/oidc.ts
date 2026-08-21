@@ -211,5 +211,21 @@ export function hasTrustedRequestOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
   const fetchSite = request.headers.get("sec-fetch-site");
   if (fetchSite === "cross-site") return false;
-  return origin === requestUrl.origin;
+  if (origin === requestUrl.origin) return true;
+  if (!origin) return false;
+
+  // Next's local dev server can normalize 127.0.0.1 requests to localhost in
+  // Request.url. Treat only loopback aliases on the exact same HTTP port as
+  // the same local origin; deployed hosts remain strict exact-origin checks.
+  try {
+    const suppliedOrigin = new URL(origin);
+    const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+    return requestUrl.protocol === "http:" &&
+      suppliedOrigin.protocol === "http:" &&
+      loopbackHosts.has(requestUrl.hostname) &&
+      loopbackHosts.has(suppliedOrigin.hostname) &&
+      requestUrl.port === suppliedOrigin.port;
+  } catch {
+    return false;
+  }
 }

@@ -122,7 +122,7 @@ test("operator product console publishes directly and manages active listings fr
   assert.match(products, /사이트에서 즉시 사라집니다/);
   assert.match(products, /status:\s*"pending" \| "active";/);
   assert.match(products, /const canPublishStore\s*=[\s\S]*stores\.find\(\(store\) => store\.id === form\.storeId\)\?\.canPublish === true/);
-  assert.match(products, /canPublishStore && publicationMode === "now"/);
+  assert.match(products, /canPublishStore && effectivePublicationMode === "now"/);
   assert.match(products, /form\.status === "active" \|\| stores\.find/);
   assert.match(products, /disabled=\{busy \|\| !canPublishStore \|\| product\.status !== "pending"\}/);
   assert.match(products, /\/products\/\$\{product\.id\}\/pause/);
@@ -240,7 +240,13 @@ test("sales history is store-scoped and moves only paid settlement batches out o
     source("src/app/api/admin/operator/revenue/route.ts"),
   ]);
 
-  assert.doesNotMatch(sales, /\/api\/admin\/operator\/orders/);
+  assert.match(sales, /\/api\/admin\/operator\/orders/);
+  assert.match(sales, /결제 대기/);
+  assert.match(sales, /activeTransfers/);
+  assert.match(sales, /member-operations\?view=winners/);
+  assert.match(sales, /pendingAuctions/);
+  assert.match(sales, /낙찰 · 결제 신청 대기/);
+  assert.match(sales, /낙찰 · 입금 확인 대기/);
   assert.match(sales, /\/api\/admin\/operator\/revenue/);
   assert.match(sales, /상품 준비하기/);
   assert.match(sales, /송장번호 입력하기/);

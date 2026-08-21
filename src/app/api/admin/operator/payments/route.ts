@@ -5,6 +5,7 @@ const PAYMENT_KINDS = new Set(["commerce", "auction", "shipping_fee"]);
 
 interface RpcError {
   code?: string;
+  message?: string;
 }
 
 interface RpcClient {
@@ -152,7 +153,10 @@ function rpcFailure(error: RpcError) {
     return commerceJson({ error: "payment_not_ready", message: "현재 입금 상태에서는 이 작업을 진행할 수 없습니다." }, 422);
   }
   if (["22023", "22003", "23514"].includes(error.code ?? "")) {
-    return commerceJson({ error: "invalid_payment_request", message: "입금 확인 내용을 확인해 주세요." }, 422);
+    return commerceJson({
+      error: "invalid_payment_request",
+      message: error.message ?? "입금 확인 내용을 확인해 주세요.",
+    }, 422);
   }
   return commerceJson({ error: "payment_queue_unavailable", message: "입금 대기열을 처리하지 못했습니다." }, 503);
 }

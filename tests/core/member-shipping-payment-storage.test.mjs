@@ -18,6 +18,7 @@ test("member checkout defaults to shipping and keeps payment and deposit-info di
   assert.match(combined, /useState\(true\)/);
   assert.match(combined, />택배비 포함 결제</);
   assert.match(combined, /includeShippingFee/);
+  assert.doesNotMatch(combined, /shippingCreditQuantity/);
   assert.match(combined, /입금 정보 보기/);
   assert.match(combined, /입금자명 수정하기/);
   assert.match(combined, /결제하기/);
@@ -62,11 +63,12 @@ test("standalone shipping credits are retired while historical ledger contracts 
 });
 
 test("member addresses use the owner-safe RPC and storage shows policy, full list, and item selection", async () => {
-  const [addressRoute, storageRoute, ordersRoute, dashboard, accountPage, accountContent, accountSectionPage, rollout, serverGrant] = await Promise.all([
+  const [addressRoute, storageRoute, ordersRoute, dashboard, cart, accountPage, accountContent, accountSectionPage, rollout, serverGrant] = await Promise.all([
     source("src/app/api/account/addresses/route.ts"),
     source("src/app/api/account/storage/route.ts"),
     source("src/app/api/orders/route.ts"),
     source("src/components/features/account/AccountDashboard.tsx"),
+    source("src/components/features/commerce/CartView.tsx"),
     source("src/app/(shop)/account/page.tsx"),
     source("src/components/features/account/DesktopAccountContent.tsx"),
     source("src/app/(shop)/account/[section]/page.tsx"),
@@ -91,9 +93,15 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   assert.match(dashboard, /aria-label=\{`\$\{item\.title\} 배송 선택`\}/);
   assert.match(dashboard, /우편번호 5자리/);
   assert.match(dashboard, /배송지를 저장하고 선택했습니다/);
+  assert.match(dashboard, /지금 처리해야 할 항목/);
   assert.match(dashboard, /배송지 추가 \/ 수정 \/ 삭제/);
   assert.match(addressRoute, /export async function PATCH/);
   assert.match(addressRoute, /export async function DELETE/);
+  assert.match(cart, /배송지 추가하고 선택/);
+  assert.match(cart, /saveCheckoutAddress/);
+  assert.match(cart, /deleteCheckoutAddress/);
+  assert.match(cart, /name="checkout-shipping-address"/);
+  assert.match(cart, /배송지 선택/);
   assert.match(dashboard, /col-start-2 row-start-1[\s\S]*id="storage"/);
   assert.match(dashboard, /col-start-1 row-start-1[\s\S]*id="shipping-request"/);
   assert.doesNotMatch(dashboard, /id="shipping-credit"/);
@@ -104,10 +112,19 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   );
   assert.doesNotMatch(dashboard, /<details[^>]*id="refunds"[^>]*open=\{true\}/);
   assert.match(accountPage, /<DesktopAccountContent \/>/);
-  assert.match(accountContent, /view=\{simpleMode\.enabled \? "simple" : "overview"\}/);
-  assert.match(accountContent, /MY 업무 분류/);
+  assert.match(accountContent, /homeOnly onNavigate/);
+  assert.match(accountContent, /내 작업 공간/);
+  assert.match(accountContent, /homeOnly/);
+  assert.match(accountContent, />홈</);
+  assert.match(accountContent, /<nav aria-label="MY 작업 메뉴">/);
+  assert.match(accountContent, /aria-expanded=\{categoryActive\}/);
+  assert.match(accountContent, /aria-current=\{task\.view === activeTask\.view \? "page" : undefined\}/);
   assert.match(accountContent, /배송지 관리/);
-  assert.match(accountContent, /MY 작업 모달 닫기/);
+  assert.match(accountContent, /보관 \/ 배송/);
+  assert.doesNotMatch(accountContent, /\{ label: "배송 신청", view: "shipping-request" \}/);
+  assert.match(dashboard, /배송 상담/);
+  assert.match(dashboard, /openShippingRequest/);
+  assert.doesNotMatch(accountContent, /role="dialog"/);
   assert.match(accountContent, /window\.history\.pushState/);
   assert.match(accountSectionPage, /redirect\(`\/account\?task=/);
   assert.match(accountContent, /<RoleWorkCenterLink \/>/);

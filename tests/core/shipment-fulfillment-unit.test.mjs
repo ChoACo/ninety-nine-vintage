@@ -23,3 +23,13 @@ test("active shipments are bound to one store or one active fulfillment group", 
   assert.match(foundation, /f\.is_blocked/i);
   assert.match(foundation, /status='packed'.*tracking_number/is);
 });
+
+test("direct purchases keep separate active shipments for each order address", async () => {
+  const migration = await readFile(
+    new URL("supabase/migrations/20260821140242_allow_parallel_direct_purchase_shipments.sql", rootUrl),
+    "utf8",
+  );
+  assert.match(migration, /drop index if exists public\.inventory_shipments_one_active_store_unit_idx/i);
+  assert.match(migration, /create unique index inventory_shipments_one_active_store_unit_idx/i);
+  assert.match(migration, /settlement_method <> 'purchase_included'/i);
+});

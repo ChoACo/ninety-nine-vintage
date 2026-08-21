@@ -162,7 +162,7 @@ function importedConditionGrade(condition: string | null) {
   return "A";
 }
 function productStatusLabel(status: string) {
-  if (status === "pending") return "등록 대기";
+  if (status === "pending") return "공개 처리 중";
   if (status === "active") return "공개 중";
   if (status === "closed") return "마감";
   if (status === "sold") return "판매 완료";
@@ -231,7 +231,7 @@ export function OperatorProductsConsole({
   );
   const [singleImages, setSingleImages] = useState<SingleImage[]>([]);
   const [publicationMode, setPublicationMode] =
-    useState<PublicationMode>("scheduled");
+    useState<PublicationMode>("now");
   const [scheduledHourKst, setScheduledHourKst] = useState(10);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingUpdatedAt, setEditingUpdatedAt] = useState<string | null>(null);
@@ -248,8 +248,7 @@ export function OperatorProductsConsole({
     saleType: view === "active" ? "fixed" : "all",
     search: "",
   });
-  const [registrationStage, setRegistrationStage] =
-    useState<RegistrationStage>("scheduled");
+  const [registrationStage] = useState<RegistrationStage>("scheduled");
   const [selectedPendingIds, setSelectedPendingIds] = useState<Set<string>>(new Set());
   const [xlsxImportOpen, setXlsxImportOpen] = useState(() =>
     typeof window !== "undefined"
@@ -498,6 +497,7 @@ export function OperatorProductsConsole({
     setEditingId(null);
     setEditingUpdatedAt(null);
     setSingleCreateOpen(keepOpen);
+    if (saleType === "auction") setPublicationMode("now");
     setForm((current) => {
       const storeId = current.storeId || scopedStores[0]?.id || "";
       const canPublish =
@@ -649,7 +649,7 @@ export function OperatorProductsConsole({
             : undefined,
         bidIncrement: Number(snapshot.form.bidIncrement),
         storageClass: snapshot.form.storageClass,
-        publicationMode: snapshot.publicationMode,
+        publicationMode: snapshot.form.saleType === "auction" ? "now" : snapshot.publicationMode,
         scheduledHourKst: snapshot.scheduledHourKst,
         imageUrls: uploaded.imageUrls,
         thumbnailUrls: uploaded.thumbnailUrls,
@@ -683,7 +683,7 @@ export function OperatorProductsConsole({
         : `“${snapshot.form.title}” 단품 등록을 완료했습니다.`;
       if (snapshot.canPublishImmediately) {
         if (!payload.product?.id) {
-          message = `“${snapshot.form.title}” 상품은 등록했지만 즉시 공개 결과를 확인하지 못했습니다. 등록 대기 목록을 확인해 주세요.`;
+          message = `“${snapshot.form.title}” 상품은 저장했지만 즉시 공개 결과를 확인하지 못했습니다. 업로드 예정 목록을 확인해 주세요.`;
         } else {
           try {
             await publishProductNow(snapshot.accessToken, payload.product.id);
@@ -787,12 +787,12 @@ export function OperatorProductsConsole({
         stores.find((store) => store.id === form.storeId)?.canPublish === true;
       const snapshot: SingleRegistrationSnapshot = {
         accessToken: token,
-        canPublishImmediately: canPublishStore && publicationMode === "now",
+        canPublishImmediately: canPublishStore && effectivePublicationMode === "now",
         files: singleImages.map((image) => image.file),
         form: { ...form },
         id: crypto.randomUUID(),
         productId: crypto.randomUUID(),
-        publicationMode,
+        publicationMode: effectivePublicationMode,
         scheduledHourKst,
       };
       singleRegistrationSnapshotsRef.current.set(snapshot.id, snapshot);
@@ -862,7 +862,7 @@ export function OperatorProductsConsole({
       let message = "상품 정보를 저장했습니다.";
       if (shouldPublishAfterSave) {
         if (!payload.product?.id) {
-          message = "상품 정보는 저장했지만 즉시 공개 결과를 확인하지 못했습니다. 등록 대기 목록을 확인해 주세요.";
+          message = "상품 정보는 저장했지만 즉시 공개 결과를 확인하지 못했습니다. 업로드 예정 목록을 확인해 주세요.";
         } else {
           try {
             await publishProductNow(token, payload.product.id);
@@ -932,7 +932,7 @@ export function OperatorProductsConsole({
     if (!token || busy || !isManageableProductStatus(product.status)) return;
     const confirmation = product.status === "active"
       ? `공개 중인 “${product.title}” 상품을 삭제할까요? 사이트에서 즉시 사라집니다. 입찰·주문 이력이 있으면 삭제되지 않습니다.`
-      : `“${product.title}” 등록 대기 상품을 삭제할까요?`;
+      : `“${product.title}” 공개 처리 중 상품을 삭제할까요?`;
     if (!window.confirm(confirmation)) return;
     setBusy(true); setNotice("");
     try {
@@ -1206,10 +1206,10 @@ export function OperatorProductsConsole({
         }
       }
       setNotice(canPublish && options.publicationMode === "now"
-        ? `${published}개 엑셀 상품을 즉시 공개했습니다.${published < count ? ` ${count - published}개는 등록 대기로 남았습니다.` : ""}`
+        ? `${published}개 엑셀 상품을 즉시 공개했습니다.${published < count ? ` ${count - published}개는 업로드 예정으로 남았습니다.` : ""}`
         : canPublish
           ? `${count}개 엑셀 상품을 상품별 공개 시각 기준으로 등록했습니다.`
-        : `${count}개 엑셀 상품을 등록 대기로 저장했습니다.`);
+        : `${count}개 엑셀 상품을 업로드 예정으로 저장했습니다.`);
       try {
         await load(token);
       } catch {
@@ -1223,7 +1223,8 @@ export function OperatorProductsConsole({
       setBusy(false);
     }
   };
-  const singleRegistrationSubmitLabel = publicationMode === "now"
+  const effectivePublicationMode: PublicationMode = form.saleType === "auction" ? "now" : publicationMode;
+  const singleRegistrationSubmitLabel = effectivePublicationMode === "now"
     ? `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 즉시 공개`
     : `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 ${String(scheduledHourKst).padStart(2, "0")}:00 예약`;
   const singleRegistrationDisabled =
@@ -1231,7 +1232,7 @@ export function OperatorProductsConsole({
 
   return <div className="space-y-8">
     <SectionHeading
-      description={view === "active" ? "현재 공개 중인 상품만 판매 방식별로 나누어 관리합니다." : "신규 상품을 등록하고 업로드 예정 상품과 등록 대기 상품을 관리합니다."}
+      description={view === "active" ? "현재 공개 중인 상품만 판매 방식별로 나누어 관리합니다." : "신규 상품을 등록합니다. 예약 공개 상품은 상품 목록의 업로드 예정에서 확인합니다."}
       eyebrow={view === "active" ? "운영자 / 상품" : "운영자 / 상품 등록"}
       title={view === "active" ? "진행 중 상품" : "상품 등록"}
       variant="page"
@@ -1263,7 +1264,7 @@ export function OperatorProductsConsole({
       </nav>
     ) : (
       <nav aria-label="상품 등록 상태" className="grid grid-cols-2 border border-ink">
-        {(["scheduled", "draft"] as const).map((stage) => <button aria-pressed={registrationStage === stage} className={`min-h-12 px-4 text-xs font-black ${registrationStage === stage ? "bg-ink text-paper" : "bg-paper text-ink"}`} key={stage} onClick={() => setRegistrationStage(stage)} type="button">{stage === "scheduled" ? "업로드 예정" : "등록 대기"} <span className="ml-1 font-mono">{registrationCounts[stage]}</span></button>)}
+        <button aria-pressed={registrationStage === "scheduled"} className="min-h-12 bg-ink px-4 text-xs font-black text-paper" type="button">업로드 예정 <span className="ml-1 font-mono">{registrationCounts.scheduled}</span></button>
       </nav>
     )}
     {view === "registration" && products.some((product) => product.brand_source === "inferred" && product.status === "pending") && <StatusNotice>등록 대기 상품 중 제목에서 임시 추론한 브랜드가 있습니다. 수정 저장하면 확인된 브랜드로 전환됩니다.</StatusNotice>}
@@ -1395,7 +1396,7 @@ export function OperatorProductsConsole({
             <TextArea aria-label="점검·하자 메모" className="min-h-20 sm:col-span-2" disabled={!productFieldsEditable} onChange={(event) => update("inspectionNotes", event.target.value)} placeholder="오염·수선·사용감 등 객관적인 상태 정보를 한 줄씩 입력" ref={inspectionNotesRef} value={form.inspectionNotes} />
             <TextArea aria-label="이미지 URL" className="min-h-20 sm:col-span-2" disabled={!productFieldsEditable} onChange={(event) => update("imageUrls", event.target.value)} placeholder="이미지 URL을 줄바꿈 또는 쉼표로 입력" required value={form.imageUrls} />
             <p className="text-[11px] leading-5 text-amber-800 sm:col-span-2">기존 상품 수정 시에만 현재 이미지 URL을 유지하거나 변경할 수 있습니다.</p>
-            <div className="flex flex-col gap-2 sm:flex-row"><TextInput aria-label="입찰 단위" disabled={!saleSetupEditable} min="1" onChange={(event) => update("bidIncrement", event.target.value)} placeholder="입찰 단위" type="number" value={form.bidIncrement} /><SelectInput aria-label="공개 상태" disabled={!saleSetupEditable} onChange={(event) => update("status", event.target.value)} value={form.status}><option value="pending">등록 대기로 저장</option>{(form.status === "active" || stores.find((store) => store.id === form.storeId)?.canPublish) && <option value="active">{editingProduct?.status === "active" ? "현재 공개 중" : "저장 후 즉시 공개"}</option>}</SelectInput></div>
+            <div className="flex flex-col gap-2 sm:flex-row"><TextInput aria-label="입찰 단위" disabled={!saleSetupEditable} min="1" onChange={(event) => update("bidIncrement", event.target.value)} placeholder="입찰 단위" type="number" value={form.bidIncrement} /><SelectInput aria-label="공개 상태" disabled={!saleSetupEditable} onChange={(event) => update("status", event.target.value)} value={form.status}><option value="pending">업로드 예정으로 저장</option>{(form.status === "active" || stores.find((store) => store.id === form.storeId)?.canPublish) && <option value="active">{editingProduct?.status === "active" ? "현재 공개 중" : "저장 후 즉시 공개"}</option>}</SelectInput></div>
             {form.saleType === "auction" && <p className="text-[11px] leading-5 text-muted sm:col-span-2">기본값은 1,000원이며 입찰 단위 입력칸에서 직접 수정할 수 있습니다.</p>}
           </>
         ) : (
@@ -1411,11 +1412,11 @@ export function OperatorProductsConsole({
               <SelectInput aria-label="단품 공개 방식" className="mt-2" onChange={async (event) => {
                 const mode = event.target.value as PublicationMode; setPublicationMode(mode);
                 if (token) await fetch("/api/admin/operator/products/publication-preference", { method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ publicationMode: mode, scheduledHourKst }) });
-              }} value={publicationMode}>
-                <option value="scheduled">예약 공개 (기본)</option>
+              }} value={effectivePublicationMode}>
+                {form.saleType !== "auction" && <option value="scheduled">예약 공개</option>}
                 <option value="now">즉시 공개</option>
               </SelectInput>
-              {publicationMode === "scheduled" && <SelectInput aria-label="예약 공개 시간" className="mt-2" onChange={async (event) => {
+              {effectivePublicationMode === "scheduled" && <SelectInput aria-label="예약 공개 시간" className="mt-2" onChange={async (event) => {
                 const hour = Number(event.target.value); setScheduledHourKst(hour);
                 if (token) await fetch("/api/admin/operator/products/publication-preference", { method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ publicationMode, scheduledHourKst: hour }) });
               }} value={String(scheduledHourKst)}>

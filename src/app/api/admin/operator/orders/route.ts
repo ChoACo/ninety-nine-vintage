@@ -57,6 +57,20 @@ interface QueueSnapshot {
   nextHistoryCursor: HistoryCursor | null;
 }
 
+type ScopedOrderItem = { order_id: string; product_id: string; store_id: string };
+type ScopedOrderItemsClient = {
+  from: (table: "commerce_order_items") => {
+    select: (columns: string) => {
+      in: (column: string, values: string[]) => {
+        eq: (column: string, value: string) => Promise<{
+          data: ScopedOrderItem[] | null;
+          error: { message?: string } | null;
+        }>;
+      };
+    };
+  };
+};
+
 interface OrderItem {
   order_id: string;
   product_id: string;
@@ -666,10 +680,35 @@ export async function GET(request: Request) {
   if (!itemsByOrder) {
     return commerceJson({ error: "operator_orders_unavailable" }, 503);
   }
+  const scopedItemsResult = orderIds.length === 0
+    ? { data: [], error: null }
+    : await (auth.admin as unknown as ScopedOrderItemsClient)
+        .from("commerce_order_items")
+        .select("order_id,product_id,store_id")
+        .in("order_id", orderIds)
+        .eq("store_id", auth.selectedStoreId);
+  if (scopedItemsResult.error) {
+    return commerceJson({ error: "operator_orders_unavailable" }, 503);
+  }
+  const scopedProductsByOrder = new Map<string, Set<string>>();
+  for (const item of scopedItemsResult.data ?? []) {
+    const productIds = scopedProductsByOrder.get(item.order_id) ?? new Set<string>();
+    productIds.add(item.product_id);
+    scopedProductsByOrder.set(item.order_id, productIds);
+  }
+  const scopedItemsByOrder = new Map<string, OrderItem[]>();
+  for (const [orderId, items] of itemsByOrder) {
+    const productIds = scopedProductsByOrder.get(orderId);
+    if (!productIds) continue;
+    const scopedItems = items.filter((item) => productIds.has(item.product_id));
+    if (scopedItems.length > 0) scopedItemsByOrder.set(orderId, scopedItems);
+  }
   const withItems = (queueTransfers: QueueTransfer[]) =>
-    queueTransfers.map((transfer) => ({
+    queueTransfers
+      .filter((transfer) => scopedItemsByOrder.has(transfer.order_id))
+      .map((transfer) => ({
       ...transfer,
-      items: itemsByOrder.get(transfer.order_id) ?? [],
+      items: scopedItemsByOrder.get(transfer.order_id) ?? [],
     }));
 
   return commerceJson({

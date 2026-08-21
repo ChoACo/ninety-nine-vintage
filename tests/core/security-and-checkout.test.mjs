@@ -185,6 +185,15 @@ test("the former entry gate is absent while live auctions keep their authoritati
   assert.match(mobileNavigation, /"\/admin\/employee"/);
 });
 
+test("trusted mutation origin keeps deployed hosts exact while accepting same-port local loopback aliases", async () => {
+  const oidc = await readFile(new URL("src/lib/kakao/oidc.ts", rootUrl), "utf8");
+  assert.match(oidc, /if \(origin === requestUrl\.origin\) return true/);
+  assert.match(oidc, /new Set\(\["localhost", "127\.0\.0\.1", "\[::1\]"\]\)/);
+  assert.match(oidc, /requestUrl\.protocol === "http:"[\s\S]*suppliedOrigin\.protocol === "http:"/);
+  assert.match(oidc, /requestUrl\.port === suppliedOrigin\.port/);
+  assert.match(oidc, /fetchSite === "cross-site"/);
+});
+
 test("Kakao returnTo accepts only same-origin application paths", () => {
   assert.equal(safeSameOriginReturnTo("/cart?from=login#checkout", origin), "/cart?from=login#checkout");
   assert.equal(safeSameOriginReturnTo("/account/login?next=%2Fhome", origin), "/account");

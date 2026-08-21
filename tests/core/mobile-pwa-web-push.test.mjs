@@ -51,6 +51,8 @@ test("service worker always shows mobile OS push and handles notification clicks
   assert.match(worker, /MAX_PUBLIC_CACHE_ENTRIES = 160/);
   assert.match(worker, /deletePublicCaches/);
   assert.match(worker, /trimPublicCache/);
+  assert.match(worker, /\["localhost", "127\.0\.0\.1", "::1"\]\.includes\(url\.hostname\)/);
+  assert.match(consent, /if \(isLoopbackHost\(\)\) return/);
   assert.match(cacheConsent, /CACHE_CONSENT_COOKIE/);
   assert.match(cacheConsent, /writeCookieConsent\(value\)/);
   assert.match(consent, /setConsent\("accepted"\)/);

@@ -9,6 +9,7 @@ const PAYMENT_KINDS = new Set(["commerce", "auction", "shipping_fee"]);
 
 interface RpcError {
   code?: string;
+  message?: string;
 }
 
 interface RpcClient {
@@ -68,14 +69,29 @@ function rpcFailure(error: RpcError) {
   if (error.code === "P0002") {
     return commerceJson({ error: "payment_not_found", message: "입금 요청을 찾을 수 없습니다." }, 404);
   }
-  if (["PT409", "23505", "40001"].includes(error.code ?? "")) {
+  if (["PT409", "40001"].includes(error.code ?? "")) {
     return commerceJson({ error: "payment_conflict", message: "입금 상태가 변경되었습니다. 새로고침 후 다시 확인해 주세요." }, 409);
+  }
+  if (error.code === "23505") {
+    if (error.message?.includes("동일한 요청 키")) {
+      return commerceJson({
+        error: "payment_conflict",
+        message: "이 입금 확인 요청이 이미 처리 중입니다. 최신 목록을 확인해 주세요.",
+      }, 409);
+    }
+    return commerceJson({
+      error: "payment_fulfillment_conflict",
+      message: "입금 확인 후 배송 접수를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    }, 503);
   }
   if (error.code === "55000") {
     return commerceJson({ error: "payment_not_ready", message: "현재 입금 상태에서는 확인을 진행할 수 없습니다." }, 422);
   }
   if (["22023", "22003", "23514"].includes(error.code ?? "")) {
-    return commerceJson({ error: "invalid_payment_request", message: "입금 확인 내용을 확인해 주세요." }, 422);
+    return commerceJson({
+      error: "invalid_payment_request",
+      message: error.message ?? "입금 확인 내용을 확인해 주세요.",
+    }, 422);
   }
   return commerceJson({ error: "payment_confirmation_unavailable", message: "입금 확인을 처리하지 못했습니다." }, 503);
 }

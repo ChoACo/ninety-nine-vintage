@@ -47,6 +47,28 @@ interface StickyBidPanelProps {
   surface?: "desktop" | "mobile";
 }
 
+function getFixedCheckoutHref(basePath: "" | "/m", productId: string) {
+  return basePath === "/m"
+    ? `/m/checkout?productId=${productId}`
+    : `/cart?productId=${productId}`;
+}
+
+function navigateToFixedCheckout(
+  basePath: "" | "/m",
+  productId: string,
+  replaceRoute: (href: string) => void,
+) {
+  const href = getFixedCheckoutHref(basePath, productId);
+  if (basePath === "/m") {
+    replaceRoute(href);
+    return;
+  }
+
+  // A soft navigation can retain the intercepted product-detail @modal slot.
+  // Rebuild the desktop route tree so checkout never opens behind that modal.
+  window.location.replace(href);
+}
+
 interface RefreshedAuctionProduct {
   antiSnipingBaseClosesAt: string | null;
   antiSnipingExtendedAt: string | null;
@@ -247,7 +269,10 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
         await reserveCartProduct(item.id, session.user.id);
         addToCart(item.id);
         if (intent === "buy") {
-          router.push(basePath === "/m" ? `/m/checkout?productId=${item.id}` : "/cart");
+          setBuying(false);
+          navigateToFixedCheckout(basePath, item.id, (href) =>
+            router.replace(href),
+          );
         } else {
           setBuyNoticeKind("success");
           setBuyNotice(
@@ -402,7 +427,10 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
       }
       await reserveCartProduct(item.id, session.user.id);
       addToCart(item.id);
-      router.push(basePath === "/m" ? `/m/checkout?productId=${item.id}` : "/cart");
+      setBuying(false);
+      navigateToFixedCheckout(basePath, item.id, (href) =>
+        router.replace(href),
+      );
     } catch (error) {
       setBuyNoticeKind("error");
       setBuyNotice(

@@ -1,6 +1,8 @@
 import { LoginPrompt } from "@/components/features/account/LoginPrompt";
 import { ModalShell } from "@/components/layout/ModalShell";
 
+export const dynamic = "force-dynamic";
+
 function safeReturnTo(value: string | string[] | undefined) {
   const candidate = typeof value === "string" ? value : "/account";
   return candidate.startsWith("/") && !candidate.startsWith("//") && !candidate.startsWith("/api") ? candidate : "/account";

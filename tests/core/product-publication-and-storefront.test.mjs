@@ -16,9 +16,11 @@ test("publication preferences persist per operator and store with hourly KST sch
   assert.match(migration, /scheduled_hour_kst between 0 and 23/i);
   assert.match(migration, /has_store_permission\(p_store_id,'manage_products'\)/i);
   assert.match(route, /set_operator_product_publication_preference/);
-  assert.match(consoleSource, /예약 공개 \(기본\)/);
+  assert.match(consoleSource, /useState<PublicationMode>\("now"\)/);
+  assert.match(consoleSource, /form\.saleType !== "auction"/);
   assert.match(consoleSource, /Array\.from\(\{ length: 24 \}/);
   assert.match(productRoute, /nextKoreanScheduledHour/);
+  assert.match(productRoute, /const publicationMode = saleType === "auction" \? "now"/);
 });
 
 test("store malls split into main, new, auction, buy, and info pages", async () => {

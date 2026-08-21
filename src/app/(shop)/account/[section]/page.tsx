@@ -22,5 +22,5 @@ export default async function AccountSectionPage({ params }: { params: Promise<{
   const { section } = await params;
   if (section === "settings") redirect("/settings");
   if (!(section in sectionLabels)) notFound();
-  redirect(`/account?task=${encodeURIComponent(section)}`);
+  redirect(`/account?task=${encodeURIComponent(section === "shipping-request" ? "storage" : section)}`);
 }

@@ -149,7 +149,10 @@ export async function POST(request: Request) {
     : images(body.thumbnailUrls);
   const startingPrice = Number(body?.startingPrice);
   const fixedPrice = saleType === "fixed" ? Number(body?.fixedPrice ?? body?.startingPrice) : null;
-  const publicationMode = body?.publicationMode === "now" ? "now" : "scheduled";
+  const requestedPublicationMode = body?.publicationMode === "now" ? "now" : "scheduled";
+  // Auction creation must not be held by the former settlement-hour rule.
+  // Scheduled publication remains available for fixed-price products.
+  const publicationMode = saleType === "auction" ? "now" : requestedPublicationMode;
   const scheduledHourKst = Number.isInteger(Number(body?.scheduledHourKst))
     ? Number(body?.scheduledHourKst) : 10;
   const publishAt = singleRegistration

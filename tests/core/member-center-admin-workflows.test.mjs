@@ -136,7 +136,7 @@ test("payment confirmation is owner-only and the operator payment page redirects
   ]);
 
   assert.doesNotMatch(layout, /label:\s*"주문·입금"/);
-  assert.match(redirectPage, /redirect\("\/admin\/operator\/fulfillment"\)/);
+  assert.match(redirectPage, /redirect\("\/admin\/operator\/sales\?status=pending"\)/);
   assert.match(route, /auth\.roleCode !== "owner"/);
   assert.match(route, /from\("profiles"\)/);
   assert.match(route, /from\("commerce_order_items"\)/);

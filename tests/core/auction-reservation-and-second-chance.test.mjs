@@ -127,6 +127,18 @@ test("cart API can only reserve and release inventory through authoritative RPCs
   assert.match(route, /staleProductIds: ids/);
 });
 
+test("auction settlement blackout no longer blocks product uploads", async () => {
+  const migration = await source(
+    "supabase/migrations/20260821124657_remove_auction_upload_settlement_blackout.sql",
+  );
+  const definition = extractSqlFunctionDefinition(
+    migration,
+    "public.guard_product_auction_blackout",
+  );
+  assert.match(definition, /begin\s+return new;\s+end;/i);
+  assert.doesNotMatch(definition, /is_auction_blackout|정산 시간/i);
+});
+
 test("quick cart copy does not promise an inventory hold", async () => {
   const quickCart = await source(
     "src/components/features/auction/detail/QuickCartModal.tsx",

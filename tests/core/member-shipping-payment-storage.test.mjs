@@ -107,7 +107,7 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   assert.match(accountContent, /view=\{simpleMode\.enabled \? "simple" : "overview"\}/);
   assert.match(accountContent, /MY 업무 분류/);
   assert.match(accountContent, /배송지 관리/);
-  assert.match(accountContent, /MY 작업 모달 닫기/);
+  assert.match(accountContent, /MY 작업 닫기/);
   assert.match(accountContent, /window\.history\.pushState/);
   assert.match(accountSectionPage, /redirect\(`\/account\?task=/);
   assert.match(accountContent, /<RoleWorkCenterLink \/>/);

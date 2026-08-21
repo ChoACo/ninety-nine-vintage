@@ -125,7 +125,7 @@ export async function GET(request: Request) {
       stores: [],
     });
   }
-  const now = new Date().toISOString();
+const now = new Date().toISOString();
   const [pastResult, closedResult] = await Promise.all([
     auth.admin
       .from("products")
@@ -175,6 +175,23 @@ export async function GET(request: Request) {
       offersByProduct.set(productId, resolveWinnerState(offers));
     }
   }
+  const { data: lockData, error: lockError } = await auth.user
+    .rpc("get_operator_pending_product_locks", { p_store_ids: storeIds });
+  if (lockError) {
+    return commerceJson({ error: "past_products_unavailable" }, 503);
+  }
+  const lockRows = (Array.isArray(lockData) ? lockData : []) as Array<{
+    productId: string;
+    lockKind: "buy_now_payment" | "auction_payment";
+    lockUntil: string | null;
+  }>;
+  const locksByProduct = new Map(lockRows.map((lock) => [lock.productId, lock]));
+  const enrichWithLock = (product: Record<string, unknown>) => {
+    const lock = locksByProduct.get(product.id as string);
+    return lock
+      ? { ...product, pending_lock_kind: lock.lockKind, pending_lock_until: lock.lockUntil }
+      : product;
+  };
   return commerceJson({
     stores: stores ?? [],
     products: (pastResult.data ?? []).map((product) => ({
@@ -186,22 +203,24 @@ export async function GET(request: Request) {
         getCatalogImageUrl(image, 320),
       ),
     })),
-    closedAuctions: closedAuctions.map((product) => ({
-      ...product,
-      image_urls: product.image_urls.map((image) =>
-        getCatalogImageUrl(image, 320),
-      ),
-      thumbnail_urls: product.thumbnail_urls.map((image) =>
-        getCatalogImageUrl(image, 320),
-      ),
-      ...(offersByProduct.get(product.id) ?? {
-        winnerAmount: null,
-        winnerDueAt: null,
-        winnerKind: null,
-        winnerName: null,
-        winnerState: "none",
+    closedAuctions: closedAuctions.map((product) =>
+      enrichWithLock({
+        ...product,
+        image_urls: product.image_urls.map((image) =>
+          getCatalogImageUrl(image, 320),
+        ),
+        thumbnail_urls: product.thumbnail_urls.map((image) =>
+          getCatalogImageUrl(image, 320),
+        ),
+        ...(offersByProduct.get(product.id) ?? {
+          winnerAmount: null,
+          winnerDueAt: null,
+          winnerKind: null,
+          winnerName: null,
+          winnerState: "none",
+        }),
       }),
-    })),
+    ),
     canProcessSecondChance:
       auth.roleCode === "owner" || auth.roleCode === "operator",
     paymentMode: "manual_transfer",

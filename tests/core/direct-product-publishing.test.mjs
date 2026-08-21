@@ -36,7 +36,8 @@ test("product management treats pending as a draft and keeps one batch input", a
   assert.match(consoleSource, /등록 대기로 저장/);
   assert.match(consoleSource, /await publishProductNow\(token, productId\)/);
   assert.match(consoleSource, /점검·하자 메모/);
-  assert.doesNotMatch(consoleSource, /실측|measurementShoulder|measurements:\s*\{/);
+  assert.match(consoleSource, /MeasurementFields category=\{form\.category\}/);
+  assert.doesNotMatch(consoleSource, /measurementShoulder/);
   assert.doesNotMatch(consoleSource, /parseBulkCsv|일괄 등록 CSV|CSV 일괄 등록 실행/);
   assert.match(xlsxSource, /등록이 끝난 상품은 즉시 공개됩니다/);
   assert.match(productsRoute, /from\("store_memberships"\)/);

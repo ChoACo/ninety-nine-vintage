@@ -29,6 +29,7 @@ export async function GET(request: Request) {
     ? auth.selectedStoreId
     : null;
   const conversationId = new URL(request.url).searchParams.get("conversationId");
+  const typeFilter = new URL(request.url).searchParams.get("type");
   if (conversationId) {
     if (!isUuid(conversationId)) {
       return commerceJson({ error: "conversation_not_found" }, 404);
@@ -72,9 +73,14 @@ export async function GET(request: Request) {
     .select(
       "id, member_id, assigned_staff_id, store_id, status, subject, conversation_type, product_id, last_message_at, last_message_preview, last_sender_id, created_at",
     )
-    .in("conversation_type", ["general", "product", "internal"])
+.in("conversation_type", ["general", "product", "internal"])
     .order("last_message_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
+  if (typeFilter === "product") {
+    query = query.eq("conversation_type", "product");
+  } else if (typeFilter === "general") {
+    query = query.eq("conversation_type", "general");
+  }
   if (selectedStoreId) {
     query = query.eq("store_id", selectedStoreId);
   }

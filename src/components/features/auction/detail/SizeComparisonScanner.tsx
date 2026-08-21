@@ -29,11 +29,15 @@ const PROFILE_FIELDS: ReadonlyArray<{
 ];
 
 function structuredMeasurements(value: ItemMeasurements): GarmentMeasurements {
+  const read = (key: string) => {
+    const parsed = Number(value[key]);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  };
   return {
-    chestWidthCm: value.chest > 0 ? value.chest : undefined,
-    totalLengthCm: value.length > 0 ? value.length : undefined,
-    shoulderWidthCm: value.shoulder > 0 ? value.shoulder : undefined,
-    sleeveLengthCm: value.sleeve > 0 ? value.sleeve : undefined,
+    chestWidthCm: read("chest"),
+    totalLengthCm: read("length"),
+    shoulderWidthCm: read("shoulder"),
+    sleeveLengthCm: read("sleeve"),
   };
 }
 

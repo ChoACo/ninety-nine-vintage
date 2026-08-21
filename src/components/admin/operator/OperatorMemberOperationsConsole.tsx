@@ -60,6 +60,96 @@ function formatAt(value: string | null) {
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString("ko-KR");
 }
 
+function winnerPaymentStatusLabel(status: "not_started" | "awaiting_manual_transfer" | undefined) {
+  if (status === "awaiting_manual_transfer") return "낙찰 대기 · 입금 확인 대기";
+  if (status === "not_started") return "낙찰 대기 · 결제 신청 전";
+  return "낙찰 대기";
+}
+
+type StorageStatusFilter = "all" | "stored" | "waiting_outbound";
+type StorageExpiryFilter = "all" | "today" | "within_2" | "within_7" | "past";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function storageDaysLeft(item: StorageItem): number | null {
+  if (!item.storageExpiresAt) return null;
+  const expiry = new Date(item.storageExpiresAt);
+  if (Number.isNaN(expiry.getTime())) return null;
+  const now = new Date();
+  const startToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
+  const startExpiry = new Date(
+    expiry.getFullYear(),
+    expiry.getMonth(),
+    expiry.getDate(),
+  ).getTime();
+  return Math.round((startExpiry - startToday) / DAY_MS);
+}
+
+function storageDaysLabel(daysLeft: number | null): string {
+  if (daysLeft === null) return "";
+  if (daysLeft < 0) return `D+${Math.abs(daysLeft)}`;
+  if (daysLeft === 0) return "D-Day";
+  return `D-${daysLeft}`;
+}
+
+function storageDurationDays(item: StorageItem): number {
+  if (item.storageStartedAt && item.storageExpiresAt) {
+    const duration = Math.round(
+      (new Date(item.storageExpiresAt).getTime() -
+        new Date(item.storageStartedAt).getTime()) / DAY_MS,
+    );
+    if (Number.isFinite(duration) && (duration === 7 || duration === 14)) {
+      return duration;
+    }
+  }
+  return 14;
+}
+
+function storageClassLabel(days: number): string {
+  return days === 7 ? "대형 · 7일 보관" : "소형 · 14일 보관";
+}
+
+function storageUrgencyClass(daysLeft: number | null): string {
+  if (daysLeft === null) return "bg-surface text-muted";
+  if (daysLeft <= 0) return "bg-red-600 text-white";
+  if (daysLeft <= 2) return "bg-amber-500 text-white";
+  if (daysLeft <= 7) return "bg-amber-100 text-amber-900";
+  return "bg-surface text-muted";
+}
+
+function storageExpiryMatches(filter: StorageExpiryFilter, daysLeft: number | null): boolean {
+  switch (filter) {
+    case "all":
+      return true;
+    case "today":
+      return daysLeft === 0;
+    case "within_2":
+      return daysLeft !== null && daysLeft >= 0 && daysLeft <= 2;
+    case "within_7":
+      return daysLeft !== null && daysLeft >= 0 && daysLeft <= 7;
+    case "past":
+      return daysLeft !== null && daysLeft < 0;
+  }
+}
+
+const STORAGE_STATUS_OPTIONS: ReadonlyArray<{ value: StorageStatusFilter; label: string }> = [
+  { value: "all", label: "전체" },
+  { value: "waiting_outbound", label: "배송 대기" },
+  { value: "stored", label: "보관 중" },
+];
+
+const STORAGE_EXPIRY_OPTIONS: ReadonlyArray<{ value: StorageExpiryFilter; label: string }> = [
+  { value: "all", label: "전체" },
+  { value: "today", label: "D-Day" },
+  { value: "within_2", label: "D-2 이내" },
+  { value: "within_7", label: "만료 임박 (7일)" },
+  { value: "past", label: "만료 지남" },
+];
+
 function OperationItemCard({
   item,
 }: {
@@ -81,10 +171,18 @@ function OperationItemCard({
         <p className="mt-2 text-[10px] text-muted">{item.originStoreName}</p>
         {storageItem ? (
           <>
-            <p className="mt-1 text-[10px] font-bold">
-              {storageItem.fulfillmentStatus === "stored" ? "보관 완료" : "매장 출고 전"}
+            <p className={`mt-2 inline-flex items-center rounded-lg px-2 py-1 text-[10px] font-bold ${storageItem.fulfillmentStatus === "stored" ? "bg-emerald-50 text-emerald-800" : "bg-blue-50 text-blue-800"}`}>
+              {storageItem.fulfillmentStatus === "stored" ? "보관 중" : "배송 대기"}
               {storageItem.shipmentRequested ? " · 배송 신청됨" : ""}
             </p>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold text-muted">{storageClassLabel(storageDurationDays(storageItem))}</span>
+              {storageDaysLeft(storageItem) !== null && (
+                <span className={`rounded-lg px-2 py-1 text-[9px] font-black ${storageUrgencyClass(storageDaysLeft(storageItem))}`}>
+                  {storageDaysLabel(storageDaysLeft(storageItem))}
+                </span>
+              )}
+            </div>
             <p className="mt-1 text-[10px] text-muted">
               보관 {formatAt(storageItem.storageStartedAt)}<br />
               만료 {formatAt(storageItem.storageExpiresAt)}
@@ -93,9 +191,7 @@ function OperationItemCard({
         ) : (
           <p className="mt-1 text-[10px] font-bold">
             {winnerItem?.amount.toLocaleString("ko-KR")}원 ·{" "}
-            {winnerItem?.paymentStatus === "awaiting_manual_transfer"
-              ? "입금 확인 대기"
-              : "결제 신청 전"}
+            {winnerPaymentStatusLabel(winnerItem?.paymentStatus)}
           </p>
         )}
         <Link
@@ -121,6 +217,8 @@ export function OperatorMemberOperationsConsole({
   const [chatStores, setChatStores] = useState<ChatStore[]>([]);
   const [query, setQuery] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StorageStatusFilter>("all");
+  const [expiryFilter, setExpiryFilter] = useState<StorageExpiryFilter>("all");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -160,9 +258,50 @@ export function OperatorMemberOperationsConsole({
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  const filteredStorageItems = useMemo(() => {
+    if (view !== "storage") return storageItems;
+    return storageItems.filter(
+      (item) =>
+        (statusFilter === "all" ||
+          item.fulfillmentStatus === statusFilter) &&
+        storageExpiryMatches(expiryFilter, storageDaysLeft(item)),
+    );
+  }, [expiryFilter, statusFilter, storageItems, view]);
+
+  const statusCounts = useMemo(
+    () => ({
+      all: storageItems.length,
+      waiting_outbound: storageItems.filter(
+        (item) => item.fulfillmentStatus === "waiting_outbound",
+      ).length,
+      stored: storageItems.filter(
+        (item) => item.fulfillmentStatus === "stored",
+      ).length,
+    }),
+    [storageItems],
+  );
+
+  const expiryCounts = useMemo<Record<StorageExpiryFilter, number>>(() => {
+    const counts: Record<StorageExpiryFilter, number> = {
+      all: storageItems.length,
+      today: 0,
+      within_2: 0,
+      within_7: 0,
+      past: 0,
+    };
+    for (const item of storageItems) {
+      const daysLeft = storageDaysLeft(item);
+      if (storageExpiryMatches("today", daysLeft)) counts.today += 1;
+      if (storageExpiryMatches("within_2", daysLeft)) counts.within_2 += 1;
+      if (storageExpiryMatches("within_7", daysLeft)) counts.within_7 += 1;
+      if (storageExpiryMatches("past", daysLeft)) counts.past += 1;
+    }
+    return counts;
+  }, [storageItems]);
+
   const storageByMember = useMemo<StorageMember[]>(() => {
     const groups = new Map<string, StorageMember>();
-    for (const item of storageItems) {
+    for (const item of filteredStorageItems) {
       const current = groups.get(item.memberId) ?? {
         memberId: item.memberId,
         memberName: item.memberName,
@@ -171,10 +310,29 @@ export function OperatorMemberOperationsConsole({
       current.items.push(item);
       groups.set(item.memberId, current);
     }
-    return [...groups.values()].sort((left, right) =>
-      left.memberName.localeCompare(right.memberName, "ko-KR")
-    );
-  }, [storageItems]);
+    const result = [...groups.values()];
+    for (const group of result) {
+      group.items.sort((left, right) => {
+        const leftDays = storageDaysLeft(left);
+        const rightDays = storageDaysLeft(right);
+        if (leftDays === null && rightDays === null) return 0;
+        if (leftDays === null) return 1;
+        if (rightDays === null) return -1;
+        return leftDays - rightDays;
+      });
+    }
+    return result.sort((left, right) => {
+      const leftMin = Math.min(
+        ...left.items.map((item) => storageDaysLeft(item) ?? Number.MAX_SAFE_INTEGER),
+      );
+      const rightMin = Math.min(
+        ...right.items.map((item) => storageDaysLeft(item) ?? Number.MAX_SAFE_INTEGER),
+      );
+      return leftMin === rightMin
+        ? left.memberName.localeCompare(right.memberName, "ko-KR")
+        : leftMin - rightMin;
+    });
+  }, [filteredStorageItems]);
 
   const groups = useMemo<(StorageMember | WinnerMember)[]>(
     () => view === "storage" ? storageByMember : winnerMembers,
@@ -234,6 +392,16 @@ export function OperatorMemberOperationsConsole({
       current.items.push(item);
       byStore.set(item.originStoreId, current);
     }
+    for (const store of byStore.values()) {
+      store.items.sort((left, right) => {
+        const leftDays = storageDaysLeft(left);
+        const rightDays = storageDaysLeft(right);
+        if (leftDays === null && rightDays === null) return 0;
+        if (leftDays === null) return 1;
+        if (rightDays === null) return -1;
+        return leftDays - rightDays;
+      });
+    }
     return [...byStore.values()].sort((left, right) =>
       left.storeName.localeCompare(right.storeName, "ko-KR")
     );
@@ -254,7 +422,7 @@ export function OperatorMemberOperationsConsole({
         )}
         description={view === "storage"
           ? "회원별 보관 상품을 확인하고 상세 창에서 매장별로 나눠 봅니다."
-          : "소속 매장의 입금 확인 전 낙찰 상품만 회원별로 확인합니다."}
+          : "소속 매장의 낙찰 대기(입금 확인 전) 상품을 회원별로 확인합니다."}
         eyebrow="운영자 / 회원 상품"
         title={view === "storage" ? "회원 상품 보관함" : "낙찰된 회원"}
         variant="page"
@@ -277,6 +445,42 @@ export function OperatorMemberOperationsConsole({
         <p className="border border-line bg-surface px-4 py-3 text-xs font-bold">
           {notice}
         </p>
+      )}
+
+      {view === "storage" && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-[10px] font-bold text-muted">상태</span>
+            {STORAGE_STATUS_OPTIONS.map((option) => (
+              <button
+                aria-pressed={statusFilter === option.value}
+                className={`border px-3 py-2 text-[11px] font-bold transition-colors ${statusFilter === option.value ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink"}`}
+                key={option.value}
+                onClick={() => setStatusFilter(option.value)}
+                type="button"
+              >
+                {option.label} · {statusCounts[option.value]}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-[10px] font-bold text-muted">보관 만료</span>
+            {STORAGE_EXPIRY_OPTIONS.map((option) => (
+              <button
+                aria-pressed={expiryFilter === option.value}
+                className={`border px-3 py-2 text-[11px] font-bold transition-colors ${expiryFilter === option.value ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink"}`}
+                key={option.value}
+                onClick={() => setExpiryFilter(option.value)}
+                type="button"
+              >
+                {option.label}
+                {expiryCounts[option.value] > 0
+                  ? ` · ${expiryCounts[option.value]}`
+                  : ""}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="divide-y divide-line border-y border-line">
@@ -308,6 +512,19 @@ export function OperatorMemberOperationsConsole({
                   <MessageCircle size={12} /> 채팅하기
                 </Link>
               ))}
+              {view === "storage" && (() => {
+                const minDays = Math.min(
+                  ...(group as StorageMember).items.map(
+                    (item) => storageDaysLeft(item) ?? Number.MAX_SAFE_INTEGER,
+                  ),
+                );
+                if (minDays === Number.MAX_SAFE_INTEGER) return null;
+                return (
+                  <span className={`rounded-lg px-2 py-1 text-[10px] font-black ${storageUrgencyClass(minDays)}`}>
+                    {storageDaysLabel(minDays)}
+                  </span>
+                );
+              })()}
               <button
                 className="text-right text-xs font-bold"
                 onClick={() => setSelectedMemberId(group.memberId)}
@@ -328,7 +545,9 @@ export function OperatorMemberOperationsConsole({
             {query.trim()
               ? "검색 조건에 맞는 회원이 없습니다."
               : view === "storage"
-                ? "현재 보관 중인 회원 상품이 없습니다."
+                ? statusFilter !== "all" || expiryFilter !== "all"
+                  ? "선택한 조건에 맞는 보관 상품이 없습니다."
+                  : "현재 보관 중인 회원 상품이 없습니다."
                 : "소속 매장에 입금 확인 전 낙찰 정보가 없습니다."}
           </p>
         )}

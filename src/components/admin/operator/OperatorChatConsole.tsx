@@ -58,9 +58,11 @@ function problemMessage(payload: unknown, fallback: string) {
 export function OperatorChatConsole({
   basePath = "/admin/operator/chat",
   staffLabel = "운영자",
+  conversationType = "all",
 }: Readonly<{
-  basePath?: "/admin/operator/chat" | "/admin/employee/inquiries";
+  basePath?: "/admin/operator/chat" | "/admin/operator/inquiries" | "/admin/employee/inquiries";
   staffLabel?: string;
+  conversationType?: "all" | "product";
 }>) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -115,7 +117,9 @@ export function OperatorChatConsole({
 
   const loadInbox = useCallback(
     async (accessToken: string, preferredId?: string | null) => {
-      const response = await fetch("/api/admin/operator/chat", {
+      const typeQuery =
+        conversationType === "product" ? "?type=product" : "";
+      const response = await fetch(`/api/admin/operator/chat${typeQuery}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
         cache: "no-store",
       });
@@ -139,7 +143,7 @@ export function OperatorChatConsole({
           : nextConversations[0]?.id ?? null;
       });
     },
-    [],
+    [conversationType],
   );
 
   const ensureRequestedConversation = useCallback(
@@ -300,8 +304,16 @@ export function OperatorChatConsole({
     <div className="grid grid-cols-1 border border-line md:min-h-[620px] md:grid-cols-[280px_minmax(0,1fr)] lg:grid-cols-[320px_minmax(0,1fr)]">
       <aside className="border-b border-line md:border-b-0 md:border-r">
         <div className="border-b border-line p-4 sm:p-5">
-          <p className="eyebrow text-muted">{staffLabel} / 매장 채팅</p>
-          <p className="mt-3 text-sm font-bold">담당 매장 회원 상담</p>
+          <p className="eyebrow text-muted">
+            {conversationType === "product"
+              ? `${staffLabel} / 상품 문의`
+              : `${staffLabel} / 매장 채팅`}
+          </p>
+          <p className="mt-3 text-sm font-bold">
+            {conversationType === "product"
+              ? "상품 문의 관리"
+              : "담당 매장 회원 상담"}
+          </p>
         </div>
         <div className="max-h-72 divide-y divide-line overflow-y-auto md:max-h-[560px]">
           {conversations.map((conversation) => (
@@ -336,7 +348,9 @@ export function OperatorChatConsole({
           ))}
           {conversations.length === 0 && (
             <p className="p-6 text-xs text-muted">
-              담당 매장에 연결된 상담이 없습니다.
+              {conversationType === "product"
+                ? "새 상품 문의가 없습니다."
+                : "담당 매장에 연결된 상담이 없습니다."}
             </p>
           )}
         </div>

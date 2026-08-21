@@ -1,6 +1,9 @@
 import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { normalizeProductBrand } from "@/lib/catalog/brand";
+import { isConditionGrade } from "@/lib/catalog/conditions";
+import { normalizeDefectTags } from "@/lib/catalog/defects";
+import { normalizeMeasurements } from "@/lib/catalog/measurements";
 
 type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -80,11 +83,13 @@ function normalizeProduct(body: Record<string, unknown>, userId: string): Produc
     created_by: userId,
     updated_by: userId,
     size_label: text(body.sizeLabel),
-    condition_grade: ["S", "A+", "A", "B"].includes(text(body.conditionGrade)) ? text(body.conditionGrade) : "A",
+    condition_grade: isConditionGrade(text(body.conditionGrade)) ? text(body.conditionGrade) : "A",
     storage_class: text(body.storageClass) === "large" ? "large" : "small",
     inspection_notes: Array.isArray(body.inspectionNotes)
       ? body.inspectionNotes.filter((item): item is string => typeof item === "string").slice(0, 30)
       : [],
+    defect_tags: normalizeDefectTags(body.defectTags),
+    measurements: normalizeMeasurements(body.measurements),
   };
 }
 

@@ -17,6 +17,13 @@ import type {
 } from "@/lib/import/batchAuction";
 import { inferBrandFromTitle } from "@/lib/catalog/brand";
 import { BATCH_CLOTHING_CATEGORIES } from "@/lib/import/categoryIds";
+import { CONDITION_OPTIONS } from "@/lib/catalog/conditions";
+import { DEFECT_TAGS } from "@/lib/catalog/defects";
+import {
+  collectMeasurements,
+  MEASUREMENT_LABELS,
+  measurementPresetForCategory,
+} from "@/lib/catalog/measurements";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { Button } from "@/components/ui/Button";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
@@ -68,6 +75,8 @@ interface Product {
   starting_price: number;
   bid_increment: number;
   status: string;
+  pending_lock_kind?: "buy_now_payment" | "auction_payment" | null;
+  pending_lock_until?: string | null;
   image_urls: string[];
   store_id: string | null;
   size_label: string;
@@ -77,6 +86,8 @@ interface Product {
   publish_at: string;
   closes_at: string;
   inspection_notes: string[];
+  defect_tags: string[];
+  measurements?: Record<string, unknown> | null;
   updated_at: string;
   stores?: { name: string } | null;
 }
@@ -98,6 +109,8 @@ type FormState = {
   publishAt: string;
   closesAt: string;
   inspectionNotes: string;
+  defectTags: string[];
+  measurements: Record<string, string>;
 };
 
 type PublicationMode = "now" | "scheduled";
@@ -137,8 +150,58 @@ type RegistrationStage = "scheduled" | "draft";
 const emptyForm: FormState = {
   title: "", description: "", brand: "", category: "기타", storeId: "", saleType: "fixed", price: "", imageUrls: "",
   sizeLabel: "", conditionGrade: "", gender: "", storageClass: "small", status: "active", bidIncrement: "1000", publishAt: "", closesAt: "",
-  inspectionNotes: "",
+  inspectionNotes: "", defectTags: [], measurements: {},
 };
+
+function measurementFieldsFor(category: string) {
+  return measurementPresetForCategory(category)?.fields ?? [];
+}
+function measurementStrings(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const record = value as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.entries(record)
+      .filter((entry): entry is [string, number | string] => typeof entry[1] === "number" || typeof entry[1] === "string")
+      .map(([key, entry]) => [key, String(entry)]),
+  );
+}
+
+function MeasurementFields({ category, disabled, onChange, values }: {
+  category: string;
+  disabled?: boolean;
+  onChange: (key: string, value: string) => void;
+  values: Record<string, string>;
+}) {
+  const fields = measurementFieldsFor(category);
+  if (fields.length === 0) return null;
+  return (
+    <fieldset className="sm:col-span-2">
+      <legend className="text-[10px] font-bold text-muted">
+        실측 치수 (cm) <span className="font-normal">(카테고리 기준 자동 표시 · 측정한 항목만 입력)</span>
+      </legend>
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        {fields.map((field) => (
+          <label className="text-[10px] font-bold text-muted" key={field}>
+            {MEASUREMENT_LABELS[field]}
+            <TextInput
+              aria-label={`${MEASUREMENT_LABELS[field]} 실측 (cm)`}
+              className="mt-1 w-full font-mono"
+              disabled={disabled}
+              inputMode="decimal"
+              max="500"
+              min="1"
+              onChange={(event) => onChange(field, event.target.value)}
+              placeholder="0"
+              step="0.1"
+              type="number"
+              value={values[field] ?? ""}
+            />
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
 
 const FIXED_PRODUCT_OPEN_UNTIL = "9999-12-31T23:59:59.000Z";
 
@@ -157,7 +220,7 @@ function toIsoDateTime(value: string) {
 }
 function importedConditionGrade(condition: string | null) {
   if (condition === "새상품") return "S";
-  if (condition === "상태 좋음") return "A+";
+  if (condition === "상태 좋음") return "A";
   if (condition === "사용감 있음") return "B";
   return "A";
 }
@@ -167,6 +230,16 @@ function productStatusLabel(status: string) {
   if (status === "closed") return "마감";
   if (status === "sold") return "판매 완료";
   return status;
+}
+function productPendingLockLabel(kind: string | null | undefined) {
+  if (kind === "buy_now_payment") return "결제 진행 중";
+  if (kind === "auction_payment") return "낙찰 대기";
+  return null;
+}
+function productStatusText(product: Product) {
+  const lockLabel = productPendingLockLabel(product.pending_lock_kind);
+  if (product.status === "closed" && lockLabel) return lockLabel;
+  return productStatusLabel(product.status);
 }
 function isManageableProductStatus(status: string) {
   return status === "pending" || status === "active";
@@ -380,7 +453,8 @@ export function OperatorProductsConsole({
         return false;
       }
       if (view === "active") {
-        return product.status === "active"
+        return (product.status === "active"
+          || (product.status === "closed" && Boolean(product.pending_lock_kind)))
           && product.sale_type === filter.saleType;
       }
       if (product.status !== "pending") return false;
@@ -457,6 +531,23 @@ export function OperatorProductsConsole({
     : permissions.canCreate;
 
   const update = (key: keyof FormState, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const updateCategory = (category: string) => setForm((current) => {
+    const allowed: Set<string> = new Set(measurementFieldsFor(category));
+    const measurements = Object.fromEntries(
+      Object.entries(current.measurements).filter(([key]) => allowed.has(key)),
+    );
+    return { ...current, category, measurements };
+  });
+  const updateMeasurement = (key: string, value: string) => setForm((current) => ({
+    ...current,
+    measurements: { ...current.measurements, [key]: value },
+  }));
+  const toggleDefect = (code: string) => setForm((current) => ({
+    ...current,
+    defectTags: current.defectTags.includes(code)
+      ? current.defectTags.filter((item) => item !== code)
+      : [...current.defectTags, code],
+  }));
   const scopedStores = useMemo(() => {
     if (storeScope.active && storeScope.storeId) {
       const scoped = stores.filter(
@@ -640,6 +731,8 @@ export function OperatorProductsConsole({
         category: snapshot.form.category,
         categoryId: BATCH_CLOTHING_CATEGORIES.find((item) => item.label === snapshot.form.category)?.id ?? null,
         sizeLabel: snapshot.form.sizeLabel,
+        defectTags: snapshot.form.defectTags,
+        measurements: collectMeasurements(snapshot.form.measurements),
         storeId: snapshot.form.storeId,
         saleType: snapshot.form.saleType,
         startingPrice: Number(snapshot.form.price),
@@ -844,6 +937,8 @@ export function OperatorProductsConsole({
             }
           : {}),
         inspectionNotes: splitLines(form.inspectionNotes),
+        defectTags: form.defectTags,
+        measurements: collectMeasurements(form.measurements),
       };
       const response = await fetch(`/api/admin/operator/products/${editingId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -914,6 +1009,8 @@ export function OperatorProductsConsole({
       publishAt: toLocalDateTimeInput(product.publish_at),
       closesAt: toLocalDateTimeInput(product.closes_at),
       inspectionNotes: product.inspection_notes?.join("\n") ?? "",
+      defectTags: product.defect_tags ?? [],
+      measurements: measurementStrings(product.measurements),
     });
     if (target === "inspection") {
       window.setTimeout(() => inspectionNotesRef.current?.focus(), 0);
@@ -1176,6 +1273,7 @@ export function OperatorProductsConsole({
           conditionGrade: importedConditionGrade(row.condition),
           storageClass: "small",
           inspectionNotes: [],
+          defectTags: [],
         });
       }
 
@@ -1232,7 +1330,7 @@ export function OperatorProductsConsole({
 
   return <div className="space-y-8">
     <SectionHeading
-      description={view === "active" ? "현재 공개 중인 상품만 판매 방식별로 나누어 관리합니다." : "신규 상품을 등록합니다. 예약 공개 상품은 상품 목록의 업로드 예정에서 확인합니다."}
+      description={view === "active" ? "현재 공개 중인 상품과 결제 진행 중·낙찰 대기로 선점된 상품을 판매 방식별로 나누어 관리합니다." : "신규 상품을 등록합니다. 예약 공개 상품은 상품 목록의 업로드 예정에서 확인합니다."}
       eyebrow={view === "active" ? "운영자 / 상품" : "운영자 / 상품 등록"}
       title={view === "active" ? "진행 중 상품" : "상품 등록"}
       variant="page"
@@ -1366,11 +1464,12 @@ export function OperatorProductsConsole({
         )}
         {!editingId && <>
           <TextInput aria-label="브랜드" onChange={(event) => update("brand", event.target.value)} placeholder="브랜드 (선택)" value={form.brand} />
-          <SelectInput aria-label="카테고리" onChange={(event) => update("category", event.target.value)} value={form.category}>
+          <SelectInput aria-label="카테고리" onChange={(event) => updateCategory(event.target.value)} value={form.category}>
             <option value="기타">카테고리 미입력</option>
             {BATCH_CLOTHING_CATEGORIES.map((category) => <option key={category.id} value={category.label}>{category.label}</option>)}
           </SelectInput>
           <TextInput aria-label="사이즈" onChange={(event) => update("sizeLabel", event.target.value)} placeholder="사이즈 (선택)" value={form.sizeLabel} />
+          <MeasurementFields category={form.category} onChange={updateMeasurement} values={form.measurements} />
         </>}
         {!editingId && <div className="border-b border-ink pb-3 pt-2 sm:col-span-2"><p className="text-xs font-black">3. 판매 정보</p><p className="mt-1 text-[11px] text-muted">판매 매장과 가격, 보관 기준을 확인하세요.</p></div>}
         <SelectInput aria-label="숍" disabled={!saleSetupEditable} onChange={(event) => {
@@ -1386,9 +1485,14 @@ export function OperatorProductsConsole({
 
         {editingId ? (
           <>
-            <TextInput aria-label="카테고리" disabled={!productFieldsEditable} onChange={(event) => update("category", event.target.value)} placeholder="카테고리" value={form.category} />
+            <TextInput aria-label="카테고리" disabled={!productFieldsEditable} onChange={(event) => updateCategory(event.target.value)} placeholder="카테고리" value={form.category} />
             <TextInput aria-label="사이즈" disabled={!productFieldsEditable} onChange={(event) => update("sizeLabel", event.target.value)} placeholder="사이즈" value={form.sizeLabel} />
-            <div className="flex gap-2"><SelectInput aria-label="컨디션" className="flex-1" disabled={!productFieldsEditable} onChange={(event) => update("conditionGrade", event.target.value)} value={form.conditionGrade}><option value="S">S</option><option value="A+">A+</option><option value="A">A</option><option value="B">B</option></SelectInput><SelectInput aria-label="보관 등급" className="flex-1" disabled={!productFieldsEditable} onChange={(event) => update("storageClass", event.target.value)} value={form.storageClass}><option value="small">소형 · 14일</option><option value="large">대형 · 7일</option></SelectInput></div>
+            <div className="flex gap-2"><SelectInput aria-label="컨디션" className="flex-1" disabled={!productFieldsEditable} onChange={(event) => update("conditionGrade", event.target.value)} value={form.conditionGrade}><option value="">등급 미입력</option>{CONDITION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.value} · {option.label}</option>)}</SelectInput><SelectInput aria-label="보관 등급" className="flex-1" disabled={!productFieldsEditable} onChange={(event) => update("storageClass", event.target.value)} value={form.storageClass}><option value="small">소형 · 14일</option><option value="large">대형 · 7일</option></SelectInput></div>
+            <MeasurementFields category={form.category} disabled={!productFieldsEditable} onChange={updateMeasurement} values={form.measurements} />
+            <fieldset className="sm:col-span-2">
+              <legend className="text-[10px] font-bold text-muted">하자·오염 체크리스트 <span className="font-normal">(해당 항목만 선택)</span></legend>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">{DEFECT_TAGS.map((tag) => { const checked = form.defectTags.includes(tag.code); return <label className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-bold transition-colors ${checked ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink"}`} key={tag.code}><input checked={checked} className="accent-ink" disabled={!productFieldsEditable} onChange={() => toggleDefect(tag.code)} type="checkbox" />{tag.label}</label>; })}</div>
+            </fieldset>
             <div className="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-2">
               <label className="text-[10px] font-bold text-muted"><span className="mb-2 block">공개 시각</span><TextInput aria-label="공개 시각" className="w-full text-ink" disabled={!saleSetupEditable} onChange={(event) => update("publishAt", event.target.value)} type="datetime-local" value={form.publishAt} /></label>
               {form.saleType === "auction" ? <label className="text-[10px] font-bold text-muted"><span className="mb-2 block">경매 마감 시각</span><TextInput aria-label="경매 마감 시각" className="w-full text-ink" disabled={!saleSetupEditable} onChange={(event) => update("closesAt", event.target.value)} type="datetime-local" value={form.closesAt} /></label> : <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">즉시구매 상품은 구매 확정 시 마감되므로 별도 마감 시각을 사용하지 않습니다.</div>}
@@ -1402,6 +1506,11 @@ export function OperatorProductsConsole({
         ) : (
           <>
             <SelectInput aria-label="보관 등급" onChange={(event) => update("storageClass", event.target.value)} value={form.storageClass}><option value="small">소형 · 14일 보관</option><option value="large">대형 · 7일 보관</option></SelectInput>
+            <SelectInput aria-label="컨디션" onChange={(event) => update("conditionGrade", event.target.value)} value={form.conditionGrade}><option value="">등급 미입력</option>{CONDITION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.value} · {option.label}</option>)}</SelectInput>
+            <fieldset className="sm:col-span-2">
+              <legend className="text-[10px] font-bold text-muted">하자·오염 체크리스트 <span className="font-normal">(해당 항목만 선택)</span></legend>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">{DEFECT_TAGS.map((tag) => { const checked = form.defectTags.includes(tag.code); return <label className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-bold transition-colors ${checked ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink"}`} key={tag.code}><input checked={checked} className="accent-ink" onChange={() => toggleDefect(tag.code)} type="checkbox" />{tag.label}</label>; })}</div>
+            </fieldset>
             {form.saleType === "auction" ? <>
               <label className="text-[10px] font-bold text-muted"><span className="mb-2 block">최소 입찰 단위 (원)</span><TextInput aria-label="최소 입찰 단위" min="1" onChange={(event) => update("bidIncrement", event.target.value)} placeholder="1,000" type="number" value={form.bidIncrement} /></label>
               <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">기본값은 1,000원이며 입력칸에서 상품별로 자유롭게 수정할 수 있습니다. 첫 입찰은 시작가부터 시작하고 이후 입찰은 현재가 + 최소 입찰 단위로 올라갑니다.</div>
@@ -1438,7 +1547,7 @@ export function OperatorProductsConsole({
       <label className="flex items-center gap-3 text-xs font-bold"><input checked={allVisiblePendingSelected} disabled={busy || !permissions.canPublish || visiblePendingIds.length === 0} onChange={toggleAllVisiblePending} type="checkbox" /> 검색 결과 전체 선택</label>
       <div className="flex flex-wrap items-center gap-3"><span className="font-mono text-xs text-muted">{selectedPendingIds.size}개 선택</span>{selectedPendingIds.size > 0 && <Button disabled={busy} onClick={() => setSelectedPendingIds(new Set())} size="compact" variant="ghost" type="button">선택 해제</Button>}<Button disabled={busy || !permissions.canPublish || selectedPendingIds.size === 0} onClick={() => void publishSelected()} size="compact" variant="primary" type="button">지금 즉시 공개</Button></div>
     </div>}
-    <div className="overflow-x-auto border-y border-line"><table className="w-full min-w-[1080px] text-left text-xs"><thead className="border-b border-line bg-surface text-[10px] tracking-[.12em] text-muted"><tr>{view === "registration" && <th className="px-4 py-4">선택</th>}<th className="px-4 py-4">상품</th><th className="px-4 py-4">숍</th><th className="px-4 py-4">판매 방식</th><th className="px-4 py-4">가격</th><th className="px-4 py-4">보관</th><th className="px-4 py-4">상태</th><th className="px-4 py-4" /></tr></thead><tbody className="divide-y divide-line">{visibleProducts.map((product) => { const manageable = isManageableProductStatus(product.status); const canPublishStore = stores.some((store) => store.id === product.store_id && store.canPublish); return <tr key={product.id}>{view === "registration" && <td className="px-4 py-4"><input aria-label={`${product.title} 공개 선택`} checked={selectedPendingIds.has(product.id)} disabled={busy || !canPublishStore || product.status !== "pending"} onChange={() => togglePending(product.id)} type="checkbox" /></td>}<td className="px-4 py-4"><div className="flex items-center gap-3"><CatalogImage alt="" className="size-12 object-cover" src={product.image_urls?.[0] ?? ""} /><span className="font-bold">{product.title}</span></div></td><td className="px-4 py-4 text-muted">{product.stores?.name ?? "미지정"}</td><td className="px-4 py-4">{product.sale_type === "fixed" ? "즉시구매" : "경매"}</td><td className="px-4 py-4 font-mono">{(product.fixed_price ?? product.current_price).toLocaleString("ko-KR")}원</td><td className="px-4 py-4">{product.storage_class === "large" ? "대형 · 7일" : "소형 · 14일"}</td><td className="px-4 py-4"><span className="border border-line px-2 py-1 text-[10px] font-bold">{view === "registration" && isScheduledProduct(product, productReferenceNow) ? "업로드 예정" : productStatusLabel(product.status)}</span></td><td className="px-4 py-4 text-right"><div className="flex justify-end gap-3">{permissions.canCloseAuctions && product.sale_type === "auction" && product.status === "active" && <button aria-label={`${product.title} 즉시 마감`} className="inline-flex items-center gap-1 font-bold text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy} onClick={() => void closeAuctionNow(product)} type="button"><CircleStop size={13} /> 즉시 마감·낙찰 확정</button>}{product.status === "active" && <button aria-label={`${product.title} 일시중지`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate} onClick={() => void pause(product)} type="button"><PauseCircle size={13} /> 일시중지</button>}{product.status === "pending" && <button aria-label={`${product.title} 공개`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !canPublishStore} onClick={() => void publish(product)} type="button"><PlayCircle size={13} /> 공개</button>}<button aria-label={`${product.title} 점검`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product, "inspection")} type="button"><ClipboardCheck size={13} /> 점검</button><button aria-label={`${product.title} 수정`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product)} type="button"><Edit3 size={13} /> 수정</button><button aria-label={`${product.title} 삭제`} className="inline-flex items-center gap-1 text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => void remove(product)} type="button"><Trash2 size={13} /> 삭제</button>{product.status === "active" && <Link className="underline" href={`/auction/${product.id}`}>보기</Link>}</div></td></tr>; })}{visibleProducts.length === 0 && <tr><td className="px-4 py-16 text-center text-muted" colSpan={view === "registration" ? 8 : 7}>조건에 맞는 상품이 없습니다.</td></tr>}</tbody></table></div>
+    <div className="overflow-x-auto border-y border-line"><table className="w-full min-w-[1080px] text-left text-xs"><thead className="border-b border-line bg-surface text-[10px] tracking-[.12em] text-muted"><tr>{view === "registration" && <th className="px-4 py-4">선택</th>}<th className="px-4 py-4">상품</th><th className="px-4 py-4">숍</th><th className="px-4 py-4">판매 방식</th><th className="px-4 py-4">가격</th><th className="px-4 py-4">보관</th><th className="px-4 py-4">상태</th><th className="px-4 py-4" /></tr></thead><tbody className="divide-y divide-line">{visibleProducts.map((product) => { const manageable = isManageableProductStatus(product.status); const canPublishStore = stores.some((store) => store.id === product.store_id && store.canPublish); return <tr key={product.id}>{view === "registration" && <td className="px-4 py-4"><input aria-label={`${product.title} 공개 선택`} checked={selectedPendingIds.has(product.id)} disabled={busy || !canPublishStore || product.status !== "pending"} onChange={() => togglePending(product.id)} type="checkbox" /></td>}<td className="px-4 py-4"><div className="flex items-center gap-3"><CatalogImage alt="" className="size-12 object-cover" src={product.image_urls?.[0] ?? ""} /><span className="font-bold">{product.title}</span></div></td><td className="px-4 py-4 text-muted">{product.stores?.name ?? "미지정"}</td><td className="px-4 py-4">{product.sale_type === "fixed" ? "즉시구매" : "경매"}</td><td className="px-4 py-4 font-mono">{(product.fixed_price ?? product.current_price).toLocaleString("ko-KR")}원</td><td className="px-4 py-4">{product.storage_class === "large" ? "대형 · 7일" : "소형 · 14일"}</td><td className="px-4 py-4"><span className={`border px-2 py-1 text-[10px] font-bold ${product.status === "closed" && product.pending_lock_kind ? "border-amber-300 bg-amber-50 text-amber-800" : "border-line"}`}>{view === "registration" && isScheduledProduct(product, productReferenceNow) ? "업로드 예정" : productStatusText(product)}</span></td><td className="px-4 py-4 text-right"><div className="flex justify-end gap-3">{permissions.canCloseAuctions && product.sale_type === "auction" && product.status === "active" && <button aria-label={`${product.title} 즉시 마감`} className="inline-flex items-center gap-1 font-bold text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy} onClick={() => void closeAuctionNow(product)} type="button"><CircleStop size={13} /> 즉시 마감·낙찰 확정</button>}{product.status === "active" && <button aria-label={`${product.title} 일시중지`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate} onClick={() => void pause(product)} type="button"><PauseCircle size={13} /> 일시중지</button>}{product.status === "pending" && <button aria-label={`${product.title} 공개`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !canPublishStore} onClick={() => void publish(product)} type="button"><PlayCircle size={13} /> 공개</button>}<button aria-label={`${product.title} 점검`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product, "inspection")} type="button"><ClipboardCheck size={13} /> 점검</button><button aria-label={`${product.title} 수정`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product)} type="button"><Edit3 size={13} /> 수정</button><button aria-label={`${product.title} 삭제`} className="inline-flex items-center gap-1 text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => void remove(product)} type="button"><Trash2 size={13} /> 삭제</button>{product.status === "active" && <Link className="underline" href={`/auction/${product.id}`}>보기</Link>}</div></td></tr>; })}{visibleProducts.length === 0 && <tr><td className="px-4 py-16 text-center text-muted" colSpan={view === "registration" ? 8 : 7}>조건에 맞는 상품이 없습니다.</td></tr>}</tbody></table></div>
     <PremiumDialog
       ariaLabel="단품 등록 결과"
       closeDisabled={registrationResult?.kind === "retrying"}

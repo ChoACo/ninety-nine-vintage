@@ -27,7 +27,7 @@ interface PublishedFixedProduct {
   imageUrls: string[];
   storageClass?: "small" | "large";
   sizeLabel?: string;
-  conditionGrade?: "S" | "A+" | "A" | "B";
+  conditionGrade?: "S" | "A" | "B" | "C";
   reservationExpiresAt?: string | null;
   storeName?: string;
 }
@@ -395,11 +395,11 @@ function toCartProduct(product: PublishedFixedProduct): CartProduct {
     condition:
       grade === "S"
         ? "NEW"
-        : grade === "A+"
+        : grade === "A"
           ? "EXCELLENT"
           : grade === "B"
-            ? "FAIR"
-            : "GOOD",
+            ? "GOOD"
+            : "FAIR",
     saleType: "fixed",
     price: product.fixedPrice ?? product.currentPrice,
     closesAt: product.closesAt,

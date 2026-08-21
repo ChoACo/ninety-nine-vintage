@@ -26,6 +26,8 @@ interface ClosedAuction {
   current_price: number;
   id: string;
   image_urls: string[];
+  pending_lock_kind?: "buy_now_payment" | "auction_payment" | null;
+  pending_lock_until?: string | null;
   store_id: string | null;
   stores?: { name: string } | null;
   title: string;
@@ -234,6 +236,11 @@ export function OperatorPastProductsConsole() {
                     </>
                   )}
                 </span>
+                {product.pending_lock_kind === "auction_payment" && (
+                  <span className="mt-2 inline-flex border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800">
+                    낙찰 대기 · 낙찰자 결제 대기
+                  </span>
+                )}
               </span>
               {showRecovery && (
                 <OperatorUnpaidRecoveryButtons

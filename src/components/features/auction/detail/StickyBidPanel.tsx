@@ -15,9 +15,11 @@ import { useAuctionPolicyClock } from "@/hooks/useAuctionPolicyClock";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useBidStore } from "@/store/useBidStore";
 import type { BidHistoryEntry, ItemDetail } from "@/types/detail";
+import { measurementEntries } from "@/lib/catalog/measurements";
 import { ProductInquiryModal } from "@/components/features/auction/detail/ProductInquiryModal";
 import { SizeComparisonScanner } from "@/components/features/auction/detail/SizeComparisonScanner";
 import { QuickCartModal } from "@/components/features/auction/detail/QuickCartModal";
+import { ShareProductButton } from "@/components/ui/ShareProductButton";
 import { AuctionBidHistoryModal } from "@/components/features/auction/AuctionBidHistoryModal";
 import { useAccountAuctionBids } from "@/components/features/auction/AuctionBidSummary";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
@@ -549,13 +551,8 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
     }
   }, [item.saleType, phase, scheduleAccountBidRefresh]);
 
-  const measurementChips = [
-    ["어깨", item.measurements.shoulder],
-    ["가슴", item.measurements.chest],
-    ["총장", item.measurements.length],
-  ].filter(
-    (measurement): measurement is [string, number] =>
-      typeof measurement[1] === "number" && measurement[1] > 0,
+  const measurementChips = measurementEntries(item.measurements).map(
+    (measurement) => [measurement.label, measurement.value] as [string, number],
   );
 
   return (
@@ -777,6 +774,13 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
       >
         <MessageCircle size={15} /> 상품 문의하기
       </button>
+      <ShareProductButton
+        className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 text-xs font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95"
+        label="공유하기"
+        priceText={`${item.saleType === "fixed" ? "판매 정가" : "현재 최고 입찰가"} ${displayPrice.toLocaleString("ko-KR")}원`}
+        title={`${item.name} | ${item.brand}`}
+        url={`/auction/${item.id}`}
+      />
       {LIVE_AUCTION_ENABLED &&
         item.saleType === "auction" &&
         participationState === "final" && (

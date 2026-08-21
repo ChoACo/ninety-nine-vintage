@@ -1,13 +1,7 @@
 import type { Bid, Item } from "@/types/auction";
+import type { ConditionGrade } from "@/lib/catalog/conditions";
 
-export type ConditionGrade = "" | "S" | "A+" | "A" | "B";
-
-export interface ItemMeasurements {
-  shoulder: number;
-  chest: number;
-  sleeve: number;
-  length: number;
-}
+export type ItemMeasurements = Record<string, number>;
 
 export interface BidHistoryEntry extends Bid {
   bidderMaskedId: string;
@@ -26,5 +20,6 @@ export interface ItemDetail extends Item {
   measurements: ItemMeasurements;
   participantCount: number;
   inspectionNotes: string[];
+  defectTags: string[];
   bidHistory: BidHistoryEntry[];
 }

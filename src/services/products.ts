@@ -9,6 +9,7 @@ import {
 } from "@/lib/catalog/query";
 import { formatProductDisplayNumber } from "@/lib/productDisplayNumber";
 import { isSoldFeedVisible } from "@/lib/catalog/soldVisibility";
+import { isConditionGrade, type ConditionGrade } from "@/lib/catalog/conditions";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"] & {
   enhanced_title?: string | null;
@@ -74,9 +75,10 @@ export interface PublishedProduct {
   storeSlug: string;
   storageClass: "small" | "large";
   sizeLabel: string;
-  conditionGrade: "" | "S" | "A+" | "A" | "B";
+  conditionGrade: ConditionGrade;
   measurements: Json;
   inspectionNotes: string[];
+  defectTags: string[];
   enhancedTitle: string | null;
   hashtags: string[];
 }
@@ -121,9 +123,10 @@ export function mapPublishedProduct(row: ProductRow & { stores?: { name?: string
     storeSlug: row.stores?.slug?.trim() ?? "",
     storageClass: row.storage_class === "large" ? "large" : "small",
     sizeLabel: resolveSizeLabel(row.title, row.size_label),
-    conditionGrade: ["S", "A+", "A", "B"].includes(row.condition_grade) ? row.condition_grade as "S" | "A+" | "A" | "B" : "",
+    conditionGrade: isConditionGrade(row.condition_grade) ? row.condition_grade : "",
     measurements: row.measurements,
     inspectionNotes: row.inspection_notes,
+    defectTags: row.defect_tags ?? [],
     enhancedTitle: row.enhanced_title ?? null,
     hashtags: Array.isArray(row.hashtags) ? row.hashtags.filter((t): t is string => typeof t === "string") : [],
   };
@@ -205,6 +208,7 @@ export async function fetchSoldFeedProducts(input: {
     id: row.id,
     imageUrls: row.image_urls,
     inspectionNotes: [],
+    defectTags: [],
     measurements: {},
     participantCount: row.participant_count,
     publishAt: row.publish_at,
@@ -252,7 +256,7 @@ export async function fetchStoreSoldFeedProducts(input: {
     brand: row.brand, brandSlug: row.brand_slug, gender: "", category: row.category,
     closesAt: row.closes_at, conditionGrade: "", currentPrice: row.current_price,
     description: row.description, finalBidAmount: row.final_bid_amount, fixedPrice: row.fixed_price,
-    id: row.id, imageUrls: row.image_urls, inspectionNotes: [], measurements: {},
+    id: row.id, imageUrls: row.image_urls, inspectionNotes: [], defectTags: [], measurements: {},
     participantCount: row.participant_count, publishAt: row.publish_at,
     saleType: row.sale_type === "fixed" ? "fixed" : "auction", sizeLabel: row.size_label,
     soldAt: row.sold_at, soldPrice: row.sold_price, startingPrice: row.starting_price,

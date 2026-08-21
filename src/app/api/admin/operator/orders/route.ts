@@ -510,7 +510,9 @@ function orderStatusMatchesTransfer(
 ) {
   if (transferStatus === "awaiting_transfer") return orderStatus === "awaiting_payment";
   if (transferStatus === "partially_paid") return orderStatus === "partially_paid";
-  if (transferStatus === "confirmed") return orderStatus === "paid" || orderStatus === "shipped";
+  if (transferStatus === "confirmed") {
+    return orderStatus === "paid" || orderStatus === "shipped" || orderStatus === "refunded";
+  }
   return orderStatus === "cancelled";
 }
 

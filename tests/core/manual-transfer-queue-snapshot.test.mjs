@@ -202,6 +202,11 @@ test("operator API validates the snapshot fail-closed and exposes summary mode",
   );
   expectMatch(
     route,
+    /transferStatus\s*===\s*"confirmed"[\s\S]{0,180}orderStatus\s*===\s*"refunded"/,
+    "a confirmed transfer may retain a refunded order status after a post-payment refund",
+  );
+  expectMatch(
+    route,
     /summaryOnly\)\s+return\s+commerceJson\(\{\s*activeCount:\s*snapshot\.activeCount\s*\}\)/i,
     "dashboard summary mode must return only the active work count",
   );

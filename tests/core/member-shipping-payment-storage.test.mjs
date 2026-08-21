@@ -62,13 +62,14 @@ test("standalone shipping credits are retired while historical ledger contracts 
 });
 
 test("member addresses use the owner-safe RPC and storage shows policy, full list, and item selection", async () => {
-  const [addressRoute, storageRoute, ordersRoute, dashboard, accountPage, accountContent, rollout, serverGrant] = await Promise.all([
+  const [addressRoute, storageRoute, ordersRoute, dashboard, accountPage, accountContent, accountSectionPage, rollout, serverGrant] = await Promise.all([
     source("src/app/api/account/addresses/route.ts"),
     source("src/app/api/account/storage/route.ts"),
     source("src/app/api/orders/route.ts"),
     source("src/components/features/account/AccountDashboard.tsx"),
     source("src/app/(shop)/account/page.tsx"),
     source("src/components/features/account/DesktopAccountContent.tsx"),
+    source("src/app/(shop)/account/[section]/page.tsx"),
     source("supabase/migrations/20260724054224_enable_selectable_paid_inventory.sql"),
     source("supabase/migrations/20260724061006_grant_inventory_server_read.sql"),
   ]);
@@ -107,6 +108,8 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   assert.match(accountContent, /MY 업무 분류/);
   assert.match(accountContent, /배송지 관리/);
   assert.match(accountContent, /MY 작업 모달 닫기/);
+  assert.match(accountContent, /window\.history\.pushState/);
+  assert.match(accountSectionPage, /redirect\(`\/account\?task=/);
   assert.match(accountContent, /<RoleWorkCenterLink \/>/);
   assert.match(accountContent, /<BidHistory surface="desktop" \/>/);
   assert.match(rollout, /create_customer_inventory_entitlement\(\s*'auction'/i);

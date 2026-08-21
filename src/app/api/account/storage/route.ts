@@ -10,9 +10,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]) {
-  const actual = Object.keys(value);
-  return actual.length === keys.length && actual.every((key) => keys.includes(key));
+function hasRequiredKeys(value: Record<string, unknown>, keys: readonly string[]) {
+  return keys.every((key) => Object.prototype.hasOwnProperty.call(value, key));
 }
 
 function isUuid(value: unknown): value is string {
@@ -44,7 +43,7 @@ type InventoryOverviewItem = Record<string, unknown> & {
 };
 
 function isInventoryItem(value: unknown): value is InventoryOverviewItem {
-  if (!isRecord(value) || !hasExactKeys(value, [
+  if (!isRecord(value) || !hasRequiredKeys(value, [
     "id", "productId", "title", "imageUrl", "sourceKind", "sourceReference",
     "originStoreId", "originStoreName", "ownershipStatus",
     "rolloutEnabled", "itemSelectedShipmentsEnabled", "requestEligible", "requestBlockReason",
@@ -66,7 +65,7 @@ function isInventoryOverview(value: unknown): value is {
   items: InventoryOverviewItem[];
   serverTime: string;
 } {
-  return isRecord(value) && hasExactKeys(value, ["rolloutEnabled", "items", "serverTime"]) &&
+  return isRecord(value) && hasRequiredKeys(value, ["rolloutEnabled", "items", "serverTime"]) &&
     typeof value.rolloutEnabled === "boolean" &&
     Array.isArray(value.items) && value.items.every(isInventoryItem) &&
     typeof value.serverTime === "string" && Number.isFinite(Date.parse(value.serverTime));

@@ -804,7 +804,7 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
   ]);
 
   assert.match(storageRoute, /"get_my_inventory_overview"/);
-  assert.match(storageRoute, /hasExactKeys/);
+  assert.match(storageRoute, /hasRequiredKeys/);
   assert.match(storageRoute, /itemSelectedShipmentsEnabled/);
   assert.match(storageRoute, /"get_my_won_products"/);
   assert.match(storageRoute, /legacyAuctionWins/);

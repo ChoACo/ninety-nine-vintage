@@ -128,7 +128,7 @@ test("buyer shipping API keeps exact legacy and v2 paths and uses manual transfe
 
   assert.match(storageRoute, /auth\.user as unknown as RpcClient/);
   assert.match(storageRoute, /"get_my_inventory_overview"/);
-  assert.match(storageRoute, /hasExactKeys\(value,\s*\["rolloutEnabled",\s*"items",\s*"serverTime"\]\)/);
+  assert.match(storageRoute, /hasRequiredKeys\(value,\s*\["rolloutEnabled",\s*"items",\s*"serverTime"\]\)/);
   assert.match(storageRoute, /"get_my_won_products"/);
   assert.match(storageRoute, /legacyAuctionWins/);
   assert.match(storageRoute, /itemSelectedShipmentsEnabled/);

@@ -81,6 +81,8 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   assert.match(storageRoute, /storage_class_snapshot,\s*storage_duration_days/);
   assert.match(storageRoute, /storageDurationDays/);
   assert.match(storageRoute, /storage_expires_at/);
+  assert.match(storageRoute, /function hasRequiredKeys/);
+  assert.doesNotMatch(storageRoute, /function hasExactKeys/);
   assert.match(ordersRoute, /storage_class/);
   assert.match(dashboard, /소형 2주, 대형 1주/);
   assert.match(dashboard, /"전체보기"/);

@@ -25,6 +25,19 @@ interface RevenueEntry {
   manualRefundId: string | null;
 }
 
+interface SettlementEntryRow {
+  source_id: string;
+  eligible_at: string;
+  settlement_batch_id: string | null;
+}
+
+interface SettlementBatchRow {
+  id: string;
+  status: string;
+  settlement_date: string;
+  paid_at: string | null;
+}
+
 interface RevenueStore {
   storeId: string;
   storeName: string;
@@ -161,30 +174,62 @@ export async function GET(request: Request) {
   const details = (inventoryRows ?? []) as InventoryDetailRow[];
   const productIds = [...new Set(details.map((row) => row.product_id))];
   const memberIds = [...new Set(details.map((row) => row.member_id))];
-  const [{ data: products, error: productError }, { data: profiles, error: profileError }] = await Promise.all([
+  const [{ data: products, error: productError }, { data: profiles, error: profileError }, settlementResult] = await Promise.all([
     productIds.length
       ? auth.admin.from("products").select("id,title,thumbnail_urls,image_urls").in("id", productIds).eq("store_id", auth.selectedStoreId)
       : Promise.resolve({ data: [], error: null }),
     memberIds.length
       ? auth.admin.from("profiles").select("id,display_name").in("id", memberIds)
       : Promise.resolve({ data: [], error: null }),
+    inventoryIds.length
+      ? auth.admin
+        .from("store_settlement_entries")
+        .select("source_id,eligible_at,settlement_batch_id")
+        .eq("store_id", auth.selectedStoreId)
+        .eq("source_kind", "inventory_item")
+        .eq("entry_kind", "item_sale")
+        .in("source_id", inventoryIds)
+      : Promise.resolve({ data: [], error: null }),
   ]);
-  if (productError || profileError) {
+  if (productError || profileError || settlementResult.error) {
     return commerceJson({ error: "revenue_detail_unavailable", message: "매출 상세 정보를 불러오지 못했습니다." }, 503);
+  }
+
+  const settlementRows = (settlementResult.data ?? []) as SettlementEntryRow[];
+  const batchIds = [...new Set(settlementRows
+    .map((row) => row.settlement_batch_id)
+    .filter((id): id is string => typeof id === "string"))];
+  const { data: batchRows, error: batchError } = batchIds.length
+    ? await auth.admin
+      .from("store_settlement_batches")
+      .select("id,status,settlement_date,paid_at")
+      .eq("store_id", auth.selectedStoreId)
+      .in("id", batchIds)
+    : { data: [], error: null };
+  if (batchError) {
+    return commerceJson({ error: "revenue_detail_unavailable", message: "정산 상태를 불러오지 못했습니다." }, 503);
   }
 
   const inventoryById = new Map(details.map((row) => [row.id, row]));
   const productById = new Map((products ?? []).map((product) => [product.id, product]));
   const memberById = new Map((profiles ?? []).map((profile) => [profile.id, profile.display_name]));
+  const settlementByInventoryId = new Map(settlementRows.map((row) => [row.source_id, row]));
+  const batchById = new Map(((batchRows ?? []) as SettlementBatchRow[]).map((row) => [row.id, row]));
   const entries = selectedStore.entries.map((entry) => {
     const inventory = entry.inventoryItemId ? inventoryById.get(entry.inventoryItemId) : null;
     const product = inventory ? productById.get(inventory.product_id) : null;
+    const settlement = entry.inventoryItemId ? settlementByInventoryId.get(entry.inventoryItemId) : null;
+    const batch = settlement?.settlement_batch_id ? batchById.get(settlement.settlement_batch_id) : null;
     return {
       ...entry,
       buyerName: inventory ? memberById.get(inventory.member_id) ?? "구매자" : null,
       productId: inventory?.product_id ?? null,
       productTitle: product?.title ?? null,
       productImageUrl: product?.thumbnail_urls?.[0] ?? product?.image_urls?.[0] ?? null,
+      settlementStatus: batch?.status === "paid" ? "paid" : settlement ? "pending" : null,
+      settlementEligibleAt: settlement?.eligible_at ?? null,
+      settlementDate: batch?.settlement_date ?? null,
+      settledAt: batch?.paid_at ?? null,
     };
   });
 

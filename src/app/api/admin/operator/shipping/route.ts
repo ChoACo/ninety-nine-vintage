@@ -206,19 +206,26 @@ export async function GET(request: Request) {
     "get_inventory_shipment_queue",
     {
       p_include_shipped: page.includeShipped,
-      p_limit: page.limit,
-      p_offset: page.offset,
+      p_limit: 500,
+      p_offset: 0,
     },
   );
   if (error) return rpcFailure(error);
   if (!isQueue(data)) return commerceJson({ error: "shipment_unavailable", message: "배송 대기열을 확인하지 못했습니다." }, 503);
-  const { data: totalCount, error: countError } = await (auth.user as unknown as RpcClient).rpc(
-    "count_inventory_shipment_queue",
-    { p_include_shipped: page.includeShipped },
-  );
-  const normalizedCount = Number(totalCount);
-  if (countError || !Number.isSafeInteger(normalizedCount) || normalizedCount < 0) return rpcFailure(countError ?? { code: "P0001" });
-  return commerceJson({ ...data, totalCount: normalizedCount });
+  const selectedStoreId = "selectedStoreId" in auth ? auth.selectedStoreId : null;
+  const scopedShipments = selectedStoreId
+    ? data.shipments.filter((shipment) => {
+        const items = shipment.items as Record<string, unknown>[];
+        const activeItems = items.filter((item) => !["excluded", "cancelled"].includes(String(item.lineStatus)));
+        return activeItems.length > 0 && activeItems.every((item) => item.originStoreId === selectedStoreId);
+      })
+    : data.shipments;
+  const shipments = scopedShipments.slice(page.offset, page.offset + page.limit);
+  return commerceJson({
+    shipments,
+    completedDeliveries: selectedStoreId ? [] : data.completedDeliveries,
+    totalCount: scopedShipments.length,
+  });
 }
 
 export async function POST(request: Request) {
@@ -247,6 +254,21 @@ export async function POST(request: Request) {
     ((action === "tracking_update" || action === "tracking_delete") && !note)
   ) {
     return commerceJson({ error: "invalid_shipment_request", message: "송장 정정 사유를 입력해 주세요." }, 422);
+  }
+
+  const selectedStoreId = "selectedStoreId" in auth ? auth.selectedStoreId : null;
+  if (selectedStoreId) {
+    const { data: scopedItems, error: scopeError } = await auth.admin
+      .from("inventory_shipment_items")
+      .select("origin_store_id,line_status")
+      .eq("shipment_id", body.shipmentId);
+    const activeItems = (scopedItems ?? []).filter((item) => !["excluded", "cancelled"].includes(item.line_status));
+    if (scopeError) {
+      return commerceJson({ error: "shipment_scope_unavailable", message: "배송 매장 범위를 확인하지 못했습니다." }, 503);
+    }
+    if (activeItems.length === 0 || activeItems.some((item) => item.origin_store_id !== selectedStoreId)) {
+      return commerceJson({ error: "shipment_store_scope_mismatch", message: "배정된 매장의 배송 상품만 처리할 수 있습니다." }, 403);
+    }
   }
 
   const result = action === "pack"

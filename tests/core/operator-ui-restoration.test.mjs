@@ -232,3 +232,23 @@ test("operator settlement and shipping remain server-authoritative after the UI 
   assert.doesNotMatch(orders, /\.from\("(?:commerce_order_transfers|manual_transfer_payment_ledger)"/);
   assert.doesNotMatch(shipping, /\.from\("shipping_requests"/);
 });
+
+test("sales history is store-scoped and moves only paid settlement batches out of active sales", async () => {
+  const [sales, shippingRoute, revenueRoute] = await Promise.all([
+    source("src/components/admin/operator/OperatorSalesConsole.tsx"),
+    source("src/app/api/admin/operator/shipping/route.ts"),
+    source("src/app/api/admin/operator/revenue/route.ts"),
+  ]);
+
+  assert.doesNotMatch(sales, /\/api\/admin\/operator\/orders/);
+  assert.match(sales, /\/api\/admin\/operator\/revenue/);
+  assert.match(sales, /상품 준비하기/);
+  assert.match(sales, /송장번호 입력하기/);
+  assert.match(sales, /송장번호 수정하기/);
+  assert.match(sales, /settlementStatus\s*===\s*"paid"/);
+  assert.match(shippingRoute, /item\.originStoreId\s*===\s*selectedStoreId/);
+  assert.match(shippingRoute, /shipment_store_scope_mismatch/);
+  assert.match(revenueRoute, /\.from\("store_settlement_entries"\)/);
+  assert.match(revenueRoute, /\.from\("store_settlement_batches"\)/);
+  assert.match(revenueRoute, /batch\?\.status\s*===\s*"paid"\s*\?\s*"paid"/);
+});

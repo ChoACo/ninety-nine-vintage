@@ -70,6 +70,45 @@ export function formatKeepDday(
   return days <= 0 ? "D-DAY" : `D-${days}`;
 }
 
+/** 만료일까지 남은 날짜를 한국 표준시 달력 기준으로 계산합니다. 지났으면 음수입니다. */
+export function getKstCalendarDaysUntil(
+  expiresAt: DateInput,
+  now: DateInput = new Date(),
+): number {
+  const end = getKoreanCalendarParts(expiresAt);
+  const start = getKoreanCalendarParts(now);
+
+  return Math.round(
+    (Date.UTC(end.year, end.month - 1, end.day) -
+      Date.UTC(start.year, start.month - 1, start.day)) / ONE_DAY_MS,
+  );
+}
+
+export function formatStorageDday(daysLeft: number): string {
+  if (daysLeft < 0) return `D+${Math.abs(daysLeft)}`;
+  if (daysLeft === 0) return "D-Day";
+  return `D-${daysLeft}`;
+}
+
+export function storageUrgencyClass(daysLeft: number | null): string {
+  if (daysLeft === null) return "";
+  if (daysLeft <= 0) return "border-red-500 bg-red-50 text-red-700";
+  if (daysLeft <= 2) return "border-amber-500 bg-amber-50 text-amber-800";
+  if (daysLeft <= 7) return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-line text-muted";
+}
+
+export function storageUrgencySurfaceClass(daysLeft: number | null): string {
+  if (daysLeft === null) return "";
+  if (daysLeft <= 0) return "bg-red-50";
+  if (daysLeft <= 2) return "bg-amber-50";
+  return "";
+}
+
+export function storageClassLabel(durationDays: number | null): string {
+  return durationDays === BULKY_KEEP_DAYS ? "대형 · 7일 보관" : "소형 · 14일 보관";
+}
+
 /**
  * 신청일 다음 날 이후 처음 만나는 화·수·목 오후 5시(KST)를 반환합니다.
  * 목~일 신청은 다음 주 화요일로 넘어갑니다.

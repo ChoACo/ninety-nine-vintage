@@ -3,6 +3,7 @@
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
+import { PremiumDialog } from "@/components/ui/PremiumDialog";
 
 interface ItemRefundRow {
   id: string;
@@ -86,6 +87,7 @@ export function OwnerRefundConsole() {
   const [references, setReferences] = useState<Record<string, string>>({});
   const [accessReasons, setAccessReasons] = useState<Record<string, string>>({});
   const [revealed, setRevealed] = useState<Record<string, RevealedAccount>>({});
+  const [approveTarget, setApproveTarget] = useState<RefundRow | null>(null);
   const keys = useRef(new Map<string, string>());
 
   const load = useCallback(async () => {
@@ -242,7 +244,7 @@ export function OwnerRefundConsole() {
                   {refund.refundKind === "item" && <textarea className="min-h-20 w-full border border-line p-3 text-xs" maxLength={1_000} onChange={(event) => setNotes((current) => ({ ...current, [subjectKey]: event.target.value }))} placeholder="처리 메모 (선택)" value={notes[subjectKey] ?? ""} />}
                   {(refund.status === "approved" || (refund.refundKind === "shipping_fee" && refund.status === "requested")) && <input className="w-full border border-line px-3 py-2 text-xs" maxLength={160} onChange={(event) => setReferences((current) => ({ ...current, [subjectKey]: event.target.value }))} placeholder="외부 송금 참조번호" value={references[subjectKey] ?? ""} />}
                   <div className="flex flex-wrap gap-2">
-                    {refund.refundKind === "item" && refund.status === "requested" && <button className="bg-ink px-4 py-2 text-xs font-bold text-paper disabled:opacity-40" disabled={busy || !refund.accountSubmittedAt} onClick={() => void mutate(refund, "approve")} type="button">환불 승인</button>}
+                    {refund.refundKind === "item" && refund.status === "requested" && <button className="bg-ink px-4 py-2 text-xs font-bold text-paper disabled:opacity-40" disabled={busy || !refund.accountSubmittedAt} onClick={() => setApproveTarget(refund)} type="button">환불 승인</button>}
                     {((refund.refundKind === "item" && refund.status === "approved") || (refund.refundKind === "shipping_fee" && refund.status === "requested")) && <button className="bg-ink px-4 py-2 text-xs font-bold text-paper disabled:opacity-40" disabled={busy || !refund.accountSubmittedAt} onClick={() => void mutate(refund, "complete")} type="button">송금 완료</button>}
                     {refund.refundKind === "item" && (refund.status === "requested" || refund.status === "approved") && <button className="border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={busy} onClick={() => void mutate(refund, "cancel")} type="button">환불 취소</button>}
                   </div>
@@ -253,6 +255,30 @@ export function OwnerRefundConsole() {
         })}
         {!loading && refunds.length === 0 && <div className="border border-dashed border-line py-16 text-center text-sm text-muted">처리할 환불 요청이 없습니다.</div>}
       </section>
+
+      <PremiumDialog labelledBy="refund-approve-title" onClose={() => setApproveTarget(null)} open={approveTarget !== null} panelClassName="max-w-md">
+        {approveTarget && (
+          <div className="p-6">
+            <h2 className="text-xl font-black" id="refund-approve-title">환불 최종 승인</h2>
+            <p className="mt-3 text-xs leading-5 text-muted">승인 후 환불 요청은 회수할 수 없으며 송금 단계로 고정됩니다. 내용을 다시 확인해 주세요.</p>
+            <dl className="mt-4 space-y-2 border border-line bg-surface p-4 text-xs">
+              <div className="flex justify-between gap-3"><dt className="text-muted">대상</dt><dd className="font-bold">{refundTitle(approveTarget)}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-muted">환불 금액</dt><dd className="font-mono font-bold">{approveTarget.amount.toLocaleString("ko-KR")}원</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-muted">구매자</dt><dd className="font-mono">{approveTarget.memberId}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-muted">계좌</dt><dd>{approveTarget.maskedAccountNumber ?? "미등록"}</dd></div>
+            </dl>
+            <div className="mt-6 flex justify-end gap-2">
+              <button className="border border-line px-4 py-3 text-xs font-bold" onClick={() => setApproveTarget(null)} type="button">취소</button>
+              <button
+                className="bg-rose-700 px-4 py-3 text-xs font-bold text-white disabled:opacity-40"
+                disabled={busyId === refundKey(approveTarget)}
+                onClick={() => { const target = approveTarget; setApproveTarget(null); void mutate(target, "approve"); }}
+                type="button"
+              >승인 확정</button>
+            </div>
+          </div>
+        )}
+      </PremiumDialog>
     </div>
   );
 }

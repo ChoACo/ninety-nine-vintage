@@ -78,7 +78,11 @@ test("single product registration is separate, scheduled by saved hourly prefere
     /form\.saleType === "auction" \? <TextInput aria-label="입찰 단위"/,
   );
   assert.match(consoleSource, /bidIncrement:\s*"1000"/);
-  assert.match(consoleSource, /입찰 최소 단위는 1,000원으로 자동 적용됩니다/);
+  assert.match(consoleSource, /aria-label="최소 입찰 단위"/);
+  assert.match(
+    consoleSource,
+    /기본값은 1,000원이며 입력칸에서 상품별로 자유롭게 수정할 수 있습니다/,
+  );
   assert.equal(
     consoleSource.match(/aria-label="판매 방식"/g)?.length,
     1,

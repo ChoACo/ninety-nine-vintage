@@ -64,7 +64,7 @@ test("band members retain a visible deadline while combined payment keeps the ex
   assert.match(combinedPayment, /paymentBlocked/);
   assert.match(combinedPayment, /deadlineEnforcementExempt/);
   assert.match(combinedPayment, /가장 빠른 결제 마감/);
-  assert.match(combinedPayment, /낙찰품 전체 결제하기/);
+  assert.match(combinedPayment, /선택 상품 결제하기/);
 });
 
 test("employee and operator navigation use direct-store fulfillment without center management", async () => {

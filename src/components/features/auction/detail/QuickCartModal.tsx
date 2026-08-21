@@ -41,12 +41,12 @@ export function QuickCartModal({
         <div className="rounded-2xl border border-white/10 bg-surface p-5 shadow-sm">
           <p className="text-[10px] font-bold tracking-[0.12em] text-muted">판매 정가</p>
           <p className="mt-2 font-mono text-2xl font-black tracking-tight">{price.toLocaleString("ko-KR")}원</p>
-          <p className="mt-3 text-xs leading-relaxed text-muted">담기 완료 시 15분 동안 재고를 안전하게 점유합니다. 현재 상세 화면은 그대로 유지됩니다.</p>
+          <p className="mt-3 text-xs leading-relaxed text-muted">장바구니는 구매 목록을 저장하며 재고를 점유하지 않습니다. 결제 완료 순서로 판매가 확정되고 현재 상세 화면은 그대로 유지됩니다.</p>
         </div>
         {notice && <p aria-live="polite" className={`mt-4 rounded-2xl border px-4 py-3 text-xs font-bold leading-relaxed shadow-sm ${completed ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>{completed && <Check className="mr-2 inline" size={14} />}{notice}</p>}
         <div className="mt-6 grid grid-cols-2 gap-2">
           <Button disabled={busy} onClick={onClose} type="button">{completed ? "계속 쇼핑" : "취소"}</Button>
-          {completed ? <Button onClick={onViewCart} type="button" variant="primary">장바구니 보기</Button> : <Button disabled={busy} onClick={onConfirm} type="button" variant="primary">{busy ? "재고 확인 중" : "장바구니에 담기"}</Button>}
+          {completed ? <Button onClick={onViewCart} type="button" variant="primary">장바구니 보기</Button> : <Button disabled={busy} onClick={onConfirm} type="button" variant="primary">{busy ? "담는 중" : "장바구니에 담기"}</Button>}
         </div>
       </div>
     </PremiumDialog>

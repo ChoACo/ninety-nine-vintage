@@ -127,6 +127,15 @@ test("cart API can only reserve and release inventory through authoritative RPCs
   assert.match(route, /staleProductIds: ids/);
 });
 
+test("quick cart copy does not promise an inventory hold", async () => {
+  const quickCart = await source(
+    "src/components/features/auction/detail/QuickCartModal.tsx",
+  );
+
+  assert.match(quickCart, /재고를 점유하지 않습니다/);
+  assert.doesNotMatch(quickCart, /15분 동안 재고를 안전하게 점유/);
+});
+
 test("the storefront keeps cart membership independent from inventory availability", async () => {
   const [client, detailPanel, cartView] = await Promise.all([
     source("src/lib/commerce/client.ts"),

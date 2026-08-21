@@ -88,6 +88,37 @@ interface LegacyAuctionWinRow {
   shipping_status: string;
 }
 
+interface QuoteGroup {
+  businessId: string;
+  businessName: string;
+  itemCount: number;
+  itemSubtotal: number;
+  earliestDueAt: string | null;
+  items: Array<{
+    productId: string;
+    title: string;
+    amount: number;
+    dueAt: string | null;
+  }>;
+  hasStoredItems: boolean;
+  shippingFeeAmount: number;
+  shippingFeeCharged: number;
+}
+
+interface AuctionPaymentQuote {
+  groups: QuoteGroup[];
+  itemSubtotal: number;
+  shippingFeeTotal: number;
+  expectedTotal: number;
+  serverTime: string;
+}
+
+interface CenterShippingToken {
+  businessId: string;
+  businessName: string;
+  availableCount: number;
+}
+
 function isLegacyAuctionWin(value: unknown): value is LegacyAuctionWinRow {
   return isRecord(value) && isUuid(value.product_id) && typeof value.title === "string" &&
     Array.isArray(value.image_urls) && value.image_urls.every((image) => typeof image === "string") &&
@@ -103,24 +134,66 @@ function isLegacyAuctionWin(value: unknown): value is LegacyAuctionWinRow {
     typeof value.shipping_status === "string";
 }
 
+function isQuoteGroup(value: unknown): value is QuoteGroup {
+  if (!isRecord(value)) return false;
+  const itemCount = Number(value.itemCount);
+  const itemSubtotal = Number(value.itemSubtotal);
+  const shippingFeeAmount = Number(value.shippingFeeAmount);
+  const shippingFeeCharged = Number(value.shippingFeeCharged);
+  return isUuid(value.businessId) &&
+    typeof value.businessName === "string" &&
+    Number.isSafeInteger(itemCount) && itemCount >= 1 &&
+    Number.isSafeInteger(itemSubtotal) && itemSubtotal >= 0 &&
+    (value.earliestDueAt === null ||
+      (typeof value.earliestDueAt === "string" && Number.isFinite(Date.parse(value.earliestDueAt)))) &&
+    Array.isArray(value.items) && value.items.every((item) =>
+      isRecord(item) && isUuid(item.productId) && typeof item.title === "string" &&
+      Number.isSafeInteger(Number(item.amount)) && Number(item.amount) >= 0 &&
+      (item.dueAt === null || (typeof item.dueAt === "string" && Number.isFinite(Date.parse(item.dueAt))))) &&
+    typeof value.hasStoredItems === "boolean" &&
+    Number.isSafeInteger(shippingFeeAmount) && shippingFeeAmount >= 0 &&
+    Number.isSafeInteger(shippingFeeCharged) && shippingFeeCharged >= 0;
+}
+
+function isAuctionPaymentQuote(value: unknown): value is AuctionPaymentQuote {
+  if (!isRecord(value)) return false;
+  const itemSubtotal = Number(value.itemSubtotal);
+  const shippingFeeTotal = Number(value.shippingFeeTotal);
+  const expectedTotal = Number(value.expectedTotal);
+  return Array.isArray(value.groups) &&
+    value.groups.every(isQuoteGroup) &&
+    Number.isSafeInteger(itemSubtotal) && itemSubtotal >= 0 &&
+    Number.isSafeInteger(shippingFeeTotal) && shippingFeeTotal >= 0 &&
+    Number.isSafeInteger(expectedTotal) && expectedTotal >= 0 &&
+    typeof value.serverTime === "string" && Number.isFinite(Date.parse(value.serverTime));
+}
+
 export async function GET(request: Request) {
   const auth = await authenticateMemberCommerceRequest(request);
   if (!auth.ok) return auth.response;
 
-  const { data, error } = await (auth.user as unknown as RpcClient).rpc(
-    "get_my_inventory_overview",
-  );
+  const rpcClient = auth.user as unknown as RpcClient;
+  const [overview, legacy, quote] = await Promise.all([
+    rpcClient.rpc("get_my_inventory_overview"),
+    rpcClient.rpc("get_my_won_products"),
+    rpcClient.rpc("get_my_auction_payment_quote"),
+  ]);
+  const { data, error } = overview;
   if (error || !isInventoryOverview(data)) {
     return inventoryUnavailable(
       error ? `overview_rpc:${error.code ?? "unknown"}` : "overview_shape",
     );
   }
-  const legacy = await (auth.user as unknown as RpcClient).rpc("get_my_won_products");
   if (legacy.error || !Array.isArray(legacy.data) || !legacy.data.every(isLegacyAuctionWin)) {
     return inventoryUnavailable(
       legacy.error
         ? `legacy_rpc:${legacy.error.code ?? "unknown"}`
         : "legacy_shape",
+    );
+  }
+  if (quote.error || !isAuctionPaymentQuote(quote.data)) {
+    return inventoryUnavailable(
+      quote.error ? `quote_rpc:${quote.error.code ?? "unknown"}` : "quote_shape",
     );
   }
   const legacyWins = legacy.data as LegacyAuctionWinRow[];
@@ -165,6 +238,7 @@ export async function GET(request: Request) {
     inventoryDetailsResult,
     productDetailsResult,
     inventoryProductIdsResult,
+    tokenRowsResult,
   ] = await Promise.all([
     data.items.length === 0
       ? Promise.resolve({ data: [], error: null })
@@ -185,14 +259,37 @@ export async function GET(request: Request) {
           .select("product_id")
           .eq("member_id", auth.userId)
           .in("product_id", legacyWins.map((win) => win.product_id)),
+    auth.admin
+      .from("shipping_fee_waiver_entitlements")
+      .select("business_id, businesses(name)")
+      .eq("member_id", auth.userId)
+      .eq("status", "available"),
   ]);
   if (
     inventoryDetailsResult.error ||
     productDetailsResult.error ||
-    inventoryProductIdsResult.error
+    inventoryProductIdsResult.error ||
+    tokenRowsResult.error
   ) {
     return inventoryUnavailable("inventory_details");
   }
+  const centerShippingTokens: CenterShippingToken[] = Object.entries(
+    (tokenRowsResult.data ?? []).reduce<Record<string, number>>(
+      (counts, row) => {
+        const businessId = String(row.business_id);
+        counts[businessId] = (counts[businessId] ?? 0) + 1;
+        return counts;
+      },
+      {},
+    ),
+  ).map(([businessId, availableCount]) => ({
+    businessId,
+    businessName:
+      (tokenRowsResult.data ?? []).find(
+        (row) => String(row.business_id) === businessId,
+      )?.businesses?.name ?? "센터",
+    availableCount,
+  }));
   const inventoryDetails = new Map(
     (inventoryDetailsResult.data ?? []).map((item) => [item.id, item]),
   );
@@ -252,5 +349,7 @@ export async function GET(request: Request) {
     deadlineEnforcementExempt: role?.role_code === "band_member",
     rememberedDepositorName:
       accountResult.data?.last_depositor_name ?? null,
+    auctionPaymentQuote: quote.data,
+    centerShippingTokens,
   });
 }

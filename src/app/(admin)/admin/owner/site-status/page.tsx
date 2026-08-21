@@ -1,3 +1,4 @@
+import { OwnerAuditLogConsole } from "@/components/admin/owner/OwnerAuditLogConsole";
 import { OwnerSiteStatusPanel } from "@/components/admin/owner/OwnerSiteStatusPanel";
 import { StorageUsageGauge } from "@/components/admin/owner/StorageUsageGauge";
 import { TokenUsageGauge } from "@/components/admin/owner/TokenUsageGauge";
@@ -17,6 +18,7 @@ export default function OwnerSiteStatusPage() {
         <TokenUsageGauge />
         <StorageUsageGauge />
       </div>
+      <OwnerAuditLogConsole />
     </div>
   );
 }

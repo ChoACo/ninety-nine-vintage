@@ -5,6 +5,8 @@ import {
 } from "@/lib/supabase/server";
 import { getManualTransferAccount } from "@/lib/manualTransferConfig";
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function json(body: Record<string, unknown>, status = 200) {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
 }
@@ -26,7 +28,14 @@ export async function POST(request: Request) {
       body?.action === "begin" &&
       typeof body.depositorName === "string" &&
       (body.includeShippingFee === undefined ||
-        typeof body.includeShippingFee === "boolean")
+        typeof body.includeShippingFee === "boolean") &&
+      (body.productIds === undefined ||
+        (Array.isArray(body.productIds) &&
+          body.productIds.length >= 1 &&
+          body.productIds.length <= 100 &&
+          body.productIds.every((value): value is string =>
+            typeof value === "string" && UUID_PATTERN.test(value),
+          )))
     ) {
       const { data: authData, error: authError } = await verifier.auth.getUser(token);
       if (authError || !authData.user) return json({ error: "unauthorized" }, 401);
@@ -34,11 +43,15 @@ export async function POST(request: Request) {
       if (depositorName.length < 1 || depositorName.length > 80) {
         return json({ error: "invalid_depositor_name" }, 422);
       }
+      const productIds = Array.isArray(body.productIds)
+        ? [...new Set(body.productIds as string[])].sort()
+        : null;
       const { data, error } = await createSupabaseUserClient(token).rpc(
         "begin_my_combined_auction_payment",
         {
           p_depositor_name: depositorName,
           p_include_shipping_fee: body.includeShippingFee !== false,
+          ...(productIds ? { p_product_ids: productIds } : {}),
         },
       );
       if (error) {

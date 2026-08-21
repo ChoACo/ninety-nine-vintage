@@ -16,6 +16,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { CombinedAuctionPayment } from "@/components/features/account/CombinedAuctionPayment";
+import type { AuctionPaymentCenterGroup } from "@/components/features/account/CombinedAuctionPayment";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { logoutBrowserSession } from "@/lib/auth/logout";
@@ -56,6 +57,20 @@ interface StoragePayload {
   rememberedDepositorName?: string | null;
   rolloutEnabled?: boolean;
   serverTime?: string;
+  auctionPaymentQuote?: AuctionPaymentQuote;
+  centerShippingTokens?: CenterShippingToken[];
+}
+interface AuctionPaymentQuote {
+  groups: AuctionPaymentCenterGroup[];
+  itemSubtotal: number;
+  shippingFeeTotal: number;
+  expectedTotal: number;
+  serverTime: string;
+}
+interface CenterShippingToken {
+  businessId: string;
+  businessName: string;
+  availableCount: number;
 }
 interface LegacyAuctionWin {
   product_id: string;
@@ -235,6 +250,8 @@ function AccountDashboardForSession({
   const [legacyAuctionWins, setLegacyAuctionWins] = useState<LegacyAuctionWin[]>([]);
   const [deadlineEnforcementExempt, setDeadlineEnforcementExempt] = useState(false);
   const [rememberedDepositorName, setRememberedDepositorName] = useState<string | null>(null);
+  const [paymentGroups, setPaymentGroups] = useState<AuctionPaymentCenterGroup[]>([]);
+  const [centerShippingTokens, setCenterShippingTokens] = useState<CenterShippingToken[]>([]);
   const [selectedInventoryItemIds, setSelectedInventoryItemIds] = useState<string[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [addressForm, setAddressForm] = useState({
@@ -349,6 +366,8 @@ const [shippingMessage, setShippingMessage] = useState("");
           setRememberedDepositorName(
             storageData.rememberedDepositorName ?? null,
           );
+          setPaymentGroups(storageData.auctionPaymentQuote?.groups ?? []);
+          setCenterShippingTokens(storageData.centerShippingTokens ?? []);
           setSelectedInventoryItemIds([]);
           setShipments(shipmentData.shipments ?? []);
           setLegacyEligibleOrders(legacyOrdersData.orders ?? []);
@@ -943,6 +962,7 @@ const [shippingMessage, setShippingMessage] = useState("");
               deadlineEnforcementExempt={deadlineEnforcementExempt}
               rememberedDepositorName={rememberedDepositorName}
               serverTime={paymentServerTime}
+              groups={paymentGroups}
               wins={pendingAuctionWins.map((win) => ({
                 productId: win.product_id,
                 title: win.title,
@@ -986,6 +1006,27 @@ const [shippingMessage, setShippingMessage] = useState("");
               {view === "storage" && <Link className="text-xs font-black underline" href={`${basePath}/account/shipping-request`}>배송 신청</Link>}
             </div>
           </div>
+          {centerShippingTokens.length > 0 && (
+            <div className="mb-4 border border-line bg-surface p-3">
+              <p className="text-xs font-bold">센터별 배송비 결제 현황</p>
+              <p className="mt-1 text-[11px] leading-5 text-muted">
+                배송비를 결제한 센터에는 보이지 않는 배송 토큰이 부여됩니다. 토큰이 남아 있는 센터는 추가 결제 없이 배송 신청할 수 있으며, 토큰을 모두 사용하면 해당 센터에 배송비만 따로 결제해 주세요.
+              </p>
+              <ul className="mt-2 space-y-1">
+                {centerShippingTokens.map((token) => (
+                  <li
+                    className="flex items-center justify-between gap-3 text-[11px]"
+                    key={token.businessId}
+                  >
+                    <span className="min-w-0 truncate font-bold">{token.businessName}</span>
+                    <span className="shrink-0 font-bold text-emerald-700">
+                      배송비 결제 {token.availableCount}회 완료
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="divide-y divide-line border-y border-line">
             {v2Storage.length === 0 &&
               settledLegacyAuctionWins.length === 0 &&

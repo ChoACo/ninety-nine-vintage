@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowDown, ArrowUp, CircleStop, ClipboardCheck, Edit3, FileSpreadsheet, ImagePlus, PauseCircle, PlayCircle, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, CircleStop, ClipboardCheck, Edit3, FileSpreadsheet, ImagePlus, PauseCircle, PlayCircle, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -19,6 +19,7 @@ import { inferBrandFromTitle } from "@/lib/catalog/brand";
 import { BATCH_CLOTHING_CATEGORIES } from "@/lib/import/categoryIds";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { Button } from "@/components/ui/Button";
+import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { SelectInput, TextArea, TextInput } from "@/components/ui/FormControls";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { StatusNotice } from "@/components/ui/StatusNotice";
@@ -123,6 +124,12 @@ interface SingleRegistrationJob {
   status: "pending" | "failed";
   title: string;
 }
+
+type RegistrationResultModal =
+  | { jobId: string; kind: "failure"; title: string }
+  | { jobId: string; kind: "retrying"; title: string }
+  | { jobId: string; kind: "success"; title: string }
+  | null;
 
 type ProductConsoleView = "active" | "registration";
 type RegistrationStage = "scheduled" | "draft";
@@ -254,6 +261,8 @@ export function OperatorProductsConsole({
   const [singleRegistrationJobs, setSingleRegistrationJobs] = useState<
     SingleRegistrationJob[]
   >([]);
+  const [registrationResult, setRegistrationResult] =
+    useState<RegistrationResultModal>(null);
   const inspectionNotesRef = useRef<HTMLTextAreaElement>(null);
   const singleImagesRef = useRef<SingleImage[]>([]);
   const singleRegistrationSnapshotsRef = useRef(
@@ -664,6 +673,11 @@ export function OperatorProductsConsole({
         );
       }
       persisted = true;
+      setRegistrationResult({
+        jobId: snapshot.id,
+        kind: "success",
+        title: snapshot.form.title,
+      });
       let message = snapshot.publicationMode === "scheduled"
         ? `“${snapshot.form.title}” 단품 등록과 ${String(snapshot.scheduledHourKst).padStart(2, "0")}:00 공개 예약을 완료했습니다.`
         : `“${snapshot.form.title}” 단품 등록을 완료했습니다.`;
@@ -699,6 +713,11 @@ export function OperatorProductsConsole({
           job.id === snapshot.id ? { ...job, status: "failed" } : job,
         ),
       );
+      setRegistrationResult({
+        jobId: snapshot.id,
+        kind: "failure",
+        title: snapshot.form.title,
+      });
       const reason = error instanceof Error
         ? error.message
         : "상품을 저장하지 못했습니다.";
@@ -715,7 +734,34 @@ export function OperatorProductsConsole({
     if (!snapshot || !token) return;
     const retrySnapshot = { ...snapshot, accessToken: token };
     singleRegistrationSnapshotsRef.current.set(jobId, retrySnapshot);
+    setRegistrationResult({
+      jobId,
+      kind: "retrying",
+      title: retrySnapshot.form.title,
+    });
     void processSingleRegistration(retrySnapshot);
+  };
+
+  const restoreFailedRegistration = (jobId: string) => {
+    const snapshot = singleRegistrationSnapshotsRef.current.get(jobId);
+    dismissFailedSingleRegistration(jobId);
+    setRegistrationResult(null);
+    if (!snapshot) return;
+    setEditingId(null);
+    setEditingUpdatedAt(null);
+    setSingleCreateOpen(true);
+    setForm({ ...snapshot.form });
+    singleImagesRef.current.forEach((image) =>
+      URL.revokeObjectURL(image.previewUrl),
+    );
+    setSingleImages(
+      snapshot.files.map((file) => ({
+        file,
+        id: crypto.randomUUID(),
+        previewUrl: URL.createObjectURL(file),
+      })),
+    );
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const dismissFailedSingleRegistration = (jobId: string) => {
@@ -1350,11 +1396,15 @@ export function OperatorProductsConsole({
             <TextArea aria-label="이미지 URL" className="min-h-20 sm:col-span-2" disabled={!productFieldsEditable} onChange={(event) => update("imageUrls", event.target.value)} placeholder="이미지 URL을 줄바꿈 또는 쉼표로 입력" required value={form.imageUrls} />
             <p className="text-[11px] leading-5 text-amber-800 sm:col-span-2">기존 상품 수정 시에만 현재 이미지 URL을 유지하거나 변경할 수 있습니다.</p>
             <div className="flex flex-col gap-2 sm:flex-row"><TextInput aria-label="입찰 단위" disabled={!saleSetupEditable} min="1" onChange={(event) => update("bidIncrement", event.target.value)} placeholder="입찰 단위" type="number" value={form.bidIncrement} /><SelectInput aria-label="공개 상태" disabled={!saleSetupEditable} onChange={(event) => update("status", event.target.value)} value={form.status}><option value="pending">등록 대기로 저장</option>{(form.status === "active" || stores.find((store) => store.id === form.storeId)?.canPublish) && <option value="active">{editingProduct?.status === "active" ? "현재 공개 중" : "저장 후 즉시 공개"}</option>}</SelectInput></div>
+            {form.saleType === "auction" && <p className="text-[11px] leading-5 text-muted sm:col-span-2">기본값은 1,000원이며 입찰 단위 입력칸에서 직접 수정할 수 있습니다.</p>}
           </>
         ) : (
           <>
             <SelectInput aria-label="보관 등급" onChange={(event) => update("storageClass", event.target.value)} value={form.storageClass}><option value="small">소형 · 14일 보관</option><option value="large">대형 · 7일 보관</option></SelectInput>
-            {form.saleType === "auction" ? <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">입찰 최소 단위는 1,000원으로 자동 적용됩니다.</div> : <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">즉시구매 상품은 입찰 단위를 사용하지 않습니다.</div>}
+            {form.saleType === "auction" ? <>
+              <label className="text-[10px] font-bold text-muted"><span className="mb-2 block">최소 입찰 단위 (원)</span><TextInput aria-label="최소 입찰 단위" min="1" onChange={(event) => update("bidIncrement", event.target.value)} placeholder="1,000" type="number" value={form.bidIncrement} /></label>
+              <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">기본값은 1,000원이며 입력칸에서 상품별로 자유롭게 수정할 수 있습니다. 첫 입찰은 시작가부터 시작하고 이후 입찰은 현재가 + 최소 입찰 단위로 올라갑니다.</div>
+            </> : <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">즉시구매 상품은 입찰 단위를 사용하지 않습니다.</div>}
             <div className="border-b border-ink pb-3 pt-2 sm:col-span-2"><p className="text-xs font-black">4. 공개 설정</p><p className="mt-1 text-[11px] text-muted">즉시 공개하거나 원하는 시간에 예약할 수 있습니다.</p></div>
             <label className="text-xs font-bold sm:col-span-2">
               공개 시각
@@ -1388,6 +1438,41 @@ export function OperatorProductsConsole({
       <div className="flex flex-wrap items-center gap-3"><span className="font-mono text-xs text-muted">{selectedPendingIds.size}개 선택</span>{selectedPendingIds.size > 0 && <Button disabled={busy} onClick={() => setSelectedPendingIds(new Set())} size="compact" variant="ghost" type="button">선택 해제</Button>}<Button disabled={busy || !permissions.canPublish || selectedPendingIds.size === 0} onClick={() => void publishSelected()} size="compact" variant="primary" type="button">지금 즉시 공개</Button></div>
     </div>}
     <div className="overflow-x-auto border-y border-line"><table className="w-full min-w-[1080px] text-left text-xs"><thead className="border-b border-line bg-surface text-[10px] tracking-[.12em] text-muted"><tr>{view === "registration" && <th className="px-4 py-4">선택</th>}<th className="px-4 py-4">상품</th><th className="px-4 py-4">숍</th><th className="px-4 py-4">판매 방식</th><th className="px-4 py-4">가격</th><th className="px-4 py-4">보관</th><th className="px-4 py-4">상태</th><th className="px-4 py-4" /></tr></thead><tbody className="divide-y divide-line">{visibleProducts.map((product) => { const manageable = isManageableProductStatus(product.status); const canPublishStore = stores.some((store) => store.id === product.store_id && store.canPublish); return <tr key={product.id}>{view === "registration" && <td className="px-4 py-4"><input aria-label={`${product.title} 공개 선택`} checked={selectedPendingIds.has(product.id)} disabled={busy || !canPublishStore || product.status !== "pending"} onChange={() => togglePending(product.id)} type="checkbox" /></td>}<td className="px-4 py-4"><div className="flex items-center gap-3"><CatalogImage alt="" className="size-12 object-cover" src={product.image_urls?.[0] ?? ""} /><span className="font-bold">{product.title}</span></div></td><td className="px-4 py-4 text-muted">{product.stores?.name ?? "미지정"}</td><td className="px-4 py-4">{product.sale_type === "fixed" ? "즉시구매" : "경매"}</td><td className="px-4 py-4 font-mono">{(product.fixed_price ?? product.current_price).toLocaleString("ko-KR")}원</td><td className="px-4 py-4">{product.storage_class === "large" ? "대형 · 7일" : "소형 · 14일"}</td><td className="px-4 py-4"><span className="border border-line px-2 py-1 text-[10px] font-bold">{view === "registration" && isScheduledProduct(product, productReferenceNow) ? "업로드 예정" : productStatusLabel(product.status)}</span></td><td className="px-4 py-4 text-right"><div className="flex justify-end gap-3">{permissions.canCloseAuctions && product.sale_type === "auction" && product.status === "active" && <button aria-label={`${product.title} 즉시 마감`} className="inline-flex items-center gap-1 font-bold text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy} onClick={() => void closeAuctionNow(product)} type="button"><CircleStop size={13} /> 즉시 마감·낙찰 확정</button>}{product.status === "active" && <button aria-label={`${product.title} 일시중지`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate} onClick={() => void pause(product)} type="button"><PauseCircle size={13} /> 일시중지</button>}{product.status === "pending" && <button aria-label={`${product.title} 공개`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !canPublishStore} onClick={() => void publish(product)} type="button"><PlayCircle size={13} /> 공개</button>}<button aria-label={`${product.title} 점검`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product, "inspection")} type="button"><ClipboardCheck size={13} /> 점검</button><button aria-label={`${product.title} 수정`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product)} type="button"><Edit3 size={13} /> 수정</button><button aria-label={`${product.title} 삭제`} className="inline-flex items-center gap-1 text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => void remove(product)} type="button"><Trash2 size={13} /> 삭제</button>{product.status === "active" && <Link className="underline" href={`/auction/${product.id}`}>보기</Link>}</div></td></tr>; })}{visibleProducts.length === 0 && <tr><td className="px-4 py-16 text-center text-muted" colSpan={view === "registration" ? 8 : 7}>조건에 맞는 상품이 없습니다.</td></tr>}</tbody></table></div>
+    <PremiumDialog
+      ariaLabel="단품 등록 결과"
+      closeDisabled={registrationResult?.kind === "retrying"}
+      labelledBy="single-registration-result-title"
+      onClose={() => setRegistrationResult(null)}
+      open={registrationResult !== null}
+      panelClassName="max-w-sm"
+    >
+      {registrationResult?.kind === "success" && <div className="space-y-5 p-6 text-center">
+        <CheckCircle2 aria-hidden="true" className="mx-auto text-emerald-600" size={40} />
+        <div>
+          <h2 className="text-lg font-black tracking-[-.04em]" id="single-registration-result-title">등록 완료</h2>
+          <p className="mt-2 break-keep text-xs leading-5 text-muted">“{registrationResult.title}” 상품 등록을 마쳤습니다.</p>
+        </div>
+        <Button className="w-full" onClick={() => setRegistrationResult(null)} type="button" variant="primary">확인</Button>
+      </div>}
+      {registrationResult?.kind === "retrying" && <div className="space-y-5 p-6 text-center">
+        <RefreshCw aria-hidden="true" className="mx-auto animate-spin text-ink" size={36} />
+        <div>
+          <h2 className="text-lg font-black tracking-[-.04em]" id="single-registration-result-title">재시도 진행 중입니다</h2>
+          <p className="mt-2 break-keep text-xs leading-5 text-muted">“{registrationResult.title}” 등록을 다시 시도하고 있습니다. 잠시만 기다려 주세요.</p>
+        </div>
+      </div>}
+      {registrationResult?.kind === "failure" && <div className="space-y-5 p-6 text-center">
+        <AlertTriangle aria-hidden="true" className="mx-auto text-red-700" size={40} />
+        <div>
+          <h2 className="text-lg font-black tracking-[-.04em]" id="single-registration-result-title">등록 실패</h2>
+          <p className="mt-2 break-keep text-xs leading-5 text-muted">“{registrationResult.title}” 등록을 완료하지 못했습니다. 입력 내용과 사진을 그대로 두고 다시 시도할 수 있습니다.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button className="flex-1" onClick={() => retrySingleRegistration(registrationResult.jobId)} type="button" variant="primary">재시도</Button>
+          <Button className="flex-1" onClick={() => restoreFailedRegistration(registrationResult.jobId)} type="button" variant="outline">확인</Button>
+        </div>
+      </div>}
+    </PremiumDialog>
     <OperatorXlsxImportModal
       accessToken={token ?? ""}
       onClose={() => setXlsxImportOpen(false)}

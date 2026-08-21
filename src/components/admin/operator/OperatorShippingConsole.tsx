@@ -12,11 +12,20 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CatalogImage } from "@/components/ui/CatalogImage";
+import {
+  formatStorageDday,
+  getKstCalendarDaysUntil,
+  storageClassLabel,
+  storageUrgencyClass,
+  storageUrgencySurfaceClass,
+} from "@/src/utils/shipping";
 
 type ShipmentAction = "pack" | "ship" | "tracking_update" | "tracking_delete";
 type ShippingForm = { courier: string; trackingNumber: string; note: string };
 type AddressReveal = { address: AddressSnapshot; expiresAt: string };
 type ShippingConsoleView = "requests" | "completed" | "history";
+type StorageExpiryFilter = "all" | "today" | "within_2" | "past";
+type ShipmentSortOrder = "recent" | "expiry";
 
 interface StoreWork {
   id: string;
@@ -66,6 +75,8 @@ interface InventoryShipment {
   releasedItemCount: number;
   unreleasedItemCount: number;
   heldItemCount: number;
+  storageExpiresAt: string | null;
+  storageDurationDays: number | null;
   storeWorks: StoreWork[];
   items: ShipmentItem[];
 }
@@ -126,7 +137,7 @@ function isAddressSnapshot(value: unknown): value is AddressSnapshot {
 }
 
 function isShipment(value: unknown): value is InventoryShipment {
-  return isRecord(value) && Object.keys(value).length === 21 &&
+  return isRecord(value) && Object.keys(value).length === 23 &&
     typeof value.id === "string" && typeof value.memberId === "string" &&
     typeof value.memberName === "string" && typeof value.businessId === "string" &&
     typeof value.status === "string" && isInteger(value.version) &&
@@ -136,7 +147,9 @@ function isShipment(value: unknown): value is InventoryShipment {
     isTextOrNull(value.trackingNumber) && isAddressSnapshot(value.addressSnapshot) && isInteger(value.itemCount) &&
     isInteger(value.activeItemCount) && isInteger(value.releasedItemCount) &&
     isInteger(value.unreleasedItemCount) &&
-    isInteger(value.heldItemCount) && Array.isArray(value.storeWorks) &&
+    isInteger(value.heldItemCount) && isTextOrNull(value.storageExpiresAt) &&
+    (value.storageDurationDays === null || isInteger(value.storageDurationDays)) &&
+    Array.isArray(value.storeWorks) &&
     value.storeWorks.every(isStoreWork) && Array.isArray(value.items) && value.items.every(isShipmentItem);
 }
 
@@ -200,6 +213,28 @@ function statusLabel(value: string) {
 function activeItems(shipment: InventoryShipment) {
   return shipment.items.filter((item) => item.lineStatus !== "excluded" && item.lineStatus !== "cancelled");
 }
+
+function shipmentDaysLeft(shipment: InventoryShipment): number | null {
+  if (!shipment.storageExpiresAt) return null;
+  const parsed = Date.parse(shipment.storageExpiresAt);
+  if (!Number.isFinite(parsed)) return null;
+  return getKstCalendarDaysUntil(parsed);
+}
+
+function expiryMatches(filter: StorageExpiryFilter, daysLeft: number | null): boolean {
+  if (filter === "all") return true;
+  if (daysLeft === null) return false;
+  if (filter === "today") return daysLeft === 0;
+  if (filter === "within_2") return daysLeft >= 0 && daysLeft <= 2;
+  return daysLeft < 0;
+}
+
+const STORAGE_EXPIRY_OPTIONS: Array<{ label: string; value: StorageExpiryFilter }> = [
+  { label: "전체", value: "all" },
+  { label: "D-Day", value: "today" },
+  { label: "D-2 이내", value: "within_2" },
+  { label: "만료 지남", value: "past" },
+];
 
 function groupShipmentsByMember(shipments: InventoryShipment[]) {
   const grouped = new Map<string, {
@@ -281,6 +316,8 @@ export function OperatorShippingConsole({
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [trackingModalShipment, setTrackingModalShipment] = useState<InventoryShipment | null>(null);
+  const [expiryFilter, setExpiryFilter] = useState<StorageExpiryFilter>("all");
+  const [sortOrder, setSortOrder] = useState<ShipmentSortOrder>("recent");
 
   const load = useCallback(async (accessToken: string | null, shipped: boolean, nextOffset: number) => {
     if (!accessToken) return;
@@ -482,14 +519,34 @@ export function OperatorShippingConsole({
     () => shipments.filter((shipment) => shipment.status !== "shipped"),
     [shipments],
   );
+  const visibleActiveShipments = useMemo(() => {
+    if (view !== "requests") return activeShipments;
+    const filtered = activeShipments.filter((shipment) =>
+      expiryMatches(expiryFilter, shipmentDaysLeft(shipment)),
+    );
+    if (sortOrder !== "expiry") return filtered;
+    return [...filtered].sort((left, right) =>
+      (shipmentDaysLeft(left) ?? Number.MAX_SAFE_INTEGER) -
+      (shipmentDaysLeft(right) ?? Number.MAX_SAFE_INTEGER),
+    );
+  }, [activeShipments, expiryFilter, sortOrder, view]);
+  const expiryCounts = useMemo(() => ({
+    all: activeShipments.length,
+    past: activeShipments.filter((shipment) => expiryMatches("past", shipmentDaysLeft(shipment))).length,
+    today: activeShipments.filter((shipment) => expiryMatches("today", shipmentDaysLeft(shipment))).length,
+    within_2: activeShipments.filter((shipment) => expiryMatches("within_2", shipmentDaysLeft(shipment))).length,
+  }), [activeShipments]);
   const shippedShipments = useMemo(
     () => shipments.filter((shipment) => shipment.status === "shipped"),
     [shipments],
   );
-  const activeMemberGroups = useMemo(
-    () => groupShipmentsByMember(activeShipments),
-    [activeShipments],
-  );
+  const activeMemberGroups = useMemo(() => {
+    const groups = groupShipmentsByMember(visibleActiveShipments);
+    if (sortOrder !== "expiry") return groups;
+    const minDaysLeft = (group: { shipments: InventoryShipment[] }) =>
+      Math.min(...group.shipments.map((shipment) => shipmentDaysLeft(shipment) ?? Number.MAX_SAFE_INTEGER));
+    return [...groups].sort((left, right) => minDaysLeft(left) - minDaysLeft(right));
+  }, [sortOrder, visibleActiveShipments]);
   const shippedMemberGroups = useMemo(
     () => groupShipmentsByMember(shippedShipments),
     [shippedShipments],
@@ -502,7 +559,7 @@ export function OperatorShippingConsole({
     ? [{
         groups: activeMemberGroups,
         key: "active",
-        title: `택배 요청 · ${activeShipments.length}건`,
+        title: `택배 요청 · ${visibleActiveShipments.length}건`,
       }]
     : view === "completed"
       ? [{
@@ -560,10 +617,35 @@ export function OperatorShippingConsole({
         </div>
       )}
 
+      {view === "requests" && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-line pb-4">
+          <span className="text-[10px] font-bold tracking-[.12em] text-muted">보관 만료</span>
+          {STORAGE_EXPIRY_OPTIONS.map((option) => (
+            <button
+              className={`border px-3 py-2 text-[10px] font-bold ${expiryFilter === option.value ? "border-ink bg-ink text-paper" : "border-line"}`}
+              key={option.value}
+              onClick={() => setExpiryFilter(option.value)}
+              type="button"
+            >
+              {option.label} · {expiryCounts[option.value]}
+            </button>
+          ))}
+          <select
+            aria-label="배송 요청 정렬 순서"
+            className="ml-auto h-9 border border-line bg-paper px-2 text-xs"
+            onChange={(event) => setSortOrder(event.target.value as ShipmentSortOrder)}
+            value={sortOrder}
+          >
+            <option value="recent">최근 요청순</option>
+            <option value="expiry">보관 만료 임박순</option>
+          </select>
+        </div>
+      )}
+
       {view !== "history" && (
         <div className="flex items-center justify-between gap-4 border-b border-line pb-4">
           <p className="text-xs font-bold">{view === "requests" ? "처리가 필요한 택배 요청만 표시합니다." : "발송 완료된 택배와 송장 정보만 표시합니다."}</p>
-          <p className="text-xs text-muted">현재 페이지 {view === "requests" ? activeShipments.length : shippedShipments.length}건</p>
+          <p className="text-xs text-muted">현재 페이지 {view === "requests" ? visibleActiveShipments.length : shippedShipments.length}건</p>
         </div>
       )}
 
@@ -594,14 +676,16 @@ export function OperatorShippingConsole({
           const active = activeItems(shipment);
           const canShip = shipment.status === "packed" && active.length > 0 && active.every((item) => item.lineStatus === "packed" && !item.isBlocked);
           const addressReveal = addressReveals[shipment.id];
+          const daysLeft = shipmentDaysLeft(shipment);
+          const showStorageUrgency = daysLeft !== null && shipment.status !== "shipped";
           return (
-            <article className="border-b border-line px-4 py-5 last:border-b-0 sm:px-5" key={shipment.id}>
+            <article className={`border-b border-line px-4 py-5 last:border-b-0 sm:px-5 ${showStorageUrgency ? storageUrgencySurfaceClass(daysLeft) : ""}`} key={shipment.id}>
               <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap gap-2"><span className="border border-line px-2 py-1 text-[10px] font-bold">{statusLabel(shipment.status)}</span><span className="border border-line px-2 py-1 text-[10px] font-bold">배송비 {statusLabel(shipment.shippingFeeStatus)}</span></div>
+                  <div className="flex flex-wrap gap-2"><span className="border border-line px-2 py-1 text-[10px] font-bold">{statusLabel(shipment.status)}</span><span className="border border-line px-2 py-1 text-[10px] font-bold">배송비 {statusLabel(shipment.shippingFeeStatus)}</span>{showStorageUrgency && (<span className={`border px-2 py-1 text-[10px] font-black ${storageUrgencyClass(daysLeft)}`} title={`보관 만료 ${formatAt(shipment.storageExpiresAt)}`}>{formatStorageDday(daysLeft)} · {storageClassLabel(shipment.storageDurationDays)}{daysLeft < 0 ? " · 만료 지남" : ""}</span>)}</div>
                   <p className="mt-3 text-sm font-bold">{shipment.memberName}</p>
                   <p className="mt-1 break-all font-mono text-[10px] text-muted">구매자 {shipment.memberId}</p>
-                  <p className="mt-1 break-all font-mono text-[10px] text-muted">배송 {shipment.id} · 요청 {formatAt(shipment.requestedAt)} · 버전 {shipment.version}</p>
+                  <p className="mt-1 break-all font-mono text-[10px] text-muted">배송 {shipment.id} · 요청 {formatAt(shipment.requestedAt)}{showStorageUrgency ? ` · 보관 만료 ${formatAt(shipment.storageExpiresAt)}` : ""} · 버전 {shipment.version}</p>
                 </div>
                 <div className="text-xs text-muted">상품 {shipment.activeItemCount}/{shipment.itemCount} · 출고 완료 {shipment.releasedItemCount} · 매장 출고 대기 {shipment.unreleasedItemCount}</div>
               </div>
@@ -713,7 +797,9 @@ export function OperatorShippingConsole({
             ))}
             {section.groups.length === 0 && (
               <p className="border-t border-line py-10 text-center text-xs text-muted">
-                표시할 {section.key === "active" ? "처리 중 배송" : "발송 완료 내역"}이 없습니다.
+                {view === "requests" && expiryFilter !== "all"
+                  ? "선택한 보관 만료 조건에 맞는 배송이 없습니다."
+                  : `표시할 ${section.key === "active" ? "처리 중 배송" : "발송 완료 내역"}이 없습니다.`}
               </p>
             )}
           </section>

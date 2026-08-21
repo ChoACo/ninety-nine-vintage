@@ -44,6 +44,7 @@ type ActionDialogState =
       scope: "warnings" | "sanctions";
     }
   | { kind: "nickname"; member: ManagedMember; nickname: string }
+  | { kind: "credits"; member: ManagedMember; delta: 1 | -1 }
   | { kind: "delete"; member: ManagedMember };
 
 const segmentLabels: Record<MemberSegment, string> = {
@@ -150,6 +151,22 @@ function dialogCopy(dialog: ActionDialogState) {
       submitLabel: "닉네임 변경",
       destructive: false,
     };
+  }
+  if (dialog.kind === "credits") {
+    const currentCount = dialog.member.shipping_credit_count ?? 0;
+    return dialog.delta > 0
+      ? {
+          title: `${dialog.member.display_name} 배송권 지급`,
+          description: `보유 ${currentCount}장에서 1장을 추가해 ${currentCount + 1}장이 됩니다. 지급 즉시 회원 배송 신청에 사용할 수 있습니다.`,
+          submitLabel: "지급 확정",
+          destructive: false,
+        }
+      : {
+          title: `${dialog.member.display_name} 배송권 차감`,
+          description: `보유 ${currentCount}장에서 1장을 차감해 ${Math.max(0, currentCount - 1)}장이 됩니다. 회원이 사용 예정인 배송권인지 확인했습니다.`,
+          submitLabel: "차감 확정",
+          destructive: true,
+        };
   }
   return {
     title: `${dialog.member.display_name} 탈퇴 처리`,
@@ -320,14 +337,23 @@ export function OwnerMembersConsole() {
   async function submitDialog() {
     if (!dialog) return;
     const reason = dialogReason.trim();
-    if (!reason) {
+    if (!reason && dialog.kind !== "credits") {
       setDialogError("처리 사유를 입력해 주세요.");
       return;
     }
     let body: Record<string, unknown>;
     let success: string;
 
-    if (dialog.kind === "nickname") {
+    if (dialog.kind === "credits") {
+      body = {
+        action: "credits",
+        memberId: dialog.member.id,
+        delta: dialog.delta,
+      };
+      success = dialog.delta > 0
+        ? "배송권을 1장 추가했습니다."
+        : "배송권을 1장 차감했습니다.";
+    } else if (dialog.kind === "nickname") {
       body = {
         action: "nickname",
         memberId: dialog.member.id,
@@ -660,14 +686,11 @@ export function OwnerMembersConsole() {
                       className="border border-line px-3 py-2 text-xs font-bold"
                       disabled={memberBusy}
                       onClick={() =>
-                        void mutate(
-                          {
-                            action: "credits",
-                            memberId: member.id,
-                            delta: 1,
-                          },
-                          "배송권을 1장 추가했습니다.",
-                        )}
+                        openDialog({
+                          kind: "credits",
+                          member,
+                          delta: 1,
+                        })}
                       type="button"
                     >
                       배송권 +1
@@ -678,14 +701,11 @@ export function OwnerMembersConsole() {
                         memberBusy || (member.shipping_credit_count ?? 0) < 1
                       }
                       onClick={() =>
-                        void mutate(
-                          {
-                            action: "credits",
-                            memberId: member.id,
-                            delta: -1,
-                          },
-                          "배송권을 1장 차감했습니다.",
-                        )}
+                        openDialog({
+                          kind: "credits",
+                          member,
+                          delta: -1,
+                        })}
                       type="button"
                     >
                       배송권 -1
@@ -911,20 +931,22 @@ export function OwnerMembersConsole() {
               </button>
             </div>
 
-            <label className="mt-6 block text-xs font-bold">
-              처리 사유
-              <textarea
-                autoFocus
-                className="mt-2 min-h-28 w-full resize-y border border-line bg-surface p-3 text-sm font-normal"
-                maxLength={500}
-                onChange={(event) => {
-                  setDialogReason(event.target.value);
-                  setDialogError("");
-                }}
-                placeholder="1~500자로 입력해 주세요."
-                value={dialogReason}
-              />
-            </label>
+            {dialog.kind !== "credits" && (
+              <label className="mt-6 block text-xs font-bold">
+                처리 사유
+                <textarea
+                  autoFocus
+                  className="mt-2 min-h-28 w-full resize-y border border-line bg-surface p-3 text-sm font-normal"
+                  maxLength={500}
+                  onChange={(event) => {
+                    setDialogReason(event.target.value);
+                    setDialogError("");
+                  }}
+                  placeholder="1~500자로 입력해 주세요."
+                  value={dialogReason}
+                />
+              </label>
+            )}
 
             {dialog.kind === "status" &&
               dialog.status === "temporary_suspended" && (

@@ -4,6 +4,7 @@ import { RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { OperatorSecondChanceButton } from "@/components/admin/operator/OperatorSecondChanceButton";
+import { OperatorUnpaidRecoveryButtons } from "@/components/admin/operator/OperatorUnpaidRecoveryButtons";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { Button } from "@/components/ui/Button";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -28,6 +29,24 @@ interface ClosedAuction {
   store_id: string | null;
   stores?: { name: string } | null;
   title: string;
+  winnerAmount?: number | null;
+  winnerDueAt?: string | null;
+  winnerKind?: string | null;
+  winnerName?: string | null;
+  winnerState?: "awaiting_payment" | "completed" | "none" | "unpaid_expired";
+}
+
+function winnerStateBadge(state: ClosedAuction["winnerState"]) {
+  if (state === "awaiting_payment") {
+    return { className: "border-amber-300 bg-amber-50 text-amber-800", label: "결제 진행 중" };
+  }
+  if (state === "unpaid_expired") {
+    return { className: "border-red-200 bg-red-50 text-red-700", label: "미결제 만료" };
+  }
+  if (state === "completed") {
+    return { className: "border-emerald-200 bg-emerald-50 text-emerald-700", label: "판매 완료" };
+  }
+  return null;
 }
 
 export function OperatorPastProductsConsole() {
@@ -172,13 +191,18 @@ export function OperatorPastProductsConsole() {
           <p className="eyebrow text-muted">마감 경매 / 차순위 낙찰</p>
           <h2 className="mt-2 text-xl font-black">차순위 낙찰 제안</h2>
           <p className="mt-2 text-xs leading-5 text-muted">
-            최근 8개 제한 없이 담당 숍의 모든 마감 경매를 표시합니다. 실제 제안
-            시 서버가 담당 숍, 원 낙찰자의 결제 기한, 중복 제안과 감사 원장을
-            다시 검증합니다.
+            최근 8개 제한 없이 담당 숍의 모든 마감 경매를 표시합니다. 결제
+            기한이 지나 미결제 만료된 낙찰은 재경매 등록(다음 10:00 자동
+            편성), 즉시구매 전환, 차순위 낙찰 승계 중 하나를 클릭 한 번으로
+            처리할 수 있습니다.
           </p>
         </div>
         <div className="divide-y divide-line border-y border-line">
-          {closedAuctions.map((product) => (
+          {closedAuctions.map((product) => {
+            const badge = winnerStateBadge(product.winnerState);
+            const showRecovery =
+              canProcessSecondChance && product.winnerState === "unpaid_expired";
+            return (
             <article
               className="flex flex-wrap items-center gap-3 px-3 py-5 sm:flex-nowrap sm:gap-4 sm:px-4"
               key={product.id}
@@ -198,8 +222,27 @@ export function OperatorPastProductsConsole() {
                 </span>
                 <span className="mt-1 block text-[10px] text-muted">
                   마감 {expiryLabel(product.closes_at)}
+                  {badge && (
+                    <>
+                      {" · "}
+                      <span className={`inline-block border px-1.5 py-0.5 font-bold ${badge.className}`}>
+                        {badge.label}
+                        {product.winnerState === "awaiting_payment" &&
+                          product.winnerDueAt &&
+                          ` · 기한 ${expiryLabel(product.winnerDueAt)}`}
+                      </span>
+                    </>
+                  )}
                 </span>
               </span>
+              {showRecovery && (
+                <OperatorUnpaidRecoveryButtons
+                  amount={product.winnerAmount ?? null}
+                  onNotice={setNotice}
+                  productId={product.id}
+                  productTitle={product.title}
+                />
+              )}
               {canProcessSecondChance ? (
                 <OperatorSecondChanceButton
                   onNotice={setNotice}
@@ -212,7 +255,8 @@ export function OperatorPastProductsConsole() {
                 </span>
               )}
             </article>
-          ))}
+            );
+          })}
           {closedAuctions.length === 0 && (
             <div className="py-16 text-center text-sm text-muted">
               현재 마감된 경매가 없습니다.

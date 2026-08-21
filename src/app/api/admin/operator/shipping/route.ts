@@ -32,6 +32,10 @@ function isNullableText(value: unknown): value is string | null {
   return value === null || typeof value === "string";
 }
 
+function isNullableNonNegativeInteger(value: unknown): value is number | null {
+  return value === null || isNonNegativeInteger(value);
+}
+
 function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]) {
   return Object.keys(value).every((key) => allowed.includes(key));
 }
@@ -100,7 +104,7 @@ function isShipment(value: unknown): value is Record<string, unknown> {
     "id", "memberId", "memberName", "businessId", "status", "version", "settlementMethod",
     "shippingFeeStatus", "requestedAt", "packedAt", "shippedAt", "courier", "trackingNumber",
     "addressSnapshot", "itemCount", "activeItemCount", "releasedItemCount", "unreleasedItemCount",
-    "heldItemCount", "storeWorks", "items",
+    "heldItemCount", "storageExpiresAt", "storageDurationDays", "storeWorks", "items",
   ];
   return Object.keys(value).length === fields.length && fields.every((field) => Object.hasOwn(value, field)) &&
     isUuid(value.id) && isUuid(value.memberId) && typeof value.memberName === "string" && isUuid(value.businessId) &&
@@ -108,6 +112,9 @@ function isShipment(value: unknown): value is Record<string, unknown> {
     typeof value.settlementMethod === "string" && typeof value.shippingFeeStatus === "string" &&
     typeof value.requestedAt === "string" && isNullableText(value.packedAt) && isNullableText(value.shippedAt) &&
     isNullableText(value.courier) && isNullableText(value.trackingNumber) &&
+    (value.storageExpiresAt === null ||
+      (typeof value.storageExpiresAt === "string" && Number.isFinite(Date.parse(value.storageExpiresAt)))) &&
+    isNullableNonNegativeInteger(value.storageDurationDays) &&
     isAddressSnapshot(value.addressSnapshot) &&
     isNonNegativeInteger(value.itemCount) && isNonNegativeInteger(value.activeItemCount) &&
     isNonNegativeInteger(value.releasedItemCount) && isNonNegativeInteger(value.unreleasedItemCount) &&

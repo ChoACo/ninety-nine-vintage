@@ -11,6 +11,28 @@ export interface CombinedAuctionWin {
   dueAt: string | null;
 }
 
+export interface AuctionPaymentCenterGroup {
+  businessId: string;
+  businessName: string;
+  itemCount: number;
+  itemSubtotal: number;
+  earliestDueAt: string | null;
+  items: Array<{
+    productId: string;
+    title: string;
+    amount: number;
+    dueAt: string | null;
+  }>;
+  hasStoredItems: boolean;
+  shippingFeeAmount: number;
+  shippingFeeCharged: number;
+}
+
+interface FeeBreakdownEntry {
+  businessId: string;
+  amount: number;
+}
+
 interface CombinedTransfer {
   paymentId: string;
   depositorName: string;
@@ -31,6 +53,7 @@ interface CombinedTransfer {
     amount: number;
     dueAt: string | null;
   }>;
+  shippingFeeBreakdown?: FeeBreakdownEntry[];
 }
 
 interface CombinedAuctionPaymentProps {
@@ -38,6 +61,7 @@ interface CombinedAuctionPaymentProps {
   rememberedDepositorName: string | null;
   serverTime: string | null;
   wins: CombinedAuctionWin[];
+  groups: AuctionPaymentCenterGroup[];
 }
 
 function formatAt(value: string | null) {
@@ -72,6 +96,7 @@ export function CombinedAuctionPayment({
   rememberedDepositorName,
   serverTime,
   wins,
+  groups,
 }: CombinedAuctionPaymentProps) {
   const [dialog, setDialog] = useState<"payment" | "info" | null>(null);
   const [busy, setBusy] = useState(false);
@@ -79,8 +104,40 @@ export function CombinedAuctionPayment({
     rememberedDepositorName ?? "",
   );
   const [includeShippingFee, setIncludeShippingFee] = useState(true);
+  const [excludedBusinessIds, setExcludedBusinessIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [transfer, setTransfer] = useState<CombinedTransfer | null>(null);
+
+  const selectedGroups = useMemo(
+    () => groups.filter((group) => !excludedBusinessIds.includes(group.businessId)),
+    [excludedBusinessIds, groups],
+  );
+  const selectedItemCount = useMemo(
+    () => selectedGroups.reduce((sum, group) => sum + group.itemCount, 0),
+    [selectedGroups],
+  );
+  const selectedItemTotal = useMemo(
+    () => selectedGroups.reduce((sum, group) => sum + group.itemSubtotal, 0),
+    [selectedGroups],
+  );
+  const selectedShippingTotal = useMemo(
+    () => selectedGroups.reduce(
+      (sum, group) =>
+        sum + (includeShippingFee ? group.shippingFeeCharged : 0),
+      0,
+    ),
+    [includeShippingFee, selectedGroups],
+  );
+  const selectedExpectedTotal = selectedItemTotal + selectedShippingTotal;
+  const selectedProductIds = useMemo(
+    () => selectedGroups.flatMap((group) => group.items.map((item) => item.productId)),
+    [selectedGroups],
+  );
+  const groupsByBusinessId = useMemo(
+    () => new Map(groups.map((group) => [group.businessId, group])),
+    [groups],
+  );
+
   const total = useMemo(
     () => wins.reduce((sum, win) => sum + win.amount, 0),
     [wins],
@@ -108,10 +165,20 @@ export function CombinedAuctionPayment({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [busy, dialog]);
 
+  const toggleGroup = (businessId: string, checked: boolean) => {
+    setExcludedBusinessIds((current) => checked
+      ? current.filter((id) => id !== businessId)
+      : [...current, businessId]);
+  };
+
   const begin = async () => {
     const canonicalName = depositorName.trim();
     if (!canonicalName) {
       setMessage("입금자명을 입력해 주세요.");
+      return;
+    }
+    if (selectedProductIds.length === 0) {
+      setMessage("결제할 센터를 하나 이상 선택해 주세요.");
       return;
     }
     setBusy(true);
@@ -130,6 +197,7 @@ export function CombinedAuctionPayment({
           action: "begin",
           depositorName: canonicalName,
           includeShippingFee,
+          productIds: selectedProductIds,
         }),
       });
       const payload = await response.json().catch(() => null) as {
@@ -139,7 +207,7 @@ export function CombinedAuctionPayment({
       } | null;
       if (!response.ok || !isCombinedTransfer(payload?.transfer)) {
         throw new Error(
-          payload?.message ?? payload?.error ?? "일괄 결제를 시작하지 못했습니다.",
+          payload?.message ?? payload?.error ?? "결제 정보를 만들지 못했습니다.",
         );
       }
       setTransfer(payload.transfer);
@@ -147,7 +215,7 @@ export function CombinedAuctionPayment({
       setDialog(null);
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "일괄 결제를 시작하지 못했습니다.",
+        error instanceof Error ? error.message : "결제 정보를 만들지 못했습니다.",
       );
     } finally {
       setBusy(false);
@@ -181,7 +249,7 @@ export function CombinedAuctionPayment({
             ? "결제 마감"
             : transfer
               ? "입금 정보 보기"
-              : "낙찰품 전체 결제하기"}
+              : "선택 상품 결제하기"}
         </button>
       </div>
 
@@ -198,13 +266,17 @@ export function CombinedAuctionPayment({
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto bg-paper p-5 shadow-2xl sm:p-7">
             <div className="flex items-start justify-between gap-4 border-b border-ink pb-4">
               <div>
-                <p className="eyebrow text-muted">낙찰품 일괄 결제</p>
+                <p className="eyebrow text-muted">낙찰품 선택 결제</p>
                 <h3
                   className="mt-2 text-xl font-black"
                   id="combined-auction-payment-title"
                 >
-                  한 번에 {wins.length}개 결제
+                  센터별로 골라서 결제
                 </h3>
+                <p className="mt-2 text-[11px] leading-5 text-muted">
+                  경매 낙찰품 전용 결제입니다. 즉시구매 상품과는 별도로
+                  처리되며, 선택한 센터의 상품만 입금 대기에 추가됩니다.
+                </p>
               </div>
               <button
                 aria-label="결제 창 닫기"
@@ -217,23 +289,82 @@ export function CombinedAuctionPayment({
               </button>
             </div>
 
-            <div className="mt-5 divide-y divide-line border-y border-line">
-              {wins.map((win) => (
-                <div
-                  className="flex items-center justify-between gap-4 py-3 text-xs"
-                  key={win.productId}
-                >
-                  <span className="min-w-0 truncate font-bold">{win.title}</span>
-                  <span className="shrink-0 font-mono">
-                    {win.amount.toLocaleString("ko-KR")}원
-                  </span>
-                </div>
-              ))}
-            </div>
+            <label className="mt-4 flex cursor-pointer items-center gap-2 bg-surface px-3 py-3 text-xs font-bold">
+              <input
+                checked={selectedGroups.length === groups.length}
+                onChange={(event) =>
+                  setExcludedBusinessIds(
+                    event.target.checked
+                      ? []
+                      : groups.map((group) => group.businessId),
+                  )
+                }
+                type="checkbox"
+              />
+              전체 선택 · {groups.length}개 센터 {wins.length}개 상품
+            </label>
 
-            <div className="mt-5 flex items-center justify-between text-sm font-black">
-              <span>낙찰품 합계</span>
-              <span>{total.toLocaleString("ko-KR")}원</span>
+            <div className="divide-y divide-line border-y border-line">
+              {groups.map((group) => {
+                const isSelected = !excludedBusinessIds.includes(group.businessId);
+                return (
+                  <div className="py-3" key={group.businessId}>
+                    <label className="flex cursor-pointer items-start justify-between gap-3">
+                      <span className="flex min-w-0 items-start gap-2">
+                        <input
+                          checked={isSelected}
+                          className="mt-0.5"
+                          onChange={(event) =>
+                            toggleGroup(group.businessId, event.target.checked)
+                          }
+                          type="checkbox"
+                        />
+                        <span className="min-w-0">
+                          <span className="block truncate text-xs font-black">
+                            {group.businessName}
+                          </span>
+                          <span className="mt-1 block text-[11px] text-muted">
+                            상품 {group.itemCount}개 · {group.itemSubtotal.toLocaleString("ko-KR")}원
+                            {" · 마감 "}
+                            {formatAt(group.earliestDueAt)}
+                          </span>
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right text-[11px] font-bold">
+                        {group.hasStoredItems ? (
+                          <>
+                            <span className="block text-emerald-700">
+                              보관중 합포장 대상
+                            </span>
+                            <span className="mt-0.5 block font-mono">
+                              택배비 0원
+                            </span>
+                          </>
+                        ) : (
+                          <span className="block font-mono">
+                            +택배비 {group.shippingFeeCharged.toLocaleString("ko-KR")}원
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                    {isSelected && (
+                      <ul className="ml-6 mt-2 space-y-1 border-l border-line pl-3">
+                        {group.items.map((item) => (
+                          <li
+                            className="flex items-center justify-between gap-3 text-[11px]"
+                            key={item.productId}
+                          >
+                            <span className="min-w-0 truncate">{item.title}</span>
+                            <span className="shrink-0 font-mono">
+                              {item.amount.toLocaleString("ko-KR")}원
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <label className="mt-5 flex cursor-pointer items-start gap-3 border border-line bg-surface p-4">
@@ -246,24 +377,25 @@ export function CombinedAuctionPayment({
               <span>
                 <span className="block text-xs font-black">택배비 포함 결제</span>
                 <span className="mt-1 block text-[11px] leading-5 text-muted">
-                  결제 확인 후 배송 접수에 사용할 배송비를 함께 결제합니다.
+                  각 센터에 설정된 택배비를 합산해 함께 결제합니다. 해당 센터에
+                  보관 중인 상품이 있으면 이번 택배비는 청구되지 않습니다.
                 </span>
               </span>
             </label>
             <div className="mt-4 space-y-2 border-y border-line py-4 text-xs">
               <p className="flex justify-between gap-4">
-                <span>낙찰품 합계</span>
-                <span>{total.toLocaleString("ko-KR")}원</span>
+                <span>낙찰품 합계 ({selectedItemCount}개)</span>
+                <span>{selectedItemTotal.toLocaleString("ko-KR")}원</span>
               </p>
               {includeShippingFee && (
                 <p className="flex justify-between gap-4 font-bold">
                   <span>+택배비</span>
-                  <span>결제 정보 생성 시 확정</span>
+                  <span>{selectedShippingTotal.toLocaleString("ko-KR")}원</span>
                 </p>
               )}
               <p className="flex justify-between gap-4 border-t border-line pt-2 text-sm font-black">
                 <span>총 결제 금액</span>
-                <span>{includeShippingFee ? "낙찰품 합계 + 택배비" : `${total.toLocaleString("ko-KR")}원`}</span>
+                <span>{selectedExpectedTotal.toLocaleString("ko-KR")}원</span>
               </p>
             </div>
             <label className="mt-6 block text-xs font-bold" htmlFor="combined-auction-depositor">
@@ -283,11 +415,11 @@ export function CombinedAuctionPayment({
             </p>
             <button
               className="mt-5 h-12 w-full bg-ink text-sm font-bold text-paper disabled:opacity-40"
-              disabled={busy || !depositorName.trim()}
+              disabled={busy || !depositorName.trim() || selectedProductIds.length === 0}
               onClick={() => void begin()}
               type="button"
             >
-              {busy ? "결제 정보 만드는 중..." : "결제하기"}
+              {busy ? "결제 정보 만드는 중..." : `${selectedItemCount}개 결제하기`}
             </button>
             {message && (
               <p aria-live="polite" className="mt-4 text-xs font-bold text-red-700">
@@ -311,7 +443,7 @@ export function CombinedAuctionPayment({
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto bg-paper p-5 shadow-2xl sm:p-7">
             <div className="flex items-start justify-between gap-4 border-b border-ink pb-4">
               <div>
-                <p className="eyebrow text-muted">낙찰품 일괄 결제</p>
+                <p className="eyebrow text-muted">낙찰품 선택 결제</p>
                 <h3 className="mt-2 text-xl font-black" id="combined-auction-transfer-title">
                   입금 정보
                 </h3>
@@ -326,15 +458,36 @@ export function CombinedAuctionPayment({
               <p>입금자명 {transfer.depositorName}</p>
               <div className="my-3 border-y border-line py-3 text-xs">
                 <p className="flex justify-between gap-4">
-                  <span>낙찰품 합계</span>
+                  <span>낙찰품 합계 ({transfer.itemCount}개)</span>
                   <span>{transfer.itemSubtotal.toLocaleString("ko-KR")}원</span>
                 </p>
-                {transfer.includeShippingFee && (
-                  <p className="mt-1 flex justify-between gap-4">
-                    <span>+택배비</span>
-                    <span>{transfer.shippingFee.toLocaleString("ko-KR")}원</span>
-                  </p>
-                )}
+                {transfer.includeShippingFee &&
+                  (transfer.shippingFeeBreakdown?.length ?? 0) > 0 ? (
+                    transfer.shippingFeeBreakdown!.map((entry) => {
+                      const group = groupsByBusinessId.get(entry.businessId);
+                      return (
+                        <p
+                          className="mt-1 flex justify-between gap-4"
+                          key={entry.businessId}
+                        >
+                          <span>
+                            +택배비 ·{" "}
+                            {entry.amount === 0
+                              ? `${group?.businessName ?? "센터"} 보관중 합포장`
+                              : group?.businessName ?? "센터"}
+                          </span>
+                          <span>
+                            {entry.amount.toLocaleString("ko-KR")}원
+                          </span>
+                        </p>
+                      );
+                    })
+                  ) : transfer.includeShippingFee ? (
+                    <p className="mt-1 flex justify-between gap-4">
+                      <span>+택배비</span>
+                      <span>{transfer.shippingFee.toLocaleString("ko-KR")}원</span>
+                    </p>
+                  ) : null}
               </div>
               <p className="flex justify-between gap-4 font-black">
                 <span>총 결제 금액</span>
@@ -342,7 +495,7 @@ export function CombinedAuctionPayment({
               </p>
               <p className="mt-2 text-xs text-muted">결제 마감 {formatAt(transfer.dueAt)}</p>
               <p className="mt-3 text-xs">
-                위 총액을 한 번만 입금해 주세요. 운영자가 입금을 확인하면 모든 낙찰품이 함께 결제 완료됩니다.
+                위 총액을 한 번만 입금해 주세요. 운영자가 입금을 확인하면 선택한 낙찰품이 함께 결제 완료됩니다.
               </p>
             </div>
             <button

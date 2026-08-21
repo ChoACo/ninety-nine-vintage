@@ -7,6 +7,71 @@ import {
 } from "@/lib/commerce/server";
 import { getCatalogImageUrl } from "@/lib/images";
 
+interface ClosedAuctionWinnerState {
+  winnerAmount: number | null;
+  winnerDueAt: string | null;
+  winnerKind: string | null;
+  winnerName: string | null;
+  winnerState: "awaiting_payment" | "completed" | "none" | "unpaid_expired";
+}
+
+const LIVE_OFFER_STATUSES = new Set(["payment_due", "offered", "accepted"]);
+
+function resolveWinnerState(
+  offers: Array<{
+    bidder_display_name_snapshot?: string;
+    offer_kind?: string;
+    offered_amount?: number;
+    offered_at?: string;
+    payment_due_at?: string | null;
+    response_due_at?: string | null;
+    status?: string;
+  }>,
+): ClosedAuctionWinnerState {
+  const sorted = [...offers].sort((left, right) =>
+    (right.offered_at ?? "").localeCompare(left.offered_at ?? ""),
+  );
+  const live = sorted.find((offer) => LIVE_OFFER_STATUSES.has(offer.status ?? ""));
+  if (live) {
+    return {
+      winnerAmount: live.offered_amount ?? null,
+      winnerDueAt: live.payment_due_at ?? live.response_due_at ?? null,
+      winnerKind: live.offer_kind ?? null,
+      winnerName: live.bidder_display_name_snapshot ?? null,
+      winnerState: "awaiting_payment",
+    };
+  }
+  if (sorted.some((offer) => offer.status === "settled")) {
+    return {
+      winnerAmount: null,
+      winnerDueAt: null,
+      winnerKind: null,
+      winnerName: null,
+      winnerState: "completed",
+    };
+  }
+  const expired = sorted.find(
+    (offer) =>
+      offer.offer_kind === "original" && offer.status === "expired_unpaid",
+  );
+  if (expired) {
+    return {
+      winnerAmount: expired.offered_amount ?? null,
+      winnerDueAt: expired.payment_due_at ?? expired.response_due_at ?? null,
+      winnerKind: "original",
+      winnerName: expired.bidder_display_name_snapshot ?? null,
+      winnerState: "unpaid_expired",
+    };
+  }
+  return {
+    winnerAmount: null,
+    winnerDueAt: null,
+    winnerKind: null,
+    winnerName: null,
+    winnerState: "none",
+  };
+}
+
 export async function GET(request: Request) {
   const auth = await authenticateOperatorStoreRequest(request);
   if (!auth.ok) return auth.response;
@@ -86,6 +151,30 @@ export async function GET(request: Request) {
   if (closedResult.error) {
     return commerceJson({ error: "closed_auctions_unavailable" }, 503);
   }
+  const closedAuctions = closedResult.data ?? [];
+  const closedIds = closedAuctions.map((product) => product.id);
+  const offersByProduct = new Map<string, ReturnType<typeof resolveWinnerState>>();
+  if (closedIds.length > 0) {
+    const { data: offerRows, error: offerError } = await auth.admin
+      .from("auction_purchase_offers")
+      .select(
+        "product_id, offer_kind, status, offered_amount, offered_at, payment_due_at, response_due_at, bidder_display_name_snapshot",
+      )
+      .in("product_id", closedIds)
+      .order("offered_at", { ascending: false });
+    if (offerError) {
+      return commerceJson({ error: "closed_auction_offers_unavailable" }, 503);
+    }
+    const grouped = new Map<string, Array<Record<string, unknown>>>();
+    for (const offer of offerRows ?? []) {
+      const bucket = grouped.get(offer.product_id) ?? [];
+      bucket.push(offer);
+      grouped.set(offer.product_id, bucket);
+    }
+    for (const [productId, offers] of grouped) {
+      offersByProduct.set(productId, resolveWinnerState(offers));
+    }
+  }
   return commerceJson({
     stores: stores ?? [],
     products: (pastResult.data ?? []).map((product) => ({
@@ -97,7 +186,7 @@ export async function GET(request: Request) {
         getCatalogImageUrl(image, 320),
       ),
     })),
-    closedAuctions: (closedResult.data ?? []).map((product) => ({
+    closedAuctions: closedAuctions.map((product) => ({
       ...product,
       image_urls: product.image_urls.map((image) =>
         getCatalogImageUrl(image, 320),
@@ -105,6 +194,13 @@ export async function GET(request: Request) {
       thumbnail_urls: product.thumbnail_urls.map((image) =>
         getCatalogImageUrl(image, 320),
       ),
+      ...(offersByProduct.get(product.id) ?? {
+        winnerAmount: null,
+        winnerDueAt: null,
+        winnerKind: null,
+        winnerName: null,
+        winnerState: "none",
+      }),
     })),
     canProcessSecondChance:
       auth.roleCode === "owner" || auth.roleCode === "operator",

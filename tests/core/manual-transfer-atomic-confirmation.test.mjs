@@ -601,10 +601,10 @@ test("shared payment evidence is a bounded projection and direct staff rows stay
     /public\.is_staff\(\)/i,
     "staff must not retain a broader direct-table read path around the projection",
   );
-  assert.doesNotMatch(
+  expectMatch(
     operatorRoute,
-    /\.from\(\s*"commerce_order_items"\s*\)/,
-    "the API must not rebuild payment evidence from a max_rows-limited item query",
+    /\.from\(\s*"commerce_order_items"\s*\)[\s\S]{0,180}\.eq\(\s*"store_id",\s*auth\.selectedStoreId\s*\)/,
+    "the API must narrow the bounded payment projection to the authenticated selected store",
   );
   expectMatch(
     operatorRoute,

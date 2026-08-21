@@ -25,7 +25,7 @@ test("draft publication uses explicit store permission and has no approval actor
   assert.doesNotMatch(route, /roleCode|operator_id/);
 });
 
-test("product management treats pending as a draft and keeps one batch input", async () => {
+test("product management treats pending as scheduled inventory and keeps one batch input", async () => {
   const [consoleSource, xlsxSource, productsRoute] = await Promise.all([
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
     source("src/components/admin/operator/OperatorXlsxImportModal.tsx"),
@@ -33,7 +33,7 @@ test("product management treats pending as a draft and keeps one batch input", a
   ]);
 
   assert.match(consoleSource, /status:\s*"active"/);
-  assert.match(consoleSource, /등록 대기로 저장/);
+  assert.match(consoleSource, /업로드 예정으로 저장/);
   assert.match(consoleSource, /await publishProductNow\(token, productId\)/);
   assert.match(consoleSource, /점검·하자 메모/);
   assert.match(consoleSource, /MeasurementFields category=\{form\.category\}/);

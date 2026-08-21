@@ -34,6 +34,7 @@ as $$
       and o.status in ('awaiting_payment', 'partially_paid')
       and t.status in ('awaiting_transfer', 'partially_paid')
       and p.store_id = any(p_store_ids)
+      and public.can_manage_product_store(p.store_id)
   ),
   auction_locks as (
     select distinct on (p.id)
@@ -46,6 +47,7 @@ as $$
       and p.status = 'closed'
       and offer.status in ('offered', 'payment_due', 'accepted')
       and p.store_id = any(p_store_ids)
+      and public.can_manage_product_store(p.store_id)
     order by p.id, offer.offered_at desc
   ),
   merged as (

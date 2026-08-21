@@ -25,7 +25,7 @@ test("owner product feed exposes an audited immediate auction close and winner a
   assert.match(migration, /owner_auction_action_audit/i);
 });
 
-test("single product registration is separate, scheduled by saved hourly preference, and uploads up to 15 ordered files", async () => {
+test("single product registration is separate, defaults to immediate publication, supports saved scheduling, and uploads up to 15 ordered files", async () => {
   const [
     consoleSource,
     route,
@@ -77,8 +77,6 @@ test("single product registration is separate, scheduled by saved hourly prefere
     consoleSource,
     /form\.saleType === "auction" \? \([\s\S]*aria-label="입찰 단위"/,
   );
-  assert.match(consoleSource, /입찰 단위 \(기본 1,000원\)/);
-  assert.match(consoleSource, /호가 단위는 상품별로 설정하는 값이며 센터 공통 설정은 없습니다/);
   assert.match(consoleSource, /bidIncrement:\s*"1000"/);
   assert.match(consoleSource, /aria-label="최소 입찰 단위"/);
   assert.match(
@@ -91,8 +89,8 @@ test("single product registration is separate, scheduled by saved hourly prefere
     1,
     "판매 방식 입력은 기존 상품 수정 폼에만 남아야 합니다.",
   );
-  assert.match(consoleSource, /useState<PublicationMode>\("scheduled"\)/);
-  assert.match(consoleSource, /예약 공개 \(기본\)/);
+  assert.match(consoleSource, /useState<PublicationMode>\("now"\)/);
+  assert.match(consoleSource, /<option value="scheduled">예약 공개<\/option>/);
   assert.match(consoleSource, /Array\.from\(\{ length: 24 \}/);
   assert.match(consoleSource, /singleImages\.length \+ selected\.length > 15/);
   assert.match(consoleSource, /type="file"/);

@@ -3,6 +3,8 @@
 -- a `defect_tags` text[] column so inspection findings are structured instead
 -- of free-form only. Free-form `inspection_notes` stay alongside.
 
+begin;
+
 -- Legacy A+ rows map to A under the S/A/B/C scale.
 update public.products
 set condition_grade = 'A'
@@ -16,18 +18,39 @@ alter table public.products
   add constraint products_condition_grade_check
     check (condition_grade in ('', 'S', 'A', 'B', 'C'));
 
+create or replace function app_private.valid_product_defect_tags(p_tags text[])
+returns boolean
+language plpgsql
+immutable
+strict
+set search_path = ''
+as $$
+declare
+  v_tag text;
+begin
+  if cardinality(p_tags) > 20 then
+    return false;
+  end if;
+
+  foreach v_tag in array p_tags loop
+    if v_tag is null or char_length(btrim(v_tag)) not between 1 and 50 then
+      return false;
+    end if;
+  end loop;
+
+  return true;
+end;
+$$;
+
+revoke all on function app_private.valid_product_defect_tags(text[])
+from public, anon, authenticated;
+grant execute on function app_private.valid_product_defect_tags(text[])
+to authenticated, service_role;
+
 alter table public.products
   drop constraint if exists products_defect_tags_check,
   add constraint products_defect_tags_check
-    check (
-      cardinality(defect_tags) <= 20
-      and not exists (
-        select 1
-        from unnest(defect_tags) as tags(tag)
-        where tags.tag is null
-          or char_length(btrim(tags.tag)) not between 1 and 50
-      )
-    );
+    check (app_private.valid_product_defect_tags(defect_tags));
 
 comment on column public.products.defect_tags is
   'Standardized vintage defect checklist codes; empty array means no notable findings.';
@@ -272,3 +295,5 @@ comment on function public.update_operator_product(
   timestamptz, text[], text[], text, text, text, jsonb, text[], text[]
 ) is
   'Row-locked, optimistic listing editor for drafts and active products; active sale mechanics stay immutable and the condition checklist stays structured';
+
+commit;

@@ -7,6 +7,8 @@
 -- auction for the next 10:00 KST drop. The offer ledger is unique per product
 -- row ((product_id, offer_round)), so a reused row could never seed a new
 -- round; the clone gives the relisted auction a clean offer space.
+begin;
+
 -- 'convert_fixed' turns the same row into an immediately purchasable
 -- fixed-price listing at the auction's reconciled current price.
 
@@ -396,3 +398,5 @@ to authenticated;
 
 comment on function public.get_operator_unpaid_auction_offers(uuid[]) is
   'Store-scoped offer ledger for the operator unpaid-auction console (owner/operator only)';
+
+commit;

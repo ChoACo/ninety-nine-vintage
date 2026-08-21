@@ -44,8 +44,8 @@ test("member storage is cross-store while winners and fulfillment stay assigned-
   assert.match(route, /auth\.roleCode !== "owner" && auth\.roleCode !== "operator"/);
   assert.match(layout, /\/admin\/operator\/sales"[\s\S]*label: "판매 내역"/);
   assert.doesNotMatch(layout, /\/admin\/operator\/storage/);
-  assert.match(consoleSource, /매장 출고 전/);
-  assert.match(consoleSource, /보관 완료/);
+  assert.match(consoleSource, /배송 대기/);
+  assert.match(consoleSource, /보관 중/);
   assert.match(consoleSource, /회원명, 회원 ID, 상품명, 매장명 검색/);
   assert.match(consoleSource, /selectedStorageByStore/);
   assert.match(consoleSource, /<PremiumDialog/);

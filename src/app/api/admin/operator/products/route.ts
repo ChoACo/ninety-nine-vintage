@@ -1,6 +1,9 @@
 import { authenticateOperatorStoreRequest, commerceJson } from "@/lib/commerce/server";
 import { normalizeProductBrand } from "@/lib/catalog/brand";
 import { getNextAuctionDeadline } from "@/utils/formatters";
+import { isConditionGrade } from "@/lib/catalog/conditions";
+import { normalizeDefectTags } from "@/lib/catalog/defects";
+import { normalizeMeasurements } from "@/lib/catalog/measurements";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -101,10 +104,23 @@ export async function GET(request: Request) {
     ? { data: [], error: null }
     : await user.from("products").select("*, stores(id, name, slug)").in("store_id", storeIds).order("created_at", { ascending: false });
   if (productError) return commerceJson({ error: "operator_products_unavailable" }, 503);
+  const { data: lockData, error: lockError } = storeIds.length === 0
+    ? { data: [], error: null }
+    : await user.rpc("get_operator_pending_product_locks", { p_store_ids: storeIds });
+  if (lockError) return commerceJson({ error: "operator_products_unavailable" }, 503);
+  const lockRows = (Array.isArray(lockData) ? lockData : []) as Array<{
+    productId: string;
+    lockKind: "buy_now_payment" | "auction_payment";
+    lockUntil: string | null;
+  }>;
+  const locksByProduct = new Map(lockRows.map((lock) => [lock.productId, lock]));
   const canMutate = stores.length > 0;
   return commerceJson({
     stores: stores ?? [],
-    products: products ?? [],
+    products: (products ?? []).map((product) => {
+      const lock = locksByProduct.get(product.id);
+      return lock ? { ...product, pending_lock_kind: lock.lockKind, pending_lock_until: lock.lockUntil } : product;
+    }),
     permissions: {
       canCloseAuctions: auth.roleCode === "owner",
       canCreate: stores.length > 0,
@@ -223,10 +239,10 @@ export async function POST(request: Request) {
     updated_by: auth.userId,
     size_label: text(body?.sizeLabel),
     condition_grade: singleRegistration
-      ? ["S", "A+", "A", "B"].includes(text(body?.conditionGrade))
+      ? isConditionGrade(text(body?.conditionGrade))
         ? text(body?.conditionGrade)
         : ""
-      : ["S", "A+", "A", "B"].includes(text(body?.conditionGrade))
+      : isConditionGrade(text(body?.conditionGrade))
         ? text(body?.conditionGrade)
         : "A",
     storage_class: text(body?.storageClass) === "large" ? "large" : "small",
@@ -237,6 +253,8 @@ export async function POST(request: Request) {
             (value): value is string => typeof value === "string",
           )
         : [],
+    defect_tags: normalizeDefectTags(body?.defectTags),
+    measurements: normalizeMeasurements(body?.measurements),
     ...aiMetadata as Record<string, unknown>,
   }).select("*").single();
   if (error) return commerceJson({ error: error.message || "상품을 등록하지 못했습니다." }, 409);

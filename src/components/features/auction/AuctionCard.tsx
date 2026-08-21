@@ -14,6 +14,7 @@ import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 import { ProductFeedTags } from "@/components/features/catalog/ProductFeedTags";
 import { isNewlyPublishedProduct } from "@/components/features/auction/auctionFeedLogic";
 import { ProductInquiryModal } from "@/components/features/auction/detail/ProductInquiryModal";
+import { ShareProductButton } from "@/components/ui/ShareProductButton";
 
 interface AuctionCardProps { basePath?: "" | "/m"; item: Omit<Item, "bidHistory"> & { closesAt?: string; timeLeft?: string; enhancedTitle?: string | null; hashtags?: string[] }; surface?: "desktop" | "mobile"; }
 
@@ -85,7 +86,8 @@ function EnabledAuctionCard({ basePath = "", item, surface = basePath === "/m" ?
           {isNew && <span className="absolute left-2 top-10 rounded-lg bg-emerald-600 px-2 py-1 text-[9px] font-black tracking-[0.12em] text-white shadow-sm">NEW</span>}
           <div className="absolute right-2 top-2 flex flex-col items-end gap-2">
             <button aria-label={`${item.name} 상품 문의`} className="flex h-8 items-center gap-1 rounded-xl bg-paper/90 px-2.5 text-[10px] font-bold text-ink shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" onClick={(event) => { event.preventDefault(); setInquiryOpen(true); }} type="button"><MessageCircle size={13} /> 문의</button>
-            {!isFixed && <button aria-label={liked ? "찜 해제" : "찜하기"} className={`grid size-9 place-items-center rounded-xl bg-paper/90 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${liked ? "text-red-700" : "text-ink"}`} onClick={(event) => { event.preventDefault(); void updateWishlist(); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>}
+{!isFixed && <button aria-label={liked ? "찜 해제" : "찜하기"} className={`grid size-9 place-items-center rounded-xl bg-paper/90 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${liked ? "text-red-700" : "text-ink"}`} onClick={(event) => { event.preventDefault(); void updateWishlist(); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>}
+            <ShareProductButton ariaLabel={`${item.name} 공유`} className="grid size-9 place-items-center rounded-xl bg-paper/90 text-ink shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" priceText={`${isFixed ? "판매 정가" : "현재 입찰가"} ${price.toLocaleString("ko-KR")}원`} title={`${item.enhancedTitle || item.name} | ${item.brand}`} url={`/auction/${item.id}`} />
           </div>
           <div className="absolute inset-x-0 bottom-0 translate-y-full bg-ink/95 px-3 py-3 text-paper opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
             <p className="text-[10px] text-zinc-400">{isFixed ? "정가 바로구매" : "경매 참여"}</p>

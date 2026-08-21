@@ -11,6 +11,7 @@ export interface AdminWorkspaceItem {
   description?: string;
   matchPrefixes?: readonly string[];
   group?: string;
+  badge?: ReactNode;
 }
 
 interface AdminWorkspaceShellProps {
@@ -47,7 +48,10 @@ export function AdminWorkspaceShell({ children, contentHeader, description, eyeb
             return (
               <div key={item.href}>
                 <Link aria-current={active ? "page" : undefined} className={`group block w-full min-w-[132px] border px-4 py-3 transition-colors lg:min-w-0 ${active ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink"}`} href={item.href}>
-                <span className="block text-sm font-black">{item.label}</span>
+                <span className="flex items-center justify-between gap-2">
+                  <span className="block text-sm font-black">{item.label}</span>
+                  {item.badge}
+                </span>
                 {item.description && <span className={`mt-1 hidden text-[10px] leading-4 lg:block ${active ? "text-paper/70" : "text-muted"}`}>{item.description}</span>}
                 </Link>
               </div>

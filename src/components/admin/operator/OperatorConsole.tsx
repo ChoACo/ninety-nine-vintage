@@ -18,6 +18,8 @@ interface Product {
   current_price: number;
   id: string;
   image_urls: string[];
+  pending_lock_kind?: "buy_now_payment" | "auction_payment" | null;
+  pending_lock_until?: string | null;
   sale_type: string;
   status: string;
   title: string;
@@ -34,6 +36,15 @@ function productStatusLabel(status: string) {
   if (status === "closed") return "마감";
   if (status === "sold") return "판매 완료";
   return status;
+}
+function productStatusText(product: Product) {
+  if (product.status === "closed" && product.pending_lock_kind === "buy_now_payment") {
+    return "결제 진행 중";
+  }
+  if (product.status === "closed" && product.pending_lock_kind === "auction_payment") {
+    return "낙찰 대기";
+  }
+  return productStatusLabel(product.status);
 }
 
 export function OperatorConsole({
@@ -131,7 +142,8 @@ export function OperatorConsole({
     ["이번 달 순매출", `${netRevenue.toLocaleString("ko-KR")}원`, Banknote],
   ] as const;
   const activeProducts = products.filter(
-    (product) => product.status === "active",
+    (product) => product.status === "active"
+      || (product.status === "closed" && Boolean(product.pending_lock_kind)),
   );
 
   return (
@@ -221,8 +233,8 @@ export function OperatorConsole({
                     {product.current_price.toLocaleString("ko-KR")}원
                   </p>
                 </div>
-                <span className="border border-line px-2 py-1 text-[10px] font-bold">
-                  {productStatusLabel(product.status)}
+                <span className={`border px-2 py-1 text-[10px] font-bold ${product.status === "closed" && product.pending_lock_kind ? "border-amber-300 bg-amber-50 text-amber-800" : "border-line"}`}>
+                  {productStatusText(product)}
                 </span>
                 {canMutate &&
                   product.sale_type === "auction" &&

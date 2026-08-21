@@ -12,11 +12,23 @@ type Transfer = { id: string; status: string; requested_at?: string; activityAt?
 type RevenueEntry = { id: string; entryKind: string; amount: number; occurredAt: string; productId: string | null; productTitle: string | null; productImageUrl: string | null };
 type SaleRow = { id: string; date: string; status: SaleFilter; statusLabel: string; title: string; imageUrl: string | null; amount: number; shipment?: Shipment };
 
-const FILTERS: Array<[SaleFilter, string]> = [["all", "전체"], ["payment", "결제 대기"], ["shipping", "배송 대기"], ["completed", "판매 완료"], ["cancelled", "취소·환불"]];
+const FILTERS: Array<[SaleFilter, string]> = [["all", "전체"], ["payment", "결제 진행 중"], ["shipping", "배송 대기"], ["completed", "판매 완료"], ["cancelled", "취소·환불"]];
 
 function dateLabel(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "날짜 확인 필요" : new Intl.DateTimeFormat("ko-KR", { dateStyle: "long", timeZone: "Asia/Seoul" }).format(date);
+}
+
+const ORDER_ERROR_MESSAGES: Record<string, string> = {
+  forbidden: "판매 내역 조회 권한이 없습니다.",
+  invalid_operator_orders_query: "판매 내역 조회 조건이 올바르지 않습니다.",
+  operator_orders_unavailable: "판매 내역을 조회할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+  operator_orders_queue_limit_exceeded: "처리 대기 중인 결제 건이 많아 조회할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+  operator_orders_snapshot_integrity_error: "판매 내역 데이터를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+};
+
+function orderErrorLabel(code: string | undefined) {
+  return (code && ORDER_ERROR_MESSAGES[code]) || "판매 내역을 불러오지 못했습니다.";
 }
 
 export function OperatorSalesConsole() {
@@ -52,7 +64,7 @@ export function OperatorSalesConsole() {
       const orderPayload = await orderResponse.json().catch(() => null) as { activeTransfers?: Transfer[]; historyTransfers?: Transfer[]; error?: string } | null;
       const shippingPayload = await shippingResponse.json().catch(() => null) as { shipments?: Shipment[]; error?: string } | null;
       const revenuePayload = await revenueResponse.json().catch(() => null) as { stores?: Array<{ entries?: RevenueEntry[] }>; error?: string } | null;
-      if (!orderResponse.ok) throw new Error(orderPayload?.error ?? "판매 내역을 불러오지 못했습니다.");
+      if (!orderResponse.ok) throw new Error(orderErrorLabel(orderPayload?.error));
       setTransfers([...(orderPayload?.activeTransfers ?? []), ...(orderPayload?.historyTransfers ?? [])]);
       setShipments(shippingResponse.ok ? shippingPayload?.shipments ?? [] : []);
       setSettlements(revenueResponse.ok ? (revenuePayload?.stores ?? []).flatMap((store) => store.entries ?? []) : []);
@@ -73,7 +85,7 @@ export function OperatorSalesConsole() {
       id: `${transfer.id}:${item.product_id}`,
       date: transfer.activityAt ?? transfer.requested_at ?? new Date().toISOString(),
       status: (["cancelled", "refunded"].includes(transfer.status) ? "cancelled" : ["confirmed", "paid"].includes(transfer.status) ? "completed" : "payment") as SaleFilter,
-      statusLabel: ["cancelled", "refunded"].includes(transfer.status) ? "거래 취소" : ["confirmed", "paid"].includes(transfer.status) ? "결제 완료" : "결제 대기 중",
+      statusLabel: ["cancelled", "refunded"].includes(transfer.status) ? "거래 취소" : ["confirmed", "paid"].includes(transfer.status) ? "결제 완료" : "결제 진행 중",
       title: item.products?.title ?? "상품 정보 확인",
       imageUrl: item.products?.image_urls?.[0] ?? null,
       amount: item.unit_price,

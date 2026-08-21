@@ -177,7 +177,9 @@ export function AuctionFilterSidebar({
           })}
         </div>
         {storeOptions.length === 0 && (
-          <p className="mt-2 text-[11px] text-muted">등록된 센터가 없습니다.</p>
+          <div className="mt-2 flex min-h-9 items-center justify-center rounded-full border border-dashed border-line px-3 text-[11px] font-medium text-muted">
+            등록된 센터가 없습니다
+          </div>
         )}
       </section>
 

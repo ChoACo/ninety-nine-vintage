@@ -4,6 +4,8 @@ import { Eye, Ruler, X } from "lucide-react";
 import { useState } from "react";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import type { ItemDetail } from "@/types/detail";
+import { DEFECT_LABELS } from "@/lib/catalog/defects";
+import { measurementEntries } from "@/lib/catalog/measurements";
 
 interface ConditionReportProps {
   item: ItemDetail;
@@ -12,19 +14,16 @@ interface ConditionReportProps {
 
 export function ConditionReport({ item, surface = "desktop" }: ConditionReportProps) {
   const [open, setOpen] = useState(false);
-  const rows = [
-    ["어깨", item.measurements.shoulder],
-    ["가슴", item.measurements.chest],
-    ["소매", item.measurements.sleeve],
-    ["총장", item.measurements.length],
-  ].filter(
-    (row): row is [string, number] =>
-      typeof row[1] === "number" && row[1] > 0,
+  const rows = measurementEntries(item.measurements).map(
+    (measurement) => [measurement.label, measurement.value] as [string, number],
   );
   const notes =
     item.inspectionNotes.length > 0
       ? item.inspectionNotes
       : ["특이사항 없음"];
+  const defects = item.defectTags
+    .map((code) => DEFECT_LABELS[code])
+    .filter(Boolean);
 
   return (
     <section className="mt-10 border-t border-zinc-950 pt-6">
@@ -39,6 +38,11 @@ export function ConditionReport({ item, surface = "desktop" }: ConditionReportPr
           </span>
         </div>
         <p className="mt-4 line-clamp-2 text-xs leading-relaxed text-zinc-600">{notes.join(" · ")}</p>
+        {defects.length > 0 && (
+          <ul className="mt-3 flex flex-wrap gap-1.5">
+            {defects.map((label) => <li className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[10px] font-bold text-zinc-600" key={label}>{label}</li>)}
+          </ul>
+        )}
         <button className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white text-xs font-bold shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95" onClick={() => setOpen(true)} type="button">
           <Eye size={15} /> 상품 상태 상세 보기
         </button>
@@ -69,6 +73,12 @@ export function ConditionReport({ item, surface = "desktop" }: ConditionReportPr
           )}
           <section className="rounded-2xl border border-line bg-zinc-50 p-5 shadow-sm">
             <h3 className="text-xs font-bold">사용감·오염·하자 기록</h3>
+            {defects.length > 0 && (
+              <ul className="mt-4 flex flex-wrap gap-1.5">
+                {defects.map((label) => <li className="rounded-full border border-line bg-white px-3 py-1.5 text-[10px] font-bold" key={label}>{label}</li>)}
+              </ul>
+            )}
+            {defects.length === 0 && <p className="mt-4 rounded-xl border border-white/70 bg-white px-4 py-3 text-xs text-zinc-600">표시된 하자·오염 항목이 없습니다.</p>}
             <ul className="mt-4 space-y-3 text-xs leading-relaxed text-zinc-600">
               {notes.map((note) => <li className="rounded-xl border border-white/70 bg-white px-4 py-3 shadow-sm" key={note}>{note}</li>)}
             </ul>

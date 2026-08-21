@@ -1,9 +1,11 @@
 import { normalizeProductBrand } from "@/lib/catalog/brand";
 import { authenticateOperatorStoreRequest, commerceJson, verifyOperatorProductScope } from "@/lib/commerce/server";
+import { isConditionGrade } from "@/lib/catalog/conditions";
+import { normalizeDefectTags } from "@/lib/catalog/defects";
+import { normalizeMeasurements } from "@/lib/catalog/measurements";
 
 const MAX_PRODUCT_PRICE = 1_000_000_000;
 const MAX_BID_INCREMENT = 100_000_000;
-const PRODUCT_CONDITIONS = new Set(["S", "A+", "A", "B"]);
 const PRODUCT_IMAGES_BUCKET = "product-images";
 
 function hasOwn(body: Record<string, unknown>, key: string) {
@@ -107,7 +109,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { data: product, error: lookupError } = await auth.user
     .from("products")
-    .select("id, store_id, updated_at, status, sale_type, starting_price, fixed_price, bid_increment, title, description, category, brand, image_urls, thumbnail_urls, size_label, condition_grade, storage_class, publish_at, inspection_notes, measurements")
+    .select("id, store_id, updated_at, status, sale_type, starting_price, fixed_price, bid_increment, title, description, category, brand, image_urls, thumbnail_urls, size_label, condition_grade, storage_class, publish_at, inspection_notes, defect_tags, measurements")
     .eq("id", id)
     .maybeSingle();
   if (lookupError) return commerceJson({ error: "product_unavailable" }, 503);
@@ -187,7 +189,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const sizeLabel = hasOwn(body, "sizeLabel") ? optionalText(body.sizeLabel, 80) : product.size_label;
   if (sizeLabel === null) return commerceJson({ error: "사이즈를 확인해 주세요." }, 400);
   const conditionGrade = hasOwn(body, "conditionGrade") ? body.conditionGrade : product.condition_grade;
-  if (typeof conditionGrade !== "string" || !PRODUCT_CONDITIONS.has(conditionGrade)) {
+  if (typeof conditionGrade !== "string" || !isConditionGrade(conditionGrade)) {
     return commerceJson({ error: "컨디션 등급을 확인해 주세요." }, 400);
   }
   const storageClass = hasOwn(body, "storageClass") ? body.storageClass : product.storage_class;
@@ -212,6 +214,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     inspectionNotes = body.inspectionNotes.map((value) => value.trim()).filter(Boolean);
   }
+  let defectTags = product.defect_tags;
+  if (hasOwn(body, "defectTags")) {
+    defectTags = normalizeDefectTags(body.defectTags);
+  }
+  const measurements = hasOwn(body, "measurements")
+    ? normalizeMeasurements(body.measurements)
+    : product.measurements;
   const { data: updated, error } = await auth.user
     .rpc("update_operator_product", {
       p_product_id: id,
@@ -230,8 +239,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       p_size_label: sizeLabel,
       p_condition_grade: conditionGrade,
       p_storage_class: storageClass,
-      p_measurements: product.measurements,
+      p_measurements: measurements,
       p_inspection_notes: inspectionNotes,
+      p_defect_tags: defectTags,
     })
     .single();
   if (error) return commerceJson({ error: error.message || "상품을 수정하지 못했습니다." }, mutationErrorStatus(error));

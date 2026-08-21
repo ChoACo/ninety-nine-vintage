@@ -112,7 +112,9 @@ test("operator product console publishes directly and manages active listings fr
   assert.match(products, /method:\s*"POST"/);
   assert.match(products, /publishAt,\s*closesAt/);
   assert.match(products, /inspectionNotes:\s*splitLines/);
-  assert.doesNotMatch(products, /measurementShoulder|measurements:\s*\{/);
+  assert.match(products, /MeasurementFields category=\{form\.category\}/);
+  assert.match(products, /measurements: collectMeasurements\(snapshot\.form\.measurements\)/);
+  assert.doesNotMatch(products, /measurementShoulder/);
   assert.match(products, /type="datetime-local"/);
   assert.match(products, /body:\s*JSON\.stringify\(\{\s*expectedUpdatedAt:\s*product\.updated_at\s*\}\)/);
   assert.match(products, /function isManageableProductStatus\(status: string\)/);
@@ -132,7 +134,7 @@ test("operator product console publishes directly and manages active listings fr
   assert.match(products, /상품 등록 방식 선택[\s\S]*lg:grid-cols-\[1\.35fr_\.65fr\]/);
 
   assert.doesNotMatch(productRoute, /getCatalogImageUrl/);
-  assert.match(productRoute, /products:\s*products \?\? \[\]/);
+  assert.match(productRoute, /products:\s*\(products \?\? \[\]\)\.map/);
   assert.match(productRoute, /auth\.user\.from\("products"\)\.insert/);
   assert.match(productRoute, /const user = auth\.user/);
   assert.match(productRoute, /user[\s\S]*\.from\("store_memberships"\)/);
@@ -154,8 +156,9 @@ test("operator product console publishes directly and manages active listings fr
   assert.match(patchRoute, /product\.status === "active" && saleSetupFields\.some/);
   assert.match(patchRoute, /active_sale_setup_immutable/);
   assert.match(patchRoute, /publish_endpoint_required/);
-  assert.doesNotMatch(patchRoute, /pending_product_required|normalizeMeasurements/);
-  assert.match(patchRoute, /p_measurements:\s*product\.measurements/);
+  assert.doesNotMatch(patchRoute, /pending_product_required/);
+  assert.match(patchRoute, /normalizeMeasurements\(body\.measurements\)/);
+  assert.match(patchRoute, /p_measurements:\s*measurements/);
   assert.match(patchRoute, /auth\.user[\s\S]*\.rpc\("update_operator_product"/);
   assert.match(patchRoute, /sameUrls\(imageUrls, product\.image_urls\)/);
   assert.match(patchRoute, /p_thumbnail_urls:\s*thumbnailUrls/);

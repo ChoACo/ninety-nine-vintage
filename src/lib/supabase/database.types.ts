@@ -4658,7 +4658,8 @@ export type Database = {
           condition_grade: string
           created_at: string
           created_by: string | null
-          current_price: number
+current_price: number
+          defect_tags: string[]
           description: string
           enhanced_title: string | null
           final_bid_amount: number | null
@@ -4707,6 +4708,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           current_price: number
+          defect_tags?: string[]
           description: string
           enhanced_title?: string | null
           final_bid_amount?: number | null
@@ -4755,6 +4757,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           current_price?: number
+          defect_tags?: string[]
           description?: string
           enhanced_title?: string | null
           final_bid_amount?: number | null
@@ -8297,6 +8300,10 @@ export type Database = {
         Args: { p_limit?: number; p_offset?: number }
         Returns: Json
       }
+      get_operator_pending_product_locks: {
+        Args: { p_store_ids: string[] }
+        Returns: Json
+      }
       get_operator_store_platform_management: { Args: never; Returns: Json }
       get_operator_store_scope: { Args: never; Returns: Json }
       get_operator_winning_members: {
@@ -9031,6 +9038,21 @@ export type Database = {
         }
         Returns: Json
       }
+      get_operator_unpaid_auction_offers: {
+        Args: { p_store_ids: string[] }
+        Returns: {
+          bidder_display_name_snapshot: string
+          offer_id: string
+          offer_kind: string
+          offer_round: number
+          offered_amount: number
+          offered_at: string
+          payment_due_at: string | null
+          product_id: string
+          response_due_at: string | null
+          status: string
+        }[]
+      }
       operator_process_second_chance: {
         Args: { p_product_id: string }
         Returns: {
@@ -9042,6 +9064,18 @@ export type Database = {
           product_id: string
           response_due_at: string
           server_time: string
+        }[]
+      }
+      operator_resolve_expired_auction: {
+        Args: { p_product_id: string; p_action: string }
+        Returns: {
+          action: string
+          closes_at: string | null
+          current_price: number | null
+          fixed_price: number | null
+          new_product_id: string | null
+          product_id: string
+          publish_at: string | null
         }[]
       }
       owner_begin_hidden_test_manual_transfer: {
@@ -10244,6 +10278,7 @@ export type Database = {
           p_brand: string
           p_category: string
           p_condition_grade: string
+          p_defect_tags: string[]
           p_description: string
           p_expected_updated_at: string
           p_image_urls: string[]
@@ -10277,6 +10312,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           current_price: number
+          defect_tags: string[]
           description: string
           enhanced_title: string | null
           final_bid_amount: number | null

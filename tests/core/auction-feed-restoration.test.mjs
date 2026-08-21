@@ -365,3 +365,29 @@ test("account auction state is complete and member capability gates the feed", a
   assert.doesNotMatch(card, /\breadOnly\b/);
   assert.match(card, /현재 로그인한 계정은 경매 입찰용 회원 계정이 아닙니다\./);
 });
+
+test("inactive auction feed falls back to a schedule panel and sold-product teaser", async () => {
+  const [grid, teaser] = await Promise.all([
+    source("src/components/features/auction/AuctionFeedGrid.tsx"),
+    source("src/components/features/auction/AuctionInactiveTeaser.tsx"),
+  ]);
+
+  assert.match(grid, /hasAnyFilter/);
+  assert.match(
+    grid,
+    /<AuctionInactiveTeaser basePath=\{basePath\} dailyPhase=\{dailyAuctionPhase\} onViewSold=\{\(\) => \{ setShowSoldOnly\(true\); setPage\(1\); \}\} surface=\{surface\} \/>/,
+  );
+  assert.match(grid, /showSoldOnly \? <div className="grid min-h-64 place-items-center[\s\S]*?판매 완료 상품이 없습니다\./);
+  assert.match(grid, /hasAnyFilter \? <div className="grid min-h-64 place-items-center/);
+
+  assert.match(teaser, /판매 완료 상품 보기/);
+  assert.match(teaser, /판매 완료 상품만 보기/);
+  assert.match(teaser, /최근 판매 완료 상품/);
+  assert.match(teaser, /경매 비활성 시간대/);
+  assert.match(teaser, /view=sold/);
+  assert.match(teaser, /dailyPhase === "closed"/);
+  assert.match(teaser, /오후 9시 정산 시간입니다\. 미판매 상품은 오후 10시부터 다시 입찰할 수 있습니다\./);
+  assert.match(teaser, /다음 경매는 매일 오전 10시에 시작됩니다\./);
+  assert.match(teaser, /<SoldFeedCard/);
+  assert.doesNotMatch(teaser, /판매 중 상품 보기로 돌아갈 수 있습니다\./);
+});

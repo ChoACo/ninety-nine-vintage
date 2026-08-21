@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { CatalogImage } from "@/components/ui/CatalogImage";
+import { ShareProductButton } from "@/components/ui/ShareProductButton";
 import type { ProductSaleType } from "@/types/auction";
 
 interface SoldFeedCardProps {
@@ -69,11 +70,20 @@ export function SoldFeedCard({
             {soldPrice.toLocaleString("ko-KR")}원
           </p>
         </div>
-        <time className="text-[10px] text-muted" dateTime={soldAt}>
-          {new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(
-            new Date(soldAt),
-          )}
-        </time>
+        <div className="flex items-center gap-2">
+          <time className="text-[10px] text-muted" dateTime={soldAt}>
+            {new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(
+              new Date(soldAt),
+            )}
+          </time>
+          <ShareProductButton
+            ariaLabel={`${title} 공유`}
+            className="grid size-8 place-items-center rounded-lg border border-line text-ink transition-all duration-300 hover:border-ink active:scale-95"
+            priceText={`${saleType === "auction" ? "낙찰가" : "판매가"} ${soldPrice.toLocaleString("ko-KR")}원`}
+            title={`${title} | ${brand}`}
+            url={`/sold/${id}`}
+          />
+        </div>
       </div>
     </article>
   );

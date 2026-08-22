@@ -2662,6 +2662,9 @@ export type Database = {
           cancelled_at: string | null
           courier: string | null
           created_at: string
+          delivered_at: string | null
+          delivery_status: string
+          delivery_status_text: string | null
           delivery_completed_at: string | null
           fulfillment_center_id: string
           fulfillment_group_id: string | null
@@ -2671,6 +2674,7 @@ export type Database = {
           packed_by: string | null
           processing_store_id: string | null
           settlement_method: string
+          settlement_status: string
           shipped_at: string | null
           shipped_by: string | null
           shipping_credit_ledger_id: string | null
@@ -2678,6 +2682,10 @@ export type Database = {
           shipping_fee_waiver_id: string | null
           status: string
           tracking_number: string | null
+          tracker_carrier_id: string | null
+          tracking_checked_at: string | null
+          tracking_error: string | null
+          auto_settle_at: string | null
           unit_kind: string | null
           unit_snapshot: Json
           unit_store_id: string | null
@@ -2692,6 +2700,9 @@ export type Database = {
           cancelled_at?: string | null
           courier?: string | null
           created_at?: string
+          delivered_at?: string | null
+          delivery_status?: string
+          delivery_status_text?: string | null
           delivery_completed_at?: string | null
           fulfillment_center_id: string
           fulfillment_group_id?: string | null
@@ -2701,6 +2712,7 @@ export type Database = {
           packed_by?: string | null
           processing_store_id?: string | null
           settlement_method: string
+          settlement_status?: string
           shipped_at?: string | null
           shipped_by?: string | null
           shipping_credit_ledger_id?: string | null
@@ -2708,6 +2720,10 @@ export type Database = {
           shipping_fee_waiver_id?: string | null
           status?: string
           tracking_number?: string | null
+          tracker_carrier_id?: string | null
+          tracking_checked_at?: string | null
+          tracking_error?: string | null
+          auto_settle_at?: string | null
           unit_kind?: string | null
           unit_snapshot?: Json
           unit_store_id?: string | null
@@ -2722,6 +2738,9 @@ export type Database = {
           cancelled_at?: string | null
           courier?: string | null
           created_at?: string
+          delivered_at?: string | null
+          delivery_status?: string
+          delivery_status_text?: string | null
           delivery_completed_at?: string | null
           fulfillment_center_id?: string
           fulfillment_group_id?: string | null
@@ -2731,6 +2750,7 @@ export type Database = {
           packed_by?: string | null
           processing_store_id?: string | null
           settlement_method?: string
+          settlement_status?: string
           shipped_at?: string | null
           shipped_by?: string | null
           shipping_credit_ledger_id?: string | null
@@ -2738,6 +2758,10 @@ export type Database = {
           shipping_fee_waiver_id?: string | null
           status?: string
           tracking_number?: string | null
+          tracker_carrier_id?: string | null
+          tracking_checked_at?: string | null
+          tracking_error?: string | null
+          auto_settle_at?: string | null
           unit_kind?: string | null
           unit_snapshot?: Json
           unit_store_id?: string | null
@@ -6827,14 +6851,17 @@ current_price: number
           billing_anchor_day: number | null
           created_at: string
           grace_until: string | null
+          fee_rollover_count: number
           monthly_fee: number
           next_billing_at: string | null
+          overdue_notice_sent_at: string | null
           plan_code: string
           requested_plan_code: string | null
           started_at: string | null
           status: string
           store_id: string
           updated_at: string
+          unpaid_fee_balance: number
           version: number
         }
         Insert: {
@@ -6846,14 +6873,17 @@ current_price: number
           billing_anchor_day?: number | null
           created_at?: string
           grace_until?: string | null
+          fee_rollover_count?: number
           monthly_fee?: number
           next_billing_at?: string | null
+          overdue_notice_sent_at?: string | null
           plan_code?: string
           requested_plan_code?: string | null
           started_at?: string | null
           status?: string
           store_id: string
           updated_at?: string
+          unpaid_fee_balance?: number
           version?: number
         }
         Update: {
@@ -6865,14 +6895,17 @@ current_price: number
           billing_anchor_day?: number | null
           created_at?: string
           grace_until?: string | null
+          fee_rollover_count?: number
           monthly_fee?: number
           next_billing_at?: string | null
+          overdue_notice_sent_at?: string | null
           plan_code?: string
           requested_plan_code?: string | null
           started_at?: string | null
           status?: string
           store_id?: string
           updated_at?: string
+          unpaid_fee_balance?: number
           version?: number
         }
         Relationships: [
@@ -7021,6 +7054,60 @@ current_price: number
           },
         ]
       }
+      store_enterprise_profiles: {
+        Row: {
+          business_address: string | null
+          business_address_detail: string | null
+          business_postal_code: string | null
+          business_registration_number: string
+          commission_rate: number
+          created_at: string
+          created_by: string
+          large_storage_days: number
+          mail_order_registration_number: string | null
+          representative_name: string
+          small_storage_days: number
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          business_address?: string | null
+          business_address_detail?: string | null
+          business_postal_code?: string | null
+          business_registration_number: string
+          commission_rate?: number
+          created_at?: string
+          created_by: string
+          large_storage_days?: number
+          mail_order_registration_number?: string | null
+          representative_name: string
+          small_storage_days?: number
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          business_address?: string | null
+          business_address_detail?: string | null
+          business_postal_code?: string | null
+          business_registration_number?: string
+          commission_rate?: number
+          created_at?: string
+          created_by?: string
+          large_storage_days?: number
+          mail_order_registration_number?: string | null
+          representative_name?: string
+          small_storage_days?: number
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [{
+          foreignKeyName: "store_enterprise_profiles_store_id_fkey"
+          columns: ["store_id"]
+          isOneToOne: true
+          referencedRelation: "stores"
+          referencedColumns: ["id"]
+        }]
+      }
       stores: {
         Row: {
           business_id: string
@@ -7029,6 +7116,10 @@ current_price: number
           home_fulfillment_center_id: string | null
           id: string
           is_active: boolean
+          banner_url: string | null
+          concept_tags: string[]
+          default_courier: string
+          logo_url: string | null
           mall_image: string | null
           mall_info: string | null
           name: string
@@ -7046,6 +7137,10 @@ current_price: number
           home_fulfillment_center_id?: string | null
           id?: string
           is_active?: boolean
+          banner_url?: string | null
+          concept_tags?: string[]
+          default_courier?: string
+          logo_url?: string | null
           mall_image?: string | null
           mall_info?: string | null
           name: string
@@ -7063,6 +7158,10 @@ current_price: number
           home_fulfillment_center_id?: string | null
           id?: string
           is_active?: boolean
+          banner_url?: string | null
+          concept_tags?: string[]
+          default_courier?: string
+          logo_url?: string | null
           mall_image?: string | null
           mall_info?: string | null
           name?: string
@@ -9125,6 +9224,10 @@ current_price: number
         Args: { p_product_id: string; p_minutes: number; p_reason: string }
         Returns: Json
       }
+      get_pending_inventory_delivery_tracking: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
       operator_close_live_auction: {
         Args: { p_product_id: string; p_reason: string }
         Returns: Json
@@ -9492,6 +9595,17 @@ current_price: number
         }
         Returns: Json
       }
+      complete_inventory_shipment_with_tracking: {
+        Args: {
+          p_courier: string
+          p_expected_version: number
+          p_idempotency_key: string
+          p_note?: string
+          p_shipment_id: string
+          p_tracking_number: string
+        }
+        Returns: Json
+      }
       pause_managed_product: {
         Args: { p_expected_updated_at: string; p_product_id: string }
         Returns: {
@@ -9634,6 +9748,17 @@ current_price: number
           p_order_item_id: string
           p_reason_code?: string
           p_storage_location_code?: string
+        }
+        Returns: Json
+      }
+      record_inventory_delivery_tracking: {
+        Args: {
+          p_delivered_at?: string | null
+          p_error?: string | null
+          p_expected_tracking_number: string
+          p_shipment_id: string
+          p_status_text: string
+          p_tracker_carrier_id: string
         }
         Returns: Json
       }
@@ -10163,6 +10288,10 @@ current_price: number
           membership_version: number
           replayed: boolean
         }[]
+      }
+      settle_due_delivered_inventory_shipments: {
+        Args: { p_limit?: number }
+        Returns: Json
       }
       ship_commerce_shipment: {
         Args: {

@@ -92,7 +92,7 @@ export function AdminWorkspaceShell({ children, contentHeader, contextBar, descr
 
   return (
     <div className={`grid min-w-0 gap-6 transition-[grid-template-columns] duration-200 lg:gap-8 ${darkMode ? (collapsed ? "lg:grid-cols-[64px_minmax(0,1fr)]" : "lg:grid-cols-[256px_minmax(0,1fr)]") : "lg:grid-cols-[248px_minmax(0,1fr)]"}`}>
-      <aside className="min-w-0 lg:sticky lg:top-6 lg:self-start">
+      <aside className="min-w-0 h-fit lg:sticky lg:top-6 lg:self-start">
         <div className={`${darkMode ? "rounded-2xl border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl shadow-zinc-950/20" : "border-line bg-surface"} border p-4 sm:p-5 ${collapsed ? "lg:p-3" : ""}`}>
           <div className="flex items-start justify-between gap-3">
             <div className={collapsed ? "lg:hidden" : undefined}>
@@ -125,7 +125,7 @@ export function AdminWorkspaceShell({ children, contentHeader, contextBar, descr
         </nav>
         <Link aria-label="구매자 MY로 이동" className={`mt-3 hidden min-h-11 items-center justify-center rounded-xl border text-xs font-bold lg:flex ${collapsed ? "px-0" : "px-4"} ${darkMode ? "border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-100" : "border-line bg-paper"}`} href="/my" title={collapsed ? "구매자 MY로 이동" : undefined}>{collapsed ? "MY" : "구매자 MY로 이동"}</Link>
       </aside>
-      <section className="min-w-0" data-admin-workspace-content>
+      <section className="min-w-0 self-start" data-admin-workspace-content>
         {contextBar}
         {contentHeader}
         {children}

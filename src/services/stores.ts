@@ -11,6 +11,9 @@ export interface PublicStore {
   description: string;
   mallImage: string | null;
   mallInfo: string | null;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  conceptTags: string[];
 }
 
 export interface StoreMallCard {
@@ -20,6 +23,9 @@ export interface StoreMallCard {
   description: string;
   mallImage: string | null;
   mallInfo: string | null;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+  conceptTags: string[];
   recentCount: number;
   totalCount: number;
   liveAuctionCount: number;
@@ -28,12 +34,12 @@ export interface StoreMallCard {
 
 export async function fetchActiveStores(): Promise<PublicStore[]> {
   const verifier = createSupabasePublicClient();
-  const { data, error } = await verifier.from("stores").select("id, slug, name, description, mall_info, mall_image").eq("is_active", true).order("name");
+  const { data, error } = await verifier.from("stores").select("id, slug, name, description, mall_info, mall_image, logo_url, banner_url, concept_tags").eq("is_active", true).order("name");
   // Public mall pages should remain usable during a transient catalog read
   // failure; the UI renders its empty-state instead of turning the whole page
   // into a 500 response.
   if (error) return [];
-  return (data ?? []).map((store) => ({ id: store.id, slug: store.slug, name: store.name, description: store.description, mallInfo: store.mall_info, mallImage: store.mall_image }));
+  return (data ?? []).map((store) => ({ id: store.id, slug: store.slug, name: store.name, description: store.description, mallInfo: store.mall_info, mallImage: store.mall_image, logoUrl: store.logo_url, bannerUrl: store.banner_url, conceptTags: store.concept_tags ?? [] }));
 }
 
 export async function fetchStoreMallCards(): Promise<StoreMallCard[]> {
@@ -43,7 +49,7 @@ export async function fetchStoreMallCards(): Promise<StoreMallCard[]> {
   const recentFrom = getKstDateRange(recentWindow[recentWindow.length - 1]).from;
   const { data, error } = await verifier
     .from("stores")
-    .select("id, slug, name, description, mall_info, mall_image")
+    .select("id, slug, name, description, mall_info, mall_image, logo_url, banner_url, concept_tags")
     .eq("is_active", true)
     .order("name");
   // Keep the public center-mall shell available during transient catalog
@@ -76,6 +82,9 @@ export async function fetchStoreMallCards(): Promise<StoreMallCard[]> {
         description: store.description,
         mallInfo: store.mall_info,
         mallImage: store.mall_image,
+        logoUrl: store.logo_url,
+        bannerUrl: store.banner_url,
+        conceptTags: store.concept_tags ?? [],
         recentCount: recentQuery.count ?? 0,
         totalCount: totalQuery.count ?? 0,
         liveAuctionCount: liveQuery.count ?? 0,
@@ -90,22 +99,22 @@ export async function fetchStoreBySlug(slug: string): Promise<PublicStore | null
   const verifier = createSupabasePublicClient();
   const { data, error } = await verifier
     .from("stores")
-    .select("id, slug, name, description, mall_info, mall_image")
+    .select("id, slug, name, description, mall_info, mall_image, logo_url, banner_url, concept_tags")
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
   if (error) throw new Error("숍 정보를 불러오지 못했습니다.");
   return data
-    ? { id: data.id, slug: data.slug, name: data.name, description: data.description, mallInfo: data.mall_info, mallImage: data.mall_image }
+    ? { id: data.id, slug: data.slug, name: data.name, description: data.description, mallInfo: data.mall_info, mallImage: data.mall_image, logoUrl: data.logo_url, bannerUrl: data.banner_url, conceptTags: data.concept_tags ?? [] }
     : null;
 }
 
 export async function fetchStoreByIdentifier(identifier: string): Promise<PublicStore | null> {
   if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(identifier)) return fetchStoreBySlug(identifier);
   const verifier = createSupabasePublicClient();
-  const { data, error } = await verifier.from("stores").select("id,slug,name,description,mall_info,mall_image").eq("id", identifier).eq("is_active", true).maybeSingle();
+  const { data, error } = await verifier.from("stores").select("id,slug,name,description,mall_info,mall_image,logo_url,banner_url,concept_tags").eq("id", identifier).eq("is_active", true).maybeSingle();
   if (error) throw new Error("센터 정보를 불러오지 못했습니다.");
-  return data ? { id: data.id, slug: data.slug, name: data.name, description: data.description, mallInfo: data.mall_info, mallImage: data.mall_image } : null;
+  return data ? { id: data.id, slug: data.slug, name: data.name, description: data.description, mallInfo: data.mall_info, mallImage: data.mall_image, logoUrl: data.logo_url, bannerUrl: data.banner_url, conceptTags: data.concept_tags ?? [] } : null;
 }
 
 export async function fetchStoreProducts(storeId: string, saleType?: "auction" | "fixed", publishedDate?: string): Promise<PublishedProduct[]> {

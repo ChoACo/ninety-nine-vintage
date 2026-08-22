@@ -176,7 +176,7 @@ export function OperatorConsole({
             <p className="eyebrow text-paper/60">판매센터 / 지금 할 일</p>
             <h2 className="mt-2 text-2xl font-black">처리가 필요한 업무부터 확인하세요.</h2>
           </div>
-          <Link className="inline-flex items-center gap-2 border border-paper/40 px-4 py-3 text-xs font-bold" href="/admin/operator/products/registration">
+          <Link className="inline-flex items-center gap-2 border border-paper/40 px-4 py-3 text-xs font-bold" href="/admin/operator/products/new">
             상품 등록 <ArrowUpRight size={14} />
           </Link>
         </div>
@@ -198,7 +198,7 @@ export function OperatorConsole({
         <section className="border border-line bg-surface p-6">
           <p className="eyebrow text-muted">오늘 / 업무 목록</p>
           <div className="mt-7 space-y-5 text-xs">
-            <Link className="flex gap-3 underline" href="/admin/operator/products/registration">새 상품 등록 <ArrowUpRight size={14} /></Link>
+            <Link className="flex gap-3 underline" href="/admin/operator/products/new">새 상품 등록 <ArrowUpRight size={14} /></Link>
             <Link className="flex gap-3 underline" href="/admin/operator/orders">주문·결제 확인 <ArrowUpRight size={14} /></Link>
             <Link className="flex gap-3 underline" href="/admin/operator/fulfillment">출고·보관 업무 <ArrowUpRight size={14} /></Link>
             <Link className="flex gap-3 underline" href="/admin/operator/shipping">배송 요청·송장 입력 <ArrowUpRight size={14} /></Link>

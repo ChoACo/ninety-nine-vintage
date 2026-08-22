@@ -8,7 +8,7 @@ const source = (path) => readFile(new URL(path, root), "utf8");
 test("stores expose exactly regular and remote-area shipping settings", async () => {
   const [migration, operator, cart, checkout] = await Promise.all([
     source("supabase/migrations/20260813060607_add_store_regional_shipping_and_fix_support_roles.sql"),
-    source("src/components/admin/operator/OperatorPlatformConsole.tsx"),
+    source("src/components/operator/platform/StoreSettingsWorkspace.tsx"),
     source("src/app/api/cart/route.ts"),
     source("src/app/api/orders/checkout/route.ts"),
   ]);
@@ -16,8 +16,8 @@ test("stores expose exactly regular and remote-area shipping settings", async ()
   assert.match(migration, /remote_area_shipping_fee bigint/);
   assert.match(migration, /configure_store_shipping_fees/);
   assert.match(migration, /p_shipping_region not in \('regular','remote_area'\)/);
-  assert.match(operator, /일반 택배/);
-  assert.match(operator, /제주 및 도서산간/);
+  assert.match(operator, /기본 배송비/);
+  assert.match(operator, /제주·도서산간 추가비/);
   assert.match(cart, /p_shipping_region: shippingRegion/);
   assert.match(checkout, /p_shipping_region: shippingRegion/);
 });

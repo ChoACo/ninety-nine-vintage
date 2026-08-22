@@ -391,8 +391,8 @@ export function OperatorChatConsole({
   };
 
   return (
-    <div className="grid grid-cols-1 border border-line md:min-h-[620px] md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)_220px]">
-      <aside className="border-b border-line md:border-b-0 md:border-r">
+    <div className="grid grid-cols-1 items-start border border-line md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)_220px]">
+      <aside className="h-fit border-b border-line md:sticky md:top-6 md:self-start md:border-b-0 md:border-r">
         <div className="border-b border-line p-4 sm:p-5">
           <p className="eyebrow text-muted">
             {conversationType === "product"
@@ -406,7 +406,7 @@ export function OperatorChatConsole({
           </p>
           <input aria-label="문의 검색" className="mt-4 h-11 w-full border border-line bg-paper px-3 text-xs outline-none focus:border-ink" onChange={(event) => setInquiryQuery(event.target.value)} placeholder="회원·제목·내용 검색" value={inquiryQuery} />
         </div>
-        <div className="max-h-72 divide-y divide-line overflow-y-auto md:max-h-[560px]">
+        <div className="divide-y divide-line">
           {visibleConversations.map((conversation) => (
             <button
               className={`block w-full p-4 text-left sm:p-5 ${
@@ -447,7 +447,7 @@ export function OperatorChatConsole({
         </div>
       </aside>
 
-      <section className="flex min-h-[480px] min-w-0 flex-col">
+      <section className="min-w-0">
         <div className="border-b border-line p-4 sm:p-6">
           <p className="flex items-center gap-2 text-xs font-bold">
             <MessageCircle size={15} />
@@ -465,7 +465,7 @@ export function OperatorChatConsole({
               : "회원 보관함의 채팅하기 버튼으로도 바로 연결할 수 있습니다."}
           </p>
         </div>
-        <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+        <div className="space-y-4 p-4 sm:p-6">
           {!token && (
             <p className="bg-surface p-4 text-xs">
               {staffLabel} 로그인이 필요합니다.

@@ -1210,7 +1210,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           </Link>
         </div>
       ) : (
-        <div className={`grid gap-10 ${surface === "desktop" ? "grid-cols-[1fr_360px]" : "grid-cols-1"}`}>
+        <div className={`grid items-start gap-10 ${surface === "desktop" ? "grid-cols-[1fr_360px]" : "grid-cols-1"}`}>
           <div className="divide-y divide-line border-y border-line">
             {products.map((product) => (
               <div className={`flex py-5 ${surface === "desktop" ? "gap-5" : "gap-4"}`} key={product.id}>
@@ -1263,7 +1263,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
               </div>
             ))}
           </div>
-          <aside className={`h-fit border-t-2 border-ink bg-surface p-6 ${surface === "desktop" ? "sticky top-28" : ""}`}>
+          <aside className={`h-fit self-start border-t-2 border-ink bg-surface p-6 ${surface === "desktop" ? "sticky top-28" : ""}`}>
             <div className="flex justify-between text-xs">
               <span>상품 금액</span>
               <strong className="font-mono">

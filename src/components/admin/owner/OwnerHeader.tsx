@@ -8,7 +8,7 @@ import { useOwnerScopeStore } from "@/store/useOwnerScopeStore";
 
 const commands = [
   ["플랫폼 대시보드", "/admin/owner"], ["판매센터 관리", "/admin/owner/stores"], ["회원·권한", "/admin/owner/members"],
-  ["입금 확인", "/admin/owner/payments"], ["통합 정산", "/admin/owner/platform"], ["감사 로그", "/admin/owner/site-status"],
+  ["입금 확인", "/admin/owner/payments"], ["송금·정산", "/admin/owner/settlements"], ["감사 로그", "/admin/owner/site-status"],
 ] as const;
 
 export function OwnerHeader() {

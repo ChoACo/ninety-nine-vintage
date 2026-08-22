@@ -1,2 +1,2 @@
-import { redirect } from "next/navigation";
-export default function OwnerSettlementsAlias() { redirect("/admin/owner/platform"); }
+import { OwnerPayoutDesk } from "@/components/admin/owner/OwnerPayoutDesk";
+export default function OwnerSettlementsPage() { return <OwnerPayoutDesk />; }

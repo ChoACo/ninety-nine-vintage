@@ -21,8 +21,8 @@ import {
   storageUrgencySurfaceClass,
 } from "@/src/utils/shipping";
 
-type ShipmentAction = "pack" | "ship" | "tracking_update" | "tracking_delete";
-type ShippingForm = { courier: string; trackingNumber: string; note: string };
+type ShipmentAction = "complete" | "pack" | "ship" | "tracking_update" | "tracking_delete";
+type ShippingForm = { courier: string; customCourier: string; trackingNumber: string; note: string };
 type AddressReveal = { address: AddressSnapshot; expiresAt: string };
 type ShippingConsoleView = "requests" | "completed" | "history";
 type StorageExpiryFilter = "all" | "today" | "within_2" | "past";
@@ -101,6 +101,7 @@ interface CompletedDelivery {
 
 const PAGE_SIZE = 50;
 const SESSION_KEY_PREFIX = "ninety-nine:inventory-shipment-command:";
+const COURIER_PRESETS = ["CJ대한통운", "우체국택배", "로젠택배", "한진택배", "롯데택배", "기타 / 직접입력"] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -273,29 +274,27 @@ function groupCompletedByMember(deliveries: CompletedDelivery[]) {
   return [...grouped.values()];
 }
 
-function packGate(shipment: InventoryShipment) {
+function dispatchGate(shipment: InventoryShipment) {
   const active = activeItems(shipment);
-  const allStoresReleased = shipment.storeWorks.every((work) => work.status === "outbound_complete");
-  const everyActiveItemReady = active.every((item) =>
-    item.lineStatus === "ready" && item.released && !item.isBlocked,
-  );
-  const ready = shipment.status === "ready_to_pack" &&
-    shipment.shippingFeeStatus === "confirmed" && active.length > 0 &&
-    shipment.activeItemCount === active.length && allStoresReleased && everyActiveItemReady;
+  const eligibleStatus = ["requested", "collecting", "ready_to_pack", "packed"].includes(shipment.status);
+  const ready = eligibleStatus && shipment.shippingFeeStatus === "confirmed" &&
+    active.length > 0 && shipment.activeItemCount === active.length &&
+    active.every((item) => !item.isBlocked && item.lineStatus !== "held");
   return {
     ready,
     reason: ready
       ? null
       : shipment.shippingFeeStatus !== "confirmed"
         ? "배송비 입금 확인이 필요합니다."
-        : "미 출고된 상품이 존재합니다",
+        : "분쟁·취소·보류 상태의 상품이 있는지 확인해 주세요.",
   };
 }
 
 function sessionKey(shipment: InventoryShipment, action: ShipmentAction, form?: ShippingForm) {
   const shipmentScope = `${shipment.id}:${action}:${shipment.version}`;
-  return action === "ship" || action === "tracking_update"
-    ? `${SESSION_KEY_PREFIX}${shipmentScope}:${form?.courier.trim() ?? ""}:${form?.trackingNumber.trim() ?? ""}:${form?.note.trim() ?? ""}`
+  const courier = form?.courier === "기타 / 직접입력" ? form.customCourier : form?.courier;
+  return action === "complete" || action === "ship" || action === "tracking_update"
+    ? `${SESSION_KEY_PREFIX}${shipmentScope}:${courier?.trim() ?? ""}:${form?.trackingNumber.trim() ?? ""}:${form?.note.trim() ?? ""}`
     : `${SESSION_KEY_PREFIX}${shipmentScope}`;
 }
 
@@ -317,7 +316,6 @@ export function OperatorShippingConsole({
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [trackingModalShipment, setTrackingModalShipment] = useState<InventoryShipment | null>(null);
-  const [pendingTrackingShipmentId, setPendingTrackingShipmentId] = useState<string | null>(null);
   const [expiryFilter, setExpiryFilter] = useState<StorageExpiryFilter>("all");
   const [sortOrder, setSortOrder] = useState<ShipmentSortOrder>("recent");
   const setOptimisticShipmentStatus = useOperatorOptimisticStore((state) => state.setShipmentStatus);
@@ -375,33 +373,16 @@ export function OperatorShippingConsole({
   const updateForm = (shipmentId: string, field: keyof ShippingForm, value: string) => {
     setForms((current) => ({
       ...current,
-      [shipmentId]: { ...(current[shipmentId] ?? { courier: "", trackingNumber: "", note: "" }), [field]: value },
+      [shipmentId]: { ...(current[shipmentId] ?? { courier: "CJ대한통운", customCourier: "", trackingNumber: "", note: "" }), [field]: value },
     }));
   };
   const openTrackingModal = (shipment: InventoryShipment) => {
     setForms((current) => current[shipment.id] ? current : {
       ...current,
-      [shipment.id]: { courier: shipment.courier ?? "", trackingNumber: shipment.trackingNumber ?? "", note: "" },
+      [shipment.id]: { courier: shipment.courier ?? "CJ대한통운", customCourier: "", trackingNumber: shipment.trackingNumber ?? "", note: "" },
     });
     setTrackingModalShipment(shipment);
   };
-
-  useEffect(() => {
-    if (!pendingTrackingShipmentId || busyKey) return;
-    const packedShipment = shipments.find((shipment) =>
-      shipment.id === pendingTrackingShipmentId && shipment.status === "packed"
-    );
-    if (!packedShipment) return;
-    const timer = window.setTimeout(() => {
-      setPendingTrackingShipmentId(null);
-      setForms((current) => current[packedShipment.id] ? current : {
-        ...current,
-        [packedShipment.id]: { courier: packedShipment.courier ?? "", trackingNumber: packedShipment.trackingNumber ?? "", note: "" },
-      });
-      setTrackingModalShipment(packedShipment);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [busyKey, pendingTrackingShipmentId, shipments]);
 
   const revealAddress = async (shipment: InventoryShipment) => {
     if (!token || busyKey) return;
@@ -452,10 +433,15 @@ export function OperatorShippingConsole({
 
   const mutateShipment = async (shipment: InventoryShipment, action: ShipmentAction) => {
     if (!token || busyKey) return;
-    const gate = packGate(shipment);
-    const form = forms[shipment.id] ?? { courier: "", trackingNumber: "", note: "" };
+    const gate = dispatchGate(shipment);
+    const form = forms[shipment.id] ?? { courier: "CJ대한통운", customCourier: "", trackingNumber: "", note: "" };
+    const resolvedCourier = form.courier === "기타 / 직접입력" ? form.customCourier.trim() : form.courier.trim();
+    if (action === "complete" && !gate.ready) {
+      setNotice(gate.reason ?? "현재 상태에서는 출고할 수 없습니다.");
+      return;
+    }
     if (action === "pack" && !gate.ready) {
-      setNotice(gate.reason ?? "미 출고된 상품이 존재합니다");
+      setNotice(gate.reason ?? "현재 상태에서는 포장할 수 없습니다.");
       return;
     }
     if (action === "ship" && shipment.status !== "packed") {
@@ -470,8 +456,8 @@ export function OperatorShippingConsole({
       return;
     }
     if (
-      (action === "ship" || action === "tracking_update") &&
-      (!form.courier.trim() || !form.trackingNumber.trim())
+      (action === "complete" || action === "ship" || action === "tracking_update") &&
+      (!resolvedCourier || !form.trackingNumber.trim())
     ) {
       setNotice("택배사와 송장번호를 입력해 주세요.");
       return;
@@ -503,8 +489,8 @@ export function OperatorShippingConsole({
           action,
           idempotencyKey,
           note: form.note.trim() || null,
-          ...(action === "ship" || action === "tracking_update"
-            ? { courier: form.courier.trim(), trackingNumber: form.trackingNumber.trim() }
+          ...(action === "complete" || action === "ship" || action === "tracking_update"
+            ? { courier: resolvedCourier, trackingNumber: form.trackingNumber.trim() }
             : {}),
         }),
       });
@@ -521,6 +507,7 @@ export function OperatorShippingConsole({
       }
       sessionStorage.removeItem(key);
       setNotice({
+        complete: "출고 및 송장 등록이 완료되었습니다.",
         pack: "합포장을 완료했습니다.",
         ship: "송장을 등록하고 발송 완료 처리했습니다.",
         tracking_update: "송장 정보를 수정했습니다.",
@@ -528,7 +515,6 @@ export function OperatorShippingConsole({
       }[action]);
       await load(token, includeShipped, offset);
     } catch (error) {
-      if (action === "pack") setPendingTrackingShipmentId(null);
       setShipments(previousShipments);
       setNotice(error instanceof Error ? error.message : "배송 상태를 변경하지 못했습니다.");
     } finally {
@@ -699,9 +685,7 @@ export function OperatorShippingConsole({
                 </summary>
                 <div className="border-t border-line">
                   {group.shipments.map((shipment) => {
-          const gate = packGate(shipment);
-          const active = activeItems(shipment);
-          const canShip = shipment.status === "packed" && active.length > 0 && active.every((item) => item.lineStatus === "packed" && !item.isBlocked);
+          const gate = dispatchGate(shipment);
           const addressReveal = addressReveals[shipment.id];
           const daysLeft = shipmentDaysLeft(shipment);
           const showStorageUrgency = daysLeft !== null && shipment.status !== "shipped";
@@ -794,17 +778,10 @@ export function OperatorShippingConsole({
                 </div>
               </div>
 
-              {shipment.status !== "packed" && shipment.status !== "shipped" && (
+              {shipment.status !== "shipped" && (
                 <div className="mt-5 border-t border-line pt-4">
                   {!gate.ready && <p className="mb-3 text-xs text-amber-700">{gate.reason}</p>}
-                  <button className="h-11 bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40" disabled={!gate.ready || busyKey !== null} onClick={() => { setPendingTrackingShipmentId(shipment.id); void mutateShipment(shipment, "pack"); }} type="button">합포장 및 송장 등록</button>
-                </div>
-              )}
-
-              {shipment.status === "packed" && (
-                <div className="mt-5 border-t border-line pt-4">
-                  <button className="h-11 bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40" disabled={!canShip || busyKey !== null} onClick={() => openTrackingModal(shipment)} type="button">송장번호 입력</button>
-                  {!canShip && <p className="text-xs text-amber-700 sm:col-span-3">미 출고된 상품이 존재합니다</p>}
+                  <button className="h-11 bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40" disabled={!gate.ready || busyKey !== null} onClick={() => openTrackingModal(shipment)} type="button">원스톱 패킹 &amp; 송장 입력</button>
                 </div>
               )}
 
@@ -899,7 +876,50 @@ export function OperatorShippingConsole({
         <button className="border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={shipments.length < PAGE_SIZE} onClick={() => changePage(offset + PAGE_SIZE)} type="button">다음</button>
       </div>}
 
-      {trackingModalShipment && <div aria-modal="true" className="fixed inset-0 z-[120] grid place-items-center bg-black/55 p-4" role="dialog"><div className="w-full max-w-lg border border-line bg-paper p-5 shadow-2xl"><div className="flex items-center justify-between border-b border-line pb-4"><div><p className="eyebrow text-muted">배송 관리</p><h2 className="mt-1 text-lg font-black">{trackingModalShipment.status === "packed" ? "송장번호 입력" : "송장 수정"}</h2></div><button aria-label="송장 모달 닫기" className="grid size-9 place-items-center" onClick={() => setTrackingModalShipment(null)} type="button"><X size={17} /></button></div><div className="mt-5 space-y-3"><input aria-label="택배사" className="h-11 w-full border border-line px-3 text-xs" onChange={(event) => updateForm(trackingModalShipment.id, "courier", event.target.value)} placeholder="택배사" value={forms[trackingModalShipment.id]?.courier ?? ""} /><input aria-label="송장번호" className="h-11 w-full border border-line px-3 font-mono text-xs" onChange={(event) => updateForm(trackingModalShipment.id, "trackingNumber", event.target.value)} placeholder="송장번호" value={forms[trackingModalShipment.id]?.trackingNumber ?? ""} />{trackingModalShipment.status === "shipped" && <input aria-label="송장 정정 사유" className="h-11 w-full border border-line px-3 text-xs" maxLength={500} onChange={(event) => updateForm(trackingModalShipment.id, "note", event.target.value)} placeholder="정정 사유" value={forms[trackingModalShipment.id]?.note ?? ""} />}<div className="grid grid-cols-1 gap-2 sm:grid-cols-2"><button className="h-11 w-full bg-ink text-xs font-bold text-paper disabled:opacity-40" disabled={busyKey !== null} onClick={async () => { await mutateShipment(trackingModalShipment, trackingModalShipment.status === "packed" ? "ship" : "tracking_update"); setTrackingModalShipment(null); }} type="button">저장</button>{trackingModalShipment.status === "shipped" && <button className="h-11 w-full border border-red-500 text-xs font-bold text-red-700 disabled:opacity-40" disabled={busyKey !== null} onClick={async () => { await mutateShipment(trackingModalShipment, "tracking_delete"); setTrackingModalShipment(null); }} type="button">송장 삭제</button>}</div></div></div></div>}
+      {trackingModalShipment && (
+        <div aria-modal="true" className="fixed inset-0 z-[120] grid place-items-center bg-black/55 p-4" role="dialog">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border border-line bg-paper p-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-line pb-4">
+              <div>
+                <p className="eyebrow text-muted">배송 관리</p>
+                <h2 className="mt-1 text-lg font-black">{trackingModalShipment.status === "shipped" ? "송장 수정" : "원스톱 패킹 & 송장 입력"}</h2>
+              </div>
+              <button aria-label="송장 모달 닫기" className="grid size-11 place-items-center" onClick={() => setTrackingModalShipment(null)} type="button"><X size={17} /></button>
+            </div>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <section className="border border-line p-4 text-xs leading-5">
+                <p className="font-black">구매자 및 배송지</p>
+                <p className="mt-2">{trackingModalShipment.memberName}</p>
+                <p className="text-muted">{trackingModalShipment.addressSnapshot.recipientName} · {trackingModalShipment.addressSnapshot.phone}</p>
+                <p className="text-muted">{trackingModalShipment.addressSnapshot.postalCode ? `[${trackingModalShipment.addressSnapshot.postalCode}] ` : ""}{trackingModalShipment.addressSnapshot.address}</p>
+              </section>
+              <section className="border border-line p-4">
+                <p className="text-xs font-black">합포장 상품 {activeItems(trackingModalShipment).length}개</p>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {activeItems(trackingModalShipment).map((item) => (
+                    <div className="min-w-0" key={item.inventoryItemId}>
+                      <div className="aspect-square bg-surface">{item.imageUrl ? <CatalogImage alt="" className="h-full w-full object-cover" sizes="96px" src={item.imageUrl} /> : null}</div>
+                      <p className="mt-1 truncate text-[10px] font-bold">{item.title}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+            <div className="mt-5 space-y-3">
+              <select aria-label="택배사" className="h-11 w-full border border-line bg-paper px-3 text-xs" onChange={(event) => updateForm(trackingModalShipment.id, "courier", event.target.value)} value={forms[trackingModalShipment.id]?.courier ?? "CJ대한통운"}>
+                {COURIER_PRESETS.map((courier) => <option key={courier} value={courier}>{courier}</option>)}
+              </select>
+              {forms[trackingModalShipment.id]?.courier === "기타 / 직접입력" && <input aria-label="택배사 직접입력" className="h-11 w-full border border-line px-3 text-xs" maxLength={80} onChange={(event) => updateForm(trackingModalShipment.id, "customCourier", event.target.value)} placeholder="택배사 이름" value={forms[trackingModalShipment.id]?.customCourier ?? ""} />}
+              <input aria-label="송장번호" className="h-11 w-full border border-line px-3 font-mono text-xs" onChange={(event) => updateForm(trackingModalShipment.id, "trackingNumber", event.target.value)} placeholder="운송장 번호 입력" value={forms[trackingModalShipment.id]?.trackingNumber ?? ""} />
+              {trackingModalShipment.status === "shipped" && <input aria-label="송장 정정 사유" className="h-11 w-full border border-line px-3 text-xs" maxLength={500} onChange={(event) => updateForm(trackingModalShipment.id, "note", event.target.value)} placeholder="정정 사유" value={forms[trackingModalShipment.id]?.note ?? ""} />}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button className="min-h-11 w-full bg-ink px-3 text-xs font-bold text-paper disabled:opacity-40" disabled={busyKey !== null} onClick={async () => { const action = trackingModalShipment.status === "shipped" ? "tracking_update" : "complete"; await mutateShipment(trackingModalShipment, action); setTrackingModalShipment(null); }} type="button">{trackingModalShipment.status === "shipped" ? "송장 정보 수정" : "🚚 송장 등록 및 즉시 출고 완료"}</button>
+                {trackingModalShipment.status === "shipped" && <button className="min-h-11 w-full border border-red-500 text-xs font-bold text-red-700 disabled:opacity-40" disabled={busyKey !== null} onClick={async () => { await mutateShipment(trackingModalShipment, "tracking_delete"); setTrackingModalShipment(null); }} type="button">송장 삭제</button>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

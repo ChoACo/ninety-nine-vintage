@@ -93,7 +93,7 @@ test("operator XLSX UI validates products, supports per-product deletion, and re
     source("src/components/admin/operator/OperatorXlsxImportModal.tsx"),
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
     source("src/components/admin/operator/OperatorConsole.tsx"),
-    source("src/app/(admin)/admin/operator/products/registration/page.tsx"),
+    source("src/app/(admin)/admin/operator/products/new/page.tsx"),
     source("src/lib/import/batchAuction.ts"),
     source("src/app/api/admin/operator/products/bulk/route.ts"),
     source("src/lib/import/categoryIds.ts"),

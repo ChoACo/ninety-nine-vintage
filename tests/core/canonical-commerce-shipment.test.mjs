@@ -154,7 +154,7 @@ test("legacy orderId buyer and owner tracking writer paths are retired with 410"
   assert.doesNotMatch(ownerTrackingRoute, /correct_commerce_shipment_tracking/);
 });
 
-test("current operator shipping uses v2 CAS packing and exact unfulfilled-item gate", async () => {
+test("current operator shipping uses one-step CAS dispatch while preserving strict scope", async () => {
   const [operatorRoute, operator] = await Promise.all([
     source("src/app/api/admin/operator/shipping/route.ts"),
     source("src/components/admin/operator/OperatorShippingConsole.tsx"),
@@ -163,16 +163,10 @@ test("current operator shipping uses v2 CAS packing and exact unfulfilled-item g
   assert.match(operatorRoute, /authenticateOperatorStoreRequest\(request,\s*true\)/);
   assert.match(operatorRoute, /auth\.user as unknown as RpcClient/);
   assert.match(operatorRoute, /"get_inventory_shipment_queue"/);
-  assert.match(operatorRoute, /"pack_inventory_shipment"/);
-  assert.match(operatorRoute, /"ship_inventory_shipment"/);
+  assert.match(operatorRoute, /"complete_inventory_shipment_with_tracking"/);
   assert.match(operatorRoute, /p_expected_version:\s*body\.expectedVersion/);
   assert.match(operatorRoute, /p_idempotency_key:\s*body\.idempotencyKey/);
-  assert.match(
-    operatorRoute,
-    /error\.code\s*===\s*"55000"\s*&&\s*error\.message\s*===\s*"미 출고된 상품이 존재합니다"/,
-  );
-  assert.match(operatorRoute, /code:\s*"UNRELEASED_ITEMS"/);
-  assert.match(operatorRoute, /blockedItemIds/);
+  assert.match(operatorRoute, /shipment_store_scope_mismatch/);
   assert.match(operatorRoute, /"addressSnapshot"/);
   assert.match(operatorRoute, /},\s*422\)/);
   assert.doesNotMatch(
@@ -183,14 +177,13 @@ test("current operator shipping uses v2 CAS packing and exact unfulfilled-item g
   assert.match(operator, /shipmentId:\s*shipment\.id/);
   assert.match(operator, /expectedVersion:\s*shipment\.version/);
   assert.match(operator, /idempotencyKey/);
-  assert.match(operator, /item\.lineStatus\s*===\s*"ready"/);
-  assert.match(operator, /item\.released/);
-  assert.match(operator, /work\.status\s*===\s*"outbound_complete"/);
-  assert.match(operator, /"미 출고된 상품이 존재합니다"/);
+  assert.match(operator, /action:\s*"complete"|action\s*=.*"complete"/);
+  assert.match(operator, /item\.lineStatus\s*!==\s*"held"/);
+  assert.match(operator, /!item\.isBlocked/);
+  assert.doesNotMatch(operator, />미 출고된 상품이 존재합니다</);
   assert.match(operator, /shipment\.addressSnapshot\.recipientName/);
   assert.match(operator, /shipment\.addressSnapshot\.postalCode/);
-  assert.match(operator, /action\s*===\s*"pack"/);
-  assert.match(operator, /action\s*===\s*"ship"/);
+  assert.match(operator, /🚚 송장 등록 및 즉시 출고 완료/);
 });
 
 test("customer UI keeps v2 and legacy-compat shipping surfaces mutually exclusive", async () => {

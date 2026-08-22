@@ -42,7 +42,7 @@ test("single product registration is separate, defaults to immediate publication
     source("src/components/admin/operator/OperatorConsole.tsx"),
     source("src/app/(admin)/admin/operator/layout.tsx"),
     source("src/app/(admin)/admin/operator/products/page.tsx"),
-    source("src/app/(admin)/admin/operator/products/registration/page.tsx"),
+    source("src/app/(admin)/admin/operator/products/new/page.tsx"),
     source("supabase/migrations/20260724010000_remove_legacy_used_clothing_category.sql"),
   ]);
 

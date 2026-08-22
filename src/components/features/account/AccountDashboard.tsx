@@ -129,6 +129,10 @@ interface InventoryShipment {
   courier: string | null;
   trackingNumber: string | null;
   trackingUrl: string | null;
+  deliveryStatus: string | null;
+  deliveryStatusText: string | null;
+  deliveredAt: string | null;
+  autoSettleAt: string | null;
   purchaseConfirmationDueAt: string | null;
   purchaseConfirmedAt: string | null;
   purchaseConfirmedBy: "member" | "automatic" | null;
@@ -773,6 +777,10 @@ const [shippingMessage, setShippingMessage] = useState("");
       courier: null,
       trackingNumber: null,
       trackingUrl: null,
+      deliveryStatus: null,
+      deliveryStatusText: null,
+      deliveredAt: null,
+      autoSettleAt: null,
       purchaseConfirmationDueAt: null,
       purchaseConfirmedAt: null,
       purchaseConfirmedBy: null,
@@ -1446,12 +1454,13 @@ const [shippingMessage, setShippingMessage] = useState("");
                       >
                         <Copy size={12} /> 송장번호 복사
                       </button>
+                      {shipment.deliveryStatusText && <p className="mt-2 text-xs font-bold text-emerald-700">{shipment.deliveryStatusText}{shipment.deliveredAt ? ` · ${new Date(shipment.deliveredAt).toLocaleString("ko-KR")}` : ""}</p>}
                     </div>
                   )}
                 </div>
                 {shipment.trackingNumber && shipment.courier && <div className="flex flex-wrap gap-2">
                   <button className="inline-flex w-fit items-center gap-1 border border-ink px-3 py-2 text-xs font-bold" onClick={() => setTrackingShipment(shipment)} type="button">택배사 조회 <ExternalLink size={12} /></button>
-                  {!shipment.purchaseConfirmedAt && shipment.purchaseConfirmationDueAt && <button className="bg-ink px-3 py-2 text-xs font-bold text-paper" onClick={() => setPurchaseConfirmationShipment(shipment)} type="button">구매 확정하기</button>}
+                  {!shipment.purchaseConfirmedAt && shipment.deliveredAt && shipment.purchaseConfirmationDueAt && <button className="bg-ink px-3 py-2 text-xs font-bold text-paper" onClick={() => setPurchaseConfirmationShipment(shipment)} type="button">구매 확정하기</button>}
                   {shipment.purchaseConfirmedAt && <span className="px-3 py-2 text-xs font-bold text-emerald-700">구매 확정 완료</span>}
                 </div>}
               </div>

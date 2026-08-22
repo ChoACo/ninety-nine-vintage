@@ -71,8 +71,8 @@ export function DesktopAccountContent() {
     <main className="mx-auto w-full max-w-[1540px] px-5 sm:px-8">
       <section className="overflow-hidden border border-line bg-paper text-ink shadow-sm" aria-label="MY 작업 공간">
         <header className="border-b border-line px-5 py-5 sm:px-7"><p className="eyebrow text-muted">MY</p><h1 className="mt-2 text-3xl font-black tracking-[-0.08em]">내 작업 공간</h1><p className="mt-2 text-xs text-muted">홈에서 처리할 일을 확인하고 필요한 작업을 선택하세요.</p></header>
-        <div className="grid min-h-[680px] md:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="border-b border-line bg-surface p-3 md:border-b-0 md:border-r">
+        <div className="grid items-start md:grid-cols-[220px_minmax(0,1fr)]">
+          <aside className="h-fit border-b border-line bg-surface p-3 md:sticky md:top-28 md:self-start md:border-b-0 md:border-r">
             <nav aria-label="MY 작업 메뉴">
               <p className="px-3 pb-2 text-[10px] font-black tracking-[0.14em] text-muted">작업 메뉴</p>
               <button aria-current={activeTask.view === "home" ? "page" : undefined} className={`mb-2 flex w-full items-center justify-between px-3 py-2 text-left text-xs font-bold ${activeTask.view === "home" ? "bg-paper text-ink" : "text-muted hover:bg-paper hover:text-ink"}`} onClick={openHome} type="button">홈</button>
@@ -86,7 +86,7 @@ export function DesktopAccountContent() {
               })}
             </nav>
           </aside>
-          <div className="min-h-0 overflow-y-auto p-5 sm:p-7"><TaskContent onNavigate={openView} simpleModeEnabled={simpleMode.enabled} task={activeTask} /></div>
+          <div className="min-w-0 p-5 sm:p-7"><TaskContent onNavigate={openView} simpleModeEnabled={simpleMode.enabled} task={activeTask} /></div>
         </div>
       </section>
     </main>

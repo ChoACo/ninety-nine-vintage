@@ -1,0 +1,31 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const read = (path) => readFile(new URL(`../../${path}`, import.meta.url), "utf8");
+const [globals, workspace, account, operatorChat, cart, detail, bidPanel] = await Promise.all([
+  read("src/app/globals.css"),
+  read("src/components/admin/AdminWorkspaceShell.tsx"),
+  read("src/components/features/account/DesktopAccountContent.tsx"),
+  read("src/components/admin/operator/OperatorChatConsole.tsx"),
+  read("src/components/features/commerce/CartView.tsx"),
+  read("src/components/features/auction/detail/AuctionDetailView.tsx"),
+  read("src/components/features/auction/detail/StickyBidPanel.tsx"),
+]);
+
+test("root and primary workspaces preserve the document as the single vertical scroll context", () => {
+  assert.match(globals, /html\s*\{[\s\S]*?min-height:\s*100%;[\s\S]*?overflow-y:\s*visible;/);
+  assert.match(globals, /body\s*\{[\s\S]*?overflow-y:\s*visible;/);
+  assert.doesNotMatch(account, /overflow-y-auto/);
+  assert.doesNotMatch(operatorChat, /overflow-y-auto/);
+  assert.match(workspace, /lg:sticky lg:top-6 lg:self-start/);
+});
+
+test("MY, cart, and product detail panels use items-start and fit-content sticky alignment", () => {
+  assert.match(account, /grid items-start/);
+  assert.match(account, /h-fit[^"]*md:sticky[^"]*md:self-start/);
+  assert.match(cart, /grid items-start gap-10/);
+  assert.match(cart, /h-fit self-start/);
+  assert.match(detail, /grid items-start gap-8/);
+  assert.match(bidPanel, /sticky col-span-5 p-6 pb-6 h-fit/);
+});

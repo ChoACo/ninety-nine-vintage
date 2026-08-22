@@ -1,3 +1,7 @@
-import { redirect } from "next/navigation";
+import { OperatorProductsConsole } from "@/components/admin/operator/OperatorProductsConsole";
 
-export default function OperatorNewProductAlias() { redirect("/admin/operator/products/registration"); }
+export const dynamic = "force-dynamic";
+
+export default function OperatorNewProductPage() {
+  return <OperatorProductsConsole view="registration" />;
+}

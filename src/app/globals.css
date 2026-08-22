@@ -207,21 +207,32 @@ html[data-theme="dark"] .theme-invariant-dark {
 
   html {
     min-width: 320px;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: visible;
     background-color: rgb(var(--theme-paper));
     scrollbar-gutter: stable;
   }
 
   body {
     min-width: 320px;
-    min-height: 100vh;
+    min-height: 100%;
     margin: 0;
     padding: 0;
     overflow-x: hidden;
+    overflow-y: visible;
     background-color: rgb(var(--theme-paper));
     color: rgb(var(--theme-ink));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+
+  .sticky-panel {
+    position: sticky;
+    top: 1.5rem;
+    align-self: flex-start;
+    height: fit-content;
   }
 
   ::selection { background: rgb(var(--theme-ink)); color: rgb(var(--theme-paper)); }

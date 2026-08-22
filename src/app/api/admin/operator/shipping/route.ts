@@ -244,7 +244,7 @@ export async function POST(request: Request) {
   const action = typeof body.action === "string" ? body.action : "";
   const allowed = action === "pack"
     ? ["shipmentId", "expectedVersion", "action", "idempotencyKey", "note"]
-    : action === "ship" || action === "tracking_update"
+    : action === "complete" || action === "ship" || action === "tracking_update"
       ? ["shipmentId", "expectedVersion", "action", "courier", "trackingNumber", "idempotencyKey", "note"]
       : action === "tracking_delete"
         ? ["shipmentId", "expectedVersion", "action", "idempotencyKey", "note"]
@@ -257,7 +257,7 @@ export async function POST(request: Request) {
     !isUuid(body.shipmentId) || !isNonNegativeInteger(body.expectedVersion) ||
     !isUuid(body.idempotencyKey) || courier === undefined || trackingNumber === undefined || note === undefined ||
     ((action === "pack" || action === "tracking_delete") && (courier !== null || trackingNumber !== null)) ||
-    ((action === "ship" || action === "tracking_update") && (!courier || !trackingNumber)) ||
+    ((action === "complete" || action === "ship" || action === "tracking_update") && (!courier || !trackingNumber)) ||
     ((action === "tracking_update" || action === "tracking_delete") && !note)
   ) {
     return commerceJson({ error: "invalid_shipment_request", message: "송장 정정 사유를 입력해 주세요." }, 422);
@@ -278,7 +278,16 @@ export async function POST(request: Request) {
     }
   }
 
-  const result = action === "pack"
+  const result = action === "complete"
+    ? await (auth.user as unknown as RpcClient).rpc("complete_inventory_shipment_with_tracking", {
+        p_shipment_id: body.shipmentId,
+        p_expected_version: body.expectedVersion,
+        p_courier: courier,
+        p_tracking_number: trackingNumber,
+        p_idempotency_key: body.idempotencyKey,
+        p_note: note,
+      })
+    : action === "pack"
     ? await (auth.user as unknown as RpcClient).rpc("pack_inventory_shipment", {
         p_shipment_id: body.shipmentId,
         p_expected_version: body.expectedVersion,

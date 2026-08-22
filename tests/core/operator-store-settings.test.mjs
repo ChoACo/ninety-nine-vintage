@@ -1,0 +1,33 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const root = new URL("../../", import.meta.url);
+const source = (path) => readFile(new URL(path, root), "utf8");
+
+test("center mall uses a compact four-column desktop grid", async () => {
+  const grid = await source("src/components/features/catalog/StoreMallGrid.tsx");
+  assert.match(grid, /grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4/);
+  assert.match(grid, /aspect-\[16\/10\]/);
+  assert.match(grid, /size-11/);
+  assert.match(grid, /conceptTags\.slice\(0,2\)/);
+});
+
+test("operator store settings use three cards and one sticky save contract", async () => {
+  const [ui, route, migration] = await Promise.all([
+    source("src/components/operator/platform/StoreSettingsWorkspace.tsx"),
+    source("src/app/api/admin/operator/platform/route.ts"),
+    source("supabase/migrations/20260822163735_enhance_operator_store_settings.sql"),
+  ]);
+  assert.match(ui, /StoreBrandingCard/);
+  assert.match(ui, /StoreBusinessCard/);
+  assert.match(ui, /StoreShippingPolicyCard/);
+  assert.match(ui, /sticky bottom-3/);
+  assert.match(ui, /className="sr-only"/);
+  assert.match(route, /save_operator_store_settings/);
+  assert.match(route, /encryptAccountNumber/);
+  assert.match(migration, /security definer set search_path=''/);
+  assert.match(migration, /has_store_permission\(p_store_id,'manage_store'\)/);
+  assert.match(migration, /store_payout_accounts/);
+  assert.doesNotMatch(migration, /account_number\s+text/);
+});

@@ -28,6 +28,27 @@ type ShipmentConfirmationAdminClient = {
   from: (table: "inventory_shipment_trade_confirmations") => ShipmentConfirmationQuery;
 };
 
+type DeliveryStateRow = {
+  id: string;
+  delivery_status: string;
+  delivery_status_text: string | null;
+  delivered_at: string | null;
+  auto_settle_at: string | null;
+};
+
+type DeliveryStateAdminClient = {
+  from: (table: "inventory_shipments") => {
+    select: (columns: string) => {
+      eq: (column: string, value: unknown) => {
+        in: (column: string, values: string[]) => Promise<{
+          data: DeliveryStateRow[] | null;
+          error: { message?: string } | null;
+        }>;
+      };
+    };
+  };
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -101,12 +122,25 @@ export async function GET(request: Request) {
         .in("shipment_id", shipmentIds);
   if (confirmationResult.error) return commerceJson({ error: "shipment_confirmation_unavailable" }, 503);
   const confirmationByShipment = new Map((confirmationResult.data ?? []).map((row) => [row.shipment_id, row]));
+  const deliveryResult = shipmentIds.length === 0
+    ? { data: [], error: null }
+    : await (auth.admin as unknown as DeliveryStateAdminClient).from("inventory_shipments")
+        .select("id,delivery_status,delivery_status_text,delivered_at,auto_settle_at")
+        .eq("member_id", auth.userId)
+        .in("id", shipmentIds);
+  if (deliveryResult.error) return commerceJson({ error: "shipment_delivery_state_unavailable" }, 503);
+  const deliveryByShipment = new Map((deliveryResult.data ?? []).map((row) => [row.id, row]));
   return commerceJson({
     shipments: data.shipments.map((shipment) => {
       const confirmation = confirmationByShipment.get(String(shipment.id));
+      const delivery = deliveryByShipment.get(String(shipment.id));
       return {
         ...shipment,
-        purchaseConfirmationDueAt: confirmation?.confirmation_due_at ?? null,
+        deliveryStatus: delivery?.delivery_status ?? null,
+        deliveryStatusText: delivery?.delivery_status_text ?? null,
+        deliveredAt: delivery?.delivered_at ?? null,
+        autoSettleAt: delivery?.auto_settle_at ?? null,
+        purchaseConfirmationDueAt: delivery?.delivered_at ? confirmation?.confirmation_due_at ?? null : null,
         purchaseConfirmedAt: confirmation?.confirmed_at ?? null,
         purchaseConfirmedBy: confirmation?.confirmed_by_kind ?? null,
       };

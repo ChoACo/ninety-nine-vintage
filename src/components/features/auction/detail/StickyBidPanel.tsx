@@ -572,7 +572,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
 
   return (
     <aside
-      className={`${surface === "desktop" ? `${compact ? "top-6" : "top-[100px]"} sticky col-span-5 p-6 pb-6` : "p-5 pb-32"} z-10 self-start rounded-3xl border border-border bg-card text-card-foreground shadow-xl shadow-black/5`}
+      className={`${surface === "desktop" ? `${compact ? "top-6" : "top-[100px]"} sticky col-span-5 p-6 pb-6 h-fit` : "p-5 pb-32"} z-10 self-start rounded-3xl border border-border bg-card text-card-foreground shadow-xl shadow-black/5`}
       data-bid-panel="sticky"
     >
       <div className="border-b border-border py-6">

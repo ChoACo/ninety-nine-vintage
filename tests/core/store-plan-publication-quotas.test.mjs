@@ -26,7 +26,7 @@ test("premium automation is owner-linked and limited to 300 items per rolling we
     source("supabase/migrations/20260809175343_enforce_store_plan_publication_quotas.sql"),
     source("src/app/api/admin/owner/platform/route.ts"),
     source("src/components/admin/owner/OwnerPlanApprovalPanel.tsx"),
-    source("src/components/admin/operator/OperatorPlatformConsole.tsx"),
+    source("src/components/operator/platform/StoreSettingsWorkspace.tsx"),
   ]);
 
   assert.match(migration, /automation_client_id/);

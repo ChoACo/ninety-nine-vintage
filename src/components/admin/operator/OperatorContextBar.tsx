@@ -9,11 +9,25 @@ import { useOperatorStoreScope } from "@/store/useOperatorStoreScope";
 const commands = [
   ["대시보드", "/admin/operator"],
   ["상품 목록", "/admin/operator/products"],
-  ["새 상품 등록", "/admin/operator/products/registration"],
+  ["새 상품 등록", "/admin/operator/products/new"],
   ["경매 모니터", "/admin/operator/auctions"],
   ["묶음 출고", "/admin/operator/shipping"],
   ["고객 문의", "/admin/operator/inquiries"],
 ] as const;
+
+const routeHeadings = [
+  { exact: true, path: "/admin/operator/products/new", title: "새 상품 등록", breadcrumb: ["운영자 센터", "상품 관리", "새 상품 등록"] },
+  { exact: true, path: "/admin/operator/products", title: "상품 목록", breadcrumb: ["운영자 센터", "상품 관리", "목록"] },
+  { exact: true, path: "/admin/operator/sales", title: "매출 분석", breadcrumb: ["운영자 센터", "매출 분석"] },
+  { exact: false, path: "/admin/operator/auctions", title: "실시간 경매 운영", breadcrumb: ["운영자 센터", "경매 운영"] },
+  { exact: false, path: "/admin/operator/orders", title: "판매·주문", breadcrumb: ["운영자 센터", "판매·주문"] },
+  { exact: false, path: "/admin/operator/shipping", title: "보관함·출고 관리", breadcrumb: ["운영자 센터", "보관함·출고"] },
+] as const;
+
+export function getOperatorPageHeading(pathname: string) {
+  return routeHeadings.find((item) => item.exact ? pathname === item.path : pathname === item.path || pathname.startsWith(`${item.path}/`))
+    ?? { title: "운영 관리", breadcrumb: ["운영자 센터"] as readonly string[] };
+}
 
 export function OperatorContextBar() {
   const { scope, stores } = useOperatorStoreScope();
@@ -22,6 +36,7 @@ export function OperatorContextBar() {
   const [query, setQuery] = useState("");
   const storeName = stores.find((store) => store.id === scope.storeId)?.name ?? (scope.active ? "담당 매장" : "매장 범위 확인 중");
   const isAuction = pathname.includes("auction");
+  const pageHeading = getOperatorPageHeading(pathname);
   const filtered = commands.filter(([label]) => label.includes(query.trim()));
 
   useEffect(() => {
@@ -41,7 +56,8 @@ export function OperatorContextBar() {
   }, []);
 
   return <>
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-xl shadow-zinc-950/10">
+    <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-100 shadow-xl shadow-zinc-950/10">
+      <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-zinc-800 text-amber-400"><Store size={17} strokeWidth={1.75} /></span>
         <div className="min-w-0"><p className="truncate text-sm font-black">{storeName}</p><p className="mt-0.5 text-[10px] text-zinc-500">운영자 고정 매장 범위</p></div>
@@ -49,7 +65,12 @@ export function OperatorContextBar() {
       </div>
       <div className="flex items-center gap-2">
         <button aria-expanded={open} aria-haspopup="dialog" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-700 px-3 text-xs font-bold text-zinc-300 transition hover:border-zinc-400 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-amber-500" onClick={() => setOpen(true)} type="button"><Search size={15} /> <span className="hidden sm:inline">빠른 이동</span><kbd className="hidden rounded border border-zinc-700 px-1.5 py-0.5 text-[9px] text-zinc-500 sm:inline-flex"><Command size={10} />K</kbd></button>
-        <Link className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-amber-500 px-3 text-xs font-black text-zinc-950 transition hover:bg-amber-400 focus-visible:ring-2 focus-visible:ring-amber-500" href="/admin/operator/products/registration"><Zap size={15} /> <span className="hidden sm:inline">새 상품 등록</span><span className="sm:hidden">등록</span></Link>
+        <Link className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-amber-500 px-3 text-xs font-black text-zinc-950 transition hover:bg-amber-400 focus-visible:ring-2 focus-visible:ring-amber-500" href="/admin/operator/products/new"><Zap size={15} /> <span className="hidden sm:inline">새 상품 등록</span><span className="sm:hidden">등록</span></Link>
+      </div>
+      </div>
+      <div className="mt-3 border-t border-zinc-800 pt-3">
+        <nav aria-label="현재 위치" className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-zinc-500">{pageHeading.breadcrumb.map((label, index) => <span className="flex items-center gap-1.5" key={`${label}-${index}`}>{index > 0 ? <span aria-hidden="true">/</span> : null}<span aria-current={index === pageHeading.breadcrumb.length - 1 ? "page" : undefined}>{label}</span></span>)}</nav>
+        <p className="mt-1 text-lg font-black text-zinc-100">{pageHeading.title}</p>
       </div>
     </div>
     {open && <div aria-label="운영자 빠른 이동" aria-modal="true" className="fixed inset-0 z-[120] grid place-items-start bg-zinc-950/70 p-4 pt-[12vh] backdrop-blur-sm" role="dialog" onClick={() => setOpen(false)}>

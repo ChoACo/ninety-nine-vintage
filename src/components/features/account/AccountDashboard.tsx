@@ -1262,7 +1262,7 @@ function AccountDashboardForSession({
                   보관 중인 상품
                 </h2>
                 <p className="mt-2 text-[11px] leading-5 text-muted">
-                  보관 기간은 매장 보관 시작일부터 소형 2주, 대형 1주입니다.
+                  보관 기간은 결제 완료 시점부터 소형 2주, 대형 1주입니다.
                 </p>
               </div>
               <div className="flex flex-wrap justify-end gap-2">
@@ -1330,8 +1330,8 @@ function AccountDashboardForSession({
                   <div className="bg-surface px-3 py-3">
                     <p className="text-xs font-bold">선택 상품 배송</p>
                     <p className="mt-1 text-[11px] text-muted">
-                      결제 완료 상품은 매장 출고 전에도 선택할 수 있으며, 서로
-                      다른 매장 상품도 한 번에 신청할 수 있습니다.
+                      결제 완료 상품은 바로 선택할 수 있으며, 서로 다른 매장
+                      상품도 한 번에 신청할 수 있습니다.
                     </p>
                   </div>
                   {visibleRequestEligibleItems.length > 0 && (

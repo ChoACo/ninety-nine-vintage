@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -15,8 +16,15 @@ export default function OperatorInquiryBadge() {
     if (inFlight.current) return;
     inFlight.current = true;
     try {
+      const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
+      if (!session?.access_token) {
+        setCount(0);
+        setReady(true);
+        return;
+      }
       const response = await fetch("/api/admin/operator/inquiries/unread", {
         cache: "no-store",
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (response.status === 401 || response.status === 403) {
         setCount(0);

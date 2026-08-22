@@ -136,7 +136,21 @@ test("employees can handle only their assigned store chats and receive role-corr
   assert.match(unreadRoute, /require_active_operator_store_scope/);
   assert.match(unreadRoute, /\["general", "product"\]/);
   assert.match(unreadRoute, /\/admin\/employee\/inquiries\?conversationId=/);
+  assert.match(unreadRoute, /\/admin\/operator\/chat\?storeId=/);
   assert.match(operatorRoute, /query = query\.eq\("store_id", selectedStoreId\)/);
+});
+
+test("owner and operator chat resolves store scope before loading conversation IDs", async () => {
+  const [consoleSource, employeePage] = await Promise.all([
+    source("src/components/admin/operator/OperatorChatConsole.tsx"),
+    source("src/app/(admin)/admin/employee/inquiries/page.tsx"),
+  ]);
+
+  assert.match(consoleSource, /await ensureStoreScope\(session\.access_token\)[\s\S]*await ensureRequestedConversation/);
+  assert.match(consoleSource, /searchParams\.get\("storeId"\)/);
+  assert.match(consoleSource, /body: JSON\.stringify\(\{ storeId: targetStoreId, accessMode: "owner_support" \}\)/);
+  assert.match(consoleSource, /requestedStoreId !== payload\.scope\.storeId/);
+  assert.match(employeePage, /requiresStoreScope=\{false\}/);
 });
 
 test("support chat policies follow the bounded Owner canary principal", async () => {

@@ -47,6 +47,19 @@ interface ChatMessage {
   product_image_url_snapshot: string | null;
 }
 
+interface StoreScopeResponse {
+  scope?: {
+    active: boolean;
+    accessMode: "assigned" | "owner_support";
+    storeId: string | null;
+    expiresAt: string | null;
+  };
+  stores?: SupportStore[];
+  canSelectStores?: boolean;
+  error?: string;
+  message?: string;
+}
+
 const CANNED_RESPONSES = [
   "안녕하세요. 문의하신 내용을 확인하고 있습니다. 잠시만 기다려 주세요.",
   "보관 상품은 보관함에서 선택한 뒤 묶음 배송을 요청할 수 있습니다.",
@@ -67,10 +80,12 @@ export function OperatorChatConsole({
   basePath = "/admin/operator/chat",
   staffLabel = "운영자",
   conversationType = "all",
+  requiresStoreScope = true,
 }: Readonly<{
   basePath?: "/admin/operator/chat" | "/admin/operator/inquiries" | "/admin/employee/inquiries";
   staffLabel?: string;
   conversationType?: "all" | "product";
+  requiresStoreScope?: boolean;
 }>) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -86,6 +101,52 @@ export function OperatorChatConsole({
   const [busy, setBusy] = useState(false);
   const [messageLoading, setMessageLoading] = useState(false);
   const [inquiryQuery, setInquiryQuery] = useState("");
+
+  const ensureStoreScope = useCallback(async (accessToken: string) => {
+    if (!requiresStoreScope) return;
+    const response = await fetch("/api/admin/operator/store-scope", {
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const payload = (await response.json().catch(() => null)) as StoreScopeResponse | null;
+    if (!response.ok || !payload?.scope) {
+      throw new Error(problemMessage(payload, "센터 범위를 불러오지 못했습니다."));
+    }
+
+    const requestedStoreId = searchParams.get("storeId");
+    if (!payload.canSelectStores) {
+      if (!payload.scope.active || !payload.scope.storeId) {
+        throw new Error("배정된 센터를 확인해 주세요.");
+      }
+      if (requestedStoreId && requestedStoreId !== payload.scope.storeId) {
+        throw new Error("담당 센터의 상담만 확인할 수 있습니다.");
+      }
+      return;
+    }
+
+    const availableStoreIds = new Set((payload.stores ?? []).map((store) => store.id));
+    const targetStoreId =
+      (requestedStoreId && availableStoreIds.has(requestedStoreId) ? requestedStoreId : null) ??
+      (payload.scope.storeId && availableStoreIds.has(payload.scope.storeId) ? payload.scope.storeId : null) ??
+      payload.stores?.[0]?.id ??
+      null;
+    if (!targetStoreId) throw new Error("접근 가능한 센터가 없습니다.");
+    if (payload.scope.active && payload.scope.storeId === targetStoreId) return;
+
+    const updateResponse = await fetch("/api/admin/operator/store-scope", {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ storeId: targetStoreId, accessMode: "owner_support" }),
+    });
+    const updatePayload = (await updateResponse.json().catch(() => null)) as StoreScopeResponse | null;
+    if (!updateResponse.ok || updatePayload?.scope?.storeId !== targetStoreId) {
+      throw new Error(problemMessage(updatePayload, "센터 범위를 연결하지 못했습니다."));
+    }
+  }, [requiresStoreScope, searchParams]);
 
   const markRead = useCallback(
     async (conversationId: string, accessToken: string) => {
@@ -211,6 +272,7 @@ export function OperatorChatConsole({
           setToken(session?.access_token ?? null);
           setStaffId(session?.user.id ?? null);
           if (session) {
+            await ensureStoreScope(session.access_token);
             await ensureRequestedConversation(session.access_token);
           }
         } catch (error) {
@@ -223,7 +285,7 @@ export function OperatorChatConsole({
       })();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [ensureRequestedConversation]);
+  }, [ensureRequestedConversation, ensureStoreScope]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

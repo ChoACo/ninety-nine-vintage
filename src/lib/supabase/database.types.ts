@@ -9894,6 +9894,13 @@ current_price: number
         Returns: Json
       }
       require_active_operator_store_scope: { Args: never; Returns: string }
+      get_owner_shipped_inventory_flow: {
+        Args: { p_from: string; p_store_id?: string | null }
+        Returns: {
+          origin_store_id: string
+          shipped_at: string
+        }[]
+      }
       reserve_fixed_product_for_cart: {
         Args: { p_product_id: string }
         Returns: {

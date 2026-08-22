@@ -117,7 +117,7 @@ export async function GET(request: Request) {
     href:
       roleCode === "owner" || roleCode === "operator"
         ? latest
-          ? `/admin/operator/chat?conversationId=${encodeURIComponent(latest.id)}`
+          ? `/admin/operator/chat?storeId=${encodeURIComponent(latest.store_id ?? "")}&conversationId=${encodeURIComponent(latest.id)}`
           : "/admin/operator/chat"
         : roleCode === "employee"
           ? latest

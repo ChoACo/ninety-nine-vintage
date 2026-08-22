@@ -116,6 +116,7 @@ export async function POST(
     "observedLedgerEntryCount",
     "expectedVersion",
     "idempotencyKey",
+    "approvalNote",
   ];
   if (!PAYMENT_KINDS.has(kind) || !isUuid(id) || !isRecord(body) || !hasExactKeys(body, fields)) {
     return commerceJson({ error: "invalid_payment_request", message: "입금 확인 내용을 확인해 주세요." }, 422);
@@ -125,18 +126,19 @@ export async function POST(
     body.depositorName,
     MANUAL_TRANSFER_DEPOSITOR_NAME_MAX_LENGTH,
   );
+  const approvalNote = typeof body.approvalNote === "string" ? body.approvalNote.trim() : "";
   if (
     !depositorName ||
     !isNonNegativeInteger(body.observedReceivedAmount) ||
     !isNonNegativeInteger(body.observedLedgerEntryCount) ||
     !isNonNegativeInteger(body.expectedVersion) ||
-    !isUuid(body.idempotencyKey)
+    !isUuid(body.idempotencyKey) || approvalNote.length < 3 || approvalNote.length > 500
   ) {
     return commerceJson({ error: "invalid_payment_request", message: "입금 확인 내용을 확인해 주세요." }, 422);
   }
 
   const { data, error } = await (auth.user as unknown as RpcClient).rpc(
-    "confirm_unified_manual_payment_v2",
+    "owner_confirm_manual_payment_with_note",
     {
       p_payment_kind: kind,
       p_payment_id: id,
@@ -145,6 +147,7 @@ export async function POST(
       p_observed_ledger_entry_count: body.observedLedgerEntryCount,
       p_expected_version: body.expectedVersion,
       p_idempotency_key: body.idempotencyKey,
+      p_approval_note: approvalNote,
     },
   );
   if (error) return rpcFailure(error);

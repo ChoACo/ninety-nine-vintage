@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Command, Database, Search, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Command, Database, Search, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useOwnerScopeStore } from "@/store/useOwnerScopeStore";
@@ -52,7 +52,7 @@ export function OwnerHeader() {
     <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-3 text-zinc-100 shadow-xl shadow-black/10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <label className="flex min-w-[240px] flex-1 items-center gap-2 text-xs font-black"><ShieldCheck className="text-amber-400" size={16} /><select aria-label="소유자 전역 센터 범위" className="h-11 min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-3 text-xs text-zinc-100 outline-none focus:border-amber-500" onChange={(event) => setSelectedStoreId(event.target.value || null)} value={selectedStoreId ?? ""}><option value="">🌐 전체 플랫폼 통합 뷰</option>{stores.map((store) => <option key={store.id} value={store.id}>🏬 {store.name}</option>)}</select></label>
-        <div className="flex items-center gap-2"><span className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 text-[10px] font-black ${health.db ? "border-emerald-500/30 text-emerald-400" : "border-rose-500/30 text-rose-400"}`}><span className={`size-2 rounded-full ${health.db ? "animate-pulse bg-emerald-400" : "bg-rose-500"}`} /><Database size={13} /> DB·Realtime</span><span className="hidden min-h-11 items-center rounded-xl border border-zinc-800 px-3 font-mono text-[10px] text-zinc-400 md:inline-flex">CCU {health.sessions}</span><button aria-expanded={open} aria-haspopup="dialog" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-700 px-3 text-xs font-bold" onClick={() => setOpen(true)} type="button"><Search size={14} /><Command size={11} />K</button></div>
+        <div className="flex items-center gap-2"><span className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 text-[10px] font-black ${health.db ? "border-emerald-500/30 text-emerald-400" : "border-rose-500/30 text-rose-400"}`}><span className={`size-2 rounded-full ${health.db ? "animate-pulse bg-emerald-400" : "bg-rose-500"}`} /><Database size={13} /> DB·Realtime</span><span className="hidden min-h-11 items-center rounded-xl border border-zinc-800 px-3 font-mono text-[10px] text-zinc-400 md:inline-flex">CCU {health.sessions}</span><Link className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-rose-500/30 px-3 text-xs font-black text-rose-400 hover:bg-rose-500/10" href="/admin/owner/rules/auction"><AlertTriangle size={14}/>비상 제어</Link><button aria-expanded={open} aria-haspopup="dialog" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-700 px-3 text-xs font-bold" onClick={() => setOpen(true)} type="button"><Search size={14} /><Command size={11} />K</button></div>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-2"><Quota label="AI token" value={health.tokens} /><Quota label="Storage" value={health.storage} /></div>
     </div>

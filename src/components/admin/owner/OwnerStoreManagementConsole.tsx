@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
+import { NewCenterModal } from "./NewCenterModal";
 
 interface Business {
   id: string;
@@ -116,6 +117,7 @@ export function OwnerStoreManagementConsole() {
   const [loading, setLoading] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const keys = useRef(new Map<string, string>());
 
   const load = useCallback(async () => {
@@ -395,21 +397,21 @@ export function OwnerStoreManagementConsole() {
   return (
     <div className="space-y-10">
       <SectionHeading
-        action={
-          <button
+        action={<div className="flex flex-wrap gap-2"><button
             className="flex items-center gap-2 border border-line px-4 py-3 text-xs font-bold disabled:opacity-40"
             disabled={loading}
             onClick={() => void load()}
             type="button"
           >
             <RefreshCw size={14} /> 새로고침
-          </button>
-        }
+          </button><button className="inline-flex min-h-11 items-center gap-2 bg-ink px-4 text-xs font-black text-paper" onClick={() => setOnboardingOpen(true)} type="button"><Plus size={14}/> 신규 판매센터 등록</button></div>}
         description="센터와 매장은 같은 업무 단위입니다. 이곳에서 매장을 만들고 담당 운영자와 직원을 배치합니다."
         eyebrow="관리자 / 센터·인력"
         title="센터(매장) 관리"
         variant="page"
       />
+
+      <NewCenterModal open={onboardingOpen} onClose={() => setOnboardingOpen(false)} onCreated={() => void load()} />
 
       {notice && (
         <div

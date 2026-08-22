@@ -4,6 +4,7 @@ import {
   ownerAccessJsonResponse,
   readSmallJsonBody,
 } from "@/lib/ownerAccess/server";
+import { encryptAccountNumber, maskAccountNumber, normalizeAccountNumber } from "@/lib/settlement/payoutAccount.server";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -181,6 +182,38 @@ export async function PATCH(request: Request) {
         },
       );
       if (error) return rpcError(error, "employee_placement_failed");
+      return ownerAccessJsonResponse({ result: data });
+    }
+
+    if (action === "onboard") {
+      const businessId = readUuid(body.businessId);
+      const operatorId = readUuid(body.operatorId);
+      const slug = typeof body.slug === "string" ? body.slug.trim().toLowerCase() : "";
+      const name = typeof body.name === "string" ? body.name.trim() : "";
+      const description = typeof body.description === "string" ? body.description.trim() : "";
+      const representativeName = typeof body.representativeName === "string" ? body.representativeName.trim() : "";
+      const registrationNumber = typeof body.businessRegistrationNumber === "string" ? body.businessRegistrationNumber.replace(/\D/g, "") : "";
+      const bankName = typeof body.bankName === "string" ? body.bankName.trim() : "";
+      const accountHolder = typeof body.accountHolder === "string" ? body.accountHolder.trim() : "";
+      const commissionRate = Number(body.commissionRate);
+      const smallStorageDays = Number(body.smallStorageDays);
+      const largeStorageDays = Number(body.largeStorageDays);
+      let accountNumber: string;
+      try { accountNumber = normalizeAccountNumber(String(body.accountNumber ?? "")); }
+      catch { return ownerAccessJsonResponse({ error: "invalid_payout_account", message: "정산 계좌번호를 확인해 주세요." }, 422); }
+      if (!businessId || !operatorId || !SLUG_PATTERN.test(slug) || !name || !representativeName || !/^\d{10}$/.test(registrationNumber) || !bankName || !accountHolder || !Number.isFinite(commissionRate) || commissionRate < 0 || commissionRate > 50 || !Number.isInteger(smallStorageDays) || !Number.isInteger(largeStorageDays)) {
+        return ownerAccessJsonResponse({ error: "invalid_onboarding_request", message: "신규 센터 등록 정보를 확인해 주세요." }, 422);
+      }
+      const { data, error } = await access.userClient.rpc("owner_onboard_store", {
+        p_business_id: businessId, p_slug: slug, p_name: name, p_description: description,
+        p_operator_id: operatorId, p_representative_name: representativeName,
+        p_business_registration_number: registrationNumber, p_bank_name: bankName,
+        p_account_holder: accountHolder, p_account_number_ciphertext: encryptAccountNumber(accountNumber),
+        p_account_number_masked: maskAccountNumber(accountNumber), p_commission_rate: commissionRate / 100,
+        p_small_storage_days: smallStorageDays, p_large_storage_days: largeStorageDays,
+        p_idempotency_key: idempotencyKey, p_reason: "소유자센터 신규 판매센터 온보딩",
+      });
+      if (error) return rpcError(error, "store_onboarding_failed");
       return ownerAccessJsonResponse({ result: data });
     }
 

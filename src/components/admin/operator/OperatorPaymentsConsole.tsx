@@ -208,6 +208,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [cancellationTarget, setCancellationTarget] = useState<PaymentRow | null>(null);
   const [cancellationReason, setCancellationReason] = useState("");
+  const [approvalNote, setApprovalNote] = useState("");
   const [notice, setNotice] = useState("");
 
   const beginBusy = (key: string) => {
@@ -284,7 +285,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
   const confirm = async (
     payment: PaymentRow,
     conflictRetry = false,
-    retryInput?: { depositorName: string; confirmationAmount: number },
+    retryInput?: { depositorName: string; confirmationAmount: number; approvalNote?: string },
   ) => {
     if (!accessToken || !actorId || (!conflictRetry && busyKeyRef.current) || payment.remainingAmount < 1) return;
     const key = sessionKey(payment);
@@ -292,6 +293,12 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
     const confirmationAmount = retryInput?.confirmationAmount ?? Number(
       (confirmationAmounts[key] ?? String(payment.remainingAmount)).replaceAll(",", ""),
     );
+    const normalizedApprovalNote = (retryInput?.approvalNote ?? approvalNote).trim();
+    if (normalizedApprovalNote.length < 3) {
+      setExpandedKey(key);
+      setNotice("입금 승인 메모를 3자 이상 입력해 주세요.");
+      return;
+    }
     if (
       !Number.isSafeInteger(confirmationAmount) ||
       confirmationAmount < 1 ||
@@ -387,6 +394,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
           observedLedgerEntryCount: payment.ledgerEntryCount,
           expectedVersion: payment.version,
           idempotencyKey,
+          approvalNote: normalizedApprovalNote,
         }),
       });
       const payload = await response.json().catch(() => null) as unknown;
@@ -397,7 +405,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
         );
         if (latest?.remainingAmount === 0) {
           setExpandedKey(null);
-          setNotice("입금 확인이 완료되었습니다. 최신 목록으로 갱신했습니다.");
+          setNotice("입금 승인 완료 및 감사 로그가 기록되었습니다.");
           return;
         }
         const snapshotChanged = latest && (
@@ -407,7 +415,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
         );
         if (!conflictRetry && latest && latest.remainingAmount > 0 && snapshotChanged) {
           setNotice("최신 입금 상태를 확인하여 다시 처리 중입니다.");
-          await confirm(latest, true, { depositorName, confirmationAmount });
+          await confirm(latest, true, { depositorName, confirmationAmount, approvalNote: normalizedApprovalNote });
           return;
         }
         throw new Error("입금 상태가 변경되었습니다. 최신 목록을 확인해 주세요.");
@@ -432,7 +440,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
       );
       setNotice(payload.payment.idempotent_replay
         ? "기존 입금 확인 결과를 다시 확인했습니다."
-        : "잔액 전액을 입금 확인 처리했습니다.");
+        : "입금 승인 완료 및 감사 로그가 기록되었습니다.");
       setExpandedKey(null);
       await load(accessToken, includeHistory, offset);
     } catch (error) {
@@ -817,10 +825,11 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
               </div>
 
               {notice && <p aria-live="polite" className="mt-5 border border-line bg-surface px-4 py-3 text-xs font-bold">{notice}</p>}
+              {confirmable && <label className="mt-5 block text-xs font-bold" htmlFor={`approval-note-${key}`}>입금 승인 메모 (감사 로그 필수)<textarea className="mt-2 min-h-24 w-full resize-y border border-line bg-paper px-3 py-3 text-sm font-normal" id={`approval-note-${key}`} maxLength={500} onChange={(event) => setApprovalNote(event.target.value)} placeholder="예: 국민은행 13,500원 입금 확인 완료" value={approvalNote} /></label>}
               <div className="mt-6 flex flex-col-reverse gap-2 border-t border-line pt-5 sm:flex-row sm:justify-end">
                 <button className="h-11 border border-line px-5 text-xs font-bold" disabled={busyKey !== null} onClick={() => setExpandedKey(null)} type="button">취소</button>
                 {confirmable && (
-                  <button className="h-11 bg-ink px-5 text-xs font-black text-paper disabled:opacity-40" disabled={busyKey !== null} onClick={() => void confirm(selectedPayment)} type="button">
+                  <button className="h-11 bg-ink px-5 text-xs font-black text-paper disabled:opacity-40" disabled={busyKey !== null || approvalNote.trim().length < 3} onClick={() => void confirm(selectedPayment)} type="button">
                     {busyKey === key ? "처리 중..." : "내용 확인 후 입금 확인 완료"}
                   </button>
                 )}

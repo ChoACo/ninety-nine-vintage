@@ -692,13 +692,14 @@ test("payment API remains strict but mutations and navigation are owner-only", a
   assert.match(queueRoute, /auth\.user as unknown as RpcClient/);
   assert.doesNotMatch(queueRoute, /export\s+async\s+function\s+POST/);
   assert.match(confirmRoute, /authenticateOwnerPaymentRequest\(request,\s*true\)/);
-  assert.match(confirmRoute, /"confirm_unified_manual_payment_v2"/);
+  assert.match(confirmRoute, /"owner_confirm_manual_payment_with_note"/);
   assert.match(confirmRoute, /p_payment_kind:\s*kind/);
   assert.match(confirmRoute, /p_payment_id:\s*id/);
   assert.match(confirmRoute, /p_observed_received_amount:\s*body\.observedReceivedAmount/);
   assert.match(confirmRoute, /p_observed_ledger_entry_count:\s*body\.observedLedgerEntryCount/);
   assert.match(confirmRoute, /p_expected_version:\s*body\.expectedVersion/);
   assert.match(confirmRoute, /p_idempotency_key:\s*body\.idempotencyKey/);
+  assert.match(confirmRoute, /p_approval_note:\s*approvalNote/);
   assert.match(confirmRoute, /payment_fulfillment_conflict/);
   assert.doesNotMatch(confirmRoute, /\["PT409",\s*"23505",\s*"40001"\]/);
   assert.doesNotMatch(confirmRoute, /\bamount\b\s*:\s*body\./i);

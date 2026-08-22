@@ -94,7 +94,7 @@ export function OwnerReturnControl() {
               <label className="mt-5 grid gap-2 text-xs font-black">확인 문구: {OWNER_RETURN_CONFIRMATION}<input autoComplete="off" className="h-11 border border-line px-3 font-normal" onChange={(event) => setConfirmation(event.target.value)} value={confirmation} /></label>
               <div className="mt-5 grid grid-cols-2 gap-2">
                 <button className="h-11 border border-line text-xs font-bold" disabled={busy} onClick={() => setStep("summary")} type="button">이전</button>
-                <button className="h-11 bg-[#FEE500] text-xs font-black text-[#191919] disabled:opacity-40" disabled={busy || confirmation.trim() !== OWNER_RETURN_CONFIRMATION} onClick={() => void returnToOwner()} type="button">{busy ? "이동 중…" : "Kakao 재인증"}</button>
+                <button className="h-11 bg-kakao text-xs font-black text-kakao-foreground disabled:opacity-40" disabled={busy || confirmation.trim() !== OWNER_RETURN_CONFIRMATION} onClick={() => void returnToOwner()} type="button">{busy ? "이동 중…" : "Kakao 재인증"}</button>
               </div>
             </>
           )}

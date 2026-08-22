@@ -137,7 +137,7 @@ test("member shipment history only exposes preparing or shipped and uses Hanjin 
   assert.match(route, /value\.publicStatus === "preparing" \|\| value\.publicStatus === "shipped"/);
   assert.match(dashboard, /발송 준비중/);
   assert.match(dashboard, /상품 발송/);
-  assert.match(dashboard, /shipment\.publicStatus === "shipped" \? "발송 완료" : "배송 신청"/);
+  assert.match(dashboard, /shipment\.publicStatus === "shipped"[\s\S]*?\? "발송 완료"[\s\S]*?: "배송 신청"/);
   assert.match(dashboard, /<details className="mt-4 border border-line">/);
   assert.match(dashboard, /송장번호 복사/);
   assert.match(dashboard, /택배사 조회/);

@@ -732,7 +732,7 @@ export function OperatorShippingConsole({
                 {!addressReveal && (
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                     <input
-                      className="min-w-0 flex-1 border border-line bg-white px-3 py-2 text-xs"
+                      className="min-w-0 flex-1 border border-line bg-card px-3 py-2 text-xs"
                       maxLength={500}
                       onChange={(event) => setAddressReasons((current) => ({ ...current, [shipment.id]: event.target.value }))}
                       placeholder="열람 사유 (예: 송장 출력)"
@@ -760,7 +760,7 @@ export function OperatorShippingConsole({
                 <p className="text-xs font-bold">신청 상품</p>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3 lg:grid-cols-5">
                   {shipment.items.map((item) => (
-                    <div className={`border p-2 ${item.released ? "border-line" : "border-amber-400 bg-amber-50"}`} key={item.inventoryItemId}>
+                    <div className={`border p-2 ${item.released ? "border-line" : "border-amber-400 bg-amber-500/10"}`} key={item.inventoryItemId}>
                       <div className="aspect-square bg-surface">
                         {item.imageUrl
                           ? <CatalogImage alt="" className="h-full w-full object-cover" loading="lazy" sizes="160px" src={item.imageUrl} />

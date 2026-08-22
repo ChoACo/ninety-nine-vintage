@@ -15,7 +15,7 @@ import { useActiveBidNavigation } from "@/components/features/auction/ActiveBidN
 import { useSimpleMode } from "@/components/features/accessibility/SimpleModeProvider";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 
-export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean }) {
+export function PcHeader() {
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const pathname = usePathname();
@@ -47,7 +47,7 @@ export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean })
       ]
     : standardNavigation;
   return (
-    <header className={`sticky ${hasLiveTicker ? "top-9" : "top-0"} z-[60] block border-b border-line bg-paper/95 text-ink backdrop-blur-md`}>
+    <header className="relative z-0 block bg-paper/90 text-ink backdrop-blur-md">
       <div className="mx-auto flex h-20 w-full max-w-[1440px] items-center gap-5 px-5 sm:px-8 xl:px-10">
         <Link className="shrink-0 whitespace-nowrap text-lg font-black tracking-[-0.06em]" href="/home" prefetch={false}>NINETY-NINE <span className="hidden lg:inline">VINTAGE</span></Link>
         <ThemeToggle className="ml-1 shrink-0 size-10 px-0 xl:ml-4" />

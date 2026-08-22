@@ -102,7 +102,7 @@ export function OwnerManualTransferAccountPanel() {
   return <section className="border border-line bg-surface p-5">
     <div className="flex flex-col gap-3 border-b border-line pb-5">
       <div><p className="eyebrow text-muted">결제 · 공용 계좌</p><h2 className="mt-2 text-xl font-black">수동 계좌이체 설정</h2><p className="mt-2 text-xs leading-5 text-muted">여러 매장의 주문이 이 계좌 하나로 입금됩니다. 변경 내용은 새 입금 안내에 적용되며 기존 주문은 당시 계좌 기록을 유지합니다.</p></div>
-      <span className={`inline-flex w-fit items-center gap-2 border px-3 py-2 text-[10px] font-bold ${configured ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+      <span className={`inline-flex w-fit items-center gap-2 border px-3 py-2 text-[10px] font-bold ${configured ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-500/10 text-amber-800"}`}>
         {configured ? <BadgeCheck size={13} /> : <Landmark size={13} />}{configured ? "결제 가능" : "계좌 설정 필요"}
       </span>
     </div>

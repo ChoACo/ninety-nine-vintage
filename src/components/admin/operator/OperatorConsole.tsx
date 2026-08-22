@@ -233,7 +233,7 @@ export function OperatorConsole({
                     {product.current_price.toLocaleString("ko-KR")}원
                   </p>
                 </div>
-                <span className={`border px-2 py-1 text-[10px] font-bold ${product.status === "closed" && product.pending_lock_kind ? "border-amber-300 bg-amber-50 text-amber-800" : "border-line"}`}>
+                <span className={`border px-2 py-1 text-[10px] font-bold ${product.status === "closed" && product.pending_lock_kind ? "border-amber-300 bg-amber-500/10 text-amber-800" : "border-line"}`}>
                   {productStatusText(product)}
                 </span>
                 {canMutate &&

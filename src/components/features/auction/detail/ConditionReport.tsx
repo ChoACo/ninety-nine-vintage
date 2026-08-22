@@ -40,10 +40,10 @@ export function ConditionReport({ item, surface = "desktop" }: ConditionReportPr
         <p className="mt-4 line-clamp-2 text-xs leading-relaxed text-zinc-600">{notes.join(" · ")}</p>
         {defects.length > 0 && (
           <ul className="mt-3 flex flex-wrap gap-1.5">
-            {defects.map((label) => <li className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[10px] font-bold text-zinc-600" key={label}>{label}</li>)}
+            {defects.map((label) => <li className="rounded-full border border-zinc-200 bg-card px-2.5 py-1 text-[10px] font-bold text-zinc-600" key={label}>{label}</li>)}
           </ul>
         )}
-        <button className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white text-xs font-bold shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95" onClick={() => setOpen(true)} type="button">
+        <button className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-card text-xs font-bold shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95" onClick={() => setOpen(true)} type="button">
           <Eye size={15} /> 상품 상태 상세 보기
         </button>
       </div>
@@ -59,7 +59,7 @@ export function ConditionReport({ item, surface = "desktop" }: ConditionReportPr
         </header>
         <div className="space-y-5 p-6">
           {rows.length > 0 && (
-            <section className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
+            <section className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
               <h3 className="flex items-center gap-2 border-b border-line bg-surface px-4 py-4 text-xs font-bold"><Ruler size={14} /> 실측 사이즈 가이드</h3>
               <dl className="grid grid-cols-2 gap-px bg-line">
                 {rows.map(([label, value]) => (
@@ -71,16 +71,16 @@ export function ConditionReport({ item, surface = "desktop" }: ConditionReportPr
               </dl>
             </section>
           )}
-          <section className="rounded-2xl border border-line bg-zinc-50 p-5 shadow-sm">
+          <section className="rounded-2xl border border-line bg-muted p-5 shadow-sm">
             <h3 className="text-xs font-bold">사용감·오염·하자 기록</h3>
             {defects.length > 0 && (
               <ul className="mt-4 flex flex-wrap gap-1.5">
-                {defects.map((label) => <li className="rounded-full border border-line bg-white px-3 py-1.5 text-[10px] font-bold" key={label}>{label}</li>)}
+                {defects.map((label) => <li className="rounded-full border border-line bg-card px-3 py-1.5 text-[10px] font-bold" key={label}>{label}</li>)}
               </ul>
             )}
-            {defects.length === 0 && <p className="mt-4 rounded-xl border border-white/70 bg-white px-4 py-3 text-xs text-zinc-600">표시된 하자·오염 항목이 없습니다.</p>}
+            {defects.length === 0 && <p className="mt-4 rounded-xl border border-white/70 bg-card px-4 py-3 text-xs text-zinc-600">표시된 하자·오염 항목이 없습니다.</p>}
             <ul className="mt-4 space-y-3 text-xs leading-relaxed text-zinc-600">
-              {notes.map((note) => <li className="rounded-xl border border-white/70 bg-white px-4 py-3 shadow-sm" key={note}>{note}</li>)}
+              {notes.map((note) => <li className="rounded-xl border border-white/70 bg-card px-4 py-3 shadow-sm" key={note}>{note}</li>)}
             </ul>
           </section>
         </div>

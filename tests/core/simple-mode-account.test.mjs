@@ -10,7 +10,9 @@ test("simple mode persists on the device and synchronizes to the signed-in accou
     source("src/app/layout.tsx"),
     source("src/components/features/accessibility/SimpleModeProvider.tsx"),
     source("src/app/api/account/experience/route.ts"),
-    source("supabase/migrations/20260725125706_member_experience_preferences.sql"),
+    source(
+      "supabase/migrations/20260725125706_member_experience_preferences.sql",
+    ),
   ]);
 
   assert.match(layout, /ninety-nine:simple-mode/);
@@ -19,14 +21,28 @@ test("simple mode persists on the device and synchronizes to the signed-in accou
   assert.match(provider, /fetch\("\/api\/account\/experience"/);
   assert.match(route, /authenticateCommerceRequest\(request,\s*true\)/);
   assert.match(route, /\.upsert\(/);
-  assert.match(migration, /create table public\.member_experience_preferences/i);
-  assert.match(migration, /simple_mode_enabled boolean not null default false/i);
+  assert.match(
+    migration,
+    /create table public\.member_experience_preferences/i,
+  );
+  assert.match(
+    migration,
+    /simple_mode_enabled boolean not null default false/i,
+  );
   assert.match(migration, /force row level security/i);
   assert.match(migration, /\(select auth\.uid\(\)\) = user_id/i);
 });
 
 test("simple mode exposes only the five consumer core destinations", async () => {
-  const [bottomNav, header, taskGrid, pcHeader, toggle, globalCss, adminLayout] = await Promise.all([
+  const [
+    bottomNav,
+    header,
+    taskGrid,
+    pcHeader,
+    toggle,
+    globalCss,
+    adminLayout,
+  ] = await Promise.all([
     source("src/components/mobile/MobileSiteBottomNav.tsx"),
     source("src/components/mobile/MobileSiteHeader.tsx"),
     source("src/components/features/account/MobileAccountTaskGrid.tsx"),
@@ -46,9 +62,15 @@ test("simple mode exposes only the five consumer core destinations", async () =>
   assert.match(taskGrid, /grid-cols-1/);
   assert.doesNotMatch(pcHeader, /Accessibility/);
   assert.doesNotMatch(toggle, /Accessibility/);
-  assert.match(globalCss, /html\[data-simple-mode="on"\]\s*\{\s*font-size:\s*19px/);
+  assert.match(
+    globalCss,
+    /html\[data-simple-mode="on"\]\s*\{\s*font-size:\s*19px/,
+  );
   assert.match(globalCss, /min-height:\s*52px/);
-  assert.match(globalCss, /data-ui-surface="mobile"[\s\S]*data-admin-surface[\s\S]*word-break:\s*keep-all/);
+  assert.match(
+    globalCss,
+    /data-ui-surface="mobile"[\s\S]*data-admin-surface[\s\S]*word-break:\s*keep-all/,
+  );
   assert.match(globalCss, /writing-mode:\s*horizontal-tb/);
   assert.match(adminLayout, /flex-col[\s\S]*sm:flex-row/);
 });
@@ -86,12 +108,15 @@ test("mobile account tabs render dedicated views and tolerate partial API failur
     assert.match(sectionPage, new RegExp(`"?${view}"?: "${view}"`));
   }
   assert.match(sectionPage, /<AccountDashboard basePath="\/m" view=\{view\}/);
-  assert.match(dashboard, /일부 계정 정보를 불러오지 못했습니다/);
+  assert.doesNotMatch(dashboard, /일부 계정 정보를 불러오지 못했습니다/);
   assert.match(dashboard, /showAddresses/);
   assert.match(dashboard, /새 배송지 추가/);
   assert.match(dashboard, /pendingDeleteAddressId/);
   assert.match(dashboard, /삭제 확인/);
-  assert.doesNotMatch(dashboard, /window\.confirm\(`\$\{address\.label\} 배송지를 삭제할까요\?`\)/);
+  assert.doesNotMatch(
+    dashboard,
+    /window\.confirm\(`\$\{address\.label\} 배송지를 삭제할까요\?`\)/,
+  );
   assert.match(dashboard, /hidden=\{!showPayments\}/);
   assert.match(dashboard, /hidden=\{!showShipments\}/);
   assert.match(

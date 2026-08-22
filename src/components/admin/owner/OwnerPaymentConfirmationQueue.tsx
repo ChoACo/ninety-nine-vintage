@@ -43,7 +43,7 @@ export function OwnerPaymentConfirmationQueue() {
 
   if (!error && requests.length === 0) return null;
   return (
-    <section className="mb-8 border border-amber-300 bg-amber-50 p-5 text-amber-950">
+    <section className="mb-8 border border-amber-300 bg-amber-500/10 p-5 text-amber-950">
       <p className="text-[10px] font-bold uppercase tracking-[0.18em]">긴급 입금 확인</p>
       <h2 className="mt-2 text-xl font-black">12시간 이상 대기 요청 {requests.length}건</h2>
       {error ? (

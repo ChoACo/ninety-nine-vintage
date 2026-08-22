@@ -583,19 +583,19 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
           {item.name}
         </h1>
         <dl className={`mt-5 grid gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 text-[11px] ${surface === "desktop" ? "grid-cols-3" : "grid-cols-1"}`}>
-          <div className="bg-white px-3 py-3">
+          <div className="bg-card px-3 py-3">
             <dt className="text-zinc-500">카테고리</dt>
             <dd className="mt-1 truncate font-bold">
               {item.category || "미분류"}
             </dd>
           </div>
-          <div className="bg-white px-3 py-3">
+          <div className="bg-card px-3 py-3">
             <dt className="text-zinc-500">사이즈</dt>
             <dd className="mt-1 truncate font-bold">
               {item.size || "표기 없음"}
             </dd>
           </div>
-          <div className="bg-white px-3 py-3">
+          <div className="bg-card px-3 py-3">
             <dt className="text-zinc-500">상태</dt>
             <dd className="mt-1 truncate font-bold">{item.conditionGrade || "미입력"}</dd>
           </div>
@@ -622,7 +622,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
         {measurementChips.length > 0 && (
           <div className="mt-5 flex flex-wrap gap-2 text-[11px] text-zinc-600">
             {measurementChips.map(([label, value]) => (
-              <span className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 shadow-sm" key={label}>
+              <span className="rounded-xl border border-zinc-200 bg-muted px-3 py-2 shadow-sm" key={label}>
                 {label} {value}cm
               </span>
             ))}
@@ -738,7 +738,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
             )}
           </>
         ) : (
-          <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-xs leading-5 text-zinc-600 shadow-sm">
+          <div className="mt-6 rounded-2xl border border-zinc-200 bg-muted p-4 text-xs leading-5 text-zinc-600 shadow-sm">
             실시간 경매는 현재 점검 중입니다. 즉시 구매 상품은 정상적으로 이용할
             수 있습니다.
           </div>

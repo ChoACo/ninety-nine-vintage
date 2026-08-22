@@ -78,7 +78,7 @@ const directoryPickerAttributes = {
 function issueClasses(issue: BatchAuctionIssue) {
   return issue.severity === "error"
     ? "border-red-300 bg-red-50 text-red-800"
-    : "border-amber-300 bg-amber-50 text-amber-900";
+    : "border-amber-300 bg-amber-500/10 text-amber-900";
 }
 
 function progressPercentage(progress: SubmitProgress | null) {
@@ -516,7 +516,7 @@ export function OperatorXlsxImportModal({
                 </select>
               </label>
             </div>
-            <p className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-900">
+            <p className="mt-3 border border-amber-200 bg-amber-500/10 px-3 py-2 text-[11px] leading-5 text-amber-900">
               {selectedStoreCanPublish
                 ? publicationMode === "now"
                   ? "등록이 끝난 상품은 즉시 공개됩니다."

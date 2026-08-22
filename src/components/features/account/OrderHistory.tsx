@@ -364,7 +364,7 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
                 ))}
               </div>
               {order.status === "awaiting_payment" && order.transfer && (
-                <p className="mt-4 border border-amber-200 bg-amber-50 px-3 py-3 text-[11px] leading-5 text-amber-900">
+                <p className="mt-4 border border-amber-200 bg-amber-500/10 px-3 py-3 text-[11px] leading-5 text-amber-900">
                   {order.transfer.expected_amount.toLocaleString("ko-KR")}원 ·{" "}
                   {order.transfer.bank_name_snapshot}{" "}
                   {order.transfer.account_number_snapshot}로 입금해 주세요. 입금

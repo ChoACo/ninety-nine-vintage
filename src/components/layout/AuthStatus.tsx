@@ -30,7 +30,7 @@ export function AuthStatus({
   if (!session) {
     return <Link
       aria-label="카카오 로그인"
-      className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[#FEE500] bg-[#FEE500] px-3 text-[11px] font-bold whitespace-nowrap text-[#191919] shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-[#f5dc00] hover:shadow-md focus-visible:ring-2 focus-visible:ring-[#191919] focus-visible:ring-offset-2 active:translate-y-0 active:scale-[.98]"
+      className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-kakao bg-kakao px-3 text-[11px] font-bold whitespace-nowrap text-kakao-foreground shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:brightness-95 hover:shadow-md focus-visible:ring-2 focus-visible:ring-kakao-foreground focus-visible:ring-offset-2 active:translate-y-0 active:scale-[.98]"
       href={`${basePath}/account/login?next=${encodeURIComponent(fallbackReturnTo)}`}
       onClick={(event) => {
         event.preventDefault();

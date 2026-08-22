@@ -1,16 +1,26 @@
-import { authenticateMemberCommerceRequest, commerceJson } from "@/lib/commerce/server";
+import {
+  authenticateMemberCommerceRequest,
+  commerceJson,
+} from "@/lib/commerce/server";
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type RpcClient = {
-  rpc: (name: string, args?: Record<string, never>) => Promise<{ data: unknown; error: { code?: string } | null }>;
+  rpc: (
+    name: string,
+    args?: Record<string, never>,
+  ) => Promise<{ data: unknown; error: { code?: string } | null }>;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function hasRequiredKeys(value: Record<string, unknown>, keys: readonly string[]) {
+function hasRequiredKeys(
+  value: Record<string, unknown>,
+  keys: readonly string[],
+) {
   return keys.every((key) => Object.prototype.hasOwnProperty.call(value, key));
 }
 
@@ -23,16 +33,22 @@ function isNullableText(value: unknown): value is string | null {
 }
 
 function isTimestamp(value: unknown): value is string | null {
-  return value === null || (typeof value === "string" && Number.isFinite(Date.parse(value)));
+  return (
+    value === null ||
+    (typeof value === "string" && Number.isFinite(Date.parse(value)))
+  );
 }
 
 function inventoryUnavailable(stage: string) {
   console.error("[api/account/storage] inventory unavailable", { stage });
-  return commerceJson({
-    error: "inventory_unavailable",
-    code: "inventory_unavailable",
-    ...(process.env.NODE_ENV === "development" ? { stage } : {}),
-  }, 503);
+  return commerceJson(
+    {
+      error: "inventory_unavailable",
+      code: "inventory_unavailable",
+      ...(process.env.NODE_ENV === "development" ? { stage } : {}),
+    },
+    503,
+  );
 }
 
 type InventoryOverviewItem = Record<string, unknown> & {
@@ -43,21 +59,55 @@ type InventoryOverviewItem = Record<string, unknown> & {
 };
 
 function isInventoryItem(value: unknown): value is InventoryOverviewItem {
-  if (!isRecord(value) || !hasRequiredKeys(value, [
-    "id", "productId", "title", "imageUrl", "sourceKind", "sourceReference",
-    "originStoreId", "originStoreName", "ownershipStatus",
-    "rolloutEnabled", "itemSelectedShipmentsEnabled", "requestEligible", "requestBlockReason",
-    "storageStartedAt", "storageExpiresAt", "activeShipmentId",
-  ])) return false;
+  if (
+    !isRecord(value) ||
+    !hasRequiredKeys(value, [
+      "id",
+      "productId",
+      "title",
+      "imageUrl",
+      "sourceKind",
+      "sourceReference",
+      "originStoreId",
+      "originStoreName",
+      "ownershipStatus",
+      "rolloutEnabled",
+      "itemSelectedShipmentsEnabled",
+      "requestEligible",
+      "requestBlockReason",
+      "storageStartedAt",
+      "storageExpiresAt",
+      "activeShipmentId",
+      "exceptionKind",
+      "exceptionStatus",
+      "exceptionResolution",
+      "exceptionPublicReason",
+    ])
+  )
+    return false;
 
-  return isUuid(value.id) && isUuid(value.productId) &&
-    typeof value.title === "string" && typeof value.imageUrl === "string" &&
-    typeof value.sourceKind === "string" && typeof value.sourceReference === "string" &&
-    isNullableText(value.originStoreId) && isNullableText(value.originStoreName) &&
-    typeof value.ownershipStatus === "string" && typeof value.rolloutEnabled === "boolean" &&
-    typeof value.itemSelectedShipmentsEnabled === "boolean" && typeof value.requestEligible === "boolean" &&
-    isNullableText(value.requestBlockReason) && isTimestamp(value.storageStartedAt) &&
-    isTimestamp(value.storageExpiresAt) && (value.activeShipmentId === null || isUuid(value.activeShipmentId));
+  return (
+    isUuid(value.id) &&
+    isUuid(value.productId) &&
+    typeof value.title === "string" &&
+    typeof value.imageUrl === "string" &&
+    typeof value.sourceKind === "string" &&
+    typeof value.sourceReference === "string" &&
+    isNullableText(value.originStoreId) &&
+    isNullableText(value.originStoreName) &&
+    typeof value.ownershipStatus === "string" &&
+    typeof value.rolloutEnabled === "boolean" &&
+    typeof value.itemSelectedShipmentsEnabled === "boolean" &&
+    typeof value.requestEligible === "boolean" &&
+    isNullableText(value.requestBlockReason) &&
+    isTimestamp(value.storageStartedAt) &&
+    isTimestamp(value.storageExpiresAt) &&
+    (value.activeShipmentId === null || isUuid(value.activeShipmentId)) &&
+    isNullableText(value.exceptionKind) &&
+    isNullableText(value.exceptionStatus) &&
+    isNullableText(value.exceptionResolution) &&
+    isNullableText(value.exceptionPublicReason)
+  );
 }
 
 function isInventoryOverview(value: unknown): value is {
@@ -65,10 +115,15 @@ function isInventoryOverview(value: unknown): value is {
   items: InventoryOverviewItem[];
   serverTime: string;
 } {
-  return isRecord(value) && hasRequiredKeys(value, ["rolloutEnabled", "items", "serverTime"]) &&
+  return (
+    isRecord(value) &&
+    hasRequiredKeys(value, ["rolloutEnabled", "items", "serverTime"]) &&
     typeof value.rolloutEnabled === "boolean" &&
-    Array.isArray(value.items) && value.items.every(isInventoryItem) &&
-    typeof value.serverTime === "string" && Number.isFinite(Date.parse(value.serverTime));
+    Array.isArray(value.items) &&
+    value.items.every(isInventoryItem) &&
+    typeof value.serverTime === "string" &&
+    Number.isFinite(Date.parse(value.serverTime))
+  );
 }
 
 interface LegacyAuctionWinRow {
@@ -119,18 +174,26 @@ interface CenterShippingToken {
 }
 
 function isLegacyAuctionWin(value: unknown): value is LegacyAuctionWinRow {
-  return isRecord(value) && isUuid(value.product_id) && typeof value.title === "string" &&
-    Array.isArray(value.image_urls) && value.image_urls.every((image) => typeof image === "string") &&
-    typeof value.closed_at === "string" && Number.isFinite(Date.parse(value.closed_at)) &&
-    Number.isSafeInteger(Number(value.final_bid_amount)) && Number(value.final_bid_amount) >= 0 &&
-    (value.manual_transfer_order_id === null || isUuid(value.manual_transfer_order_id)) &&
+  return (
+    isRecord(value) &&
+    isUuid(value.product_id) &&
+    typeof value.title === "string" &&
+    Array.isArray(value.image_urls) &&
+    value.image_urls.every((image) => typeof image === "string") &&
+    typeof value.closed_at === "string" &&
+    Number.isFinite(Date.parse(value.closed_at)) &&
+    Number.isSafeInteger(Number(value.final_bid_amount)) &&
+    Number(value.final_bid_amount) >= 0 &&
+    (value.manual_transfer_order_id === null ||
+      isUuid(value.manual_transfer_order_id)) &&
     isNullableText(value.manual_transfer_status) &&
     (value.purchase_offer_id === null || isUuid(value.purchase_offer_id)) &&
     isNullableText(value.purchase_offer_status) &&
     isTimestamp(value.payment_due_at) &&
     typeof value.is_payment_settled === "boolean" &&
     value.active_payment_mode === "manual_transfer" &&
-    typeof value.shipping_status === "string";
+    typeof value.shipping_status === "string"
+  );
 }
 
 function isQuoteGroup(value: unknown): value is QuoteGroup {
@@ -139,19 +202,34 @@ function isQuoteGroup(value: unknown): value is QuoteGroup {
   const itemSubtotal = Number(value.itemSubtotal);
   const shippingFeeAmount = Number(value.shippingFeeAmount);
   const shippingFeeCharged = Number(value.shippingFeeCharged);
-  return isUuid(value.businessId) &&
+  return (
+    isUuid(value.businessId) &&
     typeof value.businessName === "string" &&
-    Number.isSafeInteger(itemCount) && itemCount >= 1 &&
-    Number.isSafeInteger(itemSubtotal) && itemSubtotal >= 0 &&
+    Number.isSafeInteger(itemCount) &&
+    itemCount >= 1 &&
+    Number.isSafeInteger(itemSubtotal) &&
+    itemSubtotal >= 0 &&
     (value.earliestDueAt === null ||
-      (typeof value.earliestDueAt === "string" && Number.isFinite(Date.parse(value.earliestDueAt)))) &&
-    Array.isArray(value.items) && value.items.every((item) =>
-      isRecord(item) && isUuid(item.productId) && typeof item.title === "string" &&
-      Number.isSafeInteger(Number(item.amount)) && Number(item.amount) >= 0 &&
-      (item.dueAt === null || (typeof item.dueAt === "string" && Number.isFinite(Date.parse(item.dueAt))))) &&
+      (typeof value.earliestDueAt === "string" &&
+        Number.isFinite(Date.parse(value.earliestDueAt)))) &&
+    Array.isArray(value.items) &&
+    value.items.every(
+      (item) =>
+        isRecord(item) &&
+        isUuid(item.productId) &&
+        typeof item.title === "string" &&
+        Number.isSafeInteger(Number(item.amount)) &&
+        Number(item.amount) >= 0 &&
+        (item.dueAt === null ||
+          (typeof item.dueAt === "string" &&
+            Number.isFinite(Date.parse(item.dueAt)))),
+    ) &&
     typeof value.hasStoredItems === "boolean" &&
-    Number.isSafeInteger(shippingFeeAmount) && shippingFeeAmount >= 0 &&
-    Number.isSafeInteger(shippingFeeCharged) && shippingFeeCharged >= 0;
+    Number.isSafeInteger(shippingFeeAmount) &&
+    shippingFeeAmount >= 0 &&
+    Number.isSafeInteger(shippingFeeCharged) &&
+    shippingFeeCharged >= 0
+  );
 }
 
 function isAuctionPaymentQuote(value: unknown): value is AuctionPaymentQuote {
@@ -159,12 +237,18 @@ function isAuctionPaymentQuote(value: unknown): value is AuctionPaymentQuote {
   const itemSubtotal = Number(value.itemSubtotal);
   const shippingFeeTotal = Number(value.shippingFeeTotal);
   const expectedTotal = Number(value.expectedTotal);
-  return Array.isArray(value.groups) &&
+  return (
+    Array.isArray(value.groups) &&
     value.groups.every(isQuoteGroup) &&
-    Number.isSafeInteger(itemSubtotal) && itemSubtotal >= 0 &&
-    Number.isSafeInteger(shippingFeeTotal) && shippingFeeTotal >= 0 &&
-    Number.isSafeInteger(expectedTotal) && expectedTotal >= 0 &&
-    typeof value.serverTime === "string" && Number.isFinite(Date.parse(value.serverTime));
+    Number.isSafeInteger(itemSubtotal) &&
+    itemSubtotal >= 0 &&
+    Number.isSafeInteger(shippingFeeTotal) &&
+    shippingFeeTotal >= 0 &&
+    Number.isSafeInteger(expectedTotal) &&
+    expectedTotal >= 0 &&
+    typeof value.serverTime === "string" &&
+    Number.isFinite(Date.parse(value.serverTime))
+  );
 }
 
 export async function GET(request: Request) {
@@ -183,7 +267,11 @@ export async function GET(request: Request) {
       error ? `overview_rpc:${error.code ?? "unknown"}` : "overview_shape",
     );
   }
-  if (legacy.error || !Array.isArray(legacy.data) || !legacy.data.every(isLegacyAuctionWin)) {
+  if (
+    legacy.error ||
+    !Array.isArray(legacy.data) ||
+    !legacy.data.every(isLegacyAuctionWin)
+  ) {
     return inventoryUnavailable(
       legacy.error
         ? `legacy_rpc:${legacy.error.code ?? "unknown"}`
@@ -192,7 +280,9 @@ export async function GET(request: Request) {
   }
   if (quote.error || !isAuctionPaymentQuote(quote.data)) {
     return inventoryUnavailable(
-      quote.error ? `quote_rpc:${quote.error.code ?? "unknown"}` : "quote_shape",
+      quote.error
+        ? `quote_rpc:${quote.error.code ?? "unknown"}`
+        : "quote_shape",
     );
   }
   const legacyWins = legacy.data as LegacyAuctionWinRow[];
@@ -214,7 +304,7 @@ export async function GET(request: Request) {
   const role = roleResult.data;
 
   const manualTransferIds = legacyWins.flatMap((win) =>
-    win.manual_transfer_order_id ? [win.manual_transfer_order_id] : []
+    win.manual_transfer_order_id ? [win.manual_transfer_order_id] : [],
   );
   const manualTransfers = new Map<
     string,
@@ -244,20 +334,29 @@ export async function GET(request: Request) {
       : auth.admin
           .from("customer_inventory_items")
           .select("id, storage_class_snapshot, storage_duration_days")
-          .in("id", data.items.map((item) => item.id)),
+          .in(
+            "id",
+            data.items.map((item) => item.id),
+          ),
     legacyWins.length === 0
       ? Promise.resolve({ data: [], error: null })
       : auth.admin
           .from("products")
           .select("id, storage_class")
-          .in("id", legacyWins.map((win) => win.product_id)),
+          .in(
+            "id",
+            legacyWins.map((win) => win.product_id),
+          ),
     legacyWins.length === 0
       ? Promise.resolve({ data: [], error: null })
       : auth.admin
           .from("customer_inventory_items")
           .select("product_id")
           .eq("member_id", auth.userId)
-          .in("product_id", legacyWins.map((win) => win.product_id)),
+          .in(
+            "product_id",
+            legacyWins.map((win) => win.product_id),
+          ),
     auth.admin
       .from("shipping_fee_waiver_entitlements")
       .select("business_id, businesses(name)")
@@ -324,8 +423,7 @@ export async function GET(request: Request) {
         payment_due_at:
           (win.manual_transfer_order_id
             ? manualTransfers.get(win.manual_transfer_order_id)?.dueAt
-            : null) ??
-          win.payment_due_at,
+            : null) ?? win.payment_due_at,
         is_payment_settled: win.is_payment_settled,
         active_payment_mode: win.active_payment_mode,
         shipping_status: win.shipping_status,
@@ -346,8 +444,7 @@ export async function GET(request: Request) {
         })(),
       })),
     deadlineEnforcementExempt: role?.role_code === "band_member",
-    rememberedDepositorName:
-      accountResult.data?.last_depositor_name ?? null,
+    rememberedDepositorName: accountResult.data?.last_depositor_name ?? null,
     auctionPaymentQuote: quote.data,
     centerShippingTokens,
   });

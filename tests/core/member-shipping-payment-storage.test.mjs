@@ -10,7 +10,9 @@ test("member checkout defaults to shipping and keeps payment and deposit-info di
     source("src/components/features/commerce/CartView.tsx"),
     source("src/components/features/account/CombinedAuctionPayment.tsx"),
     source("src/app/api/payments/manual-transfer/route.ts"),
-    source("supabase/migrations/20260724050537_member_shipping_payment_and_storage_experience.sql"),
+    source(
+      "supabase/migrations/20260724050537_member_shipping_payment_and_storage_experience.sql",
+    ),
   ]);
 
   assert.match(cart, /useState\(true\)/);
@@ -26,11 +28,17 @@ test("member checkout defaults to shipping and keeps payment and deposit-info di
   assert.match(combined, /dialog === "info"/);
   assert.match(combined, /\+택배비/);
   assert.match(combined, /총 결제 금액/);
-  assert.match(route, /p_include_shipping_fee:\s*body\.includeShippingFee !== false/);
+  assert.match(
+    route,
+    /p_include_shipping_fee:\s*body\.includeShippingFee !== false/,
+  );
   assert.match(migration, /p_include_shipping_fee boolean default true/i);
   assert.match(migration, /inventory_fulfillment_rollout_settings/i);
   assert.match(migration, /payment_context = 'auction_bundle'/i);
-  assert.match(migration, /shipping_credit_count = shipping_credit_count \+ v_bundle\.credit_quantity/i);
+  assert.match(
+    migration,
+    /shipping_credit_count = shipping_credit_count \+ v_bundle\.credit_quantity/i,
+  );
   assert.match(migration, /expectedAmount'[\s\S]*v_shipping_fee/i);
   assert.match(
     migration,
@@ -42,7 +50,9 @@ test("standalone shipping credits are retired while historical ledger contracts 
   const [route, dashboard, migration] = await Promise.all([
     source("src/app/api/shipping/credits/route.ts"),
     source("src/components/features/account/AccountDashboard.tsx"),
-    source("supabase/migrations/20260724050537_member_shipping_payment_and_storage_experience.sql"),
+    source(
+      "supabase/migrations/20260724050537_member_shipping_payment_and_storage_experience.sql",
+    ),
   ]);
 
   assert.match(route, /shipping_credit_retired/);
@@ -50,20 +60,43 @@ test("standalone shipping credits are retired while historical ledger contracts 
   assert.match(route, /export async function POST/);
   assert.match(route, /export async function DELETE/);
   assert.match(route, /410/);
-  assert.doesNotMatch(dashboard, /필요한 크레딧 수량|requestShippingCredits|입금 확인 후 적립/);
-  assert.match(migration, /add column credit_quantity integer not null default 1/i);
+  assert.doesNotMatch(
+    dashboard,
+    /필요한 크레딧 수량|requestShippingCredits|입금 확인 후 적립/,
+  );
+  assert.match(
+    migration,
+    /add column credit_quantity integer not null default 1/i,
+  );
   assert.match(migration, /confirm_prepaid_shipping_credit_payment/i);
   assert.match(
     migration,
     /'배송 크레딧 '\s*\|\|\s*payments\.credit_quantity::text\s*\|\|\s*'개'/i,
   );
   assert.match(migration, /payment_context = 'shipping_credit'/i);
-  assert.match(migration, /shipping_credit_count \+ v_payment\.credit_quantity - 1/i);
-  assert.match(migration, /shipping_credit_count - \(v_payment\.credit_quantity - 1\)/i);
+  assert.match(
+    migration,
+    /shipping_credit_count \+ v_payment\.credit_quantity - 1/i,
+  );
+  assert.match(
+    migration,
+    /shipping_credit_count - \(v_payment\.credit_quantity - 1\)/i,
+  );
 });
 
 test("member addresses use the owner-safe RPC and storage shows policy, full list, and item selection", async () => {
-  const [addressRoute, storageRoute, ordersRoute, dashboard, cart, accountPage, accountContent, accountSectionPage, rollout, serverGrant] = await Promise.all([
+  const [
+    addressRoute,
+    storageRoute,
+    ordersRoute,
+    dashboard,
+    cart,
+    accountPage,
+    accountContent,
+    accountSectionPage,
+    rollout,
+    serverGrant,
+  ] = await Promise.all([
     source("src/app/api/account/addresses/route.ts"),
     source("src/app/api/account/storage/route.ts"),
     source("src/app/api/orders/route.ts"),
@@ -72,24 +105,43 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
     source("src/app/(shop)/account/page.tsx"),
     source("src/components/features/mypage/MyDashboard.tsx"),
     source("src/app/(shop)/account/[section]/page.tsx"),
-    source("supabase/migrations/20260724054224_enable_selectable_paid_inventory.sql"),
-    source("supabase/migrations/20260724061006_grant_inventory_server_read.sql"),
+    source(
+      "supabase/migrations/20260724054224_enable_selectable_paid_inventory.sql",
+    ),
+    source(
+      "supabase/migrations/20260724061006_grant_inventory_server_read.sql",
+    ),
   ]);
 
   assert.match(addressRoute, /\.rpc\("upsert_my_shipping_address"/);
   assert.match(addressRoute, /p_id:\s*addressId/);
-  assert.doesNotMatch(addressRoute, /p_id:\s*addressId\s*\?\?\s*crypto\.randomUUID\(\)/);
+  assert.doesNotMatch(
+    addressRoute,
+    /p_id:\s*addressId\s*\?\?\s*crypto\.randomUUID\(\)/,
+  );
   assert.doesNotMatch(addressRoute, /\.from\("shipping_addresses"\)\.insert/);
   assert.match(addressRoute, /5자리 우편번호/);
   assert.match(storageRoute, /storage_class_snapshot,\s*storage_duration_days/);
   assert.match(storageRoute, /storageDurationDays/);
   assert.match(storageRoute, /storage_expires_at/);
   assert.match(storageRoute, /function hasRequiredKeys/);
+  for (const key of [
+    "exceptionKind",
+    "exceptionStatus",
+    "exceptionResolution",
+    "exceptionPublicReason",
+  ]) {
+    assert.match(
+      storageRoute,
+      new RegExp(`isNullableText\\(value\\.${key}\\)`),
+    );
+  }
   assert.doesNotMatch(storageRoute, /function hasExactKeys/);
   assert.match(ordersRoute, /storage_class/);
   assert.match(dashboard, /소형 2주, 대형 1주/);
   assert.match(dashboard, /"전체보기"/);
   assert.match(dashboard, /배송 가능 상품 전체 선택/);
+  assert.match(dashboard, /visibleRequestEligibleItems\.length/);
   assert.match(dashboard, /aria-label=\{`\$\{item\.title\} 배송 선택`\}/);
   assert.match(dashboard, /우편번호 5자리/);
   assert.match(dashboard, /배송지를 저장하고 선택했습니다/);
@@ -103,7 +155,10 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   assert.match(cart, /name="checkout-shipping-address"/);
   assert.match(cart, /배송지 선택/);
   assert.match(dashboard, /col-start-2 row-start-1[\s\S]*id="storage"/);
-  assert.match(dashboard, /col-start-1 row-start-1[\s\S]*id="shipping-request"/);
+  assert.match(
+    dashboard,
+    /col-start-1 row-start-1[\s\S]*id="shipping-request"/,
+  );
   assert.doesNotMatch(dashboard, /id="shipping-credit"/);
   assert.match(dashboard, /<details[^>]*id="refunds"/);
   assert.match(
@@ -112,10 +167,10 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   );
   assert.doesNotMatch(dashboard, /<details[^>]*id="refunds"[^>]*open=\{true\}/);
   assert.match(accountPage, /redirect\("\/my"\)/);
-  assert.match(accountContent, /homeOnly onNavigate/);
+  assert.match(accountContent, /homeOnly[\s\S]*?onNavigate/);
   assert.match(accountContent, /MY 대시보드 메뉴/);
   assert.match(accountContent, /homeOnly/);
-  assert.match(accountContent, /label:"홈"/);
+  assert.match(accountContent, /label:\s*"홈"/);
   assert.match(accountContent, /aria-label="MY 대시보드 메뉴"/);
   assert.match(accountContent, /initialTab/);
   assert.match(accountContent, /주문·배송/);
@@ -147,15 +202,9 @@ test("direct-store cutover projects paid items without reactivating the retired 
   );
   assert.match(repair, /routes\.status = 'active'/);
   assert.match(repair, /centers\.business_id = v_business/);
-  assert.doesNotMatch(
-    repair,
-    /centers\.status = 'active'/,
-  );
+  assert.doesNotMatch(repair, /centers\.status = 'active'/);
   assert.match(repair, /'direct_store_entitlement'/);
-  assert.match(
-    repair,
-    /create_customer_inventory_entitlement\(\s*'auction'/i,
-  );
+  assert.match(repair, /create_customer_inventory_entitlement\(\s*'auction'/i);
   assert.match(
     repair,
     /current_stage = 'reconciliation_required'[\s\S]*current_stage = 'preparing'/,
@@ -164,5 +213,8 @@ test("direct-store cutover projects paid items without reactivating the retired 
     repair,
     /unified_inventory_reads_enabled = true[\s\S]*item_selected_shipments_enabled = true/,
   );
-  assert.doesNotMatch(repair, /update public\.fulfillment_centers[\s\S]*status/);
+  assert.doesNotMatch(
+    repair,
+    /update public\.fulfillment_centers[\s\S]*status/,
+  );
 });

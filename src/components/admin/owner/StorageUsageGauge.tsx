@@ -51,7 +51,7 @@ function getTextColor(ratio: number): string {
 
 function getStateBadgeClasses(state: StorageProviderUsage["state"]): string {
   if (state === "active") return "border-emerald-300 bg-emerald-50 text-emerald-800";
-  if (state === "degraded") return "border-amber-300 bg-amber-50 text-amber-800";
+  if (state === "degraded") return "border-amber-300 bg-amber-500/10 text-amber-800";
   if (state === "offline") return "border-red-300 bg-red-50 text-red-800";
   return "border-line bg-surface text-muted";
 }
@@ -184,7 +184,7 @@ export function StorageUsageGauge() {
           </div>
 
           {totalRatio >= 0.8 && (
-            <div className={`mt-4 border p-3 text-[10px] font-bold ${totalRatio >= 0.95 ? "border-red-200 bg-red-50 text-red-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+            <div className={`mt-4 border p-3 text-[10px] font-bold ${totalRatio >= 0.95 ? "border-red-200 bg-red-50 text-red-700" : "border-amber-200 bg-amber-500/10 text-amber-800"}`}>
               {totalRatio >= 0.95
                 ? "전체 스토리지 용량이 95%를 초과했습니다. 신규 업로드는 다른 프로바이더로 자동 라우팅됩니다."
                 : "전체 스토리지 용량이 80%를 초과했습니다. 임계치 도달 시 자동으로 다음 프로바이더로 롤오버됩니다."}

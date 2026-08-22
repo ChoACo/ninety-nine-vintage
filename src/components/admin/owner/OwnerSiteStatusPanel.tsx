@@ -14,7 +14,7 @@ function databaseBadge(state: DatabaseState) {
     return { className: "border-emerald-200 bg-emerald-50 text-emerald-800", label: "데이터베이스 연결됨" };
   }
   if (state === "unavailable") {
-    return { className: "border-amber-200 bg-amber-50 text-amber-800", label: "데이터베이스 확인 필요" };
+    return { className: "border-amber-200 bg-amber-500/10 text-amber-800", label: "데이터베이스 확인 필요" };
   }
   return { className: "border-line bg-surface text-muted", label: "데이터베이스 연결 확인 중..." };
 }

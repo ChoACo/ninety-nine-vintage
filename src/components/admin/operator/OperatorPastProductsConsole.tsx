@@ -40,7 +40,7 @@ interface ClosedAuction {
 
 function winnerStateBadge(state: ClosedAuction["winnerState"]) {
   if (state === "awaiting_payment") {
-    return { className: "border-amber-300 bg-amber-50 text-amber-800", label: "결제 진행 중" };
+    return { className: "border-amber-300 bg-amber-500/10 text-amber-800", label: "결제 진행 중" };
   }
   if (state === "unpaid_expired") {
     return { className: "border-red-200 bg-red-50 text-red-700", label: "미결제 만료" };
@@ -237,7 +237,7 @@ export function OperatorPastProductsConsole() {
                   )}
                 </span>
                 {product.pending_lock_kind === "auction_payment" && (
-                  <span className="mt-2 inline-flex border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800">
+                  <span className="mt-2 inline-flex border border-amber-300 bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-800">
                     낙찰 대기 · 낙찰자 결제 대기
                   </span>
                 )}

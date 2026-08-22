@@ -17,7 +17,7 @@ function EnabledLiveTickerBar({ surface }: { surface: "desktop" | "mobile" }) {
       ? "기존 참여자 전용"
       : "서버 시간 동기화";
   return (
-    <aside className={`theme-invariant-dark sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950 text-white ${surface === "desktop" ? "h-9" : "h-10"}`}>
+    <aside className={`theme-invariant-dark relative z-0 border-b border-zinc-800 bg-zinc-950/95 text-white backdrop-blur-md ${surface === "desktop" ? "h-9" : "h-10"}`}>
       <div className={`mx-auto flex h-full w-full items-center justify-between gap-3 ${surface === "desktop" ? "max-w-[1200px] px-3 text-xs" : "max-w-5xl px-3 text-[9px]"}`}>
         <div className="flex min-w-0 items-center gap-2 font-medium">
           <span className="flex shrink-0 items-center gap-1.5 tracking-[0.12em] text-emerald-400">

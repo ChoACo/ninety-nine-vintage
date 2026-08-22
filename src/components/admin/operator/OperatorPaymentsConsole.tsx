@@ -728,7 +728,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
                 )}
               </div>
               {needsLedgerAdjustment && (
-                <p className="border-t border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900">
+                <p className="border-t border-amber-300 bg-amber-500/10 px-4 py-3 text-xs font-bold text-amber-900">
                   부분·초과 입금 또는 역분개 상태입니다. 이 단순 확인 화면에서는 처리하지 않고 고급 원장 조정을 사용해 주세요.
                 </p>
               )}

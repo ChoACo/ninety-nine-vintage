@@ -120,7 +120,7 @@ export function OwnerMemberAccessPanel() {
         <div className="p-5">
           {step === "warning" ? (
             <>
-              <div className="flex gap-3 border border-amber-200 bg-amber-50 p-4 text-xs leading-5">
+              <div className="flex gap-3 border border-amber-200 bg-amber-500/10 p-4 text-xs leading-5">
                 <ShieldAlert className="mt-0.5 shrink-0 text-amber-700" size={18} />
                 <p>
                   전환 즉시 이 탭의 소유자 세션은 실제 일반 회원 세션으로 교체됩니다.

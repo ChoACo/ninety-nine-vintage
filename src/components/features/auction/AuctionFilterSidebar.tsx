@@ -155,7 +155,7 @@ export function AuctionFilterSidebar({
         <div className="flex flex-wrap gap-2">
           <button
             aria-pressed={selectedStoreId === "all"}
-            className={`min-h-9 rounded-full border px-3 text-[11px] font-bold transition-colors ${selectedStoreId === "all" ? "border-ink bg-ink text-paper" : "border-zinc-200 bg-white text-ink hover:border-ink"}`}
+            className={`min-h-9 rounded-full border px-3 text-[11px] font-bold transition-colors ${selectedStoreId === "all" ? "border-ink bg-ink text-paper" : "border-zinc-200 bg-card text-ink hover:border-ink"}`}
             onClick={() => selectStore("all")}
             type="button"
           >
@@ -166,7 +166,7 @@ export function AuctionFilterSidebar({
             return (
               <button
                 aria-pressed={active}
-                className={`min-h-9 rounded-full border px-3 text-[11px] font-bold transition-colors ${active ? "border-ink bg-ink text-paper" : "border-zinc-200 bg-white text-ink hover:border-ink"}`}
+                className={`min-h-9 rounded-full border px-3 text-[11px] font-bold transition-colors ${active ? "border-ink bg-ink text-paper" : "border-zinc-200 bg-card text-ink hover:border-ink"}`}
                 key={store.id}
                 onClick={() => selectStore(store.id)}
                 type="button"
@@ -185,7 +185,7 @@ export function AuctionFilterSidebar({
 
       <section className="border-b border-zinc-200 py-5">
         <h3 className="mb-3 text-xs font-bold">상품 검색</h3>
-        <label className="flex h-11 items-center gap-2 border border-zinc-200 bg-white px-3 focus-within:border-zinc-950">
+        <label className="flex h-11 items-center gap-2 border border-zinc-200 bg-card px-3 focus-within:border-zinc-950">
           <Search className="shrink-0 text-zinc-400" size={15} />
           <input
             aria-label="상품명·설명 검색"
@@ -205,7 +205,7 @@ export function AuctionFilterSidebar({
         <h3 className="mb-3 text-xs font-bold">브랜드 카테고리</h3>
         <select
           aria-label="브랜드 카테고리"
-          className="h-11 w-full border border-zinc-200 bg-white px-3 text-xs font-bold outline-none focus:border-zinc-950"
+          className="h-11 w-full border border-zinc-200 bg-card px-3 text-xs font-bold outline-none focus:border-zinc-950"
           onChange={(event) => {
             const nextBrand = event.target.value;
             setSelectedBrand(nextBrand);
@@ -225,7 +225,7 @@ export function AuctionFilterSidebar({
         <h3 className="mb-3 text-xs font-bold">성별 카테고리</h3>
         <select
           aria-label="성별 카테고리"
-          className="h-11 w-full border border-zinc-200 bg-white px-3 text-xs font-bold outline-none focus:border-zinc-950"
+          className="h-11 w-full border border-zinc-200 bg-card px-3 text-xs font-bold outline-none focus:border-zinc-950"
           onChange={(event) => {
             const nextGender = event.target.value as CatalogGender;
             setSelectedGender(nextGender);
@@ -245,7 +245,7 @@ export function AuctionFilterSidebar({
           <h3 className="mb-3 text-xs font-bold">상품 등록일</h3>
           <select
             aria-label="상품 등록일"
-            className="h-11 w-full border border-zinc-200 bg-white px-3 text-xs font-bold outline-none focus:border-zinc-950"
+            className="h-11 w-full border border-zinc-200 bg-card px-3 text-xs font-bold outline-none focus:border-zinc-950"
             onChange={(event) => {
               const nextDate = event.target.value;
               setSelectedDate(nextDate);

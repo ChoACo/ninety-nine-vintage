@@ -227,7 +227,7 @@ export function OwnerRefundConsole() {
                   <p>계좌 등록: {refund.accountSubmittedAt ? new Date(refund.accountSubmittedAt).toLocaleString("ko-KR") : "미등록"}</p>
                   <p>계좌: {refund.maskedAccountNumber ?? "미등록"}</p>
                   {account && (
-                    <div className="border border-amber-300 bg-amber-50 p-4 text-amber-950">
+                    <div className="border border-amber-300 bg-amber-500/10 p-4 text-amber-950">
                       <p className="font-black">{account.bankName} · {account.accountNumber}</p>
                       <p className="mt-2">예금주 {account.accountHolder}</p>
                       <button className="mt-3 flex items-center gap-2 text-[11px] font-bold underline" onClick={() => setRevealed((current) => { const next = { ...current }; delete next[subjectKey]; return next; })} type="button"><EyeOff size={13} /> 계좌 숨기기</button>

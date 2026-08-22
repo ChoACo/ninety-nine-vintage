@@ -22,7 +22,8 @@ test("the storefront renders separate mobile and fluid desktop presentation tree
   assert.match(home, /<HomeFeaturedAuction products=\{featuredAuctions\} \/>/);
   assert.match(mobileHome, /data-mobile-home/);
   assert.match(mobileHome, /basePath="\/m"/);
-  assert.match(layout, /<PcHeader hasLiveTicker=\{LIVE_AUCTION_ENABLED\} \/>/);
+  assert.match(layout, /data-global-sticky-header/);
+  assert.match(layout, /<PcHeader \/>/);
   assert.match(layout, /data-ui-surface="desktop"/);
   assert.match(layout, /max-w-\[1600px\]/);
   assert.match(layout, /data-desktop-canvas="fluid"/);
@@ -39,7 +40,8 @@ test("the storefront renders separate mobile and fluid desktop presentation tree
   assert.match(home, /"only screen and \(max-width: 1279px\)": "\/m\/home"/);
   assert.match(css, /\[data-ui-surface="desktop"\][\s\S]*word-break: keep-all/);
   assert.match(mobileLayout, /data-ui-surface="mobile"/);
-  assert.match(mobileLayout, /<MobileSiteHeader hasLiveTicker=\{LIVE_AUCTION_ENABLED\} \/>/);
+  assert.match(mobileLayout, /data-global-sticky-header/);
+  assert.match(mobileLayout, /<MobileSiteHeader \/>/);
   assert.match(mobileLayout, /<MobileSiteBottomNav \/>/);
   assert.doesNotMatch(mobileLayout, /PcHeader|PcFooter|PcLayout/);
 });

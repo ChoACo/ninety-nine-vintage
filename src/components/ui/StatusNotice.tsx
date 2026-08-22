@@ -5,7 +5,7 @@ type NoticeVariant = "neutral" | "success" | "warning" | "error";
 const noticeClasses: Record<NoticeVariant, string> = {
   neutral: "border border-line bg-surface",
   success: "border border-emerald-200 bg-emerald-50 text-emerald-800",
-  warning: "border border-amber-200 bg-amber-50 text-amber-900",
+  warning: "border border-amber-200 bg-amber-500/10 text-amber-900",
   error: "border border-red-200 bg-red-50 text-red-700",
 };
 

@@ -53,7 +53,7 @@ const severityLabels: Record<string, string> = {
 
 function severityClass(severity: string) {
   if (severity === "critical") return "border-red-500 bg-red-50 text-red-700";
-  if (severity === "warning") return "border-amber-300 bg-amber-50 text-amber-800";
+  if (severity === "warning") return "border-amber-300 bg-amber-500/10 text-amber-800";
   if (severity === "notice") return "border-blue-200 bg-blue-50 text-blue-800";
   return "border-line text-muted";
 }

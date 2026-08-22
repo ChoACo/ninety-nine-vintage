@@ -866,7 +866,7 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
   assert.doesNotMatch(dashboard, /fetch\("\/api\/orders"/);
   assert.doesNotMatch(dashboard, /orderId:\s*selectedLegacyOrder\?\.id/);
   assert.doesNotMatch(dashboard, /physicalStatus|locationKind|exceptionPublicReason|lineStatus/);
-  assert.match(dashboard, /서로 다른 매장 상품도 한 번에 신청/);
+  assert.match(dashboard, /서로\s+다른 매장 상품도\s+한 번에 신청/);
   assert.match(dashboard, /상품 상세보기/);
   assert.match(dashboard, /환불 진행 상황/);
   assert.match(dashboard, /환불 계좌 등록/);

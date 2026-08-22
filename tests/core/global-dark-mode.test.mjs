@@ -52,23 +52,26 @@ assert.match(toggle, /dark \? "모던 모드" : "다크 모드"/);
 test("dark palette uses layered non-black surfaces with readable contrast", async () => {
   const css = await source("src/app/globals.css");
   const tailwind = await source("tailwind.config.ts");
-  const darkBlock = css.match(/html\[data-theme="dark"\]\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const darkBlock = css.match(/html\[data-theme="dark"\],[\s\S]*?\.dark\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
   const rootBlock = css.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
   const modernBlock = css.match(/html\[data-theme="light"\]\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
 
 assert.match(css, /:root\s*\{/);
   assert.match(rootBlock, /color-scheme: light/);
-  assert.match(rootBlock, /--theme-paper:\s*251 250 247/);
-  assert.match(darkBlock, /--theme-paper:\s*21 24 28/);
-  assert.match(darkBlock, /--theme-surface:\s*31 36 42/);
-  assert.match(darkBlock, /--theme-line:\s*64 71 80/);
+  assert.match(rootBlock, /--theme-paper:\s*255 255 255/);
+  assert.match(darkBlock, /--theme-paper:\s*9 9 11/);
+  assert.match(darkBlock, /--theme-surface:\s*24 24 27/);
+  assert.match(darkBlock, /--theme-line:\s*39 39 42/);
   assert.match(css, /--store-card-1:\s*#554b40/);
   assert.match(modernBlock, /color-scheme: light/);
-  assert.match(modernBlock, /--theme-paper:\s*251 250 247/);
+  assert.match(modernBlock, /--theme-paper:\s*255 255 255/);
   assert.match(css, /\.theme-invariant-dark/);
-  assert.ok(contrast([21, 24, 28], [241, 236, 226]) >= 7, "paper and ink must meet enhanced contrast");
-  assert.ok(contrast([21, 24, 28], [174, 181, 191]) >= 4.5, "muted text must remain readable");
-  assert.ok(contrast([31, 36, 42], [241, 236, 226]) >= 7, "surface and ink must meet enhanced contrast");
+  assert.ok(contrast([9, 9, 11], [250, 250, 250]) >= 7, "paper and ink must meet enhanced contrast");
+  assert.ok(contrast([9, 9, 11], [161, 161, 170]) >= 4.5, "muted text must remain readable");
+  assert.ok(contrast([24, 24, 27], [250, 250, 250]) >= 7, "surface and ink must meet enhanced contrast");
+  for (const token of ["background", "foreground", "card", "card-foreground", "popover", "popover-foreground", "primary", "primary-foreground", "muted", "muted-foreground", "accent", "accent-foreground", "border", "input", "ring"]) {
+    assert.match(css, new RegExp(`--${token}:`));
+  }
   for (const token of ["ink", "paper", "line", "muted", "surface", "inverse"]) {
     assert.match(tailwind, new RegExp(`rgb\\(var\\(--theme-${token}\\) \\/ <alpha-value>\\)`));
   }

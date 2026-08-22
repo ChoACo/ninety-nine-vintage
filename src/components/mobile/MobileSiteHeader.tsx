@@ -23,7 +23,7 @@ const MEMBER_ONLY_MOBILE_HREFS = new Set([
   "/m/account/shipping",
 ]);
 
-export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean }) {
+export function MobileSiteHeader() {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -71,7 +71,7 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
 
   return (
     <>
-      <header className={`sticky ${hasLiveTicker ? "top-10" : "top-0"} z-[60] border-b border-line bg-paper/95 backdrop-blur-md`}>
+      <header className="relative z-0 bg-paper/90 backdrop-blur-md">
         <div className="flex h-14 items-center gap-1 px-2">
           <button aria-expanded={menuOpen} aria-label="전체 메뉴 열기" className="grid size-11 shrink-0 place-items-center rounded-full active:bg-surface" onClick={() => setMenuOpen(true)} type="button"><Menu size={21} /></button>
           <Link className="min-w-0 flex-1 truncate px-1 text-sm font-black tracking-[-0.05em]" href="/m/home" prefetch={false}>NINETY-NINE</Link>
@@ -79,7 +79,7 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
             {!consumerSimpleMode && <button aria-expanded={searchOpen} aria-label="상품 검색 열기" className="grid size-11 place-items-center rounded-full active:bg-surface" onClick={() => setSearchOpen((value) => !value)} type="button"><Search size={20} /></button>}
             <ThemeToggle className="size-11 rounded-full px-0" />
             {!session ? (
-              <Link aria-label="카카오 로그인" className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-[#FEE500] px-4 text-xs font-bold text-[#191919] shadow-sm focus-visible:ring-2 focus-visible:ring-[#191919] focus-visible:ring-offset-2 active:scale-[.98]" href="/m/account/login" onClick={(event) => {
+              <Link aria-label="카카오 로그인" className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-kakao px-4 text-xs font-bold text-kakao-foreground shadow-sm focus-visible:ring-2 focus-visible:ring-kakao-foreground focus-visible:ring-offset-2 active:scale-[.98]" href="/m/account/login" onClick={(event) => {
                 event.preventDefault();
                 const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
                 window.location.assign(`/m/account/login?next=${encodeURIComponent(next)}`);

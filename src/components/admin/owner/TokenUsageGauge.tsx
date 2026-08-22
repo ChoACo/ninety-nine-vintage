@@ -26,7 +26,7 @@ function getTextColor(percentage: number): string {
 
 function getBorderColor(percentage: number): string {
   if (percentage >= 95) return "border-red-200 bg-red-50";
-  if (percentage >= 80) return "border-amber-200 bg-amber-50";
+  if (percentage >= 80) return "border-amber-200 bg-amber-500/10";
   return "border-emerald-200 bg-emerald-50";
 }
 
@@ -65,7 +65,7 @@ export function TokenUsageGauge() {
           <p className="mt-1 text-[10px] text-muted">월간 한도 {MONTHLY_LIMIT.toLocaleString("ko-KR")} 토큰</p>
         </div>
         <div className="flex items-center gap-3">
-          <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${isLoading ? "bg-surface text-muted" : data && data.fallbackCalls > 0 ? "border border-amber-300 bg-amber-50 text-amber-800" : "border border-emerald-300 bg-emerald-50 text-emerald-800"}`}>
+          <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${isLoading ? "bg-surface text-muted" : data && data.fallbackCalls > 0 ? "border border-amber-300 bg-amber-500/10 text-amber-800" : "border border-emerald-300 bg-emerald-50 text-emerald-800"}`}>
             {isLoading ? "로딩 중" : data && data.fallbackCalls > 0 ? "Fallback 활성" : "Primary 정상"}
           </span>
         </div>

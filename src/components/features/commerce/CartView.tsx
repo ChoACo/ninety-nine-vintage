@@ -1124,7 +1124,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
       {staleCount > 0 && (
         <div
           aria-live="polite"
-          className="border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900"
+          className="border border-amber-200 bg-amber-500/10 px-4 py-3 text-xs text-amber-900"
         >
           판매가 완료·공개 종료되었거나 현재 계정으로 구매할 수 없는 상품 {staleCount}개를
           장바구니에서 제외했습니다.
@@ -1133,7 +1133,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
       {hasPendingCheckout && !busy && (
         <div
           aria-live="polite"
-          className="border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900"
+          className="border border-amber-200 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-900"
         >
           <p>
             진행 중인 주문 요청이 있습니다. 결제 재개는 저장된 동일 주문 키와
@@ -1170,7 +1170,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
             messageKind === "error"
               ? "border border-red-200 bg-red-50 px-4 py-3 text-xs leading-5 text-red-900"
               : messageKind === "warning"
-                ? "border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900"
+                ? "border border-amber-200 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-900"
                 : "border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900"
           }
         >
@@ -1317,7 +1317,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                       <button className={`border px-2 py-2 text-[10px] font-bold ${pendingDeleteAddressId === address.id ? "border-rose-700 bg-rose-700 text-white" : "border-rose-300 text-rose-700"}`} disabled={busy || hasPendingCheckout || addressBusy} onClick={() => void deleteCheckoutAddress(address)} type="button">{pendingDeleteAddressId === address.id ? "삭제 확인" : "삭제"}</button>
                     </div>
                   </div>
-                )) : <span className="block border border-amber-200 bg-amber-50 px-3 py-3 text-[11px] font-normal leading-5 text-amber-900">저장된 배송지가 없습니다. 아래에서 바로 추가해 주세요.</span>}
+                )) : <span className="block border border-amber-200 bg-amber-500/10 px-3 py-3 text-[11px] font-normal leading-5 text-amber-900">저장된 배송지가 없습니다. 아래에서 바로 추가해 주세요.</span>}
                 {!hasPendingCheckout && <button className="min-h-11 w-full border border-ink px-3 py-2 text-xs font-bold" disabled={busy || addressBusy} onClick={openAddressCreate} type="button">{shippingAddresses.length > 0 ? "배송지 추가" : "배송지 추가하고 선택"}</button>}
               </div>
             </div>
@@ -1336,7 +1336,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                 <button className="min-h-11 flex-1 bg-ink px-3 py-2 text-xs font-bold text-paper" disabled={addressBusy} onClick={() => void saveCheckoutAddress()} type="button">{addressBusy ? "저장 중…" : editingAddressId ? "수정 저장" : "추가하고 선택"}</button>
               </div>
             </div>}
-            <p className="mt-3 border border-amber-200 bg-amber-50 px-3 py-3 text-[11px] leading-5 text-amber-900">즉시구매는 구매 시 선택한 배송지로 결제 확인 후 바로 배송 접수됩니다. 입금은 주문 후 최대 6시간 이내에 완료해야 하며, 미입금 취소가 반복되면 구매·입찰 이용이 제한될 수 있습니다.</p>
+            <p className="mt-3 border border-amber-200 bg-amber-500/10 px-3 py-3 text-[11px] leading-5 text-amber-900">즉시구매는 구매 시 선택한 배송지로 결제 확인 후 바로 배송 접수됩니다. 입금은 주문 후 최대 6시간 이내에 완료해야 하며, 미입금 취소가 반복되면 구매·입찰 이용이 제한될 수 있습니다.</p>
             {shippingCharges.length > 0 ? (
               <div className="mt-3 space-y-2 border border-line bg-paper p-3 text-[11px]">
                 <p className="font-bold">배송비 {shippingCharges.length}건</p>
@@ -1370,7 +1370,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                 </p>
               </div>
             ) : (
-              <div className="mt-6 border border-amber-200 bg-amber-50 px-3 py-3 text-[11px] text-amber-900">
+              <div className="mt-6 border border-amber-200 bg-amber-500/10 px-3 py-3 text-[11px] text-amber-900">
                 결제 운영 모드를 확인하고 있습니다.
               </div>
             )}

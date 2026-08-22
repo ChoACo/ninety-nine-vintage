@@ -30,7 +30,7 @@ test("delivery and D+1 settlement remain atomic and idempotent", () => {
   assert.doesNotMatch(migration, /create table public\.settlement_ledger/);
 });
 
-test("hourly cron routes are secret protected and bounded", () => {
+test("daily hobby-compatible cron routes are secret protected and bounded", () => {
   for (const route of [trackingCron, settlementCron]) {
     assert.match(route, /CRON_SECRET/);
     assert.match(route, /if \(!cronSecret/);
@@ -42,10 +42,10 @@ test("hourly cron routes are secret protected and bounded", () => {
   const config = JSON.parse(vercel);
   assert.deepEqual(config.crons.find((cron) => cron.path === "/api/cron/track-deliveries"), {
     path: "/api/cron/track-deliveries",
-    schedule: "0 * * * *",
+    schedule: "0 1 * * *",
   });
   assert.deepEqual(config.crons.find((cron) => cron.path === "/api/cron/auto-settlement"), {
     path: "/api/cron/auto-settlement",
-    schedule: "30 * * * *",
+    schedule: "0 2 * * *",
   });
 });

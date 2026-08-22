@@ -16,9 +16,9 @@ test("MY auction history exposes payment only for unsettled authoritative wins",
   assert.match(route, /won\s*\?\s*"final"/);
   assert.match(
     history,
-    /item\.state === "final"[^]*account\/payments\?productId=/,
+    /item\.state === "final"[^]*checkout\?type=auction&id=/,
   );
-  assert.match(history, /item\.state === "settled"[^]*account\/storage/);
+  assert.match(history, /item\.state === "settled"[^]*my\/vault/);
   assert.match(history, /결제 완료 · 보관함 이동/);
 });
 

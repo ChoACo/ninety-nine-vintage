@@ -30,7 +30,7 @@ export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean })
     ...(LIVE_AUCTION_ENABLED && hasActiveBid ? [{ label: "입찰 중인 상품", href: "/bidding", icon: Clock }] : []),
     ...(LIVE_AUCTION_ENABLED ? [{ label: "라이브 옥션", href: "/live", icon: Gavel }] : []),
     { label: "아카이브 숍", href: "/shop", icon: Store },
-    { label: "보관함 안내", href: "/account/storage", icon: Package },
+    { label: "보관함 안내", href: "/my/vault", icon: Package },
   ];
   useEffect(() => { const onKey = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchRef.current?.focus(); } }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, []);
   const navigation = simpleMode.enabled
@@ -38,8 +38,8 @@ export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean })
         { label: "홈", href: "/home" },
         { label: "입찰", href: "/live" },
         { label: "구매", href: "/shop" },
-        { label: "결제·배송", href: "/account#auction-payments" },
-        { label: "내 정보", href: "/account" },
+        { label: "결제·배송", href: "/my/orders" },
+        { label: "내 정보", href: "/my" },
       ]
     : standardNavigation;
   return (

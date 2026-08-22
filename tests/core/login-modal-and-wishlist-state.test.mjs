@@ -54,7 +54,7 @@ test("member account pages redirect guests before rendering private dashboards",
   const [boundary, desktopAccount, mobileAccount, mobileSection, legacySettings, settings] =
     await Promise.all([
       source("src/components/features/account/MemberAccountBoundary.tsx"),
-      source("src/app/(shop)/account/page.tsx"),
+      source("src/app/(shop)/my/page.tsx"),
       source("src/app/(mobile)/m/account/page.tsx"),
       source("src/app/(mobile)/m/account/[section]/page.tsx"),
       source("src/app/(mobile)/m/account/settings/page.tsx"),
@@ -64,7 +64,7 @@ test("member account pages redirect guests before rendering private dashboards",
   assert.match(boundary, /router\.replace/);
   assert.match(boundary, /account\/login\?next=/);
   assert.match(boundary, /if \(loading \|\| !session\)/);
-  assert.match(desktopAccount, /<MemberAccountBoundary>/);
+  assert.match(desktopAccount, /<MemberAccountBoundary returnTo="\/my">/);
   for (const mobilePage of [mobileAccount, mobileSection]) {
     assert.match(mobilePage, /<MemberAccountBoundary basePath="\/m"/);
   }

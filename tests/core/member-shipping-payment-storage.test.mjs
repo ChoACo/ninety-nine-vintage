@@ -70,7 +70,7 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
     source("src/components/features/account/AccountDashboard.tsx"),
     source("src/components/features/commerce/CartView.tsx"),
     source("src/app/(shop)/account/page.tsx"),
-    source("src/components/features/account/DesktopAccountContent.tsx"),
+    source("src/components/features/mypage/MyDashboard.tsx"),
     source("src/app/(shop)/account/[section]/page.tsx"),
     source("supabase/migrations/20260724054224_enable_selectable_paid_inventory.sql"),
     source("supabase/migrations/20260724061006_grant_inventory_server_read.sql"),
@@ -111,24 +111,21 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
     /<details[^>]*id="refunds"[^>]*open=\{view === "refunds" \? true : undefined\}/,
   );
   assert.doesNotMatch(dashboard, /<details[^>]*id="refunds"[^>]*open=\{true\}/);
-  assert.match(accountPage, /<DesktopAccountContent \/>/);
+  assert.match(accountPage, /redirect\("\/my"\)/);
   assert.match(accountContent, /homeOnly onNavigate/);
-  assert.match(accountContent, /내 작업 공간/);
+  assert.match(accountContent, /MY 대시보드 메뉴/);
   assert.match(accountContent, /homeOnly/);
-  assert.match(accountContent, />홈</);
-  assert.match(accountContent, /<nav aria-label="MY 작업 메뉴">/);
-  assert.match(accountContent, /aria-expanded=\{categoryActive\}/);
-  assert.match(accountContent, /aria-current=\{task\.view === activeTask\.view \? "page" : undefined\}/);
-  assert.match(accountContent, /배송지 관리/);
-  assert.match(accountContent, /보관 \/ 배송/);
-  assert.doesNotMatch(accountContent, /\{ label: "배송 신청", view: "shipping-request" \}/);
+  assert.match(accountContent, /label:"홈"/);
+  assert.match(accountContent, /aria-label="MY 대시보드 메뉴"/);
+  assert.match(accountContent, /initialTab/);
+  assert.match(accountContent, /주문·배송/);
+  assert.match(accountContent, /보관함/);
   assert.match(dashboard, /배송 상담/);
   assert.match(dashboard, /openShippingRequest/);
   assert.doesNotMatch(accountContent, /role="dialog"/);
-  assert.match(accountContent, /window\.history\.pushState/);
-  assert.match(accountSectionPage, /redirect\(`\/account\?task=/);
-  assert.match(accountContent, /<RoleWorkCenterLink \/>/);
-  assert.match(accountContent, /<BidHistory surface="desktop" \/>/);
+  assert.doesNotMatch(accountContent, /window\.history\.pushState/);
+  assert.match(accountSectionPage, /redirect\("\/my\/vault"\)/);
+  assert.match(accountContent, /<BidHistory basePath=\{basePath\}/);
   assert.match(rollout, /create_customer_inventory_entitlement\(\s*'auction'/i);
   assert.match(rollout, /current_stage = 'reconciliation_required'/i);
   assert.match(rollout, /current_stage = 'preparing'/i);

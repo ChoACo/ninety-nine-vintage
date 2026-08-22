@@ -8,7 +8,7 @@ const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 test("first-login nickname setup is limited to Kakao account hubs and every later change is reviewed", async () => {
   const [layout, desktopAccount, mobileAccount, mobileSettings, gate, settings, review, migration] = await Promise.all([
     source("src/app/layout.tsx"),
-    source("src/app/(shop)/account/page.tsx"),
+    source("src/app/(shop)/my/page.tsx"),
     source("src/app/(mobile)/m/account/page.tsx"),
     source("src/app/(mobile)/m/settings/page.tsx"),
     source("src/components/account/NicknameGate.tsx"),

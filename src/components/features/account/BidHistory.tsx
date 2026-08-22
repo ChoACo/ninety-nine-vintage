@@ -162,8 +162,8 @@ export function BidHistory({ basePath = "", surface = "mobile" }: { basePath?: "
                   {new Date(item.createdAt).toLocaleString("ko-KR")} · 마감{" "}
                   {new Date(item.closesAt).toLocaleString("ko-KR")}
                 </p>
-                {item.state === "final" && <Link className="mt-3 inline-flex min-h-10 items-center bg-ink px-4 text-xs font-bold text-paper" href={`${basePath}/account/payments?productId=${item.productId}`}>결제하기</Link>}
-                {item.state === "settled" && <Link className="mt-3 inline-flex min-h-10 items-center border border-line px-4 text-xs font-bold" href={`${basePath}/account/storage`}>보관함에서 확인</Link>}
+                {item.state === "final" && <Link className="mt-3 inline-flex min-h-10 items-center bg-ink px-4 text-xs font-bold text-paper" href={basePath === "/m" ? `/m/my?tab=auction&paymentId=${item.productId}` : `/checkout?type=auction&id=${item.productId}`}>결제하기</Link>}
+                {item.state === "settled" && <Link className="mt-3 inline-flex min-h-10 items-center border border-line px-4 text-xs font-bold" href={basePath === "/m" ? "/m/my?tab=vault" : "/my/vault"}>보관함에서 확인</Link>}
               </div>
             </article>
           ))}

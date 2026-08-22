@@ -775,7 +775,7 @@ test("buyer purchase surfaces use manual transfer and expose legacy history read
   assert.match(cart, /입금 대기 중/);
   assert.match(cart, /bank_name_snapshot/);
   assert.match(cart, /account_number_snapshot/);
-  assert.match(settlement, /href=\{`\$\{basePath\}\/account#auction-payments`\}/);
+  assert.match(settlement, /checkout\?type=auction&id=\$\{productId\}/);
   assert.match(settlement, /개별 결제하지 않습니다/);
   assert.match(combinedPayment, /\/api\/payments\/manual-transfer/);
   assert.match(combinedPayment, /transfer\.bankName[\s\S]{0,100}transfer\.accountNumber/);

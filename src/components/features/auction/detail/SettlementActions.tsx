@@ -15,6 +15,7 @@ export function SettlementActions({
   basePath = "",
   deadlineAt = null,
   deadlineEnforcementExempt = false,
+  productId,
 }: SettlementActionsProps) {
   const deadline = deadlineAt && Number.isFinite(Date.parse(deadlineAt))
     ? new Intl.DateTimeFormat("ko-KR", {
@@ -35,7 +36,7 @@ export function SettlementActions({
       </p>
       <Link
         className="flex h-10 w-full items-center justify-center border border-zinc-950 text-xs font-bold transition-colors hover:bg-zinc-950 hover:text-white"
-        href={`${basePath}/account#auction-payments`}
+        href={basePath === "/m" ? "/m/my?tab=auction" : `/checkout?type=auction&id=${productId}`}
       >
         낙찰품 전체 결제하기
       </Link>

@@ -103,7 +103,7 @@ test("member and operator surfaces expose store selection and direct member chat
   assert.match(storagePanel, /\/admin\/operator\/chat\?memberId=/);
   assert.doesNotMatch(operatorLayout, /회원 채팅/);
   assert.match(operatorLayout, /label:\s*"공지"/);
-  assert.match(workspaceShell, /href="\/account"/);
+  assert.match(workspaceShell, /href="\/my"/);
   assert.match(localAccounts, /slot === "operator-secondary" \? 1 : 0/);
 });
 

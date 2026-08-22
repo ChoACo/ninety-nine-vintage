@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Boxes, ChartNoAxesCombined, CircleHelp, Gavel, LayoutDashboard, PackagePlus, Settings, Truck, type LucideIcon } from "lucide-react";
+import { useAdminSidebarStore } from "@/store/useAdminSidebarStore";
 
 const WORKSPACE_ICONS: Record<string, LucideIcon> = {
   auctions: Gavel,
@@ -51,24 +52,36 @@ function isActive(pathname: string, item: AdminWorkspaceItem) {
 export function AdminWorkspaceShell({ children, contentHeader, contextBar, description, eyebrow, navigation, operatorMode = false, title, utility, workspaceMode = "default" }: Readonly<AdminWorkspaceShellProps>) {
   const pathname = usePathname();
   const darkMode = operatorMode || workspaceMode !== "default";
+  const sidebarMode = workspaceMode === "owner" ? "owner" : "operator";
   const sidebarStorageKey = workspaceMode === "owner" ? "ninety-nine:owner-sidebar" : "ninety-nine:operator-sidebar";
-  const [collapsed, setCollapsed] = useState(() => darkMode && typeof window !== "undefined" && window.localStorage.getItem(sidebarStorageKey) === "collapsed");
+  const collapsed = useAdminSidebarStore((state) => state.collapsed[sidebarMode]);
+  const hydrateSidebar = useAdminSidebarStore((state) => state.hydrate);
+  const toggleSidebar = useAdminSidebarStore((state) => state.toggle);
+
+  useEffect(() => {
+    if (!darkMode) return;
+    hydrateSidebar(sidebarMode, window.localStorage.getItem(sidebarStorageKey) === "collapsed");
+  }, [darkMode, hydrateSidebar, sidebarMode, sidebarStorageKey]);
 
   useEffect(() => {
     if (!darkMode) return;
     const onShortcut = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "b") {
         event.preventDefault();
-        setCollapsed((value) => {
-          const next = !value;
-          window.localStorage.setItem(sidebarStorageKey, next ? "collapsed" : "expanded");
-          return next;
-        });
+        const next = !useAdminSidebarStore.getState().collapsed[sidebarMode];
+        toggleSidebar(sidebarMode);
+        window.localStorage.setItem(sidebarStorageKey, next ? "collapsed" : "expanded");
       }
     };
     window.addEventListener("keydown", onShortcut);
     return () => window.removeEventListener("keydown", onShortcut);
-  }, [darkMode, sidebarStorageKey]);
+  }, [darkMode, sidebarMode, sidebarStorageKey, toggleSidebar]);
+
+  const handleToggleSidebar = () => {
+    const next = !collapsed;
+    toggleSidebar(sidebarMode);
+    window.localStorage.setItem(sidebarStorageKey, next ? "collapsed" : "expanded");
+  };
 
   const groups = navigation.reduce<Record<string, AdminWorkspaceItem[]>>((acc, item) => {
     const group = item.group ?? "메뉴";
@@ -77,16 +90,16 @@ export function AdminWorkspaceShell({ children, contentHeader, contextBar, descr
   }, {});
 
   return (
-    <div className={`grid min-w-0 gap-6 lg:gap-8 ${darkMode ? "lg:grid-cols-[250px_minmax(0,1fr)]" : "lg:grid-cols-[248px_minmax(0,1fr)]"}`}>
+    <div className={`grid min-w-0 gap-6 transition-[grid-template-columns] duration-200 lg:gap-8 ${darkMode ? (collapsed ? "lg:grid-cols-[64px_minmax(0,1fr)]" : "lg:grid-cols-[256px_minmax(0,1fr)]") : "lg:grid-cols-[248px_minmax(0,1fr)]"}`}>
       <aside className="min-w-0 lg:sticky lg:top-6 lg:self-start">
-        <div className={`${darkMode ? "rounded-2xl border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl shadow-zinc-950/20" : "border-line bg-surface"} border p-4 sm:p-5`}>
+        <div className={`${darkMode ? "rounded-2xl border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl shadow-zinc-950/20" : "border-line bg-surface"} border p-4 sm:p-5 ${collapsed ? "lg:p-3" : ""}`}>
           <div className="flex items-start justify-between gap-3">
             <div className={collapsed ? "lg:hidden" : undefined}>
               <p className={`eyebrow ${darkMode ? "text-zinc-500" : "text-muted"}`}>{eyebrow}</p>
               <h1 className="mt-2 text-xl font-black tracking-[-.05em]">{title}</h1>
               <p className={`mt-2 text-xs leading-5 ${darkMode ? "text-zinc-400" : "text-muted"}`}>{description}</p>
             </div>
-            {darkMode && <button aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"} className="hidden size-9 shrink-0 place-items-center rounded-xl border border-zinc-700 text-zinc-300 transition hover:border-zinc-400 focus-visible:ring-2 focus-visible:ring-amber-500 lg:grid" onClick={() => setCollapsed((value) => { const next = !value; window.localStorage.setItem(sidebarStorageKey, next ? "collapsed" : "expanded"); return next; })} title="Cmd+B" type="button">{collapsed ? "→" : "←"}</button>}
+            {darkMode && <button aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"} className="hidden size-9 shrink-0 place-items-center rounded-xl border border-zinc-700 text-zinc-300 transition hover:border-zinc-400 focus-visible:ring-2 focus-visible:ring-amber-500 lg:grid" onClick={handleToggleSidebar} title="Cmd+B" type="button">{collapsed ? "→" : "←"}</button>}
           </div>
           {utility && <div className={`mt-4 border-t pt-4 ${darkMode ? "border-zinc-800" : "border-line"} ${collapsed ? "lg:hidden" : ""}`}>{utility}</div>}
         </div>
@@ -97,11 +110,11 @@ export function AdminWorkspaceShell({ children, contentHeader, contextBar, descr
               {items.map((item) => {
                 const active = isActive(pathname, item);
                 const Icon = item.icon ? WORKSPACE_ICONS[item.icon] : undefined;
-                return <Link aria-current={active ? "page" : undefined} className={`group block min-w-[145px] rounded-xl border px-3 py-3 transition-colors lg:min-w-0 ${darkMode ? (active ? "border-amber-500/50 bg-zinc-800 text-zinc-50" : "border-transparent text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100") : (active ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink")}`} href={item.href} key={item.href} title={collapsed ? item.label : undefined}>
-                  <span className="flex items-center gap-2">
+                return <Link aria-current={active ? "page" : undefined} aria-label={collapsed ? item.label : undefined} className={`group block min-w-[145px] rounded-xl border px-3 py-3 transition-colors lg:min-w-0 ${collapsed ? "lg:grid lg:min-h-11 lg:place-items-center lg:px-0 lg:py-0" : ""} ${darkMode ? (active ? "border-amber-500/50 bg-zinc-800 text-zinc-50" : "border-transparent text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100") : (active ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink")}`} href={item.href} key={item.href} title={collapsed ? item.label : undefined}>
+                  <span className={`flex items-center gap-2 ${collapsed ? "lg:justify-center" : ""}`}>
                     {Icon && <Icon className={active && darkMode ? "text-amber-400" : undefined} size={16} strokeWidth={1.75} />}
                     <span className={`block truncate text-sm font-black ${collapsed ? "lg:hidden" : ""}`}>{item.label}</span>
-                    {item.badge}
+                    <span className={collapsed ? "lg:hidden" : ""}>{item.badge}</span>
                   </span>
                   {item.description && <span className={`mt-1 hidden text-[10px] leading-4 lg:block ${collapsed ? "lg:hidden" : ""} ${darkMode ? "text-zinc-500" : active ? "text-paper/70" : "text-muted"}`}>{item.description}</span>}
                 </Link>;
@@ -109,7 +122,7 @@ export function AdminWorkspaceShell({ children, contentHeader, contextBar, descr
             </div>
           </div>)}
         </nav>
-        <Link className={`mt-3 hidden min-h-11 items-center justify-center rounded-xl border px-4 text-xs font-bold lg:flex ${darkMode ? "border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-100" : "border-line bg-paper"}`} href="/account">구매자 MY로 이동</Link>
+        <Link aria-label="구매자 MY로 이동" className={`mt-3 hidden min-h-11 items-center justify-center rounded-xl border text-xs font-bold lg:flex ${collapsed ? "px-0" : "px-4"} ${darkMode ? "border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-100" : "border-line bg-paper"}`} href="/my" title={collapsed ? "구매자 MY로 이동" : undefined}>{collapsed ? "MY" : "구매자 MY로 이동"}</Link>
       </aside>
       <section className="min-w-0" data-admin-workspace-content>
         {contextBar}

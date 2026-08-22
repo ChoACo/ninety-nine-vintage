@@ -26,8 +26,9 @@ export function UserMenuDropdown({ basePath = "", session }: { basePath?: "" | "
     ?? session.user.user_metadata?.nickname
     ?? session.user.user_metadata?.name
     ?? "로그인 회원";
-  const visibleIdentity = maskIdentity(String(fullIdentity));
-  const initials = String(session.user.user_metadata?.nickname ?? session.user.user_metadata?.name ?? fullIdentity)
+  const displayIdentity = session.user.user_metadata?.nickname ?? session.user.user_metadata?.name ?? fullIdentity;
+  const visibleIdentity = maskIdentity(String(displayIdentity));
+  const initials = String(displayIdentity)
     .trim()
     .slice(0, 2)
     .toUpperCase();
@@ -46,10 +47,10 @@ export function UserMenuDropdown({ basePath = "", session }: { basePath?: "" | "
   return <>
     <DropdownMenu.Root onOpenChange={setOpen} open={open}>
       <DropdownMenu.Trigger asChild>
-        <button aria-label="사용자 메뉴" className="flex h-10 items-center gap-2 rounded-xl border border-line bg-paper px-2 pr-3 text-[11px] font-bold text-ink transition-colors hover:border-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2" type="button">
-          <span aria-hidden="true" className="grid size-7 place-items-center rounded-full bg-zinc-200 text-[10px] font-bold text-zinc-900">{initials}</span>
-          <span className="max-w-28 truncate">{visibleIdentity}</span>
-          <ChevronDown className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} size={14} strokeWidth={1.75} />
+        <button aria-label="사용자 메뉴" className="theme-invariant-dark flex h-10 items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900 px-2 pr-3 text-[11px] font-bold text-zinc-200 transition-all hover:bg-zinc-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2" type="button">
+          <span aria-hidden="true" className="grid size-7 place-items-center rounded-full bg-zinc-700 text-[10px] font-bold text-zinc-100">{initials || "MY"}</span>
+          <span className="hidden max-w-28 truncate sm:inline-block">{visibleIdentity}</span>
+          <ChevronDown className={`text-zinc-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} size={14} strokeWidth={1.75} />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>

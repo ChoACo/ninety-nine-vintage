@@ -18,9 +18,15 @@ export async function generateMetadata({ params }: { params: Promise<{ section: 
   return { title: section in sectionLabels ? sectionLabels[section as AccountSection] : "MY", robots: { follow: false, index: false } };
 }
 
-export default async function AccountSectionPage({ params }: { params: Promise<{ section: string }> }) {
+export default async function AccountSectionPage({ params, searchParams }: { params: Promise<{ section: string }>; searchParams: Promise<{ productId?: string | string[] }> }) {
   const { section } = await params;
   if (section === "settings") redirect("/settings");
   if (!(section in sectionLabels)) notFound();
-  redirect(`/account?task=${encodeURIComponent(section === "shipping-request" ? "storage" : section)}`);
+  if (section === "payments") {
+    const productId = (await searchParams).productId;
+    redirect(typeof productId === "string" ? `/checkout?type=auction&id=${encodeURIComponent(productId)}` : "/checkout?type=auction");
+  }
+  if (section === "orders" || section === "shipping") redirect("/my/orders");
+  if (section === "storage" || section === "shipping-request") redirect("/my/vault");
+  redirect(section === "bids" ? "/my?tab=auction" : "/my");
 }

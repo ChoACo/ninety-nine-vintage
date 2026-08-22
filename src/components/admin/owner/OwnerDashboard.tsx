@@ -3,7 +3,7 @@
 import { Building2, MessageSquareText, Settings, ShieldCheck, UsersRound } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { OwnerManualTransferAccountPanel } from "@/components/admin/owner/OwnerManualTransferAccountPanel";
 import { OwnerMemberAccessPanel } from "@/components/admin/owner/OwnerMemberAccessPanel";
@@ -14,6 +14,7 @@ import { LocalTestMemberSwitcher } from "@/components/admin/LocalTestMemberSwitc
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { clearOwnerMemberAccessMarker } from "@/lib/ownerMemberAccess";
 import { useOwnerScopeStore } from "@/store/useOwnerScopeStore";
+import { OwnerMetricSkeleton } from "@/components/admin/owner/OwnerSkeletons";
 const OwnerBusinessAnalytics = dynamic(() => import("@/components/admin/owner/OwnerBusinessAnalytics").then((module) => module.OwnerBusinessAnalytics), { loading: () => <div className="h-72 animate-pulse border border-line bg-surface" role="status" aria-label="운영 분석 불러오는 중" /> });
 
 interface StoreRow {
@@ -44,32 +45,35 @@ export function OwnerDashboard({
   const selectedStoreId = useOwnerScopeStore((state) => state.selectedStoreId);
   const setScopeStores = useOwnerScopeStore((state) => state.setStores);
 
-  useEffect(() => {
-    void (async () => {
+  const loadOverview = useCallback(async () => {
       try {
+        setNotice("");
+        setLoading(true);
         const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
         if (!session) {
           setNotice("소유자 계정으로 로그인해 주세요.");
           return;
         }
-        setLoading(true);
         const query = selectedStoreId ? `?storeId=${encodeURIComponent(selectedStoreId)}` : "";
         const response = await fetch(`/api/admin/owner/overview${query}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
           cache: "no-store",
         });
         const payload = await response.json() as Overview & { error?: string };
-        if (!response.ok) throw new Error(payload.error ?? "소유자 데이터를 불러오지 못했습니다.");
+        if (!response.ok) throw new Error("owner_overview_unavailable");
         clearOwnerMemberAccessMarker();
         setData(payload);
         setScopeStores(payload.stores ?? []);
       } catch (error) {
-        setNotice(error instanceof Error ? error.message : "소유자 데이터를 불러오지 못했습니다.");
+        setNotice(error instanceof Error && error.message === "owner_overview_unavailable" ? "소유자 정보를 불러오는 중 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요." : "소유자 정보를 불러오지 못했습니다. 다시 시도해 주세요.");
       } finally {
         setLoading(false);
       }
-    })();
   }, [selectedStoreId, setScopeStores]);
+
+  useEffect(() => {
+    queueMicrotask(() => { void loadOverview(); });
+  }, [loadOverview]);
 
   const metrics = data?.metrics;
 
@@ -83,12 +87,12 @@ export function OwnerDashboard({
         </div>
         <span className="flex items-center gap-2 border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-bold text-emerald-800"><ShieldCheck size={13} /> 소유자 권한</span>
       </div>
-      {notice && <div className="border border-dashed border-line bg-surface p-6 text-sm">{notice}</div>}
+      {notice && <div className="rounded-2xl border border-dashed border-line bg-surface p-6 text-sm"><p>{notice}</p><button className="mt-4 min-h-11 rounded-xl border border-line bg-paper px-4 text-xs font-bold hover:border-ink focus-visible:ring-2 focus-visible:ring-ink" onClick={() => void loadOverview()} type="button">다시 시도</button></div>}
       {enableLocalTestMembers && <LocalTestMemberSwitcher />}
       <OwnerMemberAccessPanel />
-      <div className="grid grid-cols-1 gap-px border border-zinc-800 bg-zinc-800 sm:grid-cols-2 xl:grid-cols-4">
+      {loading && !data ? <OwnerMetricSkeleton /> : <div className="grid grid-cols-1 gap-px border border-line bg-line sm:grid-cols-2 xl:grid-cols-4">
         {[{ label: "플랫폼 GMV", value: `${Number(metrics?.gmv ?? 0).toLocaleString("ko-KR")}원` }, { label: "순 플랫폼 수수료", value: `${Number(metrics?.netCommission ?? 0).toLocaleString("ko-KR")}원` }, { label: "진행 중 경매", value: `${metrics?.activeAuctions ?? 0}건` }, { label: "보관 상품", value: `${metrics?.vaultItems ?? 0}건`, note: `D-3 위험 ${metrics?.vaultRiskCount ?? 0}건` }].map((metric) => <div className="bg-zinc-950 p-6 text-zinc-100" key={metric.label}><p className="text-xs text-zinc-500">{metric.label}</p><p className="mt-8 font-mono text-2xl font-bold">{loading ? "—" : metric.value}</p>{metric.note && <p className="mt-2 text-xs text-rose-400">{metric.note}</p>}</div>)}
-      </div>
+      </div>}
       {data?.analytics && <OwnerBusinessAnalytics {...data.analytics} />}
       <OwnerManualTransferAccountPanel />
       <div className="grid gap-4 md:grid-cols-2">

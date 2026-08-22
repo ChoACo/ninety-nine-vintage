@@ -3,6 +3,7 @@ import { authenticateStaffRequest, commerceJson } from "@/lib/commerce/server";
 const DAY = 86_400_000;
 
 export async function GET(request: Request) {
+ try {
   const auth = await authenticateStaffRequest(request);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner") return commerceJson({ error: "forbidden" }, 403);
@@ -25,7 +26,11 @@ export async function GET(request: Request) {
     auth.admin.from("security_activity_logs").select("id", { count: "exact", head: true }), settlements.limit(10_000), auctions.limit(10_000), vault.limit(10_000), shipments.limit(10_000),
     auth.admin.from("security_session_records").select("id", { count: "exact", head: true }).gte("last_seen_at", new Date(now.getTime() - 300_000).toISOString()),
   ]);
-  if ([storeResult, settlementResult, auctionResult, vaultResult, shipmentResult].some((result) => result.error)) return commerceJson({ error: "owner_overview_unavailable", dbConnected: false }, 503);
+  const requiredResults = [storeResult, settlementResult, auctionResult, vaultResult, shipmentResult];
+  if (requiredResults.some((result) => result.error)) {
+    console.error("[owner-overview] aggregate query failed", requiredResults.flatMap((result) => result.error ? [result.error.message] : []));
+    return commerceJson({ error: "owner_overview_unavailable", message: "소유자 정보를 불러오지 못했습니다." }, 503);
+  }
   const settlementRows = settlementResult.data ?? []; const auctionRows = auctionResult.data ?? []; const vaultRows = vaultResult.data ?? []; const shipmentRows = shipmentResult.data ?? [];
   const sumSales = (date: string) => settlementRows.filter((row) => row.created_at.slice(0, 10) === date && row.entry_kind === "item_sale").reduce((sum, row) => sum + Number(row.amount), 0);
   const revenue = Array.from({ length: 14 }, (_, index) => { const day = new Date(currentFrom.getTime() + index * DAY); const key = day.toISOString().slice(0, 10); return { date: key.slice(5).replace("-", "/"), amount: sumSales(key), previousAmount: sumSales(new Date(day.getTime() - 14 * DAY).toISOString().slice(0, 10)) }; });
@@ -35,4 +40,8 @@ export async function GET(request: Request) {
   return commerceJson({ stores: storeResult.data ?? [], selectedStoreId: storeId, auditCount: auditResult.count ?? 0, dbConnected: true, activeSessions: sessionResult.count ?? 0,
     metrics: { gmv: settlementRows.filter((row) => row.entry_kind === "item_sale" && recent(row.created_at)).reduce((sum, row) => sum + Number(row.amount), 0), netCommission: settlementRows.filter((row) => row.entry_kind === "commission" && recent(row.created_at)).reduce((sum, row) => sum + Math.abs(Number(row.amount)), 0), activeAuctions: auctionRows.filter((row) => row.status === "active").length, vaultItems: vaultRows.length, vaultRiskCount: vaultRows.filter((row) => row.storage_expires_at && Date.parse(row.storage_expires_at) <= now.getTime() + 3 * DAY).length },
     analytics: { revenue, auction: { sold: closed.filter((row) => row.final_bid_id).length, unsold: closed.filter((row) => !row.final_bid_id).length }, vaultFlow } });
+ } catch (error) {
+   console.error("[owner-overview] unexpected failure", error);
+   return commerceJson({ error: "owner_overview_unavailable", message: "소유자 정보를 불러오지 못했습니다." }, 503);
+ }
 }

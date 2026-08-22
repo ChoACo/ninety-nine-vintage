@@ -569,14 +569,14 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
 
   return (
     <aside
-      className={`${surface === "desktop" ? `${compact ? "top-6" : "top-[100px]"} sticky col-span-5 p-6 pb-6` : "p-5 pb-32"} z-10 self-start rounded-3xl border border-white/10 bg-white shadow-xl shadow-black/5`}
+      className={`${surface === "desktop" ? `${compact ? "top-6" : "top-[100px]"} sticky col-span-5 p-6 pb-6` : "p-5 pb-32"} z-10 self-start rounded-3xl border border-border bg-card text-card-foreground shadow-xl shadow-black/5`}
       data-bid-panel="sticky"
     >
-      <div className="border-b border-zinc-200 py-6">
+      <div className="border-b border-border py-6">
         <p className="mb-3 text-xs font-medium tracking-[0.1em] text-zinc-500">
           {item.brand}
         </p>
-        <h1 className="text-3xl font-black leading-snug tracking-tight text-zinc-950 [text-wrap:balance]">
+        <h1 className="text-3xl font-black leading-snug tracking-tight text-foreground [text-wrap:balance]">
           {item.name}
         </h1>
         <dl className={`mt-5 grid gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 text-[11px] ${surface === "desktop" ? "grid-cols-3" : "grid-cols-1"}`}>
@@ -741,7 +741,9 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
           </div>
         )
       ) : (
-        <div className={`${surface === "mobile" ? "mobile-detail-cta" : ""} mt-6 grid grid-cols-2 gap-2`}>
+        <>
+        <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs leading-5 text-foreground"><strong className="block">14일 무료 보관함</strong><span className="mt-1 block text-muted-foreground">결제 후 같은 센터 상품과 묶음 배송을 신청할 수 있습니다. 단 1점 고유 재고 상품입니다.</span></div>
+        <div className={`${surface === "mobile" ? "mobile-detail-cta" : ""} mt-4 grid grid-cols-2 gap-2`}>
           <button
             className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-zinc-950 text-sm font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 disabled:opacity-50"
             disabled={buying}
@@ -759,6 +761,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
             {buying ? "구매 준비 중..." : "즉시 소장하기"}
           </button>
         </div>
+        </>
       )}
       {buyNotice && !quickCartOpen && (
         <p

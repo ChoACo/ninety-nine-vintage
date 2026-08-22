@@ -95,6 +95,21 @@ export async function GET(request: Request) {
     );
   }
 
+  const conversationIds = (conversations ?? []).map((conversation) => conversation.id);
+  const [readResult, unreadMessageResult] = conversationIds.length === 0
+    ? [{ data: [], error: null }, { data: [], error: null }] as const
+    : await Promise.all([
+        auth.admin.from("support_reads").select("conversation_id,last_read_at").eq("user_id", auth.effectiveUserId).in("conversation_id", conversationIds),
+        auth.admin.from("support_messages").select("conversation_id,sender_id,created_at").in("conversation_id", conversationIds).neq("sender_id", auth.effectiveUserId).order("created_at", { ascending: false }).limit(10_000),
+      ]);
+  if (readResult.error || unreadMessageResult.error) return commerceJson({ error: "operator_chat_unavailable" }, 503);
+  const readAtByConversation = new Map((readResult.data ?? []).map((row) => [row.conversation_id, row.last_read_at]));
+  const unreadByConversation = new Map<string, number>();
+  for (const message of unreadMessageResult.data ?? []) {
+    const lastReadAt = readAtByConversation.get(message.conversation_id);
+    if (!lastReadAt || message.created_at > lastReadAt) unreadByConversation.set(message.conversation_id, (unreadByConversation.get(message.conversation_id) ?? 0) + 1);
+  }
+
   const memberIds = [
     ...new Set((conversations ?? []).map((conversation) => conversation.member_id)),
   ];
@@ -118,7 +133,7 @@ export async function GET(request: Request) {
   ]);
 
   return commerceJson({
-    conversations: conversations ?? [],
+    conversations: (conversations ?? []).map((conversation) => ({ ...conversation, unread_count: unreadByConversation.get(conversation.id) ?? 0 })),
     members: memberResult.data ?? [],
     stores: storeResult.data ?? [],
   });

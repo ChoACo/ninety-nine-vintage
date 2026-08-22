@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     ]);
     if (result.error) return commerceJson({ error: "notifications_unavailable" }, 503);
     const notifications = ((result.data ?? []) as NotificationRecord[])
-      .filter((item) => canViewNotification(viewerRole, item.audience_role));
+      .filter((item) => canViewNotification(viewerRole, item.audience_role, item.kind));
     return commerceJson({ notifications, viewerRole });
   } catch {
     return commerceJson({ error: "notifications_unavailable" }, 503);
@@ -66,12 +66,12 @@ export async function POST(request: Request) {
   if (!body?.notificationId) return commerceJson({ error: "알림을 선택해 주세요." }, 400);
   const { data: notification, error: notificationError } = await auth.user
     .from("notifications")
-    .select("audience_role")
+    .select("audience_role,kind")
     .eq("id", body.notificationId)
     .eq("member_id", auth.userId)
     .maybeSingle();
   if (notificationError) return commerceJson({ error: "notification_update_failed" }, 503);
-  if (!notification || !canViewNotification(viewerRole, notification.audience_role)) {
+  if (!notification || !canViewNotification(viewerRole, notification.audience_role, notification.kind)) {
     return commerceJson({ error: "notification_not_found" }, 404);
   }
   const { error } = await auth.user

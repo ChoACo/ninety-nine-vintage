@@ -12,6 +12,7 @@ import {
   type FormEvent,
 } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { ChatSkeleton } from "@/components/features/notifications/NotificationSkeletons";
 
 interface Conversation {
   id: string;
@@ -22,6 +23,7 @@ interface Conversation {
   subject: string | null;
   last_message_at: string | null;
   last_message_preview: string | null;
+  unread_count: number;
 }
 
 interface Member {
@@ -82,6 +84,7 @@ export function OperatorChatConsole({
   const [staffId, setStaffId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [messageLoading, setMessageLoading] = useState(false);
   const [inquiryQuery, setInquiryQuery] = useState("");
 
   const markRead = useCallback(
@@ -101,6 +104,8 @@ export function OperatorChatConsole({
 
   const loadMessages = useCallback(
     async (conversationId: string, accessToken: string) => {
+      setMessageLoading(true);
+      try {
       const response = await fetch(
         `/api/admin/operator/chat?conversationId=${encodeURIComponent(
           conversationId,
@@ -118,6 +123,9 @@ export function OperatorChatConsole({
       }
       setMessages(payload.messages ?? []);
       await markRead(conversationId, accessToken);
+      } finally {
+        setMessageLoading(false);
+      }
     },
     [markRead],
   );
@@ -308,7 +316,7 @@ export function OperatorChatConsole({
       if (!query) return true;
       return [item.subject, item.last_message_preview, memberName(item.member_id)].some((value) => value?.toLocaleLowerCase("ko-KR").includes(query));
     })
-    .toSorted((left, right) => Number(left.status === "closed") - Number(right.status === "closed") || String(right.last_message_at).localeCompare(String(left.last_message_at))), [conversations, inquiryQuery, memberName]);
+    .toSorted((left, right) => Number((right.unread_count ?? 0) > 0) - Number((left.unread_count ?? 0) > 0) || Number(left.status === "closed") - Number(right.status === "closed") || String(right.last_message_at).localeCompare(String(left.last_message_at))), [conversations, inquiryQuery, memberName]);
 
   const selectConversation = (conversationId: string) => {
     setSelected(conversationId);
@@ -321,7 +329,7 @@ export function OperatorChatConsole({
   };
 
   return (
-    <div className="grid grid-cols-1 border border-line md:min-h-[620px] md:grid-cols-[280px_minmax(0,1fr)] lg:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 border border-line md:min-h-[620px] md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)_220px]">
       <aside className="border-b border-line md:border-b-0 md:border-r">
         <div className="border-b border-line p-4 sm:p-5">
           <p className="eyebrow text-muted">
@@ -353,7 +361,7 @@ export function OperatorChatConsole({
                   {memberName(conversation.member_id)}
                 </span>
                 <span className="shrink-0 text-[10px] opacity-60">
-                  {conversationStatusLabel(conversation.status)}
+                  {conversation.unread_count > 0 ? <span className="rounded-full bg-rose-600 px-2 py-1 font-black text-white">미확인 {conversation.unread_count}</span> : conversationStatusLabel(conversation.status)}
                 </span>
               </span>
               <span className="mt-2 flex items-center gap-1 text-[10px] font-bold opacity-70">
@@ -406,7 +414,7 @@ export function OperatorChatConsole({
               왼쪽 목록에서 상담을 선택하세요.
             </p>
           )}
-          {messages.map((item) => (
+          {messageLoading ? <ChatSkeleton /> : messages.map((item) => (
             <article
               className={`max-w-[85%] p-4 text-xs leading-5 sm:max-w-md ${
                 item.sender_id === staffId
@@ -473,6 +481,11 @@ export function OperatorChatConsole({
           </button>
         </form>
       </section>
+      <aside className="hidden border-l border-line bg-surface/60 p-5 xl:block">
+        <p className="eyebrow text-muted">고객 정보</p>
+        <p className="mt-3 text-sm font-black">{selectedConversation ? memberName(selectedConversation.member_id) : "상담을 선택하세요"}</p>
+        {selectedConversation && <div className="mt-5 grid gap-2"><Link className="min-h-11 rounded-xl border border-line bg-paper px-3 py-3 text-xs font-bold hover:border-ink" href={`/admin/operator/orders?memberId=${selectedConversation.member_id}`}>주문 내역 확인</Link><Link className="min-h-11 rounded-xl border border-line bg-paper px-3 py-3 text-xs font-bold hover:border-ink" href={`/admin/operator/vault?memberId=${selectedConversation.member_id}`}>보관 상품 확인</Link><Link className="min-h-11 rounded-xl border border-line bg-paper px-3 py-3 text-xs font-bold hover:border-ink" href={`/admin/operator/unpaid?memberId=${selectedConversation.member_id}`}>낙찰·결제 대기 확인</Link></div>}
+      </aside>
     </div>
   );
 }

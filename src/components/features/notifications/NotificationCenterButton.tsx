@@ -15,15 +15,17 @@ import {
   type NotificationRecord,
   type NotificationViewerRole,
 } from "@/lib/notifications/types";
+import { NotificationTabs } from "@/components/features/notifications/NotificationTabs";
+import { NotificationSkeleton } from "@/components/features/notifications/NotificationSkeletons";
 
 type NotificationItem = NotificationRecord;
 
 function NotificationIcon({ item }: { item: NotificationItem }) {
   const category = getNotificationCategory(item.kind, item.audience_role);
-  if (category === "auction") return <Gavel size={15} strokeWidth={1.75} />;
-  if (category === "shipping") return /shipping|shipment|delivery|tracking/iu.test(item.kind) ? <Truck size={15} strokeWidth={1.75} /> : <Package size={15} strokeWidth={1.75} />;
-  if (category === "seller") return <ShoppingBag size={15} strokeWidth={1.75} />;
-  if (category === "owner") return <CircleDollarSign size={15} strokeWidth={1.75} />;
+  if (category === "AUCTION") return <Gavel size={15} strokeWidth={1.75} />;
+  if (category === "VAULT_SHIPPING") return /shipping|shipment|delivery|tracking/iu.test(item.kind) ? <Truck size={15} strokeWidth={1.75} /> : <Package size={15} strokeWidth={1.75} />;
+  if (category === "OPERATOR_SALES") return <ShoppingBag size={15} strokeWidth={1.75} />;
+  if (category === "OWNER_SETTLEMENT") return <CircleDollarSign size={15} strokeWidth={1.75} />;
   return /notice|announcement/iu.test(item.kind) ? <Megaphone size={15} strokeWidth={1.75} /> : <Bell size={15} strokeWidth={1.75} />;
 }
 
@@ -32,14 +34,15 @@ export function NotificationCenterButton() {
   const { session } = useSupabaseSession();
   const token = session?.access_token;
   const [open, setOpen] = useState(false);
-  const [category, setCategory] = useState<NotificationCategory>("all");
+  const [category, setCategory] = useState<NotificationCategory>("ALL");
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [viewerRole, setViewerRole] = useState<NotificationViewerRole>("member");
   const [loading, setLoading] = useState(false);
   const unreadCount = items.filter((item) => !item.read_at).length;
   const tabs = useMemo(() => getVisibleNotificationTabs(viewerRole), [viewerRole]);
-  const activeCategory = tabs.some((tab) => tab.id === category) ? category : "all";
-  const visibleItems = useMemo(() => activeCategory === "all" ? items : items.filter((item) => getNotificationCategory(item.kind, item.audience_role) === activeCategory), [activeCategory, items]);
+  const activeCategory = tabs.some((tab) => tab.id === category) ? category : "ALL";
+  const visibleItems = useMemo(() => activeCategory === "ALL" ? items : items.filter((item) => getNotificationCategory(item.kind, item.audience_role) === activeCategory), [activeCategory, items]);
+  const emptyLabel = tabs.find((tab) => tab.id === activeCategory)?.emptyLabel ?? "새로운 알림이 없습니다.";
 
   useEffect(() => {
     if (!token) { queueMicrotask(() => setItems([])); return; }
@@ -51,7 +54,7 @@ export function NotificationCenterButton() {
         if (!active) return;
         const role = payload.viewerRole ?? "member";
         setViewerRole(role);
-        setItems(Array.isArray(payload.notifications) ? payload.notifications.filter((item) => canViewNotification(role, item.audience_role)) : []);
+        setItems(Array.isArray(payload.notifications) ? payload.notifications.filter((item) => canViewNotification(role, item.audience_role, item.kind)) : []);
       })
       .catch(() => { if (active) setItems([]); })
       .finally(() => { if (active) setLoading(false); });
@@ -66,7 +69,7 @@ export function NotificationCenterButton() {
       const item = payload.new as Partial<NotificationItem>;
       if (typeof item.id !== "string" || typeof item.title !== "string" || typeof item.body !== "string" || typeof item.created_at !== "string" || typeof item.kind !== "string") return;
       const audienceRole = typeof item.audience_role === "string" ? item.audience_role : "member";
-      if (!canViewNotification(viewerRole, audienceRole)) return;
+      if (!canViewNotification(viewerRole, audienceRole, item.kind)) return;
       setItems((current) => [{ audience_role: audienceRole, body: item.body!, created_at: item.created_at!, href: typeof item.href === "string" ? item.href : null, id: item.id!, kind: item.kind!, read_at: null, title: item.title! }, ...current.filter((candidate) => candidate.id !== item.id)].slice(0, 50));
     }).subscribe();
     return () => { void client.removeChannel(channel); };
@@ -107,9 +110,9 @@ export function NotificationCenterButton() {
       <section className="flex max-h-[82svh] w-full flex-col rounded-t-3xl border border-line bg-paper text-ink shadow-2xl sm:mt-14 sm:w-96 sm:rounded-2xl" onClick={(event) => event.stopPropagation()}>
         <header className="flex items-start justify-between border-b border-line px-5 py-4"><div><p className="eyebrow text-muted">알림 센터</p><h2 className="mt-1 text-xl font-black">새로운 소식 <span className="font-mono text-sm text-red-600">{unreadCount}</span></h2></div><button aria-label="알림 닫기" className="grid size-9 place-items-center rounded-xl hover:bg-surface" onClick={() => setOpen(false)} type="button"><X size={17} /></button></header>
         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 text-[10px]"><button className="inline-flex items-center gap-1 font-bold disabled:opacity-40" disabled={unreadCount === 0} onClick={() => void markAllRead()} type="button"><CheckCheck size={14} /> 전체 읽음 처리</button><Link className="inline-flex items-center gap-1 font-bold" href="/settings" onClick={() => setOpen(false)}><Settings size={14} /> 알림 설정</Link></div>
-        <div className="flex overflow-x-auto border-b border-line [scrollbar-width:none]" role="tablist">{tabs.map((tab) => <button aria-selected={activeCategory === tab.id} className={`min-h-11 min-w-[25%] shrink-0 px-3 text-[10px] font-bold ${activeCategory === tab.id ? "border-b-2 border-ink text-ink" : "text-muted"}`} key={tab.id} onClick={() => setCategory(tab.id)} role="tab" type="button">{tab.label}</button>)}</div>
-        <div className="min-h-48 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
-          {loading ? <p className="p-8 text-center text-sm text-muted">알림을 불러오는 중입니다.</p> : visibleItems.length === 0 ? <div className="grid place-items-center px-6 py-14 text-center"><BellOff className="text-muted" size={32} /><p className="mt-3 text-sm font-bold">새로운 알림이 없습니다.</p></div> : visibleItems.map((item) => <button className={`relative block w-full border-b border-line px-5 py-4 text-left transition-colors hover:bg-surface ${item.read_at ? "" : "bg-blue-500/5"}`} key={item.id} onClick={() => void markRead(item)} type="button">{!item.read_at && <span className="absolute left-2 top-6 size-1.5 rounded-full bg-blue-500" />}<span className="flex items-start gap-3"><span className={`grid size-8 shrink-0 place-items-center rounded-full ${item.read_at ? "bg-surface text-muted" : "bg-ink text-paper"}`}><NotificationIcon item={item} /></span><span className="min-w-0 flex-1"><strong className="block text-sm">{item.title}</strong><span className="mt-1 block text-xs leading-5 text-muted">{item.body}</span><time className="mt-2 block text-[10px] text-muted" dateTime={item.created_at}>{new Date(item.created_at).toLocaleString("ko-KR")}</time></span></span></button>)}
+        <NotificationTabs active={activeCategory} onChange={setCategory} tabs={tabs} />
+        <div aria-labelledby={`notification-tab-${activeCategory.toLowerCase()}`} className="min-h-48 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]" id="notification-list" role="tabpanel">
+          {loading ? <NotificationSkeleton /> : visibleItems.length === 0 ? <div className="grid place-items-center px-6 py-14 text-center"><BellOff className="text-muted" size={32} /><p className="mt-3 text-sm font-bold">{emptyLabel}</p></div> : visibleItems.map((item) => <button className={`relative block w-full border-b border-line px-5 py-4 text-left transition-colors hover:bg-surface ${item.read_at ? "" : "bg-blue-500/5"}`} key={item.id} onClick={() => void markRead(item)} type="button">{!item.read_at && <span className="absolute left-2 top-6 size-1.5 rounded-full bg-blue-500" />}<span className="flex items-start gap-3"><span className={`grid size-8 shrink-0 place-items-center rounded-full ${item.read_at ? "bg-surface text-muted" : "bg-ink text-paper"}`}><NotificationIcon item={item} /></span><span className="min-w-0 flex-1"><strong className="block text-sm">{item.title}</strong><span className="mt-1 block text-xs leading-5 text-muted">{item.body}</span><time className="mt-2 block text-[10px] text-muted" dateTime={item.created_at}>{new Date(item.created_at).toLocaleString("ko-KR")}</time></span></span></button>)}
         </div>
       </section>
     </div>}

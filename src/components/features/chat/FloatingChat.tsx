@@ -28,7 +28,13 @@ export function FloatingChat({ basePath = "" }: { basePath?: "" | "/m" }) {
   }, []);
   const available = useMemo(() => now ? isBusinessHours(now) : true, [now]);
   if (/^\/(?:m\/)?(?:chat|admin)(?:\/|$)/u.test(pathname)) return null;
-  const chatHref = `${basePath}/chat${draft.trim() ? `?draft=${encodeURIComponent(draft.trim())}` : ""}`;
+  const chatParams = new URLSearchParams();
+  const centerMatch = pathname.match(/^\/(?:m\/)?centers\/([^/?#]+)/u);
+  const productMatch = pathname.match(/^\/(?:m\/)?(?:shop|auction|live)\/([0-9a-f-]{36})(?:\/|$)/iu);
+  if (centerMatch?.[1]) chatParams.set("storeContext", decodeURIComponent(centerMatch[1]));
+  if (productMatch?.[1]) chatParams.set("productId", productMatch[1]);
+  if (draft.trim()) chatParams.set("draft", draft.trim());
+  const chatHref = `${basePath}/chat${chatParams.size > 0 ? `?${chatParams.toString()}` : ""}`;
   return <>
     <AnimatePresence>
       {open && <motion.aside animate={{ opacity: 1, scale: 1, y: 0 }} aria-label="실시간 상담" className="fixed bottom-36 right-4 z-[120] w-[min(23rem,calc(100vw-2rem))] origin-bottom-right overflow-hidden rounded-3xl border border-line bg-paper text-ink shadow-2xl sm:bottom-24 sm:right-6" exit={{ opacity: 0, scale: 0.94, y: 12 }} initial={{ opacity: 0, scale: 0.94, y: 12 }} transition={{ duration: 0.22, ease: "easeOut" }}>
@@ -39,7 +45,7 @@ export function FloatingChat({ basePath = "" }: { basePath?: "" | "/m" }) {
           <div className="mt-2 flex flex-wrap gap-2">{FAQS.map((faq) => <button className="rounded-full border border-line bg-surface px-3 py-2 text-[10px] font-bold hover:border-ink" key={faq} onClick={() => setDraft(faq)} type="button">{faq}</button>)}</div>
           <label className="mt-5 block text-[11px] font-bold">문의 내용<textarea className="mt-2 min-h-24 w-full resize-none rounded-2xl border border-line bg-paper p-3 text-xs font-normal outline-none focus:border-ink focus:ring-2 focus:ring-ink/10" maxLength={500} onChange={(event) => { setDraft(event.target.value); event.currentTarget.style.height = "auto"; event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 160)}px`; }} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && draft.trim()) { event.preventDefault(); window.location.assign(chatHref); } }} placeholder="문의 내용을 미리 적어주세요. Enter로 상담 화면으로 이동합니다." value={draft} /></label>
           <Link className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-ink px-4 text-xs font-bold text-paper" href={chatHref}><Send size={14} /> 1:1 상담 시작</Link>
-          <p className="mt-3 text-[10px] leading-4 text-muted">메시지는 매장을 선택한 뒤 전송되며, 상담방 접근 권한은 서버에서 다시 확인합니다.</p>
+          <p className="mt-3 text-[10px] leading-4 text-muted">현재 센터·상품 문맥을 상담 화면에 전달합니다. 사진은 상담 화면에서 JPG·PNG·WEBP 형식으로 첨부할 수 있으며 접근 권한은 서버에서 다시 확인합니다.</p>
         </div>
       </motion.aside>}
     </AnimatePresence>

@@ -154,6 +154,8 @@ export function ChatPanel({
     const params = new URLSearchParams(window.location.search);
     const requestedConversationId = params.get("conversationId");
     const requestedStoreId = params.get("storeId");
+    const requestedStoreContext = params.get("storeContext");
+    const requestedProductId = params.get("productId");
     const requestedDraft = params.get("draft");
     if (requestedDraft && requestedDraft.length <= 500) setMessage(requestedDraft);
     if (requestedConversationId) {
@@ -161,8 +163,16 @@ export function ChatPanel({
       return;
     }
 
+    let contextualStoreId = requestedStoreId ?? nextStores.find((store) => store.id === requestedStoreContext || store.slug === requestedStoreContext)?.id ?? null;
+    if (!contextualStoreId && requestedProductId) {
+      const productResponse = await fetch(`/api/products/${encodeURIComponent(requestedProductId)}`, { cache: "no-store" });
+      if (productResponse.ok) {
+        const productPayload = await productResponse.json() as { product?: { storeId?: string | null } };
+        contextualStoreId = nextStores.some((store) => store.id === productPayload.product?.storeId) ? productPayload.product?.storeId ?? null : null;
+      }
+    }
     const nextStoreId =
-      requestedStoreId ??
+      contextualStoreId ??
       selectedStoreId ??
       nextConversations[0]?.store_id ??
       null;

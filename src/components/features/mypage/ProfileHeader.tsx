@@ -6,6 +6,7 @@ import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { useCommerceStore } from "@/store/useCommerceStore";
+import { ProfileAvatarUploader } from "@/components/features/mypage/ProfileAvatarUploader";
 export type MyTab =
   "home" | "vault" | "auction" | "orders" | "wishlist" | "settings";
 interface Metrics {
@@ -14,6 +15,10 @@ interface Metrics {
   wins: number;
   shipping: number;
   risk: boolean;
+}
+interface MemberProfile {
+  avatar_url: string | null;
+  display_name: string;
 }
 export function ProfileHeader({
   activeTab,
@@ -35,11 +40,16 @@ export function ProfileHeader({
     risk: false,
   });
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [profile, setProfile] = useState<MemberProfile | null>(null);
   const user = session?.user;
   const nickname =
+    profile?.display_name ??
+    user?.user_metadata?.nickname ??
+    user?.user_metadata?.display_name ??
     user?.user_metadata?.name ??
     user?.user_metadata?.full_name ??
-    "빈티지 피플";
+    user?.email?.split("@")[0] ??
+    "회원";
   const email =
     user?.email?.replace(/^(.{2}).*(@.*)$/u, "$1**$2") ?? "카카오 회원";
   useEffect(() => {
@@ -67,14 +77,53 @@ export function ProfileHeader({
             : 0,
           risk: items.some((row: { storageExpiresAt?: string | null }) => {
             const days =
-              (Date.parse(row.storageExpiresAt ?? "") - Date.now()) /
-              86400000;
+              (Date.parse(row.storageExpiresAt ?? "") - Date.now()) / 86400000;
             return days >= 0 && days <= 3;
           }),
         });
       })
       .catch(() => undefined);
   }, [session]);
+  useEffect(() => {
+    if (!user?.id) return;
+    const supabase = getSupabaseBrowserClient();
+    let active = true;
+    void supabase
+      .from("profiles")
+      .select("display_name, avatar_url")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active && data) setProfile(data);
+      });
+
+    const channel = supabase
+      .channel(`my-profile-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          const next = payload.new as Partial<MemberProfile>;
+          if (typeof next.display_name !== "string") return;
+          setProfile({
+            avatar_url:
+              typeof next.avatar_url === "string" ? next.avatar_url : null,
+            display_name: next.display_name,
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
   const cards = [
     {
       tab: "vault" as const,
@@ -115,9 +164,29 @@ export function ProfileHeader({
       <header className="rounded-3xl border border-zinc-800 bg-zinc-950 p-5 text-zinc-100 sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div className="flex items-center gap-4">
-            <div className="relative grid size-16 place-items-center rounded-full bg-zinc-800 text-xl font-black">
-              {String(nickname).slice(0, 1)}
-              <span className="absolute -bottom-1 -right-1 translate-x-1 translate-y-1 rounded-full bg-kakao px-2 py-1 text-[8px] font-black text-kakao-foreground">
+            <div className="relative">
+              {user?.id ? (
+                <ProfileAvatarUploader
+                  currentAvatarUrl={
+                    profile?.avatar_url ??
+                    user.user_metadata?.avatar_url ??
+                    null
+                  }
+                  nickname={String(nickname)}
+                  onAvatarUpdated={(avatarUrl) =>
+                    setProfile((current) => ({
+                      avatar_url: avatarUrl,
+                      display_name: current?.display_name ?? String(nickname),
+                    }))
+                  }
+                  userId={user.id}
+                />
+              ) : (
+                <div className="grid size-20 place-items-center rounded-full bg-zinc-800 text-2xl font-black">
+                  {String(nickname).slice(0, 1)}
+                </div>
+              )}
+              <span className="absolute -bottom-1 -right-1 translate-x-1 translate-y-1 rounded-full bg-kakao px-2 py-1 text-[8px] font-black text-kakao-foreground z-10">
                 KAKAO
               </span>
             </div>

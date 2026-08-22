@@ -248,9 +248,12 @@ function AccountDashboardForSession({
 }) {
   const token = session?.access_token ?? null;
   const userName =
+    session?.user.user_metadata?.nickname ??
+    session?.user.user_metadata?.display_name ??
     session?.user.user_metadata?.name ??
     session?.user.user_metadata?.full_name ??
-    "빈티지 피플";
+    session?.user.email?.split("@")[0] ??
+    "회원";
   const [storage, setStorage] = useState<InventoryItem[]>([]);
   const [shipments, setShipments] = useState<InventoryShipment[]>([]);
   const [legacyEligibleOrders, setLegacyEligibleOrders] = useState<

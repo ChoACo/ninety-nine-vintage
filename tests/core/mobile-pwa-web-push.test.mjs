@@ -6,9 +6,10 @@ const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 test("the install control is mobile-device gated and the manifest opens the mobile app", async () => {
-  const [manifest, provider, controls, client, mobileLayout] = await Promise.all([
+  const [manifest, provider, prompt, controls, client, mobileLayout] = await Promise.all([
     source("src/app/manifest.ts"),
     source("src/components/features/pwa/MobilePwaProvider.tsx"),
+    source("src/components/features/pwa/PwaInstallPrompt.tsx"),
     source("src/components/features/pwa/MobilePwaControls.tsx"),
     source("src/lib/webPush/client.ts"),
     source("src/components/mobile/MobileSiteLayout.tsx"),
@@ -26,6 +27,11 @@ test("the install control is mobile-device gated and the manifest opens the mobi
   assert.match(controls, /if \(!state\?\.isMobile\) return null/);
   assert.match(controls, /state\.installActionLabel/);
   assert.match(provider, /beforeinstallprompt/);
+  assert.match(prompt, /ninety-nine:pwa-install-prompt-dismissed/);
+  assert.match(prompt, /실시간 입찰 경쟁과 보관 만료 알림/);
+  assert.match(prompt, /Safari 하단 공유 버튼/);
+  assert.match(prompt, /state\.installed/);
+  assert.match(mobileLayout, /PwaInstallPrompt/);
   assert.match(provider, /Chrome에서 열고 설치/);
   assert.match(provider, /buildAndroidChromeIntent\(window\.location\.href\)/);
   assert.match(provider, /buildIosChromeUrl\(window\.location\.href\)/);
@@ -65,6 +71,9 @@ test("service worker always shows mobile OS push and handles notification clicks
   assert.match(worker, /showNotification/);
   assert.match(worker, /vibrate:\s*\[200,\s*100,\s*200\]/);
   assert.match(worker, /timestamp:\s*Date\.now\(\)/);
+  assert.match(worker, /action:\s*"open"/);
+  assert.match(worker, /action:\s*"close"/);
+  assert.match(worker, /event\.action === "close"/);
   assert.doesNotMatch(worker, /visibilityState === "visible"/);
   assert.match(worker, /addEventListener\("notificationclick"/);
   assert.match(worker, /clients\.openWindow/);
@@ -179,7 +188,7 @@ test("notification consent is stored per user and all categories default enabled
 });
 
 test("database events target members, operators, and employees through a retryable outbox", async () => {
-  const [migration, coalescingMigration, vaultMigration] = await Promise.all([
+  const [migration, coalescingMigration, vaultMigration, lifecycleMigration] = await Promise.all([
     source(
       "supabase/migrations/20260724134857_mobile_pwa_web_push_notifications.sql",
     ),
@@ -188,6 +197,9 @@ test("database events target members, operators, and employees through a retryab
     ),
     source(
       "supabase/migrations/20260724141701_store_web_push_runtime_secrets_in_vault.sql",
+    ),
+    source(
+      "supabase/migrations/20260822125402_add_outbid_and_vault_expiry_push.sql",
     ),
   ]);
 
@@ -227,5 +239,20 @@ test("database events target members, operators, and employees through a retryab
   assert.doesNotMatch(
     migration,
     /grant (select|insert|update|delete|all)[^;]*to (anon|authenticated)/i,
+  );
+  assert.match(lifecycleMigration, /auction_bids_notify_previous_high_bidder/i);
+  assert.match(lifecycleMigration, /'auction_outbid'/i);
+  assert.match(lifecycleMigration, /'\/live\/' \|\| new\.product_id::text/i);
+  assert.match(lifecycleMigration, /queue_vault_expiring_notifications/i);
+  assert.match(lifecycleMigration, /interval '3 days'/i);
+  assert.match(lifecycleMigration, /'vault_expiring_soon'/i);
+  assert.match(lifecycleMigration, /line_status in \('requested', 'held', 'ready', 'packed', 'shipped'\)/i);
+  assert.match(lifecycleMigration, /queue-vault-expiring-push/i);
+  assert.match(lifecycleMigration, /insert_owner_payment_notification/i);
+  assert.match(lifecycleMigration, /'owner'/i);
+  assert.match(lifecycleMigration, /\/admin\/owner\/settlements\?tab=deposits/i);
+  assert.doesNotMatch(
+    lifecycleMigration,
+    /insert_staff_notifications[\s\S]*payment_verification_requested/i,
   );
 });

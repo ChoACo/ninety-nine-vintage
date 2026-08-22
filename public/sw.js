@@ -86,10 +86,13 @@ self.addEventListener("push", (event) => {
     }
   })();
   const title = payload.title || "NINETY-NINE VINTAGE";
+  const icon = typeof payload.icon === "string" && payload.icon.startsWith("/")
+    ? payload.icon
+    : "/pwa-icon-192.png";
   event.waitUntil(
     self.registration.showNotification(title, {
       body: payload.body || "새로운 소식이 있습니다.",
-      icon: "/pwa-icon-192.png",
+      icon,
       badge: "/pwa-icon-192.png",
       tag: payload.tag || "ninety-nine-notification",
       renotify: true,
@@ -97,12 +100,17 @@ self.addEventListener("push", (event) => {
       lang: "ko",
       timestamp: Date.now(),
       data: { url: payload.url || "/home" },
+      actions: [
+        { action: "open", title: "확인하기" },
+        { action: "close", title: "닫기" },
+      ],
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  if (event.action === "close") return;
   const requestedUrl = new URL(event.notification.data?.url || "/home", self.location.origin);
   const targetUrl = requestedUrl.origin === self.location.origin
     ? requestedUrl.href

@@ -6,6 +6,7 @@ import { MobileSiteHeader } from "@/components/mobile/MobileSiteHeader";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 import { ActiveBidNavigationProvider } from "@/components/features/auction/ActiveBidNavigationProvider";
 import { MobilePwaProvider } from "@/components/features/pwa/MobilePwaProvider";
+import { PwaInstallPrompt } from "@/components/features/pwa/PwaInstallPrompt";
 import { FloatingChat } from "@/components/features/chat/FloatingChat";
 
 export function MobileSiteLayout({ children }: { children: ReactNode }) {
@@ -19,6 +20,7 @@ export function MobileSiteLayout({ children }: { children: ReactNode }) {
           <MobileSiteBottomNav />
           <CacheConsentBanner surface="mobile" />
           <FloatingChat basePath="/m" />
+          <PwaInstallPrompt />
         </div>
       </ActiveBidNavigationProvider>
     </MobilePwaProvider>

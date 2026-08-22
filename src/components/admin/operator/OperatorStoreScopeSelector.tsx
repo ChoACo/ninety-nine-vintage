@@ -22,6 +22,14 @@ export function OperatorStoreScopeSelector() {
     return () => window.clearTimeout(timeout);
   }, [load, scope.active, scope.expiresAt]);
 
+  useEffect(() => {
+    if (!loaded || busy || error || !canSelectStores || scope.active || stores.length === 0) return;
+    const firstStore = stores[0];
+    if (!firstStore) return;
+    void select({ active: true, accessMode: "owner_support", storeId: firstStore.id, expiresAt: null })
+      .then((selected) => { if (selected) window.location.reload(); });
+  }, [busy, canSelectStores, error, loaded, scope.active, select, stores]);
+
   if (!loaded) {
     return (
       <div className="flex items-center gap-2 text-xs text-muted">

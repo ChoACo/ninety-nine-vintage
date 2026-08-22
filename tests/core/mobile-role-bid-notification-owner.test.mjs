@@ -25,7 +25,7 @@ test("mobile shopping navigation stays buyer-first and exposes work mode separat
     /roleCode === "employee"[\s\S]*centerHref: "\/admin\/employee"[\s\S]*chatHref: "\/admin\/employee\/inquiries"/,
   );
   assert.doesNotMatch(bottomNav, /roleNavigation|access\.roleCode/);
-  for (const destination of ["/m/home", "/m/feed", "/m/shop", "/m/saved", "/m/account"]) {
+  for (const destination of ["/m/home", "/m/live", "/m/shop", "/m/account/storage", "/m/account"]) {
     assert.match(bottomNav, new RegExp(destination.replaceAll("/", "\\/")));
   }
   assert.match(header, /fallbackHref="\/m\/chat"/);

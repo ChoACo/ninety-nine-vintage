@@ -13,6 +13,7 @@ import {
 } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { OnboardingChatPanel } from "@/components/features/chat/OnboardingChatPanel";
+import { ImageAttachmentPicker, uploadSupportImages, type PendingSupportImage } from "@/components/features/chat/ImageAttachmentPicker";
 
 interface ChatStore {
   id: string;
@@ -42,6 +43,12 @@ interface ChatConversation {
   peer_read_at: string | null;
 }
 
+interface ChatAttachment {
+  id: string;
+  messageId: string;
+  signedUrl: string;
+}
+
 interface ChatPanelProps {
   basePath?: "" | "/m";
   surface?: "desktop" | "mobile";
@@ -69,6 +76,8 @@ export function ChatPanel({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [retryMessage, setRetryMessage] = useState<{ body: string; clientNonce: string } | null>(null);
+  const [pendingImages, setPendingImages] = useState<PendingSupportImage[]>([]);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
 
   const markRead = useCallback(
     async (conversationId: string, accessToken: string) => {
@@ -87,13 +96,16 @@ export function ChatPanel({
 
   const loadMessages = useCallback(
     async (conversationId: string, accessToken: string) => {
-      const response = await fetch(
-        `/api/chat?conversationId=${encodeURIComponent(conversationId)}`,
-        {
+      const [response, attachmentResponse] = await Promise.all([
+        fetch(`/api/chat?conversationId=${encodeURIComponent(conversationId)}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
           cache: "no-store",
-        },
-      );
+        }),
+        fetch(`/api/chat/attachments?conversationId=${encodeURIComponent(conversationId)}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          cache: "no-store",
+        }),
+      ]);
       const payload = (await response.json().catch(() => null)) as {
         conversation?: ChatConversation;
         messages?: ChatMessage[];
@@ -104,6 +116,12 @@ export function ChatPanel({
       setConversation(payload.conversation);
       setSelectedStoreId(payload.conversation.store_id);
       setMessages(payload.messages ?? []);
+      if (attachmentResponse.ok) {
+        const attachmentPayload = await attachmentResponse.json() as { attachments?: ChatAttachment[] };
+        setAttachments(attachmentPayload.attachments ?? []);
+      } else {
+        setAttachments([]);
+      }
       await markRead(conversationId, accessToken);
     },
     [markRead],
@@ -136,6 +154,8 @@ export function ChatPanel({
     const params = new URLSearchParams(window.location.search);
     const requestedConversationId = params.get("conversationId");
     const requestedStoreId = params.get("storeId");
+    const requestedDraft = params.get("draft");
+    if (requestedDraft && requestedDraft.length <= 500) setMessage(requestedDraft);
     if (requestedConversationId) {
       await loadMessages(requestedConversationId, session.access_token);
       return;
@@ -235,11 +255,18 @@ export function ChatPanel({
       });
       const payload = (await response.json().catch(() => null)) as {
         message?: ChatMessage;
+        conversation?: ChatConversation;
       } | null;
-      if (!response.ok || !payload?.message) {
+      const conversationId = payload?.conversation?.id ?? conversation?.id;
+      if (!response.ok || !payload?.message || !conversationId) {
         throw new Error(messageError(payload, "메시지를 보내지 못했습니다."));
       }
       setMessages((current) => [...current, payload.message as ChatMessage]);
+      if (pendingImages.length > 0) {
+        await uploadSupportImages({ token, conversationId, messageId: payload.message.id, images: pendingImages });
+        pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+        setPendingImages([]);
+      }
       setMessage("");
       setRetryMessage(null);
       await loadIndex();
@@ -423,6 +450,7 @@ export function ChatPanel({
                 </Link>
               )}
               <p className="whitespace-pre-wrap break-words">{item.body}</p>
+              {attachments.some((attachment) => attachment.messageId === item.id) && <div className="mt-3 flex flex-wrap gap-2">{attachments.filter((attachment) => attachment.messageId === item.id).map((attachment, index) => <a href={attachment.signedUrl} key={attachment.id} rel="noreferrer" target="_blank"><Image alt={`상담 첨부 이미지 ${index + 1}`} className="size-28 rounded-lg object-cover" height={112} src={attachment.signedUrl} unoptimized width={112} /></a>)}</div>}
               <time className="mt-2 block text-[10px] opacity-60">
                 {new Date(item.created_at).toLocaleString("ko-KR")}
               </time>
@@ -434,19 +462,28 @@ export function ChatPanel({
         </div>
 
         <form
-          className={`flex border-t border-line ${
-            surface === "desktop" ? "gap-3 p-5" : "gap-2 p-3"
-          }`}
+          className={`border-t border-line ${surface === "desktop" ? "p-5" : "p-3"}`}
           onSubmit={send}
         >
-          <input
+          <ImageAttachmentPicker disabled={!token || !selectedStoreId || busy} images={pendingImages} maxCount={1} onChange={setPendingImages} onError={setNotice} />
+          <div className={`mt-3 flex ${surface === "desktop" ? "gap-3" : "gap-2"}`}><textarea
             aria-label="문의 메시지"
-            className={`min-w-0 flex-1 border border-line bg-paper text-xs outline-none focus:border-ink disabled:bg-surface ${
+            className={`max-h-36 min-h-11 min-w-0 flex-1 resize-none border border-line bg-paper py-3 text-xs outline-none focus:border-ink disabled:bg-surface ${
               surface === "desktop" ? "px-4" : "px-3"
             }`}
             disabled={!token || !selectedStoreId || busy}
             maxLength={2_000}
-            onChange={(event) => setMessage(event.target.value)}
+            onChange={(event) => {
+              setMessage(event.target.value);
+              event.currentTarget.style.height = "auto";
+              event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 144)}px`;
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
             placeholder={
               token
                 ? selectedStoreId
@@ -466,6 +503,7 @@ export function ChatPanel({
           >
             <Send size={15} />
           </button>
+          </div>
         </form>
       </section>
     </div>

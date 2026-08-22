@@ -1,0 +1,1 @@
+import type {Metadata} from "next";import {AuctionBidRoute} from "@/components/features/auction/detail/AuctionBidRoute";export const metadata:Metadata={title:"라이브 옥션 입찰 | NINETY-NINE VINTAGE",robots:{index:false,follow:false}};export default async function Page({params}:{params:Promise<{id:string}>}){const{id}=await params;return <AuctionBidRoute productId={id}/>}

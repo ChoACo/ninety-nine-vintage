@@ -29,6 +29,22 @@ function formatBidTime(value: string) {
   }).format(timestamp);
 }
 
+function relativeBidTime(value: string) {
+  const elapsed = Date.now() - Date.parse(value);
+  if (!Number.isFinite(elapsed) || elapsed < 0) return formatBidTime(value);
+  if (elapsed < 60_000) return "방금 전";
+  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)}분 전`;
+  return formatBidTime(value);
+}
+
+function maskBidder(value: string) {
+  const name = value.trim() || "회원";
+  const at = name.indexOf("@");
+  if (at > 1) return `${name.slice(0, 2)}**${name.slice(at)}`;
+  if (name.length > 2) return `${name.slice(0, 1)}**${name.slice(-1)}`;
+  return "회**원";
+}
+
 export function AuctionBidHistoryModal({
   history,
   itemTitle,
@@ -66,12 +82,12 @@ export function AuctionBidHistoryModal({
                 <li className={`flex items-start justify-between gap-5 py-4 ${cancelled ? "text-muted" : ""}`} key={bid.id}>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <strong className="break-all text-sm">{bid.bidderName || "회원"}</strong>
+                      <strong className="break-all text-sm">{maskBidder(bid.bidderName || "회원")}</strong>
                       {cancelled
                         ? <span className="rounded-lg border border-zinc-300 bg-zinc-100 px-2 py-1 text-[9px] font-bold text-zinc-600">{outcomeLabel}</span>
                         : bid.id === latestActiveId && <span className="rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1 text-[9px] font-bold text-emerald-800">최신 유효 입찰</span>}
                     </div>
-                    <time className="mt-1 block font-mono text-[10px] text-muted" dateTime={bid.bidAt}>{formatBidTime(bid.bidAt)}</time>
+                    <time className="mt-1 block font-mono text-[10px] text-muted" dateTime={bid.bidAt} title={formatBidTime(bid.bidAt)}>{relativeBidTime(bid.bidAt)}</time>
                   </div>
                   <strong className={`shrink-0 font-mono text-base tabular-nums ${cancelled ? "line-through" : ""}`}>{bid.amount.toLocaleString("ko-KR")}원</strong>
                 </li>

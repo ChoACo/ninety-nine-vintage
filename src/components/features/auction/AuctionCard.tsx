@@ -16,19 +16,20 @@ import { isNewlyPublishedProduct } from "@/components/features/auction/auctionFe
 import { ProductInquiryModal } from "@/components/features/auction/detail/ProductInquiryModal";
 import { ShareProductButton } from "@/components/ui/ShareProductButton";
 
-interface AuctionCardProps { basePath?: "" | "/m"; item: Omit<Item, "bidHistory"> & { closesAt?: string; timeLeft?: string; enhancedTitle?: string | null; hashtags?: string[] }; surface?: "desktop" | "mobile"; }
+interface AuctionCardProps { basePath?: "" | "/m"; detailRoute?: "auction" | "shop"; item: Omit<Item, "bidHistory"> & { closesAt?: string; timeLeft?: string; enhancedTitle?: string | null; hashtags?: string[] }; surface?: "desktop" | "mobile"; }
 
 export function AuctionCard(props: AuctionCardProps) {
   if (props.item.saleType === "auction" && !LIVE_AUCTION_ENABLED) return null;
   return <EnabledAuctionCard {...props} />;
 }
 
-function EnabledAuctionCard({ basePath = "", item, surface = basePath === "/m" ? "mobile" : "desktop" }: AuctionCardProps) {
+function EnabledAuctionCard({ basePath = "", detailRoute, item, surface = basePath === "/m" ? "mobile" : "desktop" }: AuctionCardProps) {
   const router = useRouter();
   const isFixed = item.saleType === "fixed";
+  const resolvedDetailRoute = detailRoute ?? (isFixed ? "shop" : "auction");
   const price = isFixed ? (item.fixedPrice ?? item.currentBid) : item.currentBid;
   const likedInStore = useCommerceStore((state) => state.likedIds.includes(item.id));
-  const liked = !isFixed && likedInStore;
+  const liked = likedInStore;
   const toggleLike = useCommerceStore((state) => state.toggleLike);
   const hydrate = useCommerceStore((state) => state.hydrate);
   const addToCart = useCommerceStore((state) => state.addToCart);
@@ -36,6 +37,9 @@ function EnabledAuctionCard({ basePath = "", item, surface = basePath === "/m" ?
   const [cartBusy, setCartBusy] = useState(false);
   const [inquiryOpen, setInquiryOpen] = useState(false);
   const isNew = isNewlyPublishedProduct(item.publishAt);
+  const grade = item.conditionGrade || "B";
+  const gradeClass = grade === "S" ? "bg-emerald-700 text-white" : grade === "A+" ? "bg-blue-700 text-white" : grade === "A" ? "bg-amber-100 text-amber-950" : grade === "C" ? "bg-red-800 text-white" : "bg-zinc-800 text-white";
+  const sold = item.status === "closed";
   useEffect(() => hydrate(), [hydrate]);
   const addFixedToCart = async () => {
     if (cartBusy) return;
@@ -79,16 +83,17 @@ function EnabledAuctionCard({ basePath = "", item, surface = basePath === "/m" ?
   };
   return (
     <article className="group min-w-0">
-      <Link className="block" href={`${basePath}/auction/${item.id}`} prefetch={false}>
+      <Link className="block" href={`${basePath}/${resolvedDetailRoute}/${item.id}`} prefetch={false}>
         <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-lg shadow-black/5 transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl">
-          {item.imageUrl ? <CatalogImage alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" sizes={surface === "desktop" ? "220px" : "(max-width: 699px) 50vw, 33vw"} src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
-          <span className="absolute left-2 top-2 rounded-lg bg-paper/90 px-2 py-1 font-mono text-[9px] font-bold tracking-[0.1em] shadow-sm backdrop-blur-md">{isFixed ? "즉시 구매" : "실시간 입찰"}</span>
+          {item.imageUrl ? <CatalogImage alt={`${item.brand} ${item.name}`} className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]" loading="lazy" sizes={surface === "desktop" ? "(max-width: 1279px) 20vw, 240px" : "(max-width: 699px) 50vw, 33vw"} src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
+          <span className={`absolute left-2 top-2 rounded-lg px-2 py-1 font-mono text-[9px] font-black tracking-[0.08em] shadow-sm ${gradeClass}`}>GRADE {grade}</span>
           {isNew && <span className="absolute left-2 top-10 rounded-lg bg-emerald-600 px-2 py-1 text-[9px] font-black tracking-[0.12em] text-white shadow-sm">NEW</span>}
           <div className="absolute right-2 top-2 flex flex-col items-end gap-2">
-            <button aria-label={`${item.name} 상품 문의`} className="flex h-8 items-center gap-1 rounded-xl bg-paper/90 px-2.5 text-[10px] font-bold text-ink shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" onClick={(event) => { event.preventDefault(); setInquiryOpen(true); }} type="button"><MessageCircle size={13} /> 문의</button>
-{!isFixed && <button aria-label={liked ? "찜 해제" : "찜하기"} className={`grid size-9 place-items-center rounded-xl bg-paper/90 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${liked ? "text-red-700" : "text-ink"}`} onClick={(event) => { event.preventDefault(); void updateWishlist(); }} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button>}
+            <button aria-label={liked ? `${item.name} 찜 해제` : `${item.name} 찜하기`} className={`grid size-9 place-items-center rounded-xl bg-paper/90 shadow-sm backdrop-blur-md transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ink active:scale-95 ${liked ? "text-red-700" : "text-ink"}`} onClick={(event) => { event.preventDefault(); void updateWishlist(); }} type="button"><Heart className={liked ? "scale-110" : "scale-100"} fill={liked ? "currentColor" : "none"} size={16} strokeWidth={1.75} /></button>
+            <button aria-label={`${item.name} 상품 문의`} className="flex h-8 items-center gap-1 rounded-xl bg-paper/90 px-2.5 text-[10px] font-bold text-ink shadow-sm backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ink active:scale-95" onClick={(event) => { event.preventDefault(); setInquiryOpen(true); }} type="button"><MessageCircle size={13} strokeWidth={1.75} /> 문의</button>
             <ShareProductButton ariaLabel={`${item.name} 공유`} className="grid size-9 place-items-center rounded-xl bg-paper/90 text-ink shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" priceText={`${isFixed ? "판매 정가" : "현재 입찰가"} ${price.toLocaleString("ko-KR")}원`} title={`${item.enhancedTitle || item.name} | ${item.brand}`} url={`/auction/${item.id}`} />
           </div>
+          {sold && <div className="absolute inset-0 grid place-items-center bg-black/60 text-center text-white"><span className="border border-white/70 px-5 py-3"><strong className="block text-sm tracking-[.16em]">SOLD OUT</strong><span className="mt-1 block text-[10px]">판매완료</span></span></div>}
           <div className="absolute inset-x-0 bottom-0 translate-y-full bg-ink/95 px-3 py-3 text-paper opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
             <p className="text-[10px] text-zinc-400">{isFixed ? "정가 바로구매" : "경매 참여"}</p>
             <p className="mt-1 text-xs font-bold">{isFixed ? "상세에서 구매 절차를 확인하세요." : "상세에서 입찰가를 확인하세요."}</p>
@@ -97,7 +102,7 @@ function EnabledAuctionCard({ basePath = "", item, surface = basePath === "/m" ?
       </Link>
       <div className="pt-3">
         <div className="flex items-center justify-between gap-2 text-[10px] text-muted"><span className="truncate">{item.brand}</span><span className="shrink-0 font-mono tabular-nums">{item.timeLeft ?? "진행 중"}</span></div>
-        <Link className="mt-1 block truncate text-sm font-medium hover:underline" href={`${basePath}/auction/${item.id}`} prefetch={false}>{item.enhancedTitle || item.name}</Link>
+        <Link className="mt-1 block truncate text-sm font-semibold hover:underline focus-visible:ring-2 focus-visible:ring-ink" href={`${basePath}/${resolvedDetailRoute}/${item.id}`} prefetch={false}>{item.enhancedTitle || item.name}</Link>
         <ProductFeedTags description={item.description} gender={item.gender} hashtags={item.hashtags} size={item.size} />
         <div className="mt-3 flex items-end justify-between gap-2">
           <div><p className="text-[10px] text-muted">{isFixed ? "판매 정가" : "현재 입찰가"}</p><p className="font-mono text-sm font-bold tabular-nums">{price.toLocaleString("ko-KR")}원</p></div>

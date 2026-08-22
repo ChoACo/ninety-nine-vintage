@@ -79,7 +79,8 @@ test("home hero rotates auction product main images every five seconds and keeps
   assert.match(hero, /\/banners\/v1\/brand-banner-mobile-480\.webp 480w/);
   assert.match(hero, /object-contain object-center/);
   assert.match(hero, /fetchPriority="high"/);
-  assert.match(hero, /loading="eager"/);
+  assert.match(hero, /placeholder="blur"/);
+  assert.match(hero, /priority/);
   assert.match(hero, /prefetch=\{false\}/);
   assert.match(hero, /href=\{`\$\{basePath\}\/feed`\}/);
   assert.match(hero, /href=\{`\$\{basePath\}\/auction\/\$\{product\.id\}`\}/);

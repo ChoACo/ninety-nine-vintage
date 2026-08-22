@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CatalogImage } from "@/components/ui/CatalogImage";
+import { useOperatorOptimisticStore } from "@/store/useOperatorOptimisticStore";
 import {
   formatStorageDday,
   getKstCalendarDaysUntil,
@@ -318,6 +319,7 @@ export function OperatorShippingConsole({
   const [trackingModalShipment, setTrackingModalShipment] = useState<InventoryShipment | null>(null);
   const [expiryFilter, setExpiryFilter] = useState<StorageExpiryFilter>("all");
   const [sortOrder, setSortOrder] = useState<ShipmentSortOrder>("recent");
+  const setOptimisticShipmentStatus = useOperatorOptimisticStore((state) => state.setShipmentStatus);
 
   const load = useCallback(async (accessToken: string | null, shipped: boolean, nextOffset: number) => {
     if (!accessToken) return;
@@ -469,6 +471,10 @@ export function OperatorShippingConsole({
     sessionStorage.setItem(key, idempotencyKey);
     setBusyKey(key);
     setNotice("");
+    const previousShipments = shipments;
+    const optimisticStatus = action === "pack" || action === "tracking_delete" ? "packed" : "shipped";
+    setOptimisticShipmentStatus(shipment.id, optimisticStatus);
+    setShipments((current) => current.map((item) => item.id === shipment.id ? { ...item, status: optimisticStatus } : item));
     try {
       const response = await fetch("/api/admin/operator/shipping", {
         method: "POST",
@@ -504,8 +510,10 @@ export function OperatorShippingConsole({
       }[action]);
       await load(token, includeShipped, offset);
     } catch (error) {
+      setShipments(previousShipments);
       setNotice(error instanceof Error ? error.message : "배송 상태를 변경하지 못했습니다.");
     } finally {
+      setOptimisticShipmentStatus(shipment.id, null);
       setBusyKey(null);
     }
   };

@@ -174,7 +174,17 @@ export async function POST(request: Request) {
         error?.code === "42501" ? 403 : 409,
       );
     }
-    return commerceJson({ conversation }, 201);
+    const { data: createdMessage, error: createdMessageError } = await auth.user
+      .from("support_messages")
+      .select("*")
+      .eq("conversation_id", conversation.id)
+      .eq("sender_id", auth.userId)
+      .eq("client_nonce", clientNonce)
+      .maybeSingle();
+    if (createdMessageError || !createdMessage) {
+      return commerceJson({ error: "inquiry_message_unavailable", message: "문의는 접수되었지만 첨부 연결 정보를 확인하지 못했습니다." }, 503);
+    }
+    return commerceJson({ conversation, message: createdMessage }, 201);
   }
 
   let conversationId = body?.conversationId;
@@ -214,5 +224,5 @@ export async function POST(request: Request) {
       error.code === "42501" ? 403 : 409,
     );
   }
-  return commerceJson({ message }, 201);
+  return commerceJson({ conversation: { id: conversationId }, message }, 201);
 }

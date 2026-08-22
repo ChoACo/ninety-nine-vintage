@@ -8,6 +8,7 @@ import { formatProductDisplayNumber } from "@/lib/productDisplayNumber";
 import { Button } from "@/components/ui/Button";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { announceAuctionBidSucceeded } from "@/lib/auction/bidEvents";
+import { useToastStore } from "@/store/useToastStore";
 import {
   BID_RATE_LIMIT_MESSAGE,
   isRateLimitedResponse,
@@ -33,6 +34,13 @@ export function AuctionBidRoutePanel({ basePath = "", bidIncrement, currentPrice
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [message, setMessage] = useState<{ kind: "error" | "success"; text: string } | null>(null);
   const { isCoolingDown, beginCooldown, cooldownSeconds } = useBidRateLimitCooldown();
+  const pushToast = useToastStore((state) => state.pushToast);
+
+  const addQuickAmount = (step: number) => {
+    const currentAmount = Number(amount);
+    setAmount(String(Math.max(minimumBid, Number.isSafeInteger(currentAmount) ? currentAmount + step : minimumBid + step)));
+    setMessage(null);
+  };
 
   const requestConfirmation = () => {
     if (busy || isCoolingDown) return;
@@ -81,11 +89,14 @@ export function AuctionBidRoutePanel({ basePath = "", bidIncrement, currentPrice
       setAgreed(false);
       setConfirmOpen(false);
       setMessage({ kind: "success", text: payload.bid.isFinal ? "첫 입찰이 즉시 낙찰로 확정되었습니다." : "입찰이 완료되었습니다. 현재가가 실시간으로 갱신됩니다." });
+      pushToast("success", payload.bid.isFinal ? "첫 입찰로 낙찰이 확정되었습니다." : "입찰이 정상적으로 반영되었습니다.");
       announceAuctionBidSucceeded(productId);
       window.dispatchEvent(new Event("ninety-nine:close-route-modal"));
     } catch (error) {
       setConfirmOpen(false);
-      setMessage({ kind: "error", text: error instanceof Error ? error.message : "입찰을 저장하지 못했습니다." });
+      const errorMessage = error instanceof Error ? error.message : "입찰을 저장하지 못했습니다.";
+      setMessage({ kind: "error", text: errorMessage });
+      pushToast("error", errorMessage);
     } finally {
       setBusy(false);
     }
@@ -96,7 +107,7 @@ export function AuctionBidRoutePanel({ basePath = "", bidIncrement, currentPrice
     <section className={`mx-auto w-full max-w-xl rounded-3xl border border-white/10 bg-paper shadow-xl shadow-black/5 ${surface === "desktop" ? "p-3" : "p-1"}`}>
       <div className="border-b border-ink pb-5">
         <p className="text-[10px] font-bold tracking-[0.14em] text-muted">{formatProductDisplayNumber(productId)}</p>
-        <h1 className="mt-3 text-2xl font-black tracking-[-0.05em]">실시간 경매 입찰</h1>
+        <h1 className="mt-3 text-2xl font-black tracking-[-0.05em]">라이브 옥션 입찰</h1>
         <p className="mt-2 truncate text-sm text-muted">{productTitle}</p>
       </div>
       <dl className={`mt-6 grid gap-px overflow-hidden rounded-2xl border border-line bg-line text-sm ${surface === "desktop" ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -110,9 +121,14 @@ export function AuctionBidRoutePanel({ basePath = "", bidIncrement, currentPrice
         <span className="text-sm font-bold">원</span>
         <button aria-label={`입찰 금액 ${bidIncrement.toLocaleString("ko-KR")}원 늘리기`} className="ml-2 grid size-10 shrink-0 place-items-center rounded-xl border border-line text-lg font-bold disabled:opacity-35" disabled={busy || loading || !session} onClick={() => setAmount(String(Math.max(minimumBid, Number(amount || minimumBid)) + bidIncrement))} type="button">+</button>
       </div>
+      <div aria-label="빠른 입찰 금액 추가" className="mt-2 grid grid-cols-3 gap-2">
+        {[1_000, 3_000, 5_000].map((step) => (
+          <button className="h-10 rounded-xl border border-line bg-surface font-mono text-xs font-bold transition hover:border-ink hover:bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink disabled:opacity-40" disabled={busy || loading || !session} key={step} onClick={() => addQuickAmount(step)} type="button">+{step.toLocaleString("ko-KR")}원</button>
+        ))}
+      </div>
       <label className="mt-4 flex items-start gap-3 rounded-2xl border border-line bg-surface p-4 text-xs leading-relaxed shadow-sm"><input checked={agreed} className="mt-1 accent-ink" disabled={busy || !session} onChange={(event) => setAgreed(event.target.checked)} type="checkbox" /><span>낙찰 후 안내된 결제 기한과 미결제 시 차순위 전환 규칙을 확인했습니다. 입찰은 취소할 수 없습니다.</span></label>
       <details className="mt-4 rounded-2xl border border-line bg-paper p-4 shadow-sm">
-        <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-bold"><Lightbulb size={15} /> 실시간 경매 입찰 가이드</summary>
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-bold"><Lightbulb size={15} /> 라이브 옥션 입찰 가이드</summary>
         <ul className="mt-4 space-y-2 text-xs leading-5 text-muted"><li>• 서버의 절대 시간을 기준으로 마감합니다.</li><li>• 마감 3분 이내의 유효 입찰은 남은 시간을 다시 3분으로 연장합니다.</li><li>• 연장전에는 이미 참여한 회원만 추가 입찰할 수 있습니다.</li><li>• 낙찰 후 결제하지 않으면 낙찰이 취소되고 차순위 회원에게 구매 기회가 넘어갈 수 있습니다.</li><li>• 미결제 경고가 누적되면 입찰이 제한될 수 있습니다.</li></ul>
       </details>
       {message && <p aria-live="polite" className={`mt-4 rounded-2xl border px-4 py-3 text-xs font-bold leading-5 shadow-sm ${message.kind === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>{message.text}</p>}
@@ -122,7 +138,7 @@ export function AuctionBidRoutePanel({ basePath = "", bidIncrement, currentPrice
       <header className="flex items-start justify-between gap-6 border-b border-line px-6 py-5">
         <div>
           <p className="flex items-center gap-2 text-[10px] font-bold tracking-[0.14em] text-muted"><ShieldCheck size={13} /> 최종 확인 · 서버 저장 전</p>
-          <h2 className="mt-2 text-xl font-black leading-snug tracking-tight" id="bid-final-confirm-title">이 금액으로 입찰할까요?</h2>
+          <h2 className="mt-2 text-xl font-black leading-snug tracking-tight" id="bid-final-confirm-title">현재가 {Number(amount || 0).toLocaleString("ko-KR")}원에 입찰하시겠습니까?</h2>
           <p className="mt-2 truncate text-xs text-muted">{productTitle}</p>
         </div>
         <button aria-label="입찰 최종 확인 닫기" className="grid size-10 shrink-0 place-items-center rounded-xl text-muted transition-all duration-300 hover:-translate-y-0.5 hover:bg-surface hover:text-ink active:scale-95 disabled:opacity-40" disabled={busy} onClick={() => setConfirmOpen(false)} type="button"><X size={19} /></button>

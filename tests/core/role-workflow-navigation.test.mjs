@@ -66,9 +66,9 @@ test("staff keeps member account access and auction pages keep the cart control"
   ]);
 
   assert.match(mobileHeader, /\[\["업무", roleNavigation\.centerHref\]/);
-  assert.match(mobileHeader, /\["MY", "\/m\/account"\]/);
+  assert.match(mobileHeader, /\["MY", "\/m\/my"\]/);
   assert.doesNotMatch(mobileBottomNav, /access\.roleCode|roleNavigation/);
-  assert.match(mobileBottomNav, /\["MY", "\/m\/account", UserRound\]/);
+  assert.match(mobileBottomNav, /\["MY", "\/m\/my", UserRound\]/);
   assert.match(toolbar, /aria-label="장바구니"/);
   assert.match(toolbar, /aria-label="설정"[\s\S]*href="\/settings"/);
   assert.doesNotMatch(toolbar, /aria-label="입찰 현황"/);

@@ -34,8 +34,8 @@ test("the storefront renders separate mobile and fluid desktop presentation tree
   assert.match(header, /(?:sm|md|lg|xl):/);
   assert.match(productRail, /surface === "desktop" \? "grid grid-cols-3 gap-2"/);
   assert.match(productRail, /surface === "desktop" \? "grid grid-cols-5 gap-x-3 gap-y-9"/);
-  assert.doesNotMatch(home, /clamp\(|(?:sm|md|lg|xl):/);
-  assert.match(home, /text-\[6\.5rem\]/);
+  assert.match(home, /text-\[clamp\(2rem,5vw,3\.5rem\)\]/);
+  assert.match(home, /text-balance/);
   assert.match(home, /"only screen and \(max-width: 1279px\)": "\/m\/home"/);
   assert.match(css, /\[data-ui-surface="desktop"\][\s\S]*word-break: keep-all/);
   assert.match(mobileLayout, /data-ui-surface="mobile"/);
@@ -155,7 +155,9 @@ test("gallery, Next Image, and supplied hero banners keep the V2 media contract"
   assert.match(featuredAuction, /\/banners\/v1\/brand-banner-wide-1440\.webp/);
   assert.match(featuredAuction, /object-contain object-center/);
   assert.match(featuredAuction, /fetchPriority="high"/);
-   assert.match(featuredAuction, /srcSet=\{fallbackBanner\.srcSet\}/);
+  assert.match(featuredAuction, /import Image from "next\/image"/);
+  assert.match(featuredAuction, /placeholder="blur"/);
+  assert.match(featuredAuction, /sizes=\{fallbackBanner\.sizes\}/);
    assert.ok(optimizedBanners.every((banner) => banner.isFile() && banner.size > 0));
   assert.ok(optimizedBanners.every((banner) => banner.size < 30_000));
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { Headphones, Menu, Search, ShoppingBag, X } from "lucide-react";
+import { Headphones, Menu, MessageCircle, Search, ShoppingBag, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -15,7 +15,7 @@ import { useSimpleMode } from "@/components/features/accessibility/SimpleModePro
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 
 const MEMBER_ONLY_MOBILE_HREFS = new Set([
-  "/m/saved",
+  "/m/wishlist",
   "/m/chat",
   "/m/cart",
   "/m/account",
@@ -36,13 +36,14 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
   const consumerSimpleMode = simpleMode.enabled && !roleNavigation.isStaff;
   const standardLinks = [
     ["홈", "/m/home"],
+    ["센터몰", "/m/centers"],
     ...(hasActiveBid ? [["입찰 중인 상품", "/m/bidding"] as const] : []),
-    ["실시간 경매", "/m/feed"],
-    ["즉시 구매", "/m/shop"],
-    ["찜", "/m/saved"],
+    ["라이브 옥션 · LIVE", "/m/live"],
+    ["아카이브 숍", "/m/shop"],
+    ["찜", "/m/wishlist"],
     ["상담·채팅", "/m/chat"],
     ["장바구니", "/m/cart"],
-    ["MY", "/m/account"],
+    ["MY", "/m/my"],
     ...(roleNavigation.isStaff
       ? [["업무", roleNavigation.centerHref] as const]
       : []),
@@ -51,7 +52,7 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
   const links = consumerSimpleMode
     ? ([
         ["홈", "/m/home"],
-        ["입찰", "/m/feed"],
+        ["입찰", "/m/live"],
         ["구매", "/m/shop"],
         ["결제", "/m/account/payments"],
         ["배송 신청·현황", "/m/account/shipping"],
@@ -70,7 +71,7 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
 
   return (
     <>
-      <header className={`sticky ${hasLiveTicker ? "top-9" : "top-0"} z-[60] border-b border-line bg-paper/95 backdrop-blur-md`}>
+      <header className={`sticky ${hasLiveTicker ? "top-10" : "top-0"} z-[60] border-b border-line bg-paper/95 backdrop-blur-md`}>
         <div className="flex h-14 items-center gap-1 px-2">
           <button aria-expanded={menuOpen} aria-label="전체 메뉴 열기" className="grid size-11 shrink-0 place-items-center rounded-full active:bg-surface" onClick={() => setMenuOpen(true)} type="button"><Menu size={21} /></button>
           <Link className="min-w-0 flex-1 truncate px-1 text-sm font-black tracking-[-0.05em]" href="/m/home" prefetch={false}>NINETY-NINE</Link>
@@ -78,11 +79,11 @@ export function MobileSiteHeader({ hasLiveTicker = false }: { hasLiveTicker?: bo
             {!consumerSimpleMode && <button aria-expanded={searchOpen} aria-label="상품 검색 열기" className="grid size-11 place-items-center rounded-full active:bg-surface" onClick={() => setSearchOpen((value) => !value)} type="button"><Search size={20} /></button>}
             <ThemeToggle className="size-11 rounded-full px-0" />
             {!session ? (
-              <Link aria-label="카카오 로그인" className="grid h-11 shrink-0 place-items-center rounded-full bg-ink px-5 text-xs font-bold text-paper" href="/m/account/login" onClick={(event) => {
+              <Link aria-label="카카오 로그인" className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-[#FEE500] px-4 text-xs font-bold text-[#191919] shadow-sm focus-visible:ring-2 focus-visible:ring-[#191919] focus-visible:ring-offset-2 active:scale-[.98]" href="/m/account/login" onClick={(event) => {
                 event.preventDefault();
                 const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
                 window.location.assign(`/m/account/login?next=${encodeURIComponent(next)}`);
-              }} prefetch={false}>로그인</Link>
+              }} prefetch={false}><MessageCircle fill="currentColor" size={14} strokeWidth={1.75} /> 로그인</Link>
             ) : (
               <>
                 {!consumerSimpleMode && <Link aria-label="장바구니" className="grid size-11 place-items-center rounded-full active:bg-surface" href="/m/cart" prefetch={false}><ShoppingBag size={20} /></Link>}

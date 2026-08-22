@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, CircleStop, ClipboardCheck, Edit3, FileSpreadsheet, ImagePlus, PauseCircle, PlayCircle, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ClipboardCheck, Edit3, FileSpreadsheet, ImagePlus, PauseCircle, PlayCircle, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useOperatorStoreScope } from "@/store/useOperatorStoreScope";
+import { useOperatorOptimisticStore } from "@/store/useOperatorOptimisticStore";
 import {
   discardUnpersistedProductImages,
   uploadProductImages,
@@ -34,6 +35,7 @@ import {
   OperatorXlsxImportModal,
   type XlsxRegistrationOptions,
 } from "@/components/admin/operator/OperatorXlsxImportModal";
+import { AuctionController } from "@/components/admin/operator/AuctionController";
 import { getNextAuctionDeadline } from "@/utils/formatters";
 import {
   isAiEnhancementApplied,
@@ -144,7 +146,7 @@ type RegistrationResultModal =
   | { jobId: string; kind: "success"; title: string }
   | null;
 
-type ProductConsoleView = "active" | "registration";
+type ProductConsoleView = "active" | "auction" | "registration";
 type RegistrationStage = "scheduled" | "draft";
 
 const emptyForm: FormState = {
@@ -291,6 +293,7 @@ export function OperatorProductsConsole({
 }: Readonly<{ view?: ProductConsoleView }>) {
   const requestedSaleType = requestedSingleSaleType();
   const storeScope = useOperatorStoreScope((state) => state.scope);
+  const setOptimisticProductStatus = useOperatorOptimisticStore((state) => state.setProductStatus);
   const [token, setToken] = useState<string | null>(null);
   const [stores, setStores] = useState<Store[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -303,6 +306,7 @@ export function OperatorProductsConsole({
     () => view === "registration" && requestedSaleType !== null,
   );
   const [singleImages, setSingleImages] = useState<SingleImage[]>([]);
+  const [defectSeverities, setDefectSeverities] = useState<Record<string, "경미" | "보통" | "심함">>({});
   const [publicationMode, setPublicationMode] =
     useState<PublicationMode>("now");
   const [scheduledHourKst, setScheduledHourKst] = useState(10);
@@ -318,7 +322,7 @@ export function OperatorProductsConsole({
     saleType: "all" | "fixed" | "auction";
     search: string;
   }>({
-    saleType: view === "active" ? "fixed" : "all",
+    saleType: view === "active" ? "fixed" : view === "auction" ? "auction" : "all",
     search: "",
   });
   const [registrationStage] = useState<RegistrationStage>("scheduled");
@@ -542,12 +546,15 @@ export function OperatorProductsConsole({
     ...current,
     measurements: { ...current.measurements, [key]: value },
   }));
-  const toggleDefect = (code: string) => setForm((current) => ({
-    ...current,
-    defectTags: current.defectTags.includes(code)
-      ? current.defectTags.filter((item) => item !== code)
-      : [...current.defectTags, code],
-  }));
+  const toggleDefect = (code: string) => {
+    const removing = form.defectTags.includes(code);
+    if (removing) setDefectSeverities((values) => Object.fromEntries(Object.entries(values).filter(([key]) => key !== code)));
+    setForm((current) => ({
+      ...current,
+      defectTags: removing ? current.defectTags.filter((item) => item !== code) : [...current.defectTags, code],
+      inspectionNotes: removing ? current.inspectionNotes.split("\n").filter((line) => !line.startsWith(`[하자:${code}]`)).join("\n") : current.inspectionNotes,
+    }));
+  };
   const scopedStores = useMemo(() => {
     if (storeScope.active && storeScope.storeId) {
       const scoped = stores.filter(
@@ -557,14 +564,15 @@ export function OperatorProductsConsole({
     }
     return [];
   }, [storeScope, stores]);
-  const clearSingleImages = () => {
+  const clearSingleImages = useCallback(() => {
     singleImagesRef.current.forEach((image) =>
       URL.revokeObjectURL(image.previewUrl),
     );
     singleImagesRef.current = [];
     setSingleImages([]);
-  };
-  const resetForm = () => {
+    setDefectSeverities({});
+  }, []);
+  const resetForm = useCallback(() => {
     quickAiRequestRef.current?.abort();
     setQuickAiPreview(null);
     clearSingleImages();
@@ -576,7 +584,24 @@ export function OperatorProductsConsole({
       const canPublish = scopedStores.find((store) => store.id === storeId)?.canPublish === true;
       return { ...emptyForm, storeId, status: canPublish ? "active" : "pending" };
     });
-  };
+  }, [clearSingleImages, scopedStores]);
+  useEffect(() => {
+    const onShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        const formElement = document.querySelector<HTMLFormElement>("[data-operator-product-form]");
+        if (formElement && (editingId || singleCreateOpen)) {
+          event.preventDefault();
+          formElement.requestSubmit();
+        }
+      }
+      if (event.key === "Escape" && (editingId || singleCreateOpen) && !busy) {
+        event.preventDefault();
+        resetForm();
+      }
+    };
+    window.addEventListener("keydown", onShortcut);
+    return () => window.removeEventListener("keydown", onShortcut);
+  }, [busy, editingId, resetForm, singleCreateOpen]);
 
   const setBlankSingleRegistration = (
     saleType: "fixed" | "auction",
@@ -625,6 +650,19 @@ export function OperatorProductsConsole({
     }));
     setSingleImages((current) => [...current, ...additions]);
     setNotice("");
+  };
+
+  const addDefectImage = (code: string, label: string, file: File | undefined) => {
+    if (!file) return;
+    if (singleImages.length >= 15) { setNotice("단품 사진은 하자 상세 사진을 포함해 최대 15장입니다."); return; }
+    const photoNumber = singleImages.length + 1;
+    setSingleImages((current) => [...current, { file, id: crypto.randomUUID(), previewUrl: URL.createObjectURL(file) }]);
+    const severity = defectSeverities[code] ?? "경미";
+    setForm((current) => ({ ...current, inspectionNotes: [...current.inspectionNotes.split("\n").filter((line) => line && !line.startsWith(`[하자:${code}]`)), `[하자:${code}] ${label} · ${severity} · 사진 ${photoNumber}번`].join("\n") }));
+  };
+  const updateDefectSeverity = (code: string, label: string, severity: "경미" | "보통" | "심함") => {
+    setDefectSeverities((current) => ({ ...current, [code]: severity }));
+    setForm((current) => ({ ...current, inspectionNotes: current.inspectionNotes.split("\n").map((line) => line.startsWith(`[하자:${code}]`) ? line.replace(`${label} · 경미`, `${label} · ${severity}`).replace(`${label} · 보통`, `${label} · ${severity}`).replace(`${label} · 심함`, `${label} · ${severity}`) : line).join("\n") }));
   };
 
   const runQuickAi = async () => {
@@ -732,6 +770,7 @@ export function OperatorProductsConsole({
         categoryId: BATCH_CLOTHING_CATEGORIES.find((item) => item.label === snapshot.form.category)?.id ?? null,
         sizeLabel: snapshot.form.sizeLabel,
         defectTags: snapshot.form.defectTags,
+        inspectionNotes: splitLines(snapshot.form.inspectionNotes),
         measurements: collectMeasurements(snapshot.form.measurements),
         storeId: snapshot.form.storeId,
         saleType: snapshot.form.saleType,
@@ -1050,6 +1089,9 @@ export function OperatorProductsConsole({
     if (!window.confirm(`“${product.title}” 상품 공개를 일시중지할까요?`)) return;
     setBusy(true);
     setNotice("");
+    const previousProducts = products;
+    setOptimisticProductStatus(product.id, "pending");
+    setProducts((current) => current.map((item) => item.id === product.id ? { ...item, status: "pending" } : item));
     try {
       const response = await fetch(
         `/api/admin/operator/products/${product.id}/pause`,
@@ -1070,75 +1112,14 @@ export function OperatorProductsConsole({
       if (editingId === product.id) resetForm();
       await load(token);
     } catch (error) {
+      setProducts(previousProducts);
       setNotice(
         error instanceof Error
           ? error.message
           : "상품을 일시중지하지 못했습니다.",
       );
     } finally {
-      setBusy(false);
-    }
-  };
-
-  const closeAuctionNow = async (product: Product) => {
-    if (
-      !token ||
-      busy ||
-      !permissions.canCloseAuctions ||
-      product.sale_type !== "auction" ||
-      product.status !== "active"
-    ) {
-      return;
-    }
-    const reason = window.prompt(
-      `“${product.title}” 경매를 지금 마감합니다.\n감사 기록에 남길 사유를 입력해 주세요.`,
-      "운영 테스트 즉시 마감",
-    )?.trim();
-    if (!reason) return;
-    if (reason.length < 2 || reason.length > 500) {
-      setNotice("즉시 마감 사유를 2~500자로 입력해 주세요.");
-      return;
-    }
-
-    setBusy(true);
-    setNotice("");
-    try {
-      const response = await fetch(
-        `/api/admin/operator/products/${product.id}/close-now`,
-        {
-          body: JSON.stringify({ reason }),
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          method: "POST",
-        },
-      );
-      const payload = await response.json().catch(() => null) as {
-        message?: string;
-        result?: {
-          winner_display_name?: string | null;
-          winning_amount?: number | null;
-        };
-      } | null;
-      if (!response.ok) {
-        throw new Error(payload?.message ?? "경매를 즉시 마감하지 못했습니다.");
-      }
-      const winner = payload?.result?.winner_display_name;
-      const amount = payload?.result?.winning_amount;
-      setNotice(
-        winner && typeof amount === "number"
-          ? `경매를 즉시 마감하고 ${winner}님을 ${amount.toLocaleString("ko-KR")}원 낙찰자로 확정했습니다.`
-          : "입찰자 없이 경매를 즉시 마감했습니다.",
-      );
-      await load(token);
-    } catch (error) {
-      setNotice(
-        error instanceof Error
-          ? error.message
-          : "경매를 즉시 마감하지 못했습니다.",
-      );
-    } finally {
+      setOptimisticProductStatus(product.id, null);
       setBusy(false);
     }
   };
@@ -1147,15 +1128,20 @@ export function OperatorProductsConsole({
     if (!token || busy || product.status !== "pending") return;
     setBusy(true);
     setNotice("");
+    const previousProducts = products;
+    setOptimisticProductStatus(product.id, "active");
+    setProducts((current) => current.map((item) => item.id === product.id ? { ...item, status: "active" } : item));
     try {
       await publishProductNow(token, product.id);
       setNotice("상품을 공개했습니다.");
       await load(token);
     } catch (error) {
+      setProducts(previousProducts);
       setNotice(
         error instanceof Error ? error.message : "상품을 공개하지 못했습니다.",
       );
     } finally {
+      setOptimisticProductStatus(product.id, null);
       setBusy(false);
     }
   };
@@ -1368,7 +1354,7 @@ export function OperatorProductsConsole({
     {view === "registration" && products.some((product) => product.brand_source === "inferred" && product.status === "pending") && <StatusNotice>등록 대기 상품 중 제목에서 임시 추론한 브랜드가 있습니다. 수정 저장하면 확인된 브랜드로 전환됩니다.</StatusNotice>}
     {view === "registration" && products.some((product) => product.brand_source === "inferred" && product.status === "pending") && <section className="border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-bold text-amber-900">브랜드 확인 필요</p><div className="mt-3 flex flex-wrap gap-2">{products.filter((product) => product.brand_source === "inferred" && product.status === "pending").map((product) => <button className="border border-amber-300 bg-paper px-3 py-2 text-left text-[11px] text-amber-900 disabled:cursor-not-allowed disabled:opacity-40" disabled={!permissions.canMutate} key={product.id} onClick={() => edit(product)} type="button"><span className="font-bold">{product.brand}</span> · {product.title}</button>)}</div></section>}
     {(editingId || (view === "registration" && singleCreateOpen)) && (
-      <form className="grid grid-cols-1 gap-3 border border-ink bg-surface p-4 sm:grid-cols-2 sm:p-6" onSubmit={submit}>
+      <form className="grid grid-cols-1 gap-3 border border-ink bg-surface p-4 sm:grid-cols-2 sm:p-6" data-operator-product-form onSubmit={submit}>
         <div className="flex flex-col gap-3 sm:col-span-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-bold">{editingId ? "상품 수정" : form.saleType === "fixed" ? "즉시구매 상품 등록" : "경매 상품 등록"}</p>
@@ -1387,6 +1373,12 @@ export function OperatorProductsConsole({
             </div>
           )}
         </div>
+
+        {!editingId && <ol aria-label="상품 등록 단계" className="grid gap-2 sm:col-span-2 sm:grid-cols-3">
+          <li className="border border-ink bg-ink p-3 text-paper"><span className="text-[10px] font-mono">STEP 1</span><strong className="mt-1 block text-xs">기본 정보·사진</strong></li>
+          <li className="border border-line bg-paper p-3"><span className="text-[10px] font-mono text-muted">STEP 2</span><strong className="mt-1 block text-xs">실측·상태·하자</strong></li>
+          <li className="border border-line bg-paper p-3"><span className="text-[10px] font-mono text-muted">STEP 3</span><strong className="mt-1 block text-xs">판매 방식·공개</strong></li>
+        </ol>}
 
         {!editingId && (
           <section className="border border-line bg-paper p-4 sm:col-span-2">
@@ -1511,6 +1503,7 @@ export function OperatorProductsConsole({
               <legend className="text-[10px] font-bold text-muted">하자·오염 체크리스트 <span className="font-normal">(해당 항목만 선택)</span></legend>
               <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">{DEFECT_TAGS.map((tag) => { const checked = form.defectTags.includes(tag.code); return <label className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-bold transition-colors ${checked ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink"}`} key={tag.code}><input checked={checked} className="accent-ink" onChange={() => toggleDefect(tag.code)} type="checkbox" />{tag.label}</label>; })}</div>
             </fieldset>
+            {form.defectTags.length > 0 && <section className="space-y-2 border border-line bg-paper p-4 sm:col-span-2"><div><p className="text-xs font-black">하자 상세 매핑</p><p className="mt-1 text-[10px] text-muted">하자별 심각도와 근접 사진을 연결합니다. 사진은 전체 상품 이미지에도 포함됩니다.</p></div>{form.defectTags.map((code) => { const tag = DEFECT_TAGS.find((item) => item.code === code); if (!tag) return null; return <div className="grid items-center gap-2 border-t border-line pt-3 sm:grid-cols-[1fr_120px_180px]" key={code}><strong className="text-xs">{tag.label}</strong><select aria-label={`${tag.label} 심각도`} className="h-10 border border-line px-3 text-xs" onChange={(event) => updateDefectSeverity(code, tag.label, event.target.value as "경미" | "보통" | "심함")} value={defectSeverities[code] ?? "경미"}><option>경미</option><option>보통</option><option>심함</option></select><label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 border border-ink px-3 text-xs font-bold"><ImagePlus size={14} />상세 사진 선택<input accept={PRODUCT_IMAGE_INPUT_ACCEPT} className="sr-only" onChange={(event) => { addDefectImage(code, tag.label, event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} type="file" /></label></div>; })}</section>}
             {form.saleType === "auction" ? <>
               <label className="text-[10px] font-bold text-muted"><span className="mb-2 block">최소 입찰 단위 (원)</span><TextInput aria-label="최소 입찰 단위" min="1" onChange={(event) => update("bidIncrement", event.target.value)} placeholder="1,000" type="number" value={form.bidIncrement} /></label>
               <div className="border border-line bg-paper px-4 py-3 text-[11px] leading-5 text-muted">기본값은 1,000원이며 입력칸에서 상품별로 자유롭게 수정할 수 있습니다. 첫 입찰은 시작가부터 시작하고 이후 입찰은 현재가 + 최소 입찰 단위로 올라갑니다.</div>
@@ -1547,7 +1540,7 @@ export function OperatorProductsConsole({
       <label className="flex items-center gap-3 text-xs font-bold"><input checked={allVisiblePendingSelected} disabled={busy || !permissions.canPublish || visiblePendingIds.length === 0} onChange={toggleAllVisiblePending} type="checkbox" /> 검색 결과 전체 선택</label>
       <div className="flex flex-wrap items-center gap-3"><span className="font-mono text-xs text-muted">{selectedPendingIds.size}개 선택</span>{selectedPendingIds.size > 0 && <Button disabled={busy} onClick={() => setSelectedPendingIds(new Set())} size="compact" variant="ghost" type="button">선택 해제</Button>}<Button disabled={busy || !permissions.canPublish || selectedPendingIds.size === 0} onClick={() => void publishSelected()} size="compact" variant="primary" type="button">지금 즉시 공개</Button></div>
     </div>}
-    <div className="overflow-x-auto border-y border-line"><table className="w-full min-w-[1080px] text-left text-xs"><thead className="border-b border-line bg-surface text-[10px] tracking-[.12em] text-muted"><tr>{view === "registration" && <th className="px-4 py-4">선택</th>}<th className="px-4 py-4">상품</th><th className="px-4 py-4">숍</th><th className="px-4 py-4">판매 방식</th><th className="px-4 py-4">가격</th><th className="px-4 py-4">보관</th><th className="px-4 py-4">상태</th><th className="px-4 py-4" /></tr></thead><tbody className="divide-y divide-line">{visibleProducts.map((product) => { const manageable = isManageableProductStatus(product.status); const canPublishStore = stores.some((store) => store.id === product.store_id && store.canPublish); return <tr key={product.id}>{view === "registration" && <td className="px-4 py-4"><input aria-label={`${product.title} 공개 선택`} checked={selectedPendingIds.has(product.id)} disabled={busy || !canPublishStore || product.status !== "pending"} onChange={() => togglePending(product.id)} type="checkbox" /></td>}<td className="px-4 py-4"><div className="flex items-center gap-3"><CatalogImage alt="" className="size-12 object-cover" src={product.image_urls?.[0] ?? ""} /><span className="font-bold">{product.title}</span></div></td><td className="px-4 py-4 text-muted">{product.stores?.name ?? "미지정"}</td><td className="px-4 py-4">{product.sale_type === "fixed" ? "즉시구매" : "경매"}</td><td className="px-4 py-4 font-mono">{(product.fixed_price ?? product.current_price).toLocaleString("ko-KR")}원</td><td className="px-4 py-4">{product.storage_class === "large" ? "대형 · 7일" : "소형 · 14일"}</td><td className="px-4 py-4"><span className={`border px-2 py-1 text-[10px] font-bold ${product.status === "closed" && product.pending_lock_kind ? "border-amber-300 bg-amber-50 text-amber-800" : "border-line"}`}>{view === "registration" && isScheduledProduct(product, productReferenceNow) ? "업로드 예정" : productStatusText(product)}</span></td><td className="px-4 py-4 text-right"><div className="flex justify-end gap-3">{permissions.canCloseAuctions && product.sale_type === "auction" && product.status === "active" && <button aria-label={`${product.title} 즉시 마감`} className="inline-flex items-center gap-1 font-bold text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy} onClick={() => void closeAuctionNow(product)} type="button"><CircleStop size={13} /> 즉시 마감·낙찰 확정</button>}{product.status === "active" && <button aria-label={`${product.title} 일시중지`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate} onClick={() => void pause(product)} type="button"><PauseCircle size={13} /> 일시중지</button>}{product.status === "pending" && <button aria-label={`${product.title} 공개`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !canPublishStore} onClick={() => void publish(product)} type="button"><PlayCircle size={13} /> 공개</button>}<button aria-label={`${product.title} 점검`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product, "inspection")} type="button"><ClipboardCheck size={13} /> 점검</button><button aria-label={`${product.title} 수정`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product)} type="button"><Edit3 size={13} /> 수정</button><button aria-label={`${product.title} 삭제`} className="inline-flex items-center gap-1 text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => void remove(product)} type="button"><Trash2 size={13} /> 삭제</button>{product.status === "active" && <Link className="underline" href={`/auction/${product.id}`}>보기</Link>}</div></td></tr>; })}{visibleProducts.length === 0 && <tr><td className="px-4 py-16 text-center text-muted" colSpan={view === "registration" ? 8 : 7}>조건에 맞는 상품이 없습니다.</td></tr>}</tbody></table></div>
+    <div className="overflow-x-auto border-y border-line"><table className="w-full min-w-[1080px] text-left text-xs"><thead className="border-b border-line bg-surface text-[10px] tracking-[.12em] text-muted"><tr>{view === "registration" && <th className="px-4 py-4">선택</th>}<th className="px-4 py-4">상품</th><th className="px-4 py-4">숍</th><th className="px-4 py-4">판매 방식</th><th className="px-4 py-4">가격</th><th className="px-4 py-4">보관</th><th className="px-4 py-4">상태</th><th className="px-4 py-4" /></tr></thead><tbody className="divide-y divide-line">{visibleProducts.map((product) => { const manageable = isManageableProductStatus(product.status); const canPublishStore = stores.some((store) => store.id === product.store_id && store.canPublish); return <tr key={product.id}>{view === "registration" && <td className="px-4 py-4"><input aria-label={`${product.title} 공개 선택`} checked={selectedPendingIds.has(product.id)} disabled={busy || !canPublishStore || product.status !== "pending"} onChange={() => togglePending(product.id)} type="checkbox" /></td>}<td className="px-4 py-4"><div className="flex items-center gap-3"><CatalogImage alt="" className="size-12 object-cover" src={product.image_urls?.[0] ?? ""} /><span className="font-bold">{product.title}</span></div></td><td className="px-4 py-4 text-muted">{product.stores?.name ?? "미지정"}</td><td className="px-4 py-4">{product.sale_type === "fixed" ? "즉시구매" : "경매"}</td><td className="px-4 py-4 font-mono">{(product.fixed_price ?? product.current_price).toLocaleString("ko-KR")}원</td><td className="px-4 py-4">{product.storage_class === "large" ? "대형 · 7일" : "소형 · 14일"}</td><td className="px-4 py-4"><span className={`border px-2 py-1 text-[10px] font-bold ${product.status === "closed" && product.pending_lock_kind ? "border-amber-300 bg-amber-50 text-amber-800" : "border-line"}`}>{view === "registration" && isScheduledProduct(product, productReferenceNow) ? "업로드 예정" : productStatusText(product)}</span></td><td className="px-4 py-4 text-right"><div className="flex justify-end gap-3">{permissions.canMutate && product.sale_type === "auction" && product.status === "active" && <AuctionController onChanged={() => void load(token)} productId={product.id} title={product.title} />}{product.status === "active" && <button aria-label={`${product.title} 일시중지`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate} onClick={() => void pause(product)} type="button"><PauseCircle size={13} /> 일시중지</button>}{product.status === "pending" && <button aria-label={`${product.title} 공개`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !canPublishStore} onClick={() => void publish(product)} type="button"><PlayCircle size={13} /> 공개</button>}<button aria-label={`${product.title} 점검`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product, "inspection")} type="button"><ClipboardCheck size={13} /> 점검</button><button aria-label={`${product.title} 수정`} className="inline-flex items-center gap-1 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product)} type="button"><Edit3 size={13} /> 수정</button><button aria-label={`${product.title} 삭제`} className="inline-flex items-center gap-1 text-red-700 underline disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => void remove(product)} type="button"><Trash2 size={13} /> 삭제</button>{product.status === "active" && <Link className="underline" href={`/auction/${product.id}`}>보기</Link>}</div></td></tr>; })}{visibleProducts.length === 0 && <tr><td className="px-4 py-16 text-center text-muted" colSpan={view === "registration" ? 8 : 7}>조건에 맞는 상품이 없습니다.</td></tr>}</tbody></table></div>
     <PremiumDialog
       ariaLabel="단품 등록 결과"
       closeDisabled={registrationResult?.kind === "retrying"}

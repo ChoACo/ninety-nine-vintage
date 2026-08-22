@@ -37,10 +37,10 @@ test("simple mode exposes only the five consumer core destinations", async () =>
   ]);
 
   assert.match(bottomNav, /simpleMode\.enabled/);
-  assert.match(bottomNav, /\["입찰", "\/m\/feed"/);
+  assert.match(bottomNav, /\["입찰", "\/m\/live"/);
   assert.match(bottomNav, /\["구매", "\/m\/shop"/);
-  assert.match(bottomNav, /\["찜", "\/m\/saved"/);
-  assert.match(bottomNav, /\["MY", "\/m\/account"/);
+  assert.match(bottomNav, /\["보관함", "\/m\/account\/storage"/);
+  assert.match(bottomNav, /\["MY", "\/m\/my"/);
   assert.match(header, /\["배송 신청·현황", "\/m\/account\/shipping"/);
   assert.match(taskGrid, /simpleMode\.enabled[\s\S]*tasks\.filter/);
   assert.match(taskGrid, /grid-cols-1/);

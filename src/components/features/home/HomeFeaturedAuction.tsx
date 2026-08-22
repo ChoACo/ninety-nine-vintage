@@ -1,8 +1,8 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- Versioned local banner srcsets bypass the disabled deployment image optimizer. */
 import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 import { CatalogImage } from "@/components/ui/CatalogImage";
@@ -68,16 +68,16 @@ export function HomeFeaturedAuction({
         href={`${basePath}/feed`}
         prefetch={false}
       >
-        <img
+        <Image
           alt="나인티 나인 빈티지 배너"
           className="h-full w-full object-contain object-center"
-          decoding="async"
+          blurDataURL="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI1MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjMDkwOTBiIi8+PC9zdmc+"
           fetchPriority="high"
           height={fallbackBanner.height}
-          loading="eager"
+          placeholder="blur"
+          priority
           sizes={fallbackBanner.sizes}
           src={fallbackBanner.src}
-          srcSet={fallbackBanner.srcSet}
           width={fallbackBanner.width}
         />
         <div

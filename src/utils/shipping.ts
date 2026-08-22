@@ -92,16 +92,15 @@ export function formatStorageDday(daysLeft: number): string {
 
 export function storageUrgencyClass(daysLeft: number | null): string {
   if (daysLeft === null) return "";
-  if (daysLeft <= 0) return "border-red-500 bg-red-50 text-red-700";
-  if (daysLeft <= 2) return "border-amber-500 bg-amber-50 text-amber-800";
-  if (daysLeft <= 7) return "border-amber-200 bg-amber-50 text-amber-700";
+  if (daysLeft <= 0) return "border-red-600 bg-red-600 text-white";
+  if (daysLeft <= 3) return "border-red-500/30 bg-red-500/10 text-red-600";
   return "border-line text-muted";
 }
 
 export function storageUrgencySurfaceClass(daysLeft: number | null): string {
   if (daysLeft === null) return "";
   if (daysLeft <= 0) return "bg-red-50";
-  if (daysLeft <= 2) return "bg-amber-50";
+  if (daysLeft <= 3) return "bg-red-50/50";
   return "";
 }
 

@@ -1,10 +1,11 @@
 "use client";
 
-import { Building2, LogIn, UserRound } from "lucide-react";
+import { Building2, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
+import { UserMenuDropdown } from "@/components/layout/UserMenuDropdown";
 
 export function AuthStatus({
   basePath = "",
@@ -29,7 +30,7 @@ export function AuthStatus({
   if (!session) {
     return <Link
       aria-label="카카오 로그인"
-      className="inline-flex h-10 shrink-0 items-center gap-2 border border-line px-3 text-[11px] font-bold whitespace-nowrap transition-colors hover:border-ink hover:bg-surface"
+      className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[#FEE500] bg-[#FEE500] px-3 text-[11px] font-bold whitespace-nowrap text-[#191919] shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-[#f5dc00] hover:shadow-md focus-visible:ring-2 focus-visible:ring-[#191919] focus-visible:ring-offset-2 active:translate-y-0 active:scale-[.98]"
       href={`${basePath}/account/login?next=${encodeURIComponent(fallbackReturnTo)}`}
       onClick={(event) => {
         event.preventDefault();
@@ -38,7 +39,7 @@ export function AuthStatus({
           `${basePath}/account/login?next=${encodeURIComponent(returnTo)}`,
         );
       }}
-    ><LogIn size={15} /> 카카오 로그인</Link>;
+    ><MessageCircle fill="currentColor" size={15} strokeWidth={1.75} /> 카카오 로그인</Link>;
   }
   const workLink = access.roleCode === "operator"
     ? { href: "/admin/operator", label: "업무" }
@@ -54,8 +55,6 @@ export function AuthStatus({
     {hasWorkLink && workLink && (
       <Link aria-label={workLink.label} className="inline-flex h-10 shrink-0 items-center gap-2 border border-line px-3 text-[11px] font-bold whitespace-nowrap text-muted transition-colors hover:border-ink hover:text-ink" href={workLink.href}><Building2 size={15} /> {workLink.label}</Link>
     )}
-    {hasMyLink && (
-      <Link aria-label="MY" className="inline-flex h-10 shrink-0 items-center gap-2 border border-line px-3 text-[11px] font-bold whitespace-nowrap text-muted transition-colors hover:border-ink hover:text-ink" href={`${basePath}/account`}><UserRound size={15} /> MY</Link>
-    )}
+    {hasMyLink && <UserMenuDropdown basePath={basePath} session={session} />}
   </div>;
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { Building2, Database, MessageSquareText, Settings, ShieldCheck, Store, UsersRound } from "lucide-react";
+import { Building2, MessageSquareText, Settings, ShieldCheck, UsersRound } from "lucide-react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
 import { OwnerManualTransferAccountPanel } from "@/components/admin/owner/OwnerManualTransferAccountPanel";
@@ -12,6 +13,8 @@ import { TokenUsageGauge } from "@/components/admin/owner/TokenUsageGauge";
 import { LocalTestMemberSwitcher } from "@/components/admin/LocalTestMemberSwitcher";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { clearOwnerMemberAccessMarker } from "@/lib/ownerMemberAccess";
+import { useOwnerScopeStore } from "@/store/useOwnerScopeStore";
+const OwnerBusinessAnalytics = dynamic(() => import("@/components/admin/owner/OwnerBusinessAnalytics").then((module) => module.OwnerBusinessAnalytics), { loading: () => <div className="h-72 animate-pulse border border-line bg-surface" role="status" aria-label="운영 분석 불러오는 중" /> });
 
 interface StoreRow {
   id: string;
@@ -23,8 +26,13 @@ interface StoreRow {
 }
 interface Overview {
   stores?: StoreRow[];
-  paidTotal?: number;
   auditCount?: number;
+  metrics?: { gmv: number; netCommission: number; activeAuctions: number; vaultItems: number; vaultRiskCount: number };
+  analytics?: {
+    revenue: Array<{ date: string; amount: number; previousAmount: number }>;
+    auction: { sold: number; unsold: number };
+    vaultFlow: Array<{ date: string; stored: number; shipped: number }>;
+  };
 }
 
 export function OwnerDashboard({
@@ -33,6 +41,8 @@ export function OwnerDashboard({
   const [data, setData] = useState<Overview | null>(null);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
+  const selectedStoreId = useOwnerScopeStore((state) => state.selectedStoreId);
+  const setScopeStores = useOwnerScopeStore((state) => state.setStores);
 
   useEffect(() => {
     void (async () => {
@@ -42,7 +52,9 @@ export function OwnerDashboard({
           setNotice("소유자 계정으로 로그인해 주세요.");
           return;
         }
-        const response = await fetch("/api/admin/owner/overview", {
+        setLoading(true);
+        const query = selectedStoreId ? `?storeId=${encodeURIComponent(selectedStoreId)}` : "";
+        const response = await fetch(`/api/admin/owner/overview${query}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
           cache: "no-store",
         });
@@ -50,23 +62,23 @@ export function OwnerDashboard({
         if (!response.ok) throw new Error(payload.error ?? "소유자 데이터를 불러오지 못했습니다.");
         clearOwnerMemberAccessMarker();
         setData(payload);
+        setScopeStores(payload.stores ?? []);
       } catch (error) {
         setNotice(error instanceof Error ? error.message : "소유자 데이터를 불러오지 못했습니다.");
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [selectedStoreId, setScopeStores]);
 
-  const stores = data?.stores ?? [];
-  const paidTotal = Number(data?.paidTotal ?? 0);
+  const metrics = data?.metrics;
 
   return (
     <div className="space-y-10">
       <div className="flex flex-col items-start justify-between gap-5 border-b border-ink pb-7">
         <div>
-          <p className="eyebrow text-muted">관리자 · 전체 매장</p>
-          <h1 className="mt-3 text-3xl font-black tracking-[-.07em] md:text-4xl md:tracking-[-.08em]">관리자 센터</h1>
+          <p className="eyebrow text-zinc-500">Owner Center · {selectedStoreId ? "개별 센터" : "전체 플랫폼"}</p>
+          <h1 className="mt-3 text-3xl font-black tracking-[-.07em] text-zinc-100 md:text-4xl md:tracking-[-.08em]">플랫폼 총괄</h1>
           <p className="mt-3 text-sm text-muted">사이트 설정과 권한, 센터(매장)와 인력 배치, 감사 로그를 관리합니다. 상품·입금·배송 실무는 운영자 센터에서 처리합니다.</p>
         </div>
         <span className="flex items-center gap-2 border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-bold text-emerald-800"><ShieldCheck size={13} /> 소유자 권한</span>
@@ -74,11 +86,10 @@ export function OwnerDashboard({
       {notice && <div className="border border-dashed border-line bg-surface p-6 text-sm">{notice}</div>}
       {enableLocalTestMembers && <LocalTestMemberSwitcher />}
       <OwnerMemberAccessPanel />
-      <div className="grid grid-cols-1 gap-px border border-line bg-line sm:grid-cols-3">
-        <div className="bg-paper p-6"><Store size={17} /><p className="mt-8 text-xs text-muted">운영 중인 센터(매장)</p><p className="mt-2 font-mono text-3xl font-bold">{loading ? "—" : stores.filter((store) => store.is_active).length}</p></div>
-        <div className="bg-paper p-6"><Database size={17} /><p className="mt-8 text-xs text-muted">결제 완료 거래 합계</p><p className="mt-2 font-mono text-3xl font-bold">{loading ? "—" : `${paidTotal.toLocaleString("ko-KR")}원`}</p></div>
-        <div className="bg-ink p-6 text-paper"><p className="eyebrow text-zinc-400">감사 · 활동 기록</p><p className="mt-8 font-mono text-3xl font-bold">{loading ? "—" : data?.auditCount ?? 0}</p><p className="mt-2 text-xs text-zinc-400">감사 로그</p></div>
+      <div className="grid grid-cols-1 gap-px border border-zinc-800 bg-zinc-800 sm:grid-cols-2 xl:grid-cols-4">
+        {[{ label: "플랫폼 GMV", value: `${Number(metrics?.gmv ?? 0).toLocaleString("ko-KR")}원` }, { label: "순 플랫폼 수수료", value: `${Number(metrics?.netCommission ?? 0).toLocaleString("ko-KR")}원` }, { label: "진행 중 경매", value: `${metrics?.activeAuctions ?? 0}건` }, { label: "보관 상품", value: `${metrics?.vaultItems ?? 0}건`, note: `D-3 위험 ${metrics?.vaultRiskCount ?? 0}건` }].map((metric) => <div className="bg-zinc-950 p-6 text-zinc-100" key={metric.label}><p className="text-xs text-zinc-500">{metric.label}</p><p className="mt-8 font-mono text-2xl font-bold">{loading ? "—" : metric.value}</p>{metric.note && <p className="mt-2 text-xs text-rose-400">{metric.note}</p>}</div>)}
       </div>
+      {data?.analytics && <OwnerBusinessAnalytics {...data.analytics} />}
       <OwnerManualTransferAccountPanel />
       <div className="grid gap-4 md:grid-cols-2">
         <TokenUsageGauge />

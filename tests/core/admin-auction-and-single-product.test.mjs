@@ -5,24 +5,26 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("owner product feed exposes an audited immediate auction close and winner action", async () => {
-  const [consoleSource, closeRoute, productsRoute, migration] = await Promise.all([
+test("store-scoped product feed exposes audited live auction controls", async () => {
+  const [consoleSource, controllerSource, liveRoute, productsRoute, migration] = await Promise.all([
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
-    source("src/app/api/admin/operator/products/[id]/close-now/route.ts"),
+    source("src/components/admin/operator/AuctionController.tsx"),
+    source("src/app/api/admin/operator/auctions/live/[id]/route.ts"),
     source("src/app/api/admin/operator/products/route.ts"),
-    source("supabase/migrations/20260718061000_add_auction_lifecycle_controls.sql"),
+    source("supabase/migrations/20260822081357_add_admin_auction_controls_and_payment_audit.sql"),
   ]);
 
   assert.match(productsRoute, /canCloseAuctions:\s*auth\.roleCode === "owner"/);
-  assert.match(consoleSource, /즉시 마감·낙찰 확정/);
-  assert.match(consoleSource, /permissions\.canCloseAuctions/);
-  assert.match(consoleSource, /\/close-now/);
-  assert.match(closeRoute, /authenticateOperatorStoreRequest\(request,\s*true\)/);
-  assert.match(closeRoute, /auth\.roleCode !== "owner"/);
-  assert.match(closeRoute, /auth\.user[\s\S]*\.rpc\("owner_close_auction_now"/);
-  assert.doesNotMatch(closeRoute, /auth\.admin[\s\S]*\.from\("products"\)/);
-  assert.match(migration, /order by bids\.amount desc,\s*bids\.created_at,\s*bids\.id/i);
-  assert.match(migration, /owner_auction_action_audit/i);
+  assert.match(consoleSource, /<AuctionController/);
+  assert.match(controllerSource, /즉시 마감·정산/);
+  assert.match(controllerSource, /\+10분 연장/);
+  assert.match(controllerSource, /입찰 취소/);
+  assert.match(liveRoute, /authenticateOperatorStoreRequest\(request,\s*true\)/);
+  assert.match(liveRoute, /verifyOperatorProductScope/);
+  assert.match(liveRoute, /operator_close_live_auction/);
+  assert.match(liveRoute, /manage_member_sanction/);
+  assert.match(migration, /order by (?:bids\.)?amount desc,\s*(?:bids\.)?created_at,\s*(?:bids\.)?id/i);
+  assert.match(migration, /auction_operation_audit/i);
 });
 
 test("single product registration is separate, defaults to immediate publication, supports saved scheduling, and uploads up to 15 ordered files", async () => {
@@ -48,7 +50,7 @@ test("single product registration is separate, defaults to immediate publication
   assert.match(consoleSource, /엑셀 대량 등록/);
   assert.match(consoleSource, /즉시구매 상품 등록/);
   assert.match(consoleSource, /경매 상품 등록/);
-  for (const step of ["1. 상품 사진 선택", "2. 상품 정보", "3. 판매 정보", "4. 공개 설정"]) {
+  for (const step of ["STEP 1", "STEP 2", "STEP 3", "1. 상품 사진 선택", "2. 상품 정보", "3. 판매 정보", "4. 공개 설정"]) {
     assert.match(consoleSource, new RegExp(step.replace(".", "\\.")));
   }
   assert.match(consoleSource, /const singleRegistrationSubmitLabel/);
@@ -112,7 +114,8 @@ test("single product registration is separate, defaults to immediate publication
   assert.match(route, /value\.length > 15/);
   assert.match(route, /p_permission:\s*"publish_products"/);
   assert.match(route, /size_label:\s*text\(body\?\.sizeLabel\)/);
-  assert.match(route, /inspection_notes:\s*singleRegistration[\s\S]*\?\s*\[\]/);
+  assert.match(route, /inspection_notes:\s*Array\.isArray\(body\?\.inspectionNotes\)/);
+  assert.match(consoleSource, /하자 상세 매핑/);
   assert.doesNotMatch(route, /구제 의류/);
   assert.match(categoryMigration, /alter column category set default '기타'/);
   assert.match(categoryMigration, /where btrim\(category\) in \('구제 의류', '구제의류'\)/);

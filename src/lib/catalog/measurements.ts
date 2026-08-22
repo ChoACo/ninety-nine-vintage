@@ -7,7 +7,10 @@ export type MeasurementKey =
   | "thigh"
   | "hem"
   | "hip"
-  | "length";
+  | "length"
+  | "width"
+  | "height"
+  | "depth";
 
 export const MEASUREMENT_LABELS: Readonly<Record<MeasurementKey, string>> = {
   shoulder: "어깨",
@@ -19,6 +22,9 @@ export const MEASUREMENT_LABELS: Readonly<Record<MeasurementKey, string>> = {
   hem: "밑단",
   hip: "힙",
   length: "총장",
+  width: "가로",
+  height: "세로",
+  depth: "폭",
 };
 
 const MEASUREMENT_KEY_ORDER: readonly MeasurementKey[] = [
@@ -31,6 +37,9 @@ const MEASUREMENT_KEY_ORDER: readonly MeasurementKey[] = [
   "hem",
   "hip",
   "length",
+  "width",
+  "height",
+  "depth",
 ];
 
 export interface MeasurementPreset {
@@ -38,7 +47,7 @@ export interface MeasurementPreset {
 }
 
 export const MEASUREMENT_PRESETS: Readonly<
-  Record<"top" | "outer" | "bottom" | "onepiece" | "jumpsuit" | "setup", MeasurementPreset>
+  Record<"top" | "outer" | "bottom" | "onepiece" | "jumpsuit" | "setup" | "goods", MeasurementPreset>
 > = {
   top: { fields: ["shoulder", "chest", "sleeve", "length"] },
   outer: { fields: ["shoulder", "chest", "sleeve", "length"] },
@@ -48,6 +57,7 @@ export const MEASUREMENT_PRESETS: Readonly<
   setup: {
     fields: ["shoulder", "chest", "sleeve", "length", "waist", "hem"],
   },
+  goods: { fields: ["width", "height", "depth"] },
 };
 
 const GROUP_PRESETS: Readonly<Record<string, MeasurementPreset | null>> = {
@@ -58,6 +68,10 @@ const GROUP_PRESETS: Readonly<Record<string, MeasurementPreset | null>> = {
   원피스: MEASUREMENT_PRESETS.onepiece,
   점프수트: MEASUREMENT_PRESETS.jumpsuit,
   "셋업/세트": MEASUREMENT_PRESETS.setup,
+  액세서리: MEASUREMENT_PRESETS.goods,
+  잡화: MEASUREMENT_PRESETS.goods,
+  가방: MEASUREMENT_PRESETS.goods,
+  신발: MEASUREMENT_PRESETS.goods,
 };
 
 export function measurementPresetForCategory(

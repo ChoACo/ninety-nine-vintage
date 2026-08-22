@@ -35,8 +35,8 @@ test("active bidding navigation appears only with active bid history and support
       source("src/app/(mobile)/m/bidding/page.tsx"),
     ]);
 
-  assert.match(desktopHeader, /홈[\s\S]*입찰 중인 상품[\s\S]*실시간 경매/);
-  assert.match(mobileHeader, /홈[\s\S]*입찰 중인 상품[\s\S]*실시간 경매/);
+  assert.match(desktopHeader, /홈[\s\S]*입찰 중인 상품[\s\S]*라이브 옥션/);
+  assert.match(mobileHeader, /홈[\s\S]*입찰 중인 상품[\s\S]*라이브 옥션/);
   assert.match(desktopHeader, /LIVE_AUCTION_ENABLED && hasActiveBid/);
   assert.match(mobileHeader, /hasActiveBid/);
   assert.match(visibilityProvider, /item\.productStatus === "active"/);

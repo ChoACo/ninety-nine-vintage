@@ -18,6 +18,7 @@ function toItem(product: PublishedProduct) {
     category: product.category,
     description: product.description,
     gender: product.gender,
+    conditionGrade: product.conditionGrade,
     imageUrl: getCatalogImageUrl(product.thumbnailUrls[0] ?? product.imageUrls[0] ?? ""),
     thumbnailUrl: getCatalogImageUrl(product.thumbnailUrls[0] ?? product.imageUrls[0] ?? ""),
     startingPrice: product.startingPrice,

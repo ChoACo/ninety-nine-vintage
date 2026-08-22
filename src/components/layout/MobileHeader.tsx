@@ -20,8 +20,8 @@ export function MobileHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolea
   const publicNavigation = [
     { label: "홈", href: "/home" },
     ...(LIVE_AUCTION_ENABLED && hasActiveBid ? [{ label: "입찰 중인 상품", href: "/bidding" }] : []),
-    ...(LIVE_AUCTION_ENABLED ? [{ label: "실시간 경매", href: "/feed" }] : []),
-    { label: "즉시 구매", href: "/shop" },
+    ...(LIVE_AUCTION_ENABLED ? [{ label: "라이브 옥션 · LIVE", href: "/live" }] : []),
+    { label: "아카이브 숍", href: "/shop" },
     { label: "내 정보", href: "/account" },
   ];
 
@@ -38,7 +38,7 @@ export function MobileHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolea
   const close = () => setOpen(false);
   return (
     <>
-      <header className={`sticky ${hasLiveTicker ? "top-9" : "top-0"} z-[60] border-b border-line bg-paper/95 backdrop-blur-md md:hidden`}>
+      <header className={`sticky ${hasLiveTicker ? "top-10" : "top-0"} z-[60] border-b border-line bg-paper/95 backdrop-blur-md md:hidden`}>
         <div className="flex h-14 items-center justify-between px-4">
           <button aria-expanded={open} aria-haspopup="dialog" aria-label="전체 메뉴 열기" className="grid size-10 place-items-center rounded-xl transition-all duration-300 active:scale-95" onClick={() => setOpen(true)} type="button"><Menu size={20} /></button>
           <Link className="text-sm font-black tracking-[-0.05em]" href="/home">NINETY-NINE</Link>

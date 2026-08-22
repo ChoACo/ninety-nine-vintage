@@ -1,0 +1,3 @@
+import { PackageCheck } from "lucide-react";
+import { CartView } from "@/components/features/commerce/CartView";
+export function CartExperience({basePath="",selectedProductId,surface="desktop"}:{basePath?:""|"/m";selectedProductId?:string;surface?:"desktop"|"mobile"}){return <div className="space-y-6"><aside className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs leading-5"><PackageCheck className="mt-0.5 shrink-0 text-amber-600" size={17}/><p><strong className="block">빈티지는 단 1점 한정 상품입니다.</strong><span className="text-muted">결제 완료 순으로 최종 소유권이 확정되며 모든 상품 수량은 1개로 고정됩니다.</span></p></aside><CartView basePath={basePath} selectedProductId={selectedProductId} surface={surface}/></div>}

@@ -132,6 +132,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
   const productRefreshTimer = useRef<number | null>(null);
   const previousPhase = useRef<AuctionFeedPhase | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [realtimeState, setRealtimeState] = useState<"connected" | "reconnecting" | "offline">("reconnecting");
   const [inquiryOpen, setInquiryOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [buying, setBuying] = useState(false);
@@ -301,6 +302,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
     )
       return;
     let client: ReturnType<typeof getSupabaseBrowserClient> | null = null;
+    let active = true;
     let channel: ReturnType<
       ReturnType<typeof getSupabaseBrowserClient>["channel"]
     > | null = null;
@@ -335,11 +337,19 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
             scheduleProductRefresh();
           },
         )
-        .subscribe();
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") setRealtimeState("connected");
+          else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") setRealtimeState("reconnecting");
+          else if (status === "CLOSED") setRealtimeState("offline");
+        });
     } catch {
       channel = null;
+      queueMicrotask(() => {
+        if (active) setRealtimeState("offline");
+      });
     }
     return () => {
+      active = false;
       if (channel && client) void client.removeChannel(channel);
     };
   }, [
@@ -499,6 +509,8 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
       : dailyAuctionPhase === "closed" && phase !== "CLOSING_SOON"
         ? "정산 중"
         : getAuctionRemainingLabel(auctionSnapshot.closesAt, now);
+  const remainingMs = Date.parse(auctionSnapshot.closesAt) - now;
+  const isLastMinute = phase !== "CLOSED" && remainingMs > 0 && remainingMs < 60_000;
   const participationState = accountBidItems.find(
     (entry) => entry.productId === item.id,
   )?.state;
@@ -537,7 +549,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
                     ? "로그인 후 입찰"
                     : participationState === "outbid"
                       ? "재입찰하기"
-                      : "실시간 경매 입찰하기";
+                      : "라이브 옥션 입찰하기";
 
   useEffect(() => {
     if (item.saleType !== "auction") return;
@@ -626,19 +638,21 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
       </div>
 
       {LIVE_AUCTION_ENABLED && item.saleType === "auction" && (
-        <div className="my-6 rounded-2xl border border-white/10 bg-zinc-950 px-5 py-5 text-white shadow-xl shadow-black/15">
+        <div className={`my-6 rounded-2xl border px-5 py-5 text-white shadow-xl shadow-black/15 transition-colors ${isLastMinute ? "animate-pulse border-red-400/60 bg-red-950" : "border-white/10 bg-zinc-950"}`}>
           <div className="flex items-center justify-between">
-            <span className="text-xs text-zinc-400">실시간 경매 남은 시간</span>
-            <span
-              className={`h-2 w-2 rounded-full ${phase === "CLOSED" ? "bg-zinc-500" : phase === "CLOSING_SOON" ? "bg-amber-400" : "bg-emerald-400"}`}
-            />
+            <span className="text-xs text-zinc-400">라이브 옥션 남은 시간</span>
+            <span className="inline-flex items-center gap-2 text-[10px] text-zinc-300">
+              <span className={`h-2 w-2 rounded-full ${realtimeState === "connected" ? "animate-pulse bg-emerald-400" : realtimeState === "reconnecting" ? "bg-amber-400" : "bg-red-500"}`} />
+              {realtimeState === "connected" ? "실시간 연결" : realtimeState === "reconnecting" ? "재연결 중" : "연결 확인 필요"}
+            </span>
           </div>
-          <p className="mt-3 font-mono text-3xl font-bold tracking-[0.06em]">
+          <p className={`mt-3 font-mono text-3xl font-bold tracking-[0.06em] ${isLastMinute ? "text-red-200" : ""}`}>
             {timeLeft}
           </p>
           <p className="mt-2 text-[11px] text-zinc-400">
             21:00–22:00 정산 점검 · 20:56 이후 신규 참여 제한
           </p>
+          <p className="mt-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-zinc-300">마감 3분 전 유효 입찰 시 남은 시간이 3분으로 자동 연장됩니다.</p>
         </div>
       )}
 
@@ -734,7 +748,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
             onClick={() => { setBuyNotice(""); setBuyNoticeKind("success"); setCartReserved(false); setQuickCartOpen(true); }}
             type="button"
           >
-            <ShoppingBag size={15} /> 장바구니
+            <ShoppingBag size={15} /> 장바구니 담기
           </button>
           <button
             className="flex h-14 items-center justify-center rounded-2xl bg-zinc-950 text-sm font-bold text-white shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-95 disabled:opacity-50"
@@ -742,7 +756,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
             onClick={() => void buyNow()}
             type="button"
           >
-            {buying ? "장바구니 준비 중..." : "즉시 구매"}
+            {buying ? "구매 준비 중..." : "즉시 소장하기"}
           </button>
         </div>
       )}

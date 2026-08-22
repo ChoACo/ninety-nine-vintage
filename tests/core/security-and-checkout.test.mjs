@@ -179,7 +179,7 @@ test("the former entry gate is absent while live auctions keep their authoritati
     /grant execute on function public\.place_bid\(uuid, bigint\)[\s\S]*to authenticated/i,
   );
   for (const source of [header, mobileNavigation]) {
-    assert.match(source, /"\/feed"/);
+    assert.match(source, /"\/(?:m\/)?live"/);
   }
   assert.match(mobileNavigation, /"\/admin\/operator\/fulfillment"/);
   assert.match(mobileNavigation, /"\/admin\/employee"/);
@@ -358,7 +358,7 @@ storeService,
   ]);
 
   assert.match(authStatus, /useSupabaseSession\(\)/);
-  assert.match(authStatus, /aria-label="MY"/);
+  assert.match(authStatus, /UserMenuDropdown/);
   assert.match(
     authStatus,
     /href: "\/admin\/operator", label: "업무"/,
@@ -394,7 +394,7 @@ storeService,
   assert.doesNotMatch(homePage, /String\(index \+ 1\)\.padStart\(2, "0"\)/);
   assert.doesNotMatch(homePage, /엄선된 숍|전체 숍 보기/);
   assert.match(storeExperience, /공식 판매 센터몰/);
-  assert.match(storeTabs, /정보[\s\S]*문의하기/);
+  assert.match(storeTabs, /구매 후기[\s\S]*문의하기/);
 });
 
 test.skip("retired provider payment ID behavior", () => {

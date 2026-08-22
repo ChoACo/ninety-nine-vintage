@@ -46,6 +46,7 @@ export interface ProductPayload {
   brand: string;
   brandSlug: string;
   gender?: "" | "남성" | "여성" | "공용";
+  conditionGrade?: "" | "S" | "A+" | "A" | "B" | "C";
   publishAt: string;
   closesAt: string;
   status: "pending" | "active" | "closed";
@@ -85,6 +86,7 @@ interface CatalogFilters {
 interface AuctionFeedGridProps {
   basePath?: "" | "/m";
   className?: string;
+  detailRoute?: "auction" | "shop";
   initialProducts?: ProductPayload[];
   saleType: ProductSaleType;
   surface?: "desktop" | "mobile";
@@ -196,6 +198,9 @@ export function AuctionFeedGrid(props: AuctionFeedGridProps) {
 function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts, saleType, surface = "desktop", title }: AuctionFeedGridProps) {
   const routeSearchParams = useSearchParams();
   const routeQuery = routeSearchParams.get("q") ?? "";
+  const routeCategory = routeSearchParams.get("category") ?? "";
+  const routeGrade = routeSearchParams.get("grade") ?? "";
+  const routeSort = routeSearchParams.get("sort") ?? "latest";
   const policyNow = useAuctionPolicyClock(saleType === "auction");
   const now = policyNow.getTime();
   const dailyAuctionPhase = now > 0 ? getDailyAuctionPhase(now) : "open";
@@ -480,6 +485,7 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
       category: product.category,
       description: product.description,
       gender: product.gender,
+      conditionGrade: product.conditionGrade,
       imageUrl: getCatalogImageUrl(product.thumbnailUrls[0] ?? product.imageUrls[0] ?? ""),
       thumbnailUrl: getCatalogImageUrl(product.thumbnailUrls[0] ?? product.imageUrls[0] ?? ""),
       imageUrls,
@@ -573,8 +579,15 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
     const genderMatch = effectiveSelectedGender === "all" || card.catalogGender === effectiveSelectedGender;
     const source = productById.get(card.id);
     const storeMatch = selectedStoreId === "all" || source?.storeId === selectedStoreId;
-    return queryMatch && dateMatch && brandMatch && genderMatch && storeMatch;
-  }), [cards, effectiveSelectedBrand, effectiveSelectedDate, effectiveSelectedGender, productById, query, selectedStoreId]);
+    const categoryMatch = !routeCategory || card.category.includes(routeCategory);
+    const gradeMatch = !routeGrade || card.conditionGrade === routeGrade;
+    return queryMatch && dateMatch && brandMatch && genderMatch && storeMatch && categoryMatch && gradeMatch;
+  }).toSorted((left, right) => {
+    if (routeSort === "price-asc") return (left.fixedPrice ?? left.currentBid) - (right.fixedPrice ?? right.currentBid);
+    if (routeSort === "price-desc") return (right.fixedPrice ?? right.currentBid) - (left.fixedPrice ?? left.currentBid);
+    if (routeSort === "condition") return String(left.conditionGrade).localeCompare(String(right.conditionGrade));
+    return Date.parse(right.publishAt ?? "") - Date.parse(left.publishAt ?? "");
+  }), [cards, effectiveSelectedBrand, effectiveSelectedDate, effectiveSelectedGender, productById, query, routeCategory, routeGrade, routeSort, selectedStoreId]);
   const pagination = useMemo(() => paginateAuctionFeed(visibleCards, page), [page, visibleCards]);
 
   const hasAnyFilter = useMemo(() => Boolean(query.trim())

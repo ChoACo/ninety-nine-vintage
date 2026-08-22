@@ -249,6 +249,7 @@ export interface Item {
   imageUrl: string;
   thumbnailUrl?: string;
   condition?: "NEW" | "EXCELLENT" | "GOOD" | "FAIR";
+  conditionGrade?: "" | "S" | "A+" | "A" | "B" | "C";
   size?: string;
   startingPrice: number;
   currentBid: number;

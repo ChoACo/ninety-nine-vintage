@@ -1,0 +1,1 @@
+import {AuctionGridSkeleton,AuctionTimelineSkeleton} from "@/components/skeletons/AuctionSkeletons";export default function Loading(){return <div className="space-y-8"><div className="h-72 animate-pulse rounded-3xl bg-zinc-900"/><AuctionTimelineSkeleton/><AuctionGridSkeleton/></div>}

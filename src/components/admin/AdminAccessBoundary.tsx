@@ -45,7 +45,8 @@ export function AdminAccessBoundary({
   const needsOwnerAccess =
     pathname === "/admin/owner" || pathname.startsWith("/admin/owner/");
   const needsEmployeeAccess =
-    pathname === "/admin/employee" || pathname.startsWith("/admin/employee/");
+    pathname === "/admin/employee" || pathname.startsWith("/admin/employee/") ||
+    pathname === "/admin/staff" || pathname.startsWith("/admin/staff/");
   const snapshotIsCurrent =
     Boolean(userId) &&
     access.userId === userId &&
@@ -164,7 +165,7 @@ export function AdminAccessBoundary({
             ? "이 화면은 소유자 계정만 이용할 수 있습니다."
             : "이 화면은 운영 권한이 있는 계정만 이용할 수 있습니다.")
         }
-        title="접근 권한이 없습니다."
+        title="403 Access Denied"
       />
     );
   }

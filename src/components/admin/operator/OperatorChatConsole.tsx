@@ -45,6 +45,12 @@ interface ChatMessage {
   product_image_url_snapshot: string | null;
 }
 
+const CANNED_RESPONSES = [
+  "안녕하세요. 문의하신 내용을 확인하고 있습니다. 잠시만 기다려 주세요.",
+  "보관 상품은 보관함에서 선택한 뒤 묶음 배송을 요청할 수 있습니다.",
+  "결제 확인 후 상품 준비 상태로 순차 변경되며 변경 시 알림을 보내드립니다.",
+] as const;
+
 function conversationStatusLabel(status: string) {
   return status === "closed" ? "상담 완료" : "상담 중";
 }
@@ -76,6 +82,7 @@ export function OperatorChatConsole({
   const [staffId, setStaffId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [inquiryQuery, setInquiryQuery] = useState("");
 
   const markRead = useCallback(
     async (conversationId: string, accessToken: string) => {
@@ -242,8 +249,13 @@ export function OperatorChatConsole({
   const send = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!token || !selected || !message.trim() || busy) return;
+    const draft = message.trim();
+    const optimisticId = `optimistic:${crypto.randomUUID()}`;
+    const optimisticMessage: ChatMessage = { id: optimisticId, body: draft, sender_id: staffId, created_at: new Date().toISOString(), product_id: null, product_title_snapshot: null, product_image_url_snapshot: null };
     setBusy(true);
     setNotice("");
+    setMessages((current) => [...current, optimisticMessage]);
+    setMessage("");
     try {
       const response = await fetch("/api/admin/operator/chat", {
         method: "POST",
@@ -253,7 +265,7 @@ export function OperatorChatConsole({
         },
         body: JSON.stringify({
           conversationId: selected,
-          body: message,
+          body: draft,
           clientNonce: crypto.randomUUID(),
         }),
       });
@@ -263,10 +275,11 @@ export function OperatorChatConsole({
       if (!response.ok || !payload?.message) {
         throw new Error(problemMessage(payload, "메시지를 보내지 못했습니다."));
       }
-      setMessages((current) => [...current, payload.message as ChatMessage]);
-      setMessage("");
+      setMessages((current) => current.map((item) => item.id === optimisticId ? payload.message as ChatMessage : item));
       await loadInbox(token, selected);
     } catch (error) {
+      setMessages((current) => current.filter((item) => item.id !== optimisticId));
+      setMessage(draft);
       setNotice(
         error instanceof Error ? error.message : "메시지를 보내지 못했습니다.",
       );
@@ -289,6 +302,13 @@ export function OperatorChatConsole({
     () => conversations.find((item) => item.id === selected) ?? null,
     [conversations, selected],
   );
+  const visibleConversations = useMemo(() => conversations
+    .filter((item) => {
+      const query = inquiryQuery.trim().toLocaleLowerCase("ko-KR");
+      if (!query) return true;
+      return [item.subject, item.last_message_preview, memberName(item.member_id)].some((value) => value?.toLocaleLowerCase("ko-KR").includes(query));
+    })
+    .toSorted((left, right) => Number(left.status === "closed") - Number(right.status === "closed") || String(right.last_message_at).localeCompare(String(left.last_message_at))), [conversations, inquiryQuery, memberName]);
 
   const selectConversation = (conversationId: string) => {
     setSelected(conversationId);
@@ -314,9 +334,10 @@ export function OperatorChatConsole({
               ? "상품 문의 관리"
               : "담당 매장 회원 상담"}
           </p>
+          <input aria-label="문의 검색" className="mt-4 h-11 w-full border border-line bg-paper px-3 text-xs outline-none focus:border-ink" onChange={(event) => setInquiryQuery(event.target.value)} placeholder="회원·제목·내용 검색" value={inquiryQuery} />
         </div>
         <div className="max-h-72 divide-y divide-line overflow-y-auto md:max-h-[560px]">
-          {conversations.map((conversation) => (
+          {visibleConversations.map((conversation) => (
             <button
               className={`block w-full p-4 text-left sm:p-5 ${
                 selected === conversation.id
@@ -346,7 +367,7 @@ export function OperatorChatConsole({
               </span>
             </button>
           ))}
-          {conversations.length === 0 && (
+          {visibleConversations.length === 0 && (
             <p className="p-6 text-xs text-muted">
               {conversationType === "product"
                 ? "새 상품 문의가 없습니다."
@@ -429,9 +450,10 @@ export function OperatorChatConsole({
           )}
         </div>
         <form
-          className="flex gap-2 border-t border-line p-3 sm:gap-3 sm:p-5"
+          className="grid gap-2 border-t border-line p-3 sm:grid-cols-[180px_minmax(0,1fr)_44px] sm:gap-3 sm:p-5"
           onSubmit={send}
         >
+          <select aria-label="빠른 답변 템플릿" className="min-h-11 border border-line bg-paper px-3 text-xs" disabled={!token || !selected || busy} onChange={(event) => { if (event.target.value) setMessage(event.target.value); event.currentTarget.value = ""; }} defaultValue=""><option value="">빠른 답변</option>{CANNED_RESPONSES.map((template, index) => <option key={template} value={template}>템플릿 {index + 1}</option>)}</select>
           <input
             aria-label="회원 답변"
             className="min-w-0 flex-1 border border-line bg-paper px-3 text-xs outline-none focus:border-ink disabled:bg-surface sm:px-4"

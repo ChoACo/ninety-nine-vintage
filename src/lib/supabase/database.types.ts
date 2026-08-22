@@ -7238,6 +7238,61 @@ current_price: number
           },
         ]
       }
+      support_message_attachments: {
+        Row: {
+          byte_size: number
+          conversation_id: string
+          created_at: string
+          id: string
+          message_id: string
+          mime_type: string
+          object_path: string
+          uploader_id: string
+        }
+        Insert: {
+          byte_size: number
+          conversation_id: string
+          created_at?: string
+          id?: string
+          message_id: string
+          mime_type: string
+          object_path: string
+          uploader_id: string
+        }
+        Update: {
+          byte_size?: number
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          message_id?: string
+          mime_type?: string
+          object_path?: string
+          uploader_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_message_attachments_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "support_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_message_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "support_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_message_attachments_uploader_id_fkey"
+            columns: ["uploader_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_reads: {
         Row: {
           conversation_id: string
@@ -9065,6 +9120,18 @@ current_price: number
           response_due_at: string
           server_time: string
         }[]
+      }
+      operator_extend_live_auction: {
+        Args: { p_product_id: string; p_minutes: number; p_reason: string }
+        Returns: Json
+      }
+      operator_close_live_auction: {
+        Args: { p_product_id: string; p_reason: string }
+        Returns: Json
+      }
+      operator_cancel_auction_bid: {
+        Args: { p_bid_id: string; p_reason: string }
+        Returns: Json
       }
       operator_resolve_expired_auction: {
         Args: { p_product_id: string; p_action: string }

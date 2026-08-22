@@ -1,0 +1,1 @@
+const P=({className}:{className:string})=><div className={`animate-pulse rounded-2xl bg-zinc-800 ${className}`}/>;export function CartSkeleton(){return <div className="space-y-5"><P className="h-20"/><div className="grid gap-5 lg:grid-cols-[1fr_22rem]"><div className="space-y-4">{[0,1].map(i=><P className="h-64" key={i}/>)}</div><P className="h-72"/></div></div>}

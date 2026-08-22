@@ -78,7 +78,7 @@ test("proxy enforces device routing, expires legacy choices, and keeps rollout c
   for (const surface of [layout, mobileHeader, mobileSettings]) {
     assert.doesNotMatch(surface, /UiModeSwitcher|ui-mode/);
   }
-  assert.doesNotMatch(layout, /PcFooter/);
+  assert.match(layout, /<PcFooter \/>/);
   await assert.rejects(source("src/app/api/ui-mode/route.ts"), { code: "ENOENT" });
   await assert.rejects(source("src/components/mobile/UiModeSwitcher.tsx"), { code: "ENOENT" });
 });

@@ -36,6 +36,7 @@ export function BidHistory({ basePath = "", surface = "mobile" }: { basePath?: "
     userId: string;
     payload: BidPayload;
   } | null>(null);
+  const [activeTab, setActiveTab] = useState<"active" | "won" | "closed">("active");
 
   useEffect(() => {
     if (!session?.access_token) return;
@@ -75,6 +76,12 @@ export function BidHistory({ basePath = "", surface = "mobile" }: { basePath?: "
   if (loading || !session || !payload) return null;
   const items = payload.items ?? [];
   const summary = payload.summary;
+  const tabItems = items.filter((item) => activeTab === "won" ? item.state === "final" : activeTab === "closed" ? item.state === "closed" : item.state === "leading" || item.state === "outbid");
+  const tabs = [
+    { id: "active" as const, label: "입찰 중", count: items.filter((item) => item.state === "leading" || item.state === "outbid").length },
+    { id: "won" as const, label: "낙찰 완료 (결제 대기)", count: items.filter((item) => item.state === "final").length },
+    { id: "closed" as const, label: "종료/유찰", count: items.filter((item) => item.state === "closed").length },
+  ];
   return (
     <section id="bids">
       <div className={`mb-5 flex items-start gap-3 border-b border-ink pb-4 ${surface === "desktop" ? "flex-row items-end justify-between" : "flex-col"}`}>
@@ -87,6 +94,9 @@ export function BidHistory({ basePath = "", surface = "mobile" }: { basePath?: "
         <Link className="text-xs font-bold underline" href={`${basePath}/feed`}>
           실시간 경매 보기
         </Link>
+      </div>
+      <div className="mb-5 grid grid-cols-3 border border-line" role="tablist" aria-label="경매 내역 구분">
+        {tabs.map((tab) => <button aria-selected={activeTab === tab.id} className={`min-h-12 border-r border-line px-2 text-[10px] font-bold last:border-r-0 sm:text-xs ${activeTab === tab.id ? "bg-ink text-paper" : "bg-paper text-muted"}`} key={tab.id} onClick={() => setActiveTab(tab.id)} role="tab" type="button">{tab.label} <span className="font-mono">{tab.count}</span></button>)}
       </div>
       <div className="mb-4 grid grid-cols-3 gap-px border border-line bg-line">
         <div className={`bg-paper ${surface === "desktop" ? "p-4" : "p-3"}`}>
@@ -108,14 +118,13 @@ export function BidHistory({ basePath = "", surface = "mobile" }: { basePath?: "
           </p>
         </div>
       </div>
-      {items.length === 0 ? (
+      {tabItems.length === 0 ? (
         <div className="border border-dashed border-line px-4 py-14 text-center text-sm text-muted">
-          아직 입찰한 상품이 없습니다. 실시간 경매에서 첫 입찰을 시작해
-          보세요.
+          이 구분에 해당하는 경매 상품이 없습니다.
         </div>
       ) : (
         <div className="divide-y divide-line border-y border-line">
-          {items.map((item) => (
+          {tabItems.map((item) => (
             <article className={`flex py-4 ${surface === "desktop" ? "gap-4" : "gap-3"}`} key={item.id}>
               <Link
                 className="size-20 shrink-0 bg-surface"
@@ -150,6 +159,7 @@ export function BidHistory({ basePath = "", surface = "mobile" }: { basePath?: "
                   {new Date(item.createdAt).toLocaleString("ko-KR")} · 마감{" "}
                   {new Date(item.closesAt).toLocaleString("ko-KR")}
                 </p>
+                {item.state === "final" && <Link className="mt-3 inline-flex min-h-10 items-center bg-ink px-4 text-xs font-bold text-paper" href={`${basePath}/account/payments`}>결제하기</Link>}
               </div>
             </article>
           ))}

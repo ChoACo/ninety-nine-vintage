@@ -6,6 +6,7 @@ import { MobileSiteHeader } from "@/components/mobile/MobileSiteHeader";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 import { ActiveBidNavigationProvider } from "@/components/features/auction/ActiveBidNavigationProvider";
 import { MobilePwaProvider } from "@/components/features/pwa/MobilePwaProvider";
+import { FloatingChat } from "@/components/features/chat/FloatingChat";
 
 export function MobileSiteLayout({ children }: { children: ReactNode }) {
   return (
@@ -17,6 +18,7 @@ export function MobileSiteLayout({ children }: { children: ReactNode }) {
           <main className="mx-auto min-h-[calc(100svh-7rem)] w-full max-w-lg px-4 py-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">{children}</main>
           <MobileSiteBottomNav />
           <CacheConsentBanner surface="mobile" />
+          <FloatingChat basePath="/m" />
         </div>
       </ActiveBidNavigationProvider>
     </MobilePwaProvider>

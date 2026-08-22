@@ -1,0 +1,1 @@
+import {WishlistFeed} from "@/components/features/wishlist/WishlistFeed";import {MemberAccountBoundary} from "@/components/features/account/MemberAccountBoundary";export default function Page(){return <MemberAccountBoundary returnTo="/m/wishlist"><WishlistFeed basePath="/m"/></MemberAccountBoundary>}

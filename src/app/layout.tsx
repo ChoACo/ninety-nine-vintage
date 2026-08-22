@@ -36,12 +36,12 @@ const themeInitializationScript = `
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.ninety-nine-vintage.store"),
   title: "NINETY-NINE VINTAGE",
-  description: "선별된 한 점의 빈티지를 바로 만나는 곳",
+  description: "시간을 다시 입는 선택, 빈티지 라이브 옥션 & 14일 무료 보관 플랫폼",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "NINETY-NINE",
+    title: "99 Vintage",
   },
   icons: {
     apple: "/apple-touch-icon.png",

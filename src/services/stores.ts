@@ -22,6 +22,8 @@ export interface StoreMallCard {
   mallInfo: string | null;
   recentCount: number;
   totalCount: number;
+  liveAuctionCount: number;
+  previewImages: string[];
 }
 
 export async function fetchActiveStores(): Promise<PublicStore[]> {
@@ -50,7 +52,7 @@ export async function fetchStoreMallCards(): Promise<StoreMallCard[]> {
   const rows = data ?? [];
   const counts = await Promise.all(
     rows.map(async (store) => {
-      const [totalQuery, recentQuery] = await Promise.all([
+      const [totalQuery, recentQuery, previewQuery, liveQuery] = await Promise.all([
         verifier
           .from("products")
           .select("id", { count: "exact", head: true })
@@ -64,6 +66,8 @@ export async function fetchStoreMallCards(): Promise<StoreMallCard[]> {
           .eq("status", "active")
           .gte("publish_at", recentFrom)
           .lte("publish_at", now),
+        verifier.from("products").select("thumbnail_urls,image_urls").eq("store_id", store.id).eq("status", "active").lte("publish_at", now).order("publish_at", { ascending: false }).limit(3),
+        verifier.from("products").select("id", { count: "exact", head: true }).eq("store_id", store.id).eq("sale_type", "auction").eq("status", "active").lte("publish_at", now).gt("closes_at", now),
       ]);
       return {
         id: store.id,
@@ -74,6 +78,8 @@ export async function fetchStoreMallCards(): Promise<StoreMallCard[]> {
         mallImage: store.mall_image,
         recentCount: recentQuery.count ?? 0,
         totalCount: totalQuery.count ?? 0,
+        liveAuctionCount: liveQuery.count ?? 0,
+        previewImages: (previewQuery.data ?? []).flatMap((product) => [product.thumbnail_urls?.[0] ?? product.image_urls?.[0] ?? ""]).filter(Boolean),
       };
     }),
   );
@@ -92,6 +98,14 @@ export async function fetchStoreBySlug(slug: string): Promise<PublicStore | null
   return data
     ? { id: data.id, slug: data.slug, name: data.name, description: data.description, mallInfo: data.mall_info, mallImage: data.mall_image }
     : null;
+}
+
+export async function fetchStoreByIdentifier(identifier: string): Promise<PublicStore | null> {
+  if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(identifier)) return fetchStoreBySlug(identifier);
+  const verifier = createSupabasePublicClient();
+  const { data, error } = await verifier.from("stores").select("id,slug,name,description,mall_info,mall_image").eq("id", identifier).eq("is_active", true).maybeSingle();
+  if (error) throw new Error("센터 정보를 불러오지 못했습니다.");
+  return data ? { id: data.id, slug: data.slug, name: data.name, description: data.description, mallInfo: data.mall_info, mallImage: data.mall_image } : null;
 }
 
 export async function fetchStoreProducts(storeId: string, saleType?: "auction" | "fixed", publishedDate?: string): Promise<PublishedProduct[]> {

@@ -96,14 +96,17 @@ self.addEventListener("push", (event) => {
       vibrate: [200, 100, 200],
       lang: "ko",
       timestamp: Date.now(),
-      data: { url: payload.url || "/m/home" },
+      data: { url: payload.url || "/home" },
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = new URL(event.notification.data?.url || "/m/home", self.location.origin).href;
+  const requestedUrl = new URL(event.notification.data?.url || "/home", self.location.origin);
+  const targetUrl = requestedUrl.origin === self.location.origin
+    ? requestedUrl.href
+    : new URL("/home", self.location.origin).href;
   event.waitUntil((async () => {
     const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const client of clients) {

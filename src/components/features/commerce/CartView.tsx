@@ -13,6 +13,7 @@ import {
 } from "@/lib/commerce/paymentMode";
 import { useCommerceStore } from "@/store/useCommerceStore";
 import { CatalogImage } from "@/components/ui/CatalogImage";
+import { PostcodeSearchButton } from "@/components/features/account/PostcodeSearchButton";
 
 interface PublishedFixedProduct {
   id: string;
@@ -65,6 +66,13 @@ interface CartProduct {
 
 type CartAccess = "loading" | "member" | "guest";
 type CartPaymentMode = "loading" | CommercePaymentMode | "unavailable";
+
+function formatPhoneNumber(value: string): string {
+  const digits = value.replace(/\D/gu, "").slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
 
 class CheckoutSessionChangedError extends Error {
   constructor() {
@@ -439,6 +447,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [addressBusy, setAddressBusy] = useState(false);
   const [pendingDeleteAddressId, setPendingDeleteAddressId] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [addressForm, setAddressForm] = useState({
     label: "집",
     recipientName: "",
@@ -509,6 +518,11 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
 
   const saveCheckoutAddress = async () => {
     if (addressBusy) return;
+    if (!/^010-\d{4}-\d{4}$/u.test(addressForm.phone)) {
+      setMessageKind("error");
+      setMessage("연락처를 010-0000-0000 형식으로 입력해 주세요.");
+      return;
+    }
     setAddressBusy(true);
     try {
       const { data } = await getSupabaseBrowserClient().auth.getSession();
@@ -1050,7 +1064,8 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const checkoutDisabled =
     busy ||
     paymentMode !== "manual_transfer" ||
-    !shippingAddressId;
+    !shippingAddressId ||
+    !termsAccepted;
   const checkoutButtonLabel = busy
     ? "결제 준비 중..."
     : paymentMode === "manual_transfer"
@@ -1151,9 +1166,9 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           <p className="text-sm font-bold">장바구니가 비어 있습니다.</p>
           <Link
             className="mt-5 inline-flex items-center gap-2 text-xs font-bold underline"
-            href={`${basePath}/shop`}
+            href={`${basePath}/home`}
           >
-            상품 둘러보기 <ArrowRight size={14} />
+            오늘의 빈티지 둘러보기 <ArrowRight size={14} />
           </Link>
         </div>
       ) : (
@@ -1200,7 +1215,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                   </div>
                   <div className="mt-6 flex items-center justify-between">
                     <div className="border border-line px-3 py-2 text-xs text-muted">
-                      <span aria-label="수량">단일 상품 · 1점</span>
+                      <span aria-label="수량">수량: 1개 (단일 빈티지)</span>
                     </div>
                     <span className="font-mono text-sm font-bold">
                       {product.price.toLocaleString("ko-KR")}원
@@ -1217,28 +1232,15 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                 {productTotal.toLocaleString("ko-KR")}원
               </strong>
             </div>
-            <div className="mt-4 flex items-start justify-between gap-4 text-xs">
-              <label className="flex items-start gap-2 font-bold">
-                <input
-                  checked={includeShippingFee}
-                  className="mt-0.5"
-                  disabled={busy || hasPendingCheckout || shippingFee < 1}
-                  onChange={(event) => setIncludeShippingFee(event.target.checked)}
-                  type="checkbox"
-                />
-                <span>
-                  배송비 함께 결제
-                  <small className="mt-1 block font-normal text-muted">
-                  센터별 배송 단위 기준으로 주문과 함께 결제합니다.
-                  </small>
-                </span>
+            <fieldset className="mt-5 grid gap-2">
+              <legend className="mb-2 text-xs font-bold">상품 수령 방법</legend>
+              <label className={`cursor-pointer border p-4 text-xs ${!includeShippingFee ? "border-ink bg-paper shadow-sm" : "border-line"}`}>
+                <span className="flex items-start gap-3"><input checked={!includeShippingFee} disabled={busy || hasPendingCheckout} name="shipping-mode" onChange={() => { invalidateCheckoutRequest(); setIncludeShippingFee(false); }} type="radio" /><span><strong className="block">보관함 보관 후 묶음 배송</strong><small className="mt-1 block leading-5 text-muted">최대 14일 무료 보관 · 다른 상품과 묶어 배송비를 절약할 수 있습니다.</small></span></span>
               </label>
-              <strong className="shrink-0 font-mono">
-                {includeShippingFee
-                  ? `${shippingFee.toLocaleString("ko-KR")}원`
-                  : "나중에 결제"}
-              </strong>
-            </div>
+              <label className={`cursor-pointer border p-4 text-xs ${includeShippingFee ? "border-ink bg-paper shadow-sm" : "border-line"}`}>
+                <span className="flex items-start gap-3"><input checked={includeShippingFee} disabled={busy || hasPendingCheckout || shippingFee < 1} name="shipping-mode" onChange={() => { invalidateCheckoutRequest(); setIncludeShippingFee(true); }} type="radio" /><span className="flex-1"><strong className="flex justify-between gap-2"><span>즉시 발송 · 배송비 함께 결제</span><span className="font-mono">{shippingFee.toLocaleString("ko-KR")}원</span></strong><small className="mt-1 block leading-5 text-muted">결제 확인 후 선택한 배송지로 택배 접수합니다.</small></span></span>
+              </label>
+            </fieldset>
             <label className="mt-3 block text-xs font-bold">
               배송 지역
               <select
@@ -1286,9 +1288,10 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 <input aria-label="배송지 이름" className="border border-line bg-paper px-3 py-3 text-xs" disabled={addressBusy} onChange={(event) => setAddressForm({ ...addressForm, label: event.target.value })} placeholder="배송지 이름" value={addressForm.label} />
                 <input aria-label="수령인" className="border border-line bg-paper px-3 py-3 text-xs" disabled={addressBusy} onChange={(event) => setAddressForm({ ...addressForm, recipientName: event.target.value })} placeholder="수령인" value={addressForm.recipientName} />
-                <input aria-label="연락처" className="border border-line bg-paper px-3 py-3 text-xs" disabled={addressBusy} onChange={(event) => setAddressForm({ ...addressForm, phone: event.target.value })} placeholder="연락처" value={addressForm.phone} />
-                <input aria-label="우편번호" className="border border-line bg-paper px-3 py-3 text-xs" disabled={addressBusy} inputMode="numeric" maxLength={5} onChange={(event) => setAddressForm({ ...addressForm, postalCode: event.target.value.replace(/\D/gu, "") })} placeholder="우편번호 5자리" value={addressForm.postalCode} />
+                <label className="grid gap-1 text-[10px] font-bold">연락처<input aria-label="연락처" className="border border-line bg-paper px-3 py-3 text-xs font-normal" disabled={addressBusy} inputMode="tel" onChange={(event) => setAddressForm({ ...addressForm, phone: formatPhoneNumber(event.target.value) })} placeholder="010-0000-0000" value={addressForm.phone} /><span className={/^010-\d{4}-\d{4}$/u.test(addressForm.phone) || !addressForm.phone ? "sr-only" : "text-red-600"}>010-0000-0000 형식으로 입력해 주세요.</span></label>
+                <div className="grid grid-cols-[1fr_auto] gap-2"><input aria-label="우편번호" className="min-w-0 border border-line bg-paper px-3 py-3 text-xs" disabled={addressBusy} inputMode="numeric" maxLength={5} onChange={(event) => setAddressForm({ ...addressForm, postalCode: event.target.value.replace(/\D/gu, "") })} placeholder="우편번호 5자리" value={addressForm.postalCode} /><PostcodeSearchButton disabled={addressBusy} onSelect={(result) => setAddressForm((current) => ({ ...current, ...result }))} /></div>
                 <input aria-label="주소" className="border border-line bg-paper px-3 py-3 text-xs sm:col-span-2" disabled={addressBusy} onChange={(event) => setAddressForm({ ...addressForm, address: event.target.value })} placeholder="주소" value={addressForm.address} />
+                <label className="flex items-center gap-2 text-xs sm:col-span-2"><input checked={addressForm.isDefault} disabled={addressBusy} onChange={(event) => setAddressForm({ ...addressForm, isDefault: event.target.checked })} type="checkbox" />기본 배송지로 저장</label>
               </div>
               <div className="mt-3 flex gap-2">
                 <button className="min-h-11 flex-1 border border-line px-3 py-2 text-xs font-bold" disabled={addressBusy} onClick={() => setAddressEditorOpen(false)} type="button">취소</button>
@@ -1333,6 +1336,11 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                 결제 운영 모드를 확인하고 있습니다.
               </div>
             )}
+            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]" aria-label="결제 수단">
+              <span className="border border-ink bg-paper px-3 py-3 font-bold">계좌이체 <small className="block font-normal text-muted">현재 이용 가능</small></span>
+              {['토스페이먼츠', '카카오페이', '신용카드'].map((method) => <span aria-disabled="true" className="border border-line px-3 py-3 text-muted opacity-60" key={method}>{method}<small className="block">준비 중</small></span>)}
+            </div>
+            <label className="mt-4 flex items-start gap-2 border border-line bg-paper p-3 text-[11px] leading-5"><input checked={termsAccepted} className="mt-1" onChange={(event) => setTermsAccepted(event.target.checked)} type="checkbox" /><span><strong className="block">필수 약관 전체 동의</strong>구매 조건, 결제 및 배송·보관 정책을 확인하고 동의합니다.</span></label>
             <button
               className="mt-4 h-13 w-full bg-ink text-xs font-bold text-paper disabled:opacity-50"
               disabled={checkoutDisabled}

@@ -14,8 +14,12 @@ test("the install control is mobile-device gated and the manifest opens the mobi
     source("src/components/mobile/MobileSiteLayout.tsx"),
   ]);
 
-  assert.match(manifest, /start_url:\s*"\/m\/home"/);
+  assert.match(manifest, /short_name:\s*"99 Vintage"/);
+  assert.match(manifest, /start_url:\s*"\/home"/);
   assert.match(manifest, /display:\s*"standalone"/);
+  assert.match(manifest, /background_color:\s*"#09090b"/);
+  assert.match(manifest, /theme_color:\s*"#09090b"/);
+  assert.match(manifest, /orientation:\s*"portrait-primary"/);
   assert.match(manifest, /purpose:\s*"maskable"/);
   assert.match(client, /userAgentData\?\.mobile/);
   assert.match(client, /Android\|iPhone/);
@@ -64,6 +68,7 @@ test("service worker always shows mobile OS push and handles notification clicks
   assert.doesNotMatch(worker, /visibilityState === "visible"/);
   assert.match(worker, /addEventListener\("notificationclick"/);
   assert.match(worker, /clients\.openWindow/);
+  assert.match(worker, /requestedUrl\.origin === self\.location\.origin/);
   assert.doesNotMatch(consent, /\.unregister\(\)/);
 });
 

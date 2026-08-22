@@ -19,6 +19,7 @@ import { CombinedAuctionPayment } from "@/components/features/account/CombinedAu
 import type { AuctionPaymentCenterGroup } from "@/components/features/account/CombinedAuctionPayment";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
+import { PostcodeSearchButton } from "@/components/features/account/PostcodeSearchButton";
 import { logoutBrowserSession } from "@/lib/auth/logout";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 
@@ -277,6 +278,7 @@ function AccountDashboardForSession({
   });
 const [shippingMessage, setShippingMessage] = useState("");
     const [logoutBusy, setLogoutBusy] = useState(false);
+    const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
     const [memberAccessRequired, setMemberAccessRequired] = useState(false);
   const [trackingShipment, setTrackingShipment] = useState<InventoryShipment | null>(null);
   const [purchaseConfirmationShipment, setPurchaseConfirmationShipment] = useState<InventoryShipment | null>(null);
@@ -483,7 +485,7 @@ const [shippingMessage, setShippingMessage] = useState("");
       "찜한 상품",
       String(likedCount).padStart(2, "0"),
       "다시 보고 싶은 아이템",
-      `${basePath}/saved`,
+      `${basePath}/wishlist`,
       Heart,
     ],
   ] as const;
@@ -873,6 +875,7 @@ const [shippingMessage, setShippingMessage] = useState("");
       try {
         await logoutBrowserSession(token, basePath);
       } finally {
+        setLogoutConfirmOpen(false);
         setLogoutBusy(false);
       }
     })();
@@ -903,7 +906,7 @@ const [shippingMessage, setShippingMessage] = useState("");
         </div>
         {token ? (
           <div className="flex w-fit flex-wrap items-center gap-2">
-            <button aria-label="로그아웃하기" className="inline-flex items-center gap-2 border border-line bg-paper px-4 py-3 text-xs font-bold disabled:opacity-40" disabled={logoutBusy} onClick={logout} type="button"><LogOut size={15} /> 로그아웃하기</button>
+            <button aria-label="로그아웃하기" className="inline-flex items-center gap-2 border border-line bg-paper px-4 py-3 text-xs font-bold disabled:opacity-40" disabled={logoutBusy} onClick={() => setLogoutConfirmOpen(true)} type="button"><LogOut size={15} /> 로그아웃하기</button>
             <span className="flex items-center gap-2 border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800">
               <UserRound size={15} /> 로그인 상태
             </span>
@@ -1110,6 +1113,8 @@ const [shippingMessage, setShippingMessage] = useState("");
                 <div className={`grid gap-3 p-1 ${surface === "desktop" ? "grid-cols-3" : "grid-cols-2"}`}>
                   {visibleV2Storage.map((item) => {
                     const expires = item.storageExpiresAt ? new Date(item.storageExpiresAt) : null;
+                    const daysRemaining = expires && now > 0 ? Math.max(0, Math.ceil((expires.getTime() - now) / 86_400_000)) : null;
+                    const progress = daysRemaining === null ? 0 : Math.max(0, Math.min(100, (daysRemaining / item.storageDurationDays) * 100));
                     const disabled = !item.requestEligible || Boolean(item.activeShipmentId);
                     const isSelected = selectedInventoryItemIds.includes(item.id);
                     return (
@@ -1140,6 +1145,7 @@ const [shippingMessage, setShippingMessage] = useState("");
                                 : ` · ${expires.toLocaleDateString("ko-KR")}까지`
                               : ""}
                           </p>
+                          {daysRemaining !== null && <div className="mt-3" aria-label={`남은 보관 기간 D-${daysRemaining} / ${item.storageDurationDays}일`}><div className="flex justify-between text-[10px] font-bold"><span>남은 보관 기간</span><span className={daysRemaining <= 2 ? "text-red-600" : "text-muted"}>D-{daysRemaining} / {item.storageDurationDays}일</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line"><span className={`block h-full rounded-full ${daysRemaining <= 2 ? "bg-red-600" : "bg-emerald-600"}`} style={{ width: `${progress}%` }} /></div></div>}
                           {disabled && (
                             <p className="mt-2 text-[11px] text-amber-700">
                               {item.activeShipmentId ? "이미 배송 신청에 포함된 상품입니다." : "현재 배송 신청할 수 없습니다."}
@@ -1658,18 +1664,21 @@ const [shippingMessage, setShippingMessage] = useState("");
                   placeholder="연락처"
                   value={addressForm.phone}
                 />
-                <input
-                  aria-label="우편번호"
-                  className="border border-line bg-paper px-3 py-3 text-xs"
-                  inputMode="numeric"
-                  maxLength={5}
-                  onChange={(event) => setAddressForm({
-                    ...addressForm,
-                    postalCode: event.target.value.replace(/\D/gu, ""),
-                  })}
-                  placeholder="우편번호 5자리"
-                  value={addressForm.postalCode}
-                />
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <input
+                    aria-label="우편번호"
+                    className="min-w-0 border border-line bg-paper px-3 py-3 text-xs"
+                    inputMode="numeric"
+                    maxLength={5}
+                    onChange={(event) => setAddressForm({
+                      ...addressForm,
+                      postalCode: event.target.value.replace(/\D/gu, ""),
+                    })}
+                    placeholder="우편번호 5자리"
+                    value={addressForm.postalCode}
+                  />
+                  <PostcodeSearchButton onSelect={(result) => setAddressForm((current) => ({ ...current, ...result }))} />
+                </div>
                 <input
                   aria-label="주소"
                   className={`border border-line bg-paper px-3 py-3 text-xs ${surface === "desktop" ? "col-span-2" : ""}`}
@@ -1720,6 +1729,14 @@ const [shippingMessage, setShippingMessage] = useState("");
               finally { setPurchaseConfirmationBusy(false); }
             }} type="button">{purchaseConfirmationBusy ? "확정 중..." : "확정하기"}</button>
           </div>
+        </div>
+      </PremiumDialog>
+      <PremiumDialog closeDisabled={logoutBusy} labelledBy="logout-confirmation-title" onClose={() => setLogoutConfirmOpen(false)} open={logoutConfirmOpen} panelClassName="max-w-md">
+        <div className="p-6">
+          <p className="eyebrow text-muted">계정 보호</p>
+          <h2 className="mt-2 text-xl font-black" id="logout-confirmation-title">로그아웃하시겠습니까?</h2>
+          <p className="mt-4 text-sm leading-6 text-muted">이 기기의 로그인 세션을 종료합니다. 장바구니와 주문 내역은 계정에 안전하게 보관됩니다.</p>
+          <div className="mt-6 grid grid-cols-2 gap-2"><button className="h-11 border border-line text-xs font-bold" disabled={logoutBusy} onClick={() => setLogoutConfirmOpen(false)} type="button">계속 이용하기</button><button className="h-11 bg-ink text-xs font-bold text-paper disabled:opacity-50" disabled={logoutBusy} onClick={logout} type="button">{logoutBusy ? "로그아웃 중…" : "로그아웃"}</button></div>
         </div>
       </PremiumDialog>
       <PremiumDialog

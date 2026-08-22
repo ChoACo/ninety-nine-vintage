@@ -249,13 +249,11 @@ export async function POST(request: Request) {
         ? text(body?.conditionGrade)
         : "A",
     storage_class: text(body?.storageClass) === "large" ? "large" : "small",
-    inspection_notes: singleRegistration
-      ? []
-      : Array.isArray(body?.inspectionNotes)
-        ? body.inspectionNotes.filter(
-            (value): value is string => typeof value === "string",
-          )
-        : [],
+    inspection_notes: Array.isArray(body?.inspectionNotes)
+      ? body.inspectionNotes.filter(
+          (value): value is string => typeof value === "string" && value.length <= 500,
+        ).slice(0, 50)
+      : [],
     defect_tags: normalizeDefectTags(body?.defectTags),
     measurements: normalizeMeasurements(body?.measurements),
     ...aiMetadata as Record<string, unknown>,

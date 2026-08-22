@@ -124,7 +124,7 @@ export function MobileAccountTaskGrid({ basePath = "/m" }: { basePath?: "" | "/m
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Link className="flex min-h-12 items-center justify-center gap-1 rounded-xl border border-line text-xs font-bold" href={`${basePath}/account/bids`}><Gavel size={15} /> 입찰</Link>
-          <Link className="flex min-h-12 items-center justify-center gap-1 rounded-xl border border-line text-xs font-bold" href={`${basePath}/saved`}><Heart size={15} /> 찜</Link>
+          <Link className="flex min-h-12 items-center justify-center gap-1 rounded-xl border border-line text-xs font-bold" href={`${basePath}/wishlist`}><Heart size={15} /> 찜</Link>
           <Link className="flex min-h-12 items-center justify-center gap-1 rounded-xl border border-line text-xs font-bold" href={`${basePath}/account/addresses`}><MapPin size={15} /> 배송지</Link>
         </div>
       </section>

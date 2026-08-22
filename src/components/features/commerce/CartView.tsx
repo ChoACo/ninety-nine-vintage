@@ -433,13 +433,14 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const [access, setAccess] = useState<CartAccess>("loading");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [messageKind, setMessageKind] = useState<"success" | "error">(
+  const [messageKind, setMessageKind] = useState<"success" | "warning" | "error">(
     "success",
   );
   const [staleCount, setStaleCount] = useState(0);
   const [paymentMode, setPaymentMode] = useState<CartPaymentMode>("loading");
   const [shippingFee, setShippingFee] = useState(0);
   const [shippingCharges, setShippingCharges] = useState<ShippingCharge[]>([]);
+  const [shippingAvailable, setShippingAvailable] = useState(true);
   const shippingMode = useCartStore(
     (state) => state.shippingModes.checkout ?? "ship",
   );
@@ -600,7 +601,20 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
     let authEventSequence = 0;
     let lastSessionKey: string | null = null;
 
-    const clearMemberState = (clearRecovery = true) => {
+    const loadCachedCartProducts = async (productIds: readonly string[]) => {
+      if (productIds.length === 0) return [];
+      const response = await fetch("/api/products?saleType=fixed&limit=100", {
+        cache: "no-store",
+      });
+      if (!response.ok) return [];
+      const payload = await response.json() as { products?: PublishedFixedProduct[] };
+      const wanted = new Set(productIds);
+      return (payload.products ?? [])
+        .filter((product) => wanted.has(product.id))
+        .map(toCartProduct);
+    };
+
+    const clearMemberState = (clearRecovery = true, preserveCart = false) => {
       activeCheckoutOperation.current = null;
       checkoutOperationSequence.current += 1;
       checkoutRequest.current = null;
@@ -609,12 +623,15 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
       setRestoredCheckoutProducts([]);
       setReleaseCheckoutAllowed(false);
       if (clearRecovery) clearStoredCheckoutRequest();
-      setLiveProducts([]);
-      replaceCart([]);
+      if (!preserveCart) {
+        setLiveProducts([]);
+        replaceCart([]);
+      }
       setStaleCount(0);
       setPaymentMode("loading");
       setShippingFee(0);
       setShippingCharges([]);
+      setShippingAvailable(true);
       setShippingAddresses([]);
       setShippingAddressId("");
       setIncludeShippingFee(true);
@@ -633,10 +650,16 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
 
       if (!session?.access_token) {
         cartRefreshRef.current = null;
-        clearMemberState();
+        const guestCartIds = useCommerceStore.getState().cartIds;
+        clearMemberState(true, true);
         setAccess("guest");
-        setProductsLoading(false);
+        setProductsLoading(guestCartIds.length > 0);
         setCartLoading(false);
+        const cachedProducts = await loadCachedCartProducts(guestCartIds);
+        if (!disposed && authUserId.current === null) {
+          setLiveProducts(cachedProducts);
+          setProductsLoading(false);
+        }
         return;
       }
 
@@ -696,11 +719,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
             setProductsLoading(false);
             setCartLoading(false);
           } else {
-            setPaymentMode("unavailable");
-            setMessageKind("error");
-            setMessage(
-              "장바구니 서버 응답을 확인하지 못했습니다. 잠시 후 새로고침해 주세요.",
-            );
+            throw new Error(`장바구니 API 응답 오류 (${response.status})`);
           }
           return;
         }
@@ -711,44 +730,52 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           items?: PublishedFixedProduct[];
           shippingFee?: unknown;
           shippingCharges?: ShippingCharge[];
+          shippingAvailable?: boolean;
         };
         if (!isCurrent()) return;
         if (payload.paymentMode !== "manual_transfer") {
           setPaymentMode("unavailable");
-          setMessageKind("error");
+          setMessageKind("warning");
           setMessage(
-            "결제 운영 모드를 확인하지 못했습니다. 잠시 후 새로고침해 주세요.",
+            "상품은 정상적으로 불러왔지만 결제 설정을 확인하고 있습니다.",
           );
         } else {
           setPaymentMode(payload.paymentMode);
         }
         const cartProducts = (payload.items ?? []).map(toCartProduct);
         const nextShippingFee = Number(payload.shippingFee);
+        const nextShippingAvailable = payload.shippingAvailable !== false;
         if (
           cartProducts.length > 0 &&
+          nextShippingAvailable &&
           (!Number.isSafeInteger(nextShippingFee) || nextShippingFee < 1)
         ) {
           throw new Error("배송비 설정을 확인하지 못했습니다.");
         }
-        if (!activeRequest) setShippingFee(cartProducts.length > 0 ? nextShippingFee : 0);
+        setShippingAvailable(nextShippingAvailable);
+        if (!activeRequest) setShippingFee(cartProducts.length > 0 && nextShippingAvailable ? nextShippingFee : 0);
         if (!activeRequest) {
-          setShippingCharges(Array.isArray(payload.shippingCharges) ? payload.shippingCharges : []);
+          setShippingCharges(nextShippingAvailable && Array.isArray(payload.shippingCharges) ? payload.shippingCharges : []);
+          if (!nextShippingAvailable) setIncludeShippingFee(false);
         }
         const ids =
           payload.productIds ?? cartProducts.map((product) => product.id);
         setLiveProducts(cartProducts);
         replaceCart(ids);
         setStaleCount(payload.staleProductIds?.length ?? 0);
-      } catch {
+      } catch (loadError) {
         if (!isCurrent()) return;
         // A transient cart/API failure must not masquerade as logout or expose
         // anonymous fallback data over an authenticated member snapshot.
         setAccess("member");
         setPaymentMode("unavailable");
-        setMessageKind("error");
-        setMessage(
-          "장바구니 정보를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.",
-        );
+        const cachedIds = useCommerceStore.getState().cartIds;
+        const cachedProducts = await loadCachedCartProducts(cachedIds);
+        if (!isCurrent()) return;
+        setLiveProducts((current) => current.length > 0 ? current : cachedProducts);
+        setMessageKind("warning");
+        setMessage("장바구니 결제 정보를 갱신하지 못했습니다. 상품 목록은 임시 저장된 정보로 표시합니다.");
+        console.error("[cart] server refresh failed; rendered cached products", loadError);
       } finally {
         if (!isCurrent()) return;
         setProductsLoading(false);
@@ -1142,7 +1169,9 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           className={
             messageKind === "error"
               ? "border border-red-200 bg-red-50 px-4 py-3 text-xs leading-5 text-red-900"
-              : "border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900"
+              : messageKind === "warning"
+                ? "border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900"
+                : "border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-900"
           }
         >
           {message}{" "}
@@ -1158,7 +1187,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           <p className="text-sm font-bold">장바구니를 불러오는 중입니다.</p>
           <p className="mt-2 text-[11px] text-muted">잠시만 기다려 주세요.</p>
         </div>
-      ) : access !== "member" ? (
+      ) : access !== "member" && products.length === 0 ? (
         <div className="border border-dashed border-line bg-surface py-24 text-center">
           <p className="text-sm font-bold">
             카카오 로그인 후 장바구니를 이용할 수 있습니다.
@@ -1247,7 +1276,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                 <span className="flex items-start gap-3"><input checked={!includeShippingFee} disabled={busy || hasPendingCheckout} name="shipping-mode" onChange={() => { invalidateCheckoutRequest(); setIncludeShippingFee(false); }} type="radio" /><span><strong className="block">보관함 보관 후 묶음 배송</strong><small className="mt-1 block leading-5 text-muted">최대 14일 무료 보관 · 다른 상품과 묶어 배송비를 절약할 수 있습니다.</small></span></span>
               </label>
               <label className={`cursor-pointer border p-4 text-xs ${includeShippingFee ? "border-ink bg-paper shadow-sm" : "border-line"}`}>
-                <span className="flex items-start gap-3"><input checked={includeShippingFee} disabled={busy || hasPendingCheckout || shippingFee < 1} name="shipping-mode" onChange={() => { invalidateCheckoutRequest(); setIncludeShippingFee(true); }} type="radio" /><span className="flex-1"><strong className="flex justify-between gap-2"><span>즉시 발송 · 배송비 함께 결제</span><span className="font-mono">{shippingFee.toLocaleString("ko-KR")}원</span></strong><small className="mt-1 block leading-5 text-muted">결제 확인 후 선택한 배송지로 택배 접수합니다.</small></span></span>
+                <span className="flex items-start gap-3"><input checked={includeShippingFee} disabled={busy || hasPendingCheckout || !shippingAvailable || shippingFee < 1} name="shipping-mode" onChange={() => { invalidateCheckoutRequest(); setIncludeShippingFee(true); }} type="radio" /><span className="flex-1"><strong className="flex justify-between gap-2"><span>즉시 발송 · 배송비 함께 결제</span><span className="font-mono">{shippingAvailable ? `${shippingFee.toLocaleString("ko-KR")}원` : "견적 확인 중"}</span></strong><small className="mt-1 block leading-5 text-muted">{shippingAvailable ? "결제 확인 후 선택한 배송지로 택배 접수합니다." : "보관함 보관은 계속 선택할 수 있습니다."}</small></span></span>
               </label>
             </fieldset>
             <label className="mt-3 block text-xs font-bold">

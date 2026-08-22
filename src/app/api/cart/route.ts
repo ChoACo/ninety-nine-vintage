@@ -40,15 +40,42 @@ export async function GET(request: Request) {
   const auth = await authenticateMemberRlsRequest(request);
   if (!auth.ok) return auth.response;
   const { admin } = createSupabaseServerClients();
-  const { data, error } = await auth.user.rpc("get_my_cart_reservations");
-  if (error) return commerceJson({ error: "cart_unavailable" }, 503);
-  try {
-    await getManualTransferAccount(admin);
-  } catch {
-    return commerceJson({ error: "payment_status_unavailable" }, 503);
+  const paymentStatusPromise = getManualTransferAccount(admin)
+    .then(() => true)
+    .catch((paymentError: unknown) => {
+      console.error("[cart:get] manual transfer account unavailable", {
+        message: paymentError instanceof Error ? paymentError.message : "unknown error",
+      });
+      return false;
+    });
+  const reservationResult = await auth.user.rpc("get_my_cart_reservations");
+  let reservations = reservationResult.data ?? [];
+  if (reservationResult.error) {
+    console.error("[cart:get] reservation RPC failed; using RLS table fallback", {
+      code: reservationResult.error.code,
+      message: reservationResult.error.message,
+    });
+    const fallbackResult = await auth.user
+      .from("cart_items")
+      .select("product_id,created_at,reserved_until")
+      .eq("member_id", auth.userId)
+      .order("created_at", { ascending: false });
+    if (fallbackResult.error) {
+      console.error("[cart:get] RLS table fallback failed", {
+        code: fallbackResult.error.code,
+        message: fallbackResult.error.message,
+      });
+      return commerceJson({ error: "cart_unavailable" }, 503);
+    }
+    const serverTime = new Date().toISOString();
+    reservations = (fallbackResult.data ?? []).map((item) => ({
+      ...item,
+      server_time: serverTime,
+    }));
   }
-  const paymentMode = ACTIVE_COMMERCE_PAYMENT_MODE;
-  const reservations = data ?? [];
+  const paymentMode = await paymentStatusPromise
+    ? ACTIVE_COMMERCE_PAYMENT_MODE
+    : "unavailable";
   const ids = reservations.map((item) => item.product_id);
   if (ids.length === 0) {
     return commerceJson({
@@ -59,6 +86,7 @@ export async function GET(request: Request) {
       serverTime: null,
       shippingFee: 0,
       shippingCharges: [],
+      shippingAvailable: true,
     });
   }
   const { data: products, error: productError } = await auth.user
@@ -68,7 +96,13 @@ export async function GET(request: Request) {
     .eq("sale_type", "fixed")
     .eq("status", "active")
     .lte("publish_at", new Date().toISOString());
-  if (productError) return commerceJson({ error: "cart_unavailable" }, 503);
+  if (productError) {
+    console.error("[cart:get] product relation query failed", {
+      code: productError.code,
+      message: productError.message,
+    });
+    return commerceJson({ error: "cart_unavailable" }, 503);
+  }
   const liveIds = (products ?? []).map((product) => product.id);
   const eligibility = await Promise.all(
     liveIds.map(async (productId) => {
@@ -80,6 +114,9 @@ export async function GET(request: Request) {
     }),
   );
   if (eligibility.some((result) => result.error)) {
+    console.error("[cart:get] purchase eligibility query failed", {
+      failures: eligibility.filter((result) => result.error).length,
+    });
     return commerceJson({ error: "cart_unavailable" }, 503);
   }
   const purchasableIds = eligibility
@@ -98,6 +135,7 @@ export async function GET(request: Request) {
       serverTime: reservations[0]?.server_time ?? null,
       shippingFee: 0,
       shippingCharges: [],
+      shippingAvailable: true,
       quoteTotal: 0,
       staleProductIds: ids,
     });
@@ -109,12 +147,16 @@ export async function GET(request: Request) {
     "quote_commerce_shipping_fee",
     { p_product_ids: purchasableIds, p_shipping_region: shippingRegion },
   );
-  if (quoteResult.error || !quoteResult.data || typeof quoteResult.data !== "object") {
-    return commerceJson({ error: "shipping_fee_unavailable" }, 503);
+  const quote = quoteResult.data && typeof quoteResult.data === "object"
+    ? quoteResult.data as ShippingQuote
+    : null;
+  if (quoteResult.error || !quote) {
+    console.error("[cart:get] shipping quote unavailable", {
+      message: quoteResult.error?.message ?? "empty quote",
+    });
   }
-  const quote = quoteResult.data as ShippingQuote;
-  const shippingFee = Number(quote.shippingFee);
-  const chargesAreValid = Array.isArray(quote.charges) && quote.charges.length > 0 &&
+  const shippingFee = Number(quote?.shippingFee ?? 0);
+  const chargesAreValid = Array.isArray(quote?.charges) && quote.charges.length > 0 &&
     quote.charges.every((charge) =>
       charge && typeof charge.chargeKey === "string" &&
       (charge.unitKind === "store" || charge.unitKind === "fulfillment_group") &&
@@ -126,9 +168,9 @@ export async function GET(request: Request) {
       Array.isArray(charge.productIds) && charge.productIds.length > 0 &&
       Array.isArray(charge.products) && charge.products.length === charge.productIds.length,
     );
-  if (!Number.isSafeInteger(shippingFee) || shippingFee < 1 || !chargesAreValid) {
-    return commerceJson({ error: "shipping_fee_unavailable" }, 503);
-  }
+  const shippingAvailable = !quoteResult.error && Number.isSafeInteger(shippingFee) &&
+    shippingFee > 0 && chargesAreValid;
+  if (!shippingAvailable) console.error("[cart:get] invalid shipping quote shape");
   const reservationByProduct = new Map(
     reservations.map((reservation) => [
       reservation.product_id,
@@ -154,9 +196,10 @@ export async function GET(request: Request) {
       reservedUntil: reservation.reserved_until,
     })),
     serverTime: reservations[0]?.server_time ?? null,
-    shippingFee,
-    shippingCharges: Array.isArray(quote.charges) ? quote.charges : [],
-    quoteTotal: Number(quote.total),
+    shippingFee: shippingAvailable ? shippingFee : 0,
+    shippingCharges: shippingAvailable && Array.isArray(quote?.charges) ? quote.charges : [],
+    shippingAvailable,
+    quoteTotal: shippingAvailable ? Number(quote?.total) : Number(quote?.productSubtotal ?? 0),
     staleProductIds: ids.filter((id) => !purchasableIdSet.has(id)),
   });
 }

@@ -647,7 +647,11 @@ function EnabledAuctionFeedGrid({ basePath = "", className = "", initialProducts
             <h1 className="text-2xl font-black tracking-[-0.05em]">{title ?? (saleType === "fixed" ? "상시 즉시 구매" : "오늘의 경매")}</h1>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3">
-            <span className="font-mono text-xs font-bold tabular-nums text-muted">{loading ? "—" : `${visibleCards.length}개 상품`}</span>
+            {loading ? (
+              <span aria-label="상품 수 불러오는 중" className="h-4 w-16 animate-pulse rounded bg-zinc-800" role="status" />
+            ) : (
+              <span className="font-mono text-xs font-bold tabular-nums text-muted">{visibleCards.length}개 상품</span>
+            )}
             <button
               aria-pressed={showSoldOnly}
               className={`h-10 border px-4 text-xs font-bold transition-colors ${showSoldOnly ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink"}`}

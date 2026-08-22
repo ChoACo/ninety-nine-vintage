@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
-import { Boxes, ChartNoAxesCombined, CircleHelp, Gavel, LayoutDashboard, PackagePlus, Settings, Truck, type LucideIcon } from "lucide-react";
+import { Banknote, Boxes, ChartNoAxesCombined, CircleHelp, Gavel, LayoutDashboard, PackagePlus, Settings, Truck, type LucideIcon } from "lucide-react";
 import { useAdminSidebarStore } from "@/store/useAdminSidebarStore";
 
 const WORKSPACE_ICONS: Record<string, LucideIcon> = {
@@ -12,6 +12,7 @@ const WORKSPACE_ICONS: Record<string, LucideIcon> = {
   inquiries: CircleHelp,
   orders: ChartNoAxesCombined,
   products: Boxes,
+  revenue: Banknote,
   register: PackagePlus,
   settings: Settings,
   shipping: Truck,

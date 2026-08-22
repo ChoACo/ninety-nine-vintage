@@ -127,7 +127,7 @@ test("retired center management is gone and product control uses explicit store 
   assert.match(migration, /v_product\.status <> 'active'/i);
 });
 
-test("payment confirmation is owner-only and the operator payment page redirects to fulfillment", async () => {
+test("payment confirmation is owner-only and the operator order page mounts the scoped ledger", async () => {
   const [layout, route, consoleSource, redirectPage] = await Promise.all([
     source("src/app/(admin)/admin/operator/layout.tsx"),
     source("src/app/api/admin/operator/payments/route.ts"),
@@ -136,7 +136,7 @@ test("payment confirmation is owner-only and the operator payment page redirects
   ]);
 
   assert.doesNotMatch(layout, /label:\s*"주문·입금"/);
-  assert.match(redirectPage, /redirect\("\/admin\/operator\/sales\?status=pending"\)/);
+  assert.match(redirectPage, /<OperatorOrdersConsole\s*\/>/);
   assert.match(route, /auth\.roleCode !== "owner"/);
   assert.match(route, /from\("profiles"\)/);
   assert.match(route, /from\("commerce_order_items"\)/);

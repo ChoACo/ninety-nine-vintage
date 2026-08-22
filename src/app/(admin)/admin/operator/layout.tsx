@@ -7,13 +7,14 @@ import { StandaloneBackModal } from "@/components/layout/StandaloneBackModal";
 
 const navigation = [
   { group: "대시보드", exact: true, href: "/admin/operator", label: "오늘 할 일", description: "지금 처리할 판매 업무", icon: "dashboard" },
-  { group: "대시보드", href: "/admin/operator/auctions", label: "실시간 경매", description: "입찰·마감 모니터", icon: "auctions" },
+  { group: "경매 & 거래", href: "/admin/operator/auctions", label: "실시간 경매 운영", description: "입찰·마감 모니터", icon: "auctions" },
   { group: "상품 & 재고", exact: true, href: "/admin/operator/products", label: "상품 목록", description: "공개·비공개 상품 관리", icon: "products" },
-  { group: "상품 & 재고", href: "/admin/operator/products/registration", label: "새 상품 등록", description: "사진·실측·판매 방식", icon: "register" },
-  { group: "경매 & 거래", href: "/admin/operator/sales", label: "판매·주문", description: "결제·배송·거래 상태", icon: "orders", badge: <OperatorPendingBadge kind="orders" /> },
+  { group: "상품 & 재고", href: "/admin/operator/products/new", label: "새 상품 등록", description: "사진·실측·판매 방식", icon: "register" },
+  { group: "경매 & 거래", href: "/admin/operator/sales", label: "매출 분석", description: "KPI·차트·정산 원장", icon: "revenue" },
+  { group: "경매 & 거래", href: "/admin/operator/orders", label: "판매·주문", description: "결제·배송·거래 상태", icon: "orders", badge: <OperatorPendingBadge kind="orders" /> },
   { group: "경매 & 거래", href: "/admin/operator/unpaid", label: "미결제 낙찰", description: "정산 미완료 경매", icon: "auctions" },
   { group: "보관함 & 출고", href: "/admin/operator/storage", label: "보관함", description: "회원별 보관·D-Day", icon: "vault" },
-  { group: "보관함 & 출고", href: "/admin/operator/shipping", label: "묶음 출고", description: "패킹·송장 일괄 처리", icon: "shipping", badge: <OperatorPendingBadge kind="shipping" /> },
+  { group: "보관함 & 출고", href: "/admin/operator/shipping", label: "보관함·출고 관리", description: "패킹·송장 일괄 처리", icon: "shipping", badge: <OperatorPendingBadge kind="shipping" /> },
   { group: "고객 소통 & 설정", href: "/admin/operator/inquiries", label: "문의", description: "고객 문의 분할 화면", icon: "inquiries", badge: <OperatorInquiryBadge /> },
   { group: "고객 소통 & 설정", href: "/admin/operator/community", label: "공지", description: "운영 안내와 질문·답변", icon: "inquiries" },
   { group: "고객 소통 & 설정", href: "/admin/operator/platform", label: "매장 설정", description: "등급·계좌·운영 정보", icon: "settings" },

@@ -123,8 +123,8 @@ test("single product registration is separate, defaults to immediate publication
   assert.doesNotMatch(dashboard, /products\?import=xlsx/);
   assert.doesNotMatch(dashboard, /products\?create=single/);
   assert.doesNotMatch(dashboard, /엑셀 일괄 등록|단품 등록/);
-  assert.match(layout, /href:\s*"\/admin\/operator\/products"[\s\S]*label:\s*"판매 중 상품"/);
-  assert.match(layout, /href:\s*"\/admin\/operator\/products\/registration"[\s\S]*label:\s*"상품 등록"/);
+  assert.match(layout, /href:\s*"\/admin\/operator\/products"[\s\S]*label:\s*"상품 목록"/);
+  assert.match(layout, /href:\s*"\/admin\/operator\/products\/new"[\s\S]*label:\s*"새 상품 등록"/);
   assert.match(activePage, /<OperatorProductsConsole view="active"\s*\/>/);
   assert.match(registrationPage, /<OperatorProductsConsole view="registration"\s*\/>/);
   assert.match(consoleSource, /product\.status === "active"[\s\S]*product\.sale_type === filter\.saleType/);

@@ -57,7 +57,7 @@ interface QueueSnapshot {
   nextHistoryCursor: HistoryCursor | null;
 }
 
-type ScopedOrderItem = { order_id: string; product_id: string; store_id: string };
+type ScopedOrderItem = { id: string; order_id: string; product_id: string; store_id: string };
 type ScopedOrderItemsClient = {
   from: (table: "commerce_order_items") => {
     select: (columns: string) => {
@@ -684,7 +684,7 @@ export async function GET(request: Request) {
     ? { data: [], error: null }
     : await (auth.admin as unknown as ScopedOrderItemsClient)
         .from("commerce_order_items")
-        .select("order_id,product_id,store_id")
+        .select("id,order_id,product_id,store_id")
         .in("order_id", orderIds)
         .eq("store_id", auth.selectedStoreId);
   if (scopedItemsResult.error) {
@@ -703,12 +703,39 @@ export async function GET(request: Request) {
     const scopedItems = items.filter((item) => productIds.has(item.product_id));
     if (scopedItems.length > 0) scopedItemsByOrder.set(orderId, scopedItems);
   }
+  const scopedOrderIds = [...scopedItemsByOrder.keys()];
+  const scopedProductIds = [...new Set(
+    [...scopedItemsByOrder.values()].flatMap((items) => items.map((item) => item.product_id)),
+  )];
+  const [ordersResult, productsResult, profilesResult] = await Promise.all([
+    scopedOrderIds.length
+      ? auth.admin.from("commerce_orders").select("id,member_id,status,subtotal,shipping_fee,total,created_at").in("id", scopedOrderIds)
+      : Promise.resolve({ data: [], error: null }),
+    scopedProductIds.length
+      ? auth.admin.from("products").select("id,sale_type,condition_grade").eq("store_id", auth.selectedStoreId).in("id", scopedProductIds)
+      : Promise.resolve({ data: [], error: null }),
+    transfers.length
+      ? auth.admin.from("profiles").select("id,display_name").in("id", [...new Set(transfers.map((transfer) => transfer.member_id))])
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (ordersResult.error || productsResult.error || profilesResult.error) {
+    return commerceJson({ error: "operator_orders_unavailable" }, 503);
+  }
+  const orderMeta = new Map((ordersResult.data ?? []).map((order) => [order.id, order]));
+  const productMeta = new Map((productsResult.data ?? []).map((product) => [product.id, product]));
+  const profileNames = new Map((profilesResult.data ?? []).map((profile) => [profile.id, profile.display_name]));
   const withItems = (queueTransfers: QueueTransfer[]) =>
     queueTransfers
       .filter((transfer) => scopedItemsByOrder.has(transfer.order_id))
       .map((transfer) => ({
       ...transfer,
-      items: scopedItemsByOrder.get(transfer.order_id) ?? [],
+      buyerMasked: `${String(profileNames.get(transfer.member_id) ?? "구매자").slice(0, 2)}**`,
+      orderMeta: orderMeta.get(transfer.order_id) ?? null,
+      items: (scopedItemsByOrder.get(transfer.order_id) ?? []).map((item) => ({
+        ...item,
+        conditionGrade: productMeta.get(item.product_id)?.condition_grade ?? null,
+        saleType: productMeta.get(item.product_id)?.sale_type === "auction" ? "auction" : "shop",
+      })),
     }));
 
   return commerceJson({

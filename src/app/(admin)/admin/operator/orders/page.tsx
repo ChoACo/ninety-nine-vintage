@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { OperatorOrdersConsole } from "@/components/admin/operator/OperatorOrdersConsole";
 
 export default function OperatorOrdersPage() {
-  redirect("/admin/operator/sales?status=pending");
+  return <OperatorOrdersConsole />;
 }

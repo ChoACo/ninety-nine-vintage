@@ -1,3 +1,3 @@
-import { TableSkeleton } from "@/components/admin/operator/OperatorSkeletons";
+import { SalesSkeleton } from "@/components/admin/operator/sales/SalesSkeleton";
 
-export default function Loading() { return <TableSkeleton columns={6} />; }
+export default function Loading() { return <SalesSkeleton />; }

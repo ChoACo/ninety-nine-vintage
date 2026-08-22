@@ -638,7 +638,7 @@ test("shared payment evidence is a bounded projection and direct staff rows stay
   );
   expectMatch(
     operatorConsole,
-    /처리자\s+\{entry\.recorded_by\}[\s\S]{0,120}entry\.created_at/,
+    /처리자\s+\{entry\.recorded_by\}[\s\S]{0,180}entry\.created_at/,
     "the visible audit history must show who acted and when",
   );
 
@@ -1188,7 +1188,7 @@ test("receipt UIs persist one actor-bound canonical key until a successful respo
   );
   expectMatch(
     operatorConsole,
-    /function\s+isActionableTransfer[\s\S]{0,220}awaiting_transfer[\s\S]{0,100}partially_paid[\s\S]{0,120}remainingAmount\s*>\s*0[\s\S]*?\{isActionableTransfer\(transfer\)\s*&&/,
+    /function\s+isActionableTransfer[\s\S]{0,220}awaiting_transfer[\s\S]{0,100}partially_paid[\s\S]{0,120}remainingAmount\s*>\s*0[\s\S]*?\{isActionableTransfer\(selectedTransfer\)\s*&&/,
     "cancelled transfers may be shown as history but must not count as payable work or render a receipt form",
   );
 

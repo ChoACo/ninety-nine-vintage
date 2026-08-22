@@ -236,28 +236,29 @@ test("operator settlement and shipping remain server-authoritative after the UI 
   assert.doesNotMatch(shipping, /\.from\("shipping_requests"/);
 });
 
-test("sales history is store-scoped and moves only paid settlement batches out of active sales", async () => {
-  const [sales, shippingRoute, revenueRoute] = await Promise.all([
+test("sales analytics is store-scoped while fulfillment stays on its dedicated route", async () => {
+  const [sales, ledger, charts, shippingRoute, revenueRoute] = await Promise.all([
     source("src/components/admin/operator/OperatorSalesConsole.tsx"),
+    source("src/components/admin/operator/sales/SalesLedgerTable.tsx"),
+    source("src/components/admin/operator/sales/SalesChartsDeck.tsx"),
     source("src/app/api/admin/operator/shipping/route.ts"),
     source("src/app/api/admin/operator/revenue/route.ts"),
   ]);
 
-  assert.match(sales, /\/api\/admin\/operator\/orders/);
-  assert.match(sales, /결제 대기/);
-  assert.match(sales, /activeTransfers/);
-  assert.match(sales, /member-operations\?view=winners/);
-  assert.match(sales, /pendingAuctions/);
-  assert.match(sales, /낙찰 · 결제 신청 대기/);
-  assert.match(sales, /낙찰 · 입금 확인 대기/);
   assert.match(sales, /\/api\/admin\/operator\/revenue/);
-  assert.match(sales, /상품 준비하기/);
-  assert.match(sales, /송장번호 입력하기/);
-  assert.match(sales, /송장번호 수정하기/);
-  assert.match(sales, /settlementStatus\s*===\s*"paid"/);
+  assert.match(sales, /useSalesDateRangeStore/);
+  assert.match(sales, /router\.replace\(`\/admin\/operator\/sales\?/);
+  assert.match(sales, /\\uFEFF/);
+  assert.doesNotMatch(sales, /상품 준비하기|송장번호 입력하기/);
+  assert.match(ledger, /정산 대기/);
+  assert.match(ledger, /실정산액/);
+  assert.match(charts, /AreaChart/);
+  assert.match(charts, /PieChart/);
   assert.match(shippingRoute, /item\.originStoreId\s*===\s*selectedStoreId/);
   assert.match(shippingRoute, /shipment_store_scope_mismatch/);
   assert.match(revenueRoute, /\.from\("store_settlement_entries"\)/);
   assert.match(revenueRoute, /\.from\("store_settlement_batches"\)/);
   assert.match(revenueRoute, /batch\?\.status\s*===\s*"paid"\s*\?\s*"paid"/);
+  assert.match(revenueRoute, /saleType:/);
+  assert.match(revenueRoute, /commissionAmount:/);
 });

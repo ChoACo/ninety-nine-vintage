@@ -317,6 +317,7 @@ export function OperatorShippingConsole({
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [trackingModalShipment, setTrackingModalShipment] = useState<InventoryShipment | null>(null);
+  const [pendingTrackingShipmentId, setPendingTrackingShipmentId] = useState<string | null>(null);
   const [expiryFilter, setExpiryFilter] = useState<StorageExpiryFilter>("all");
   const [sortOrder, setSortOrder] = useState<ShipmentSortOrder>("recent");
   const setOptimisticShipmentStatus = useOperatorOptimisticStore((state) => state.setShipmentStatus);
@@ -384,6 +385,23 @@ export function OperatorShippingConsole({
     });
     setTrackingModalShipment(shipment);
   };
+
+  useEffect(() => {
+    if (!pendingTrackingShipmentId || busyKey) return;
+    const packedShipment = shipments.find((shipment) =>
+      shipment.id === pendingTrackingShipmentId && shipment.status === "packed"
+    );
+    if (!packedShipment) return;
+    const timer = window.setTimeout(() => {
+      setPendingTrackingShipmentId(null);
+      setForms((current) => current[packedShipment.id] ? current : {
+        ...current,
+        [packedShipment.id]: { courier: packedShipment.courier ?? "", trackingNumber: packedShipment.trackingNumber ?? "", note: "" },
+      });
+      setTrackingModalShipment(packedShipment);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [busyKey, pendingTrackingShipmentId, shipments]);
 
   const revealAddress = async (shipment: InventoryShipment) => {
     if (!token || busyKey) return;
@@ -510,6 +528,7 @@ export function OperatorShippingConsole({
       }[action]);
       await load(token, includeShipped, offset);
     } catch (error) {
+      if (action === "pack") setPendingTrackingShipmentId(null);
       setShipments(previousShipments);
       setNotice(error instanceof Error ? error.message : "배송 상태를 변경하지 못했습니다.");
     } finally {
@@ -778,13 +797,13 @@ export function OperatorShippingConsole({
               {shipment.status !== "packed" && shipment.status !== "shipped" && (
                 <div className="mt-5 border-t border-line pt-4">
                   {!gate.ready && <p className="mb-3 text-xs text-amber-700">{gate.reason}</p>}
-                  <button className="h-10 bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40" disabled={!gate.ready || busyKey !== null} onClick={() => void mutateShipment(shipment, "pack")} type="button">합포장 완료</button>
+                  <button className="h-11 bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40" disabled={!gate.ready || busyKey !== null} onClick={() => { setPendingTrackingShipmentId(shipment.id); void mutateShipment(shipment, "pack"); }} type="button">합포장 및 송장 등록</button>
                 </div>
               )}
 
               {shipment.status === "packed" && (
                 <div className="mt-5 border-t border-line pt-4">
-                  <button className="h-10 bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40" disabled={!canShip || busyKey !== null} onClick={() => openTrackingModal(shipment)} type="button">송장번호 입력</button>
+                  <button className="h-11 bg-ink px-4 text-xs font-bold text-paper disabled:opacity-40" disabled={!canShip || busyKey !== null} onClick={() => openTrackingModal(shipment)} type="button">송장번호 입력</button>
                   {!canShip && <p className="text-xs text-amber-700 sm:col-span-3">미 출고된 상품이 존재합니다</p>}
                 </div>
               )}

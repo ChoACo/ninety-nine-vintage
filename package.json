@@ -30,7 +30,6 @@
     "deploy": "vercel --prod"
   },
   "dependencies": {
-    "@google/generative-ai": "0.24.1",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
     "@supabase/supabase-js": "2.110.6",
     "@upstash/ratelimit": "^2.0.8",
@@ -38,7 +37,6 @@
     "embla-carousel-react": "^8.6.0",
     "exceljs": "4.4.0",
     "framer-motion": "^13.1.1",
-    "googleapis": "^174.0.0",
     "lucide-react": "1.25.0",
     "next": "16.2.11",
     "react": "19.2.6",

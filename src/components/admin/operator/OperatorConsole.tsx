@@ -200,7 +200,7 @@ export function OperatorConsole({
           <div className="mt-7 space-y-5 text-xs">
             <Link className="flex gap-3 underline" href="/admin/operator/products/new">새 상품 등록 <ArrowUpRight size={14} /></Link>
             <Link className="flex gap-3 underline" href="/admin/operator/orders">주문·결제 확인 <ArrowUpRight size={14} /></Link>
-            <Link className="flex gap-3 underline" href="/admin/operator/fulfillment">출고·보관 업무 <ArrowUpRight size={14} /></Link>
+            <Link className="flex gap-3 underline" href="/admin/operator/storage">보관함 현황 <ArrowUpRight size={14} /></Link>
             <Link className="flex gap-3 underline" href="/admin/operator/shipping">배송 요청·송장 입력 <ArrowUpRight size={14} /></Link>
             <Link className="flex gap-3 underline" href="/admin/operator/chat">회원 문의 확인 <ArrowUpRight size={14} /></Link>
           </div>

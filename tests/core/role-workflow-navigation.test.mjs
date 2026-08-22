@@ -43,9 +43,10 @@ test("staff navigation follows each role's core work sequence", async () => {
   ]) {
     assert.match(operatorLayout, new RegExp(`label: "${label}"`));
   }
-  for (const label of ["오늘의 작업", "상품 준비", "포장·송장", "문의"]) {
+  for (const label of ["오늘의 작업", "포장·송장", "문의"]) {
     assert.match(employeeLayout, new RegExp(`"${label}"`));
   }
+  assert.doesNotMatch(employeeLayout, /"상품 준비"|\/admin\/employee\/fulfillment/);
   for (const label of [
     "입금 확인",
     "환불·긴급",

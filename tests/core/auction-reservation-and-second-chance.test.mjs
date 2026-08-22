@@ -140,12 +140,12 @@ test("auction settlement blackout no longer blocks product uploads", async () =>
 });
 
 test("quick cart copy does not promise an inventory hold", async () => {
-  const quickCart = await source(
-    "src/components/features/auction/detail/QuickCartModal.tsx",
+  const detailPanel = await source(
+    "src/components/features/auction/detail/StickyBidPanel.tsx",
   );
 
-  assert.match(quickCart, /재고를 점유하지 않습니다/);
-  assert.doesNotMatch(quickCart, /15분 동안 재고를 안전하게 점유/);
+  assert.match(detailPanel, /구매 가능 여부는 결제 시 다시 확인됩니다/);
+  assert.doesNotMatch(detailPanel, /15분 동안 재고를 안전하게 점유/);
 });
 
 test("the storefront keeps cart membership independent from inventory availability", async () => {

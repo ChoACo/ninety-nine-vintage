@@ -8,14 +8,15 @@ const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 test("operator member API is read-only and exposes no global enforcement calls", async () => {
   const [route, consoleSource] = await Promise.all([
     source("src/app/api/admin/operator/members/route.ts"),
-    source("src/components/admin/operator/OperatorMembersConsole.tsx"),
+    source("src/components/admin/operator/OperatorMemberOperationsConsole.tsx"),
   ]);
   const patchHandler = route.slice(route.indexOf("export async function PATCH"));
 
   assert.match(patchHandler, /operator_member_mutation_forbidden/);
   assert.doesNotMatch(patchHandler, /set_member_access_role|add_member_warning|manage_member_sanction/);
   assert.doesNotMatch(consoleSource, /제재 추가|경고 추가|역할을 변경|sanction_|action:\s*["']role/);
-  assert.match(consoleSource, /거래 지원용 최소 정보/);
+  assert.match(consoleSource, /보관 중/);
+  assert.doesNotMatch(consoleSource, /배송 대기/);
 });
 
 test("database keeps global role warning and sanction RPCs owner-only", async () => {

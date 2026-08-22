@@ -75,14 +75,13 @@ test("sold routes own their canonical, structured data and safe 404 boundary", a
 });
 
 test("sold archive stays addressable but main navigation exposes it only through feed toggles", async () => {
-  const [pcHeader, mobileHeader, mobileSiteHeader, settings, grid] = await Promise.all([
+  const [pcHeader, mobileSiteHeader, settings, grid] = await Promise.all([
     source("src/components/layout/PcHeader.tsx"),
-    source("src/components/layout/MobileHeader.tsx"),
     source("src/components/mobile/MobileSiteHeader.tsx"),
     source("src/components/settings/SiteSettingsPage.tsx"),
     source("src/components/features/auction/AuctionFeedGrid.tsx"),
   ]);
-  for (const navigation of [pcHeader, mobileHeader, mobileSiteHeader, settings]) {
+  for (const navigation of [pcHeader, mobileSiteHeader, settings]) {
     assert.doesNotMatch(navigation, /판매 완료/);
     assert.doesNotMatch(navigation, /\/sold/);
   }

@@ -1,7 +1,7 @@
-import { OperatorFulfillmentConsole } from "./OperatorFulfillmentConsole";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default function OperatorFulfillmentPage() {
-  return <OperatorFulfillmentConsole />;
+  redirect("/admin/operator/storage");
 }

@@ -954,10 +954,13 @@ test("v2 operations return stable Korean problem contracts with CAS and business
   assert.match(ownerServer, /typeof body\.error === "string" && typeof body\.code !== "string"/);
   assert.match(ownerServer, /\? "로그인이 필요합니다\."/);
 
-  for (const route of [payments, fulfillment, shipping, exceptions, evidence, refunds, refundAccount]) {
+  for (const route of [payments, shipping, exceptions, evidence, refunds, refundAccount]) {
     assert.match(route, /\["PT409", "23505", "40001"\]/);
     assert.match(route, /error\.code === "55000"[\s\S]{0,500}\b422\b/);
   }
+  assert.match(fulfillment, /operator_fulfillment_retired/);
+  assert.match(fulfillment, /410/);
+  assert.doesNotMatch(fulfillment, /release_buyer_/);
   assert.match(confirm, /\["PT409", "40001"\]/);
   assert.match(confirm, /error\.code === "23505"/);
   assert.match(confirm, /payment_fulfillment_conflict/);

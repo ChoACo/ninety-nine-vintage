@@ -1440,20 +1440,20 @@ function AccountDashboardForSession({
                                 ? expires.getTime() <= now
                                   ? " · 보관 만료"
                                   : ` · ${expires.toLocaleDateString("ko-KR")}까지`
-                                : " · 매장 입고 후 시작"}
+                                : " · 보관 기한 확인 중"}
                             </p>
                             <div
                               className="mt-3"
                               aria-label={
                                 daysRemaining === null
-                                  ? `보관 시작 전 · 입고 후 ${item.storageDurationDays}일`
+                                  ? "결제 완료 시점 기준 보관 기한 확인 중"
                                   : `남은 보관 기간 ${formatStorageDday(daysRemaining)} / ${item.storageDurationDays}일`
                               }
                             >
                               <div className="flex justify-between text-[10px] font-bold">
                                 <span>
                                   {daysRemaining === null
-                                    ? "보관 시작 전"
+                                    ? "보관 기한"
                                     : "남은 보관 기간"}
                                 </span>
                                 <span
@@ -1464,7 +1464,7 @@ function AccountDashboardForSession({
                                   }
                                 >
                                   {daysRemaining === null
-                                    ? `입고 후 D-${item.storageDurationDays} 시작`
+                                    ? "확인 중"
                                     : `${formatStorageDday(daysRemaining)} / ${item.storageDurationDays}일`}
                                 </span>
                               </div>

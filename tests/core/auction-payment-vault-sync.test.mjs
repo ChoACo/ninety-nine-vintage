@@ -31,7 +31,8 @@ test("vault cards always render a D-Day progress gauge from authoritative storag
   assert.match(dashboard, /item\.storageExpiresAt/);
   assert.match(dashboard, /item\.storageDurationDays \* 86_400_000/);
   assert.match(dashboard, /role="progressbar"/);
-  assert.match(dashboard, /입고 후 D-\$\{item\.storageDurationDays\} 시작/);
+  assert.match(dashboard, /결제 완료 시점 기준 보관 기한 확인 중/);
+  assert.doesNotMatch(dashboard, /매장 입고 후 시작|보관 시작 전|입고 후 D-/);
   assert.match(dashboard, /daysRemaining !== null && daysRemaining <= 3/);
   assert.match(dashboard, /daysRemaining === 0[^]*오늘 보관 만료/);
   assert.match(dashboard, /만료 임박 · 묶음 배송 신청 권장/);

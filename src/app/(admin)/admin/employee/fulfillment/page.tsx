@@ -1,5 +1,5 @@
-import { OperatorFulfillmentConsole } from "@/app/(admin)/admin/operator/fulfillment/OperatorFulfillmentConsole";
+import { redirect } from "next/navigation";
 
 export default function EmployeeFulfillmentPage() {
-  return <OperatorFulfillmentConsole staffLabel="직원센터" />;
+  redirect("/admin/employee/parcels");
 }

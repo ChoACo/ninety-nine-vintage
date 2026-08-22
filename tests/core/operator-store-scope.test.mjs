@@ -151,7 +151,11 @@ test("every operator API except scope selection requires the active selected sto
         "/api/admin/operator/transfers/[id]/ledger/route.ts",
       );
 
-    if (normalizedRoute.endsWith("/store-scope/route.ts")) {
+    if (normalizedRoute.endsWith("/fulfillment/route.ts")) {
+      assert.match(route, /operator_fulfillment_retired/);
+      assert.match(route, /410/);
+      assert.doesNotMatch(route, /authenticateOperatorStoreRequest/);
+    } else if (normalizedRoute.endsWith("/store-scope/route.ts")) {
       assert.match(route, /authenticateStaffRequest/);
     } else if (isOwnerPaymentRoute) {
       assert.match(route, /authenticateOwnerPaymentRequest/, routeFile);

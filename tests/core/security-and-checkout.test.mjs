@@ -141,7 +141,7 @@ test("the former entry gate is absent while live auctions keep their authoritati
       "utf8",
     ),
     readFile(new URL("src/components/layout/PcHeader.tsx", rootUrl), "utf8"),
-    readFile(new URL("src/components/layout/MobileBottomNav.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/components/mobile/MobileSiteBottomNav.tsx", rootUrl), "utf8"),
   ]);
 
   await Promise.all([
@@ -181,8 +181,7 @@ test("the former entry gate is absent while live auctions keep their authoritati
   for (const source of [header, mobileNavigation]) {
     assert.match(source, /"\/(?:m\/)?live"/);
   }
-  assert.match(mobileNavigation, /"\/admin\/operator\/fulfillment"/);
-  assert.match(mobileNavigation, /"\/admin\/employee"/);
+  assert.doesNotMatch(mobileNavigation, /\/admin\//);
 });
 
 test("trusted mutation origin keeps deployed hosts exact while accepting same-port local loopback aliases", async () => {
@@ -339,8 +338,8 @@ storeService,
   ] = await Promise.all([
     readFile(new URL("src/components/layout/AuthStatus.tsx", rootUrl), "utf8"),
     readFile(new URL("src/components/layout/PcHeader.tsx", rootUrl), "utf8"),
-    readFile(new URL("src/components/layout/MobileHeader.tsx", rootUrl), "utf8"),
-    readFile(new URL("src/components/layout/MobileBottomNav.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/components/mobile/MobileSiteHeader.tsx", rootUrl), "utf8"),
+    readFile(new URL("src/components/mobile/MobileSiteBottomNav.tsx", rootUrl), "utf8"),
     readFile(new URL("src/hooks/useAdminNavigationAccess.ts", rootUrl), "utf8"),
     readFile(new URL("src/app/api/admin/session/route.ts", rootUrl), "utf8"),
     readFile(new URL("src/app/(shop)/account/page.tsx", rootUrl), "utf8"),
@@ -375,11 +374,10 @@ storeService,
     assert.doesNotMatch(source, /href="\/(?:owner|operator)"/);
     assert.doesNotMatch(source, /AccountSessionPanel/);
   }
-  assert.match(mobileHeader, /access\.roleCode === "operator"[\s\S]*?href="\/admin\/operator\/fulfillment"/);
-  assert.match(mobileHeader, /access\.roleCode === "employee"[\s\S]*?href="\/admin\/employee"/);
-  assert.match(mobileHeader, /access\.canAccessOwner[\s\S]*?href="\/admin\/owner"/);
-  assert.match(mobileNavigation, /access\.roleCode === "operator"/);
-  assert.match(mobileNavigation, /access\.roleCode === "employee"/);
+  assert.match(mobileHeader, /getMobileRoleNavigation\(access\.roleCode\)/);
+  assert.match(mobileHeader, /\["업무", roleNavigation\.centerHref\]/);
+  assert.doesNotMatch(mobileHeader, /\/admin\/operator\/fulfillment/);
+  assert.doesNotMatch(mobileNavigation, /access\.roleCode|roleNavigation|\/admin\//);
   assert.match(accessHook, /useSupabaseSession\(\)/);
   assert.match(accessHook, /fetch\("\/api\/admin\/session"/);
   assert.match(accessHook, /snapshot\.userId === userId[\s\S]*snapshot\.revision === revision/);

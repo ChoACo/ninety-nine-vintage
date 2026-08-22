@@ -5,60 +5,47 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("operator fulfillment uses direct-store storage with dated product grids", async () => {
-  await access(new URL("src/app/(admin)/admin/operator/fulfillment/page.tsx", rootUrl));
-  const [route, consoleSource, layout, migration] = await Promise.all([
+test("operator intake is retired and paid inventory starts storage immediately", async () => {
+  const [route, page, operatorLayout, employeeLayout, migration] = await Promise.all([
     source("src/app/api/admin/operator/fulfillment/route.ts"),
-    source("src/app/(admin)/admin/operator/fulfillment/OperatorFulfillmentConsole.tsx"),
+    source("src/app/(admin)/admin/operator/fulfillment/page.tsx"),
     source("src/app/(admin)/admin/operator/layout.tsx"),
-    source("supabase/migrations/20260724063531_simplify_direct_store_fulfillment.sql"),
+    source("src/app/(admin)/admin/employee/layout.tsx"),
+    source("supabase/migrations/20260822181044_start_inventory_storage_at_payment.sql"),
   ]);
 
-  assert.match(route, /"get_direct_store_fulfillment_groups"/);
-  assert.match(route, /"store_paid_items",\s*"store_requested_items"/);
-  assert.match(route, /"release_buyer_paid_inventory_items"/);
-  assert.match(route, /"release_buyer_inventory_shipment_items"/);
-  assert.doesNotMatch(route, /record_buyer_inventory_center_items|center_receive|center_store/);
-  assert.match(route, /p_date:\s*date/);
-  assert.match(route, /new Set\(value\)\.size === value\.length/);
-  assert.match(route, /\.sort\(\(a, b\) => a\.id\.localeCompare\(b\.id\)\)/);
+  assert.match(route, /operator_fulfillment_retired/);
+  assert.match(route, /410/);
+  assert.doesNotMatch(route, /release_buyer_|get_direct_store_fulfillment_groups/);
+  assert.match(page, /redirect\("\/admin\/operator\/storage"\)/);
+  assert.doesNotMatch(operatorLayout, /\/admin\/operator\/fulfillment/);
+  assert.doesNotMatch(employeeLayout, /\/admin\/employee\/fulfillment/);
+  await assert.rejects(access(new URL(
+    "src/app/(admin)/admin/operator/fulfillment/OperatorFulfillmentConsole.tsx",
+    rootUrl,
+  )));
 
-  assert.match(consoleSource, /type Action = "store_paid_items" \| "store_requested_items"/);
-  assert.match(consoleSource, /type="date"/);
-  assert.match(consoleSource, /grid-cols-2[\s\S]*lg:grid-cols-5/);
-  assert.match(consoleSource, /CatalogImage/);
-  assert.match(consoleSource, /상품 상세보기/);
-  assert.match(consoleSource, /선택 상품 출고·보관 완료/);
-  assert.doesNotMatch(consoleSource, /센터 입고|보관 위치|목적지/);
-  assert.match(layout, /href:\s*"\/admin\/operator\/sales"[\s\S]*label:\s*"판매 내역"/);
-  assert.doesNotMatch(layout, /href:\s*"\/admin\/operator\/fulfillment"/);
-  assert.doesNotMatch(layout, /\/admin\/operator\/center/);
-
-  assert.match(migration, /current_stage = 'center_stored'/);
-  assert.match(migration, /storage_location_code = 'DIRECT_STORE'/);
-  assert.match(migration, /direct_store_cutover/);
+  assert.match(migration, /new\.storage_started_at := new\.paid_at/);
+  assert.match(migration, /storage_expires_at = paid_at \+ make_interval/);
+  assert.match(migration, /revoke all on function public\.release_buyer_paid_inventory_items/);
+  assert.match(migration, /revoke all on function public\.release_buyer_inventory_shipment_items/);
 });
 
-test("center topology and address management surfaces are retired", async () => {
-  const [ownerPage, operatorCenterPage, employeeCenterPage, ownerLayout, dashboard, migration] =
+test("legacy center aliases lead to current storage and shipping workspaces", async () => {
+  const [ownerPage, operatorCenterPage, employeeCenterPage, ownerLayout, dashboard] =
     await Promise.all([
       source("src/app/(admin)/admin/owner/fulfillment/page.tsx"),
       source("src/app/(admin)/admin/operator/center/page.tsx"),
       source("src/app/(admin)/admin/employee/center/page.tsx"),
       source("src/app/(admin)/admin/owner/layout.tsx"),
       source("src/components/admin/owner/OwnerDashboard.tsx"),
-      source("supabase/migrations/20260724063531_simplify_direct_store_fulfillment.sql"),
     ]);
 
   await assert.rejects(access(new URL("src/app/api/admin/owner/fulfillment/route.ts", rootUrl)));
   await assert.rejects(access(new URL("src/app/api/admin/centers/route.ts", rootUrl)));
-  await assert.rejects(access(new URL("src/components/admin/center/StaffCenterManagementConsole.tsx", rootUrl)));
   assert.match(ownerPage, /redirect\("\/admin\/owner"\)/);
-  assert.match(operatorCenterPage, /redirect\("\/admin\/operator\/fulfillment"\)/);
-  assert.match(employeeCenterPage, /redirect\("\/admin\/employee\/fulfillment"\)/);
+  assert.match(operatorCenterPage, /redirect\("\/admin\/operator\/storage"\)/);
+  assert.match(employeeCenterPage, /redirect\("\/admin\/employee\/parcels"\)/);
   assert.doesNotMatch(ownerLayout, /센터·매장 구조|\/admin\/owner\/fulfillment/);
   assert.doesNotMatch(dashboard, /센터·매장 구조 설정|\/admin\/owner\/fulfillment/);
-  assert.match(migration, /revoke all on function public\.configure_managed_fulfillment_center/);
-  assert.match(migration, /revoke all on function public\.configure_store_fulfillment_route/);
-  assert.match(migration, /revoke all on function public\.get_my_center_management\(\)/);
 });

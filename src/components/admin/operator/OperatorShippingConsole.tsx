@@ -205,8 +205,8 @@ function statusLabel(value: string) {
     shipped: "발송 완료",
     cancelled: "취소됨",
     reconciliation_required: "정합성 확인 필요",
-    outbound_complete: "출고 완료",
-    ready: "출고 준비 완료",
+    outbound_complete: "처리 완료",
+    ready: "배송 준비 완료",
     held: "보류",
     excluded: "다음 배송 제외",
   }[value] ?? value;
@@ -698,7 +698,7 @@ export function OperatorShippingConsole({
                   <p className="mt-1 break-all font-mono text-[10px] text-muted">구매자 {shipment.memberId}</p>
                   <p className="mt-1 break-all font-mono text-[10px] text-muted">배송 {shipment.id} · 요청 {formatAt(shipment.requestedAt)}{showStorageUrgency ? ` · 보관 만료 ${formatAt(shipment.storageExpiresAt)}` : ""} · 버전 {shipment.version}</p>
                 </div>
-                <div className="text-xs text-muted">상품 {shipment.activeItemCount}/{shipment.itemCount} · 출고 완료 {shipment.releasedItemCount} · 매장 출고 대기 {shipment.unreleasedItemCount}</div>
+                <div className="text-xs text-muted">배송 상품 {shipment.activeItemCount}/{shipment.itemCount}</div>
               </div>
 
               <div className="mt-5 border-t border-line pt-4">
@@ -750,17 +750,10 @@ export function OperatorShippingConsole({
               </div>
 
               <div className="mt-5 border-t border-line pt-4">
-                <p className="text-xs font-bold">매장별 출고 현황</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {shipment.storeWorks.map((work) => <span className="border border-line px-2 py-1 text-[10px]" key={work.id}>{work.storeName} · {statusLabel(work.status)}</span>)}
-                </div>
-              </div>
-
-              <div className="mt-5 border-t border-line pt-4">
                 <p className="text-xs font-bold">신청 상품</p>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3 lg:grid-cols-5">
                   {shipment.items.map((item) => (
-                    <div className={`border p-2 ${item.released ? "border-line" : "border-amber-400 bg-amber-500/10"}`} key={item.inventoryItemId}>
+                    <div className="border border-line p-2" key={item.inventoryItemId}>
                       <div className="aspect-square bg-surface">
                         {item.imageUrl
                           ? <CatalogImage alt="" className="h-full w-full object-cover" loading="lazy" sizes="160px" src={item.imageUrl} />
@@ -768,10 +761,7 @@ export function OperatorShippingConsole({
                       </div>
                       <p className="mt-2 line-clamp-2 min-h-8 font-bold">{item.title}</p>
                       <p className="mt-2 text-[10px] text-muted">{item.originStoreName}</p>
-                      <p className={`mt-1 text-[10px] font-bold ${item.released ? "text-emerald-700" : "text-amber-700"}`}>
-                        {item.released ? "출고 완료" : "매장 출고 대기"}
-                        {item.isBlocked ? " · 확인 필요" : ""}
-                      </p>
+                      {item.isBlocked && <p className="mt-1 text-[10px] font-bold text-amber-700">확인 필요</p>}
                       <Link className="mt-2 inline-block text-[10px] font-bold underline" href={`/auction/${item.productId}`}>상품 상세보기</Link>
                     </div>
                   ))}

@@ -67,7 +67,7 @@ test("band members retain a visible deadline while combined payment keeps the ex
   assert.match(combinedPayment, /선택 상품 결제하기/);
 });
 
-test("employee and operator navigation use direct-store fulfillment without center management", async () => {
+test("employee and operator navigation use storage and one-step shipping without intake management", async () => {
   await Promise.all([
     access(new URL("src/app/(admin)/admin/employee/inquiries/page.tsx", rootUrl)),
     access(new URL("src/app/(admin)/admin/employee/fulfillment/page.tsx", rootUrl)),
@@ -89,9 +89,10 @@ test("employee and operator navigation use direct-store fulfillment without cent
   assert.match(session, /canAccessEmployee = isOwner \|\| roleCode === "employee"/);
   assert.match(boundary, /pathname\.startsWith\("\/admin\/employee\/"\)/);
   assert.match(employeeLayout, /title="직원센터"/);
-  for (const route of ["inquiries", "fulfillment", "parcels"]) {
+  for (const route of ["inquiries", "parcels"]) {
     assert.match(employeeLayout, new RegExp(`/admin/employee/${route}`));
   }
+  assert.doesNotMatch(employeeLayout, /\/admin\/employee\/fulfillment/);
   assert.doesNotMatch(employeeLayout, /\/admin\/employee\/center/);
   assert.doesNotMatch(operatorLayout, /\/admin\/operator\/center/);
   assert.match(operatorLayout, /상품 등록부터 배송과 정산까지/);

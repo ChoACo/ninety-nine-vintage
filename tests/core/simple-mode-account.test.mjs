@@ -80,7 +80,7 @@ test("simple mode can be changed only from the standalone settings page", async 
     source("src/components/settings/SiteSettingsPage.tsx"),
     source("src/components/layout/PcHeader.tsx"),
     source("src/components/mobile/MobileSiteHeader.tsx"),
-    source("src/components/features/account/DesktopAccountContent.tsx"),
+    source("src/app/(shop)/my/page.tsx"),
   ]);
 
   assert.match(settings, /<SimpleModeToggle detailed/);

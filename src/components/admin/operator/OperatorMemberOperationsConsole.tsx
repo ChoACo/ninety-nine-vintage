@@ -66,7 +66,7 @@ function winnerPaymentStatusLabel(status: "not_started" | "awaiting_manual_trans
   return "낙찰 대기";
 }
 
-type StorageStatusFilter = "all" | "stored" | "waiting_outbound";
+type StorageStatusFilter = "all" | "not_requested" | "requested";
 type StorageExpiryFilter = "all" | "today" | "within_2" | "within_7" | "past";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -138,8 +138,8 @@ function storageExpiryMatches(filter: StorageExpiryFilter, daysLeft: number | nu
 
 const STORAGE_STATUS_OPTIONS: ReadonlyArray<{ value: StorageStatusFilter; label: string }> = [
   { value: "all", label: "전체" },
-  { value: "waiting_outbound", label: "배송 대기" },
-  { value: "stored", label: "보관 중" },
+  { value: "not_requested", label: "보관 중" },
+  { value: "requested", label: "배송 신청됨" },
 ];
 
 const STORAGE_EXPIRY_OPTIONS: ReadonlyArray<{ value: StorageExpiryFilter; label: string }> = [
@@ -171,9 +171,8 @@ function OperationItemCard({
         <p className="mt-2 text-[10px] text-muted">{item.originStoreName}</p>
         {storageItem ? (
           <>
-            <p className={`mt-2 inline-flex items-center rounded-lg px-2 py-1 text-[10px] font-bold ${storageItem.fulfillmentStatus === "stored" ? "bg-emerald-50 text-emerald-800" : "bg-blue-50 text-blue-800"}`}>
-              {storageItem.fulfillmentStatus === "stored" ? "보관 중" : "배송 대기"}
-              {storageItem.shipmentRequested ? " · 배송 신청됨" : ""}
+            <p className={`mt-2 inline-flex items-center rounded-lg px-2 py-1 text-[10px] font-bold ${storageItem.shipmentRequested ? "bg-blue-50 text-blue-800" : "bg-emerald-50 text-emerald-800"}`}>
+              {storageItem.shipmentRequested ? "배송 신청됨" : "보관 중"}
             </p>
             <div className="mt-2 flex items-center justify-between gap-2">
               <span className="text-[10px] font-bold text-muted">{storageClassLabel(storageDurationDays(storageItem))}</span>
@@ -263,7 +262,7 @@ export function OperatorMemberOperationsConsole({
     return storageItems.filter(
       (item) =>
         (statusFilter === "all" ||
-          item.fulfillmentStatus === statusFilter) &&
+          (statusFilter === "requested" ? item.shipmentRequested : !item.shipmentRequested)) &&
         storageExpiryMatches(expiryFilter, storageDaysLeft(item)),
     );
   }, [expiryFilter, statusFilter, storageItems, view]);
@@ -271,12 +270,8 @@ export function OperatorMemberOperationsConsole({
   const statusCounts = useMemo(
     () => ({
       all: storageItems.length,
-      waiting_outbound: storageItems.filter(
-        (item) => item.fulfillmentStatus === "waiting_outbound",
-      ).length,
-      stored: storageItems.filter(
-        (item) => item.fulfillmentStatus === "stored",
-      ).length,
+      not_requested: storageItems.filter((item) => !item.shipmentRequested).length,
+      requested: storageItems.filter((item) => item.shipmentRequested).length,
     }),
     [storageItems],
   );

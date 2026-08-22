@@ -70,12 +70,11 @@ test("contain fitting and pinch transforms stay finite at malformed gesture boun
 });
 
 test("premium detail actions use confirmation dialogs only for consequential mutations", async () => {
-  const [styles, modal, routeModal, condition, cart, bid, gallery, catalogImage, sticky, scrollLock] = await Promise.all([
+  const [styles, modal, routeModal, condition, bid, gallery, catalogImage, sticky, scrollLock] = await Promise.all([
     source("src/app/globals.css"),
     source("src/components/ui/PremiumDialog.tsx"),
     source("src/components/layout/ModalShell.tsx"),
     source("src/components/features/auction/detail/ConditionReport.tsx"),
-    source("src/components/features/auction/detail/QuickCartModal.tsx"),
     source("src/components/features/auction/detail/AuctionBidRoutePanel.tsx"),
     source("src/components/features/auction/AuctionGalleryModal.tsx"),
     source("src/components/ui/CatalogImage.tsx"),
@@ -99,8 +98,6 @@ test("premium detail actions use confirmation dialogs only for consequential mut
   assert.match(condition, /상품 상태 정보/);
   assert.match(condition, /상태 등급 \{item\.conditionGrade \|\| "미입력"\}/);
   assert.doesNotMatch(condition, /전문가 검수 완료|정품·상태 확인|검수 보고서|상세 보고서|BadgeCheck/);
-  assert.match(cart, /PremiumDialog/);
-  assert.match(cart, /간편 장바구니/);
   assert.match(bid, /setConfirmOpen\(true\)/);
   assert.match(bid, /동의하고 최종 입찰/);
   const confirmationRequest = bid.slice(
@@ -162,7 +159,7 @@ test("premium detail actions use confirmation dialogs only for consequential mut
 test("fixed navigation and operator dialogs share the accessible portaled lifecycle", async () => {
   const [dialog, mobileHeader, mobileFilters, operatorImport] = await Promise.all([
     source("src/components/ui/PremiumDialog.tsx"),
-    source("src/components/layout/MobileHeader.tsx"),
+    source("src/components/mobile/MobileSiteHeader.tsx"),
     source("src/components/features/auction/AuctionFilterSidebar.tsx"),
     source("src/components/admin/operator/OperatorXlsxImportModal.tsx"),
   ]);
@@ -179,7 +176,7 @@ test("fixed navigation and operator dialogs share the accessible portaled lifecy
   assert.match(dialog, /"sheet-bottom"/);
 
   assert.match(mobileHeader, /<PremiumDialog/);
-  assert.match(mobileHeader, /aria-expanded=\{open\} aria-haspopup="dialog"/);
+  assert.match(mobileHeader, /aria-expanded=\{menuOpen\} aria-label="전체 메뉴 열기"/);
   assert.match(mobileHeader, /placement="drawer-left"/);
   assert.doesNotMatch(mobileHeader, /document\.body\.style\.overflow/);
 

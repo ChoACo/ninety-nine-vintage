@@ -35,6 +35,6 @@ test("checkout snapshots one immutable charge per store or fulfillment group", a
   assert.match(cartRoute, /staleProductIds:\s*ids\.filter\(\(id\) => !purchasableIdSet\.has\(id\)\)/);
   assert.match(cartRoute, /charge\.unitKind === "store"/);
   assert.match(cartView, /현재 계정으로 구매할 수 없는 상품/);
-  assert.match(cartView, /처리 \{charge\.billingStoreName\}/);
-  assert.match(cartView, /charge\.products\.map/);
+  assert.match(cartView, /처리\{" "\}[\s\S]*?\{charge\.billingStoreName\}/);
+  assert.match(cartView, /charge\.products[\s\S]*?\.map/);
 });

@@ -19,7 +19,8 @@ test("operator orders use one compact filter bar, dense table, and a dedicated d
   assert.match(consoleSource, /<OrderDetailDrawer/);
   for (const label of ["전체", "보관함 적재 대기", "즉시 출고 준비", "배송 중", "배송 완료", "취소\/반품"]) assert.match(filterSource, new RegExp(label));
   assert.match(filterSource, /엑셀 다운로드/);
-  assert.match(tableSource, /min-w-\[1380px\]/);
+  assert.match(tableSource, /min-w-\[680px\][\s\S]*lg:min-w-\[1180px\]/);
+  assert.match(tableSource, /hidden w-32 lg:table-cell/);
   assert.match(tableSource, /h-\[60px\]/);
   assert.match(tableSource, /📦 14일 보관함/);
   assert.match(tableSource, /🚚 즉시 발송/);

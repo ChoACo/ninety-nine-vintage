@@ -9,10 +9,10 @@ test("center mall uses a compact four-column desktop grid", async () => {
   const grid = await source(
     "src/components/features/catalog/StoreMallGrid.tsx",
   );
-  assert.match(grid, /grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4/);
+  assert.match(grid, /grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4/);
   assert.match(grid, /aspect-\[16\/10\]/);
   assert.match(grid, /size-11/);
-  assert.match(grid, /conceptTags\.slice\(0,2\)/);
+  assert.match(grid, /conceptTags\.slice\(0,\s*2\)/);
 });
 
 test("MY renders persistent notification switches and aligns the Kakao badge", async () => {

@@ -365,8 +365,12 @@ function readStoredCheckoutRequest(options?: {
         // therefore represents a product-only order.
         includeShippingFee: parsed.includeShippingFee === true,
         shippingFeeQuote: Number(parsed.shippingFeeQuote ?? 0),
-        shippingRegion: parsed.shippingRegion === "remote_area" ? "remote_area" : "regular",
-        shippingAddressId: typeof parsed.shippingAddressId === "string" ? parsed.shippingAddressId : "",
+        shippingRegion:
+          parsed.shippingRegion === "remote_area" ? "remote_area" : "regular",
+        shippingAddressId:
+          typeof parsed.shippingAddressId === "string"
+            ? parsed.shippingAddressId
+            : "",
       };
     }
   } catch {
@@ -418,7 +422,15 @@ function toCartProduct(product: PublishedFixedProduct): CartProduct {
   };
 }
 
-export function CartView({ basePath = "", selectedProductId, surface = "mobile" }: { basePath?: "" | "/m"; selectedProductId?: string; surface?: "desktop" | "mobile" }) {
+export function CartView({
+  basePath = "",
+  selectedProductId,
+  surface = "mobile",
+}: {
+  basePath?: "" | "/m";
+  selectedProductId?: string;
+  surface?: "desktop" | "mobile";
+}) {
   const hydrate = useCommerceStore((state) => state.hydrate);
   const cartIds = useCommerceStore((state) => state.cartIds);
   const removeFromCart = useCommerceStore((state) => state.removeFromCart);
@@ -433,9 +445,9 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const [access, setAccess] = useState<CartAccess>("loading");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [messageKind, setMessageKind] = useState<"success" | "warning" | "error">(
-    "success",
-  );
+  const [messageKind, setMessageKind] = useState<
+    "success" | "warning" | "error"
+  >("success");
   const [staleCount, setStaleCount] = useState(0);
   const [paymentMode, setPaymentMode] = useState<CartPaymentMode>("loading");
   const [shippingFee, setShippingFee] = useState(0);
@@ -447,16 +459,23 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const setShippingMode = useCartStore((state) => state.setShippingMode);
   const includeShippingFee = shippingMode === "ship";
   const setIncludeShippingFee = useCallback(
-    (include: boolean) => setShippingMode("checkout", include ? "ship" : "vault"),
+    (include: boolean) =>
+      setShippingMode("checkout", include ? "ship" : "vault"),
     [setShippingMode],
   );
-  const [shippingRegion, setShippingRegion] = useState<"regular" | "remote_area">("regular");
-  const [shippingAddresses, setShippingAddresses] = useState<ShippingAddress[]>([]);
+  const [shippingRegion, setShippingRegion] = useState<
+    "regular" | "remote_area"
+  >("regular");
+  const [shippingAddresses, setShippingAddresses] = useState<ShippingAddress[]>(
+    [],
+  );
   const [shippingAddressId, setShippingAddressId] = useState("");
   const [addressEditorOpen, setAddressEditorOpen] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [addressBusy, setAddressBusy] = useState(false);
-  const [pendingDeleteAddressId, setPendingDeleteAddressId] = useState<string | null>(null);
+  const [pendingDeleteAddressId, setPendingDeleteAddressId] = useState<
+    string | null
+  >(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [addressForm, setAddressForm] = useState({
     label: "집",
@@ -490,7 +509,14 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const openAddressCreate = () => {
     setEditingAddressId(null);
     setPendingDeleteAddressId(null);
-    setAddressForm({ label: "집", recipientName: "", phone: "", postalCode: "", address: "", isDefault: shippingAddresses.length === 0 });
+    setAddressForm({
+      label: "집",
+      recipientName: "",
+      phone: "",
+      postalCode: "",
+      address: "",
+      isDefault: shippingAddresses.length === 0,
+    });
     setAddressEditorOpen(true);
   };
 
@@ -510,20 +536,31 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
 
   const reloadCheckoutAddresses = async (preferredId?: string) => {
     const { data } = await getSupabaseBrowserClient().auth.getSession();
-    if (!data.session?.access_token) throw new Error("로그인 후 배송지를 관리할 수 있습니다.");
+    if (!data.session?.access_token)
+      throw new Error("로그인 후 배송지를 관리할 수 있습니다.");
     const response = await fetch("/api/account/addresses", {
       headers: { Authorization: `Bearer ${data.session.access_token}` },
       cache: "no-store",
     });
-    const payload = await response.json().catch(() => null) as { addresses?: ShippingAddress[]; error?: string } | null;
-    if (!response.ok) throw new Error(payload?.error ?? "배송지 목록을 불러오지 못했습니다.");
-    const addresses = Array.isArray(payload?.addresses) ? payload.addresses : [];
+    const payload = (await response.json().catch(() => null)) as {
+      addresses?: ShippingAddress[];
+      error?: string;
+    } | null;
+    if (!response.ok)
+      throw new Error(payload?.error ?? "배송지 목록을 불러오지 못했습니다.");
+    const addresses = Array.isArray(payload?.addresses)
+      ? payload.addresses
+      : [];
     setShippingAddresses(addresses);
-    setShippingAddressId((current) => preferredId && addresses.some((address) => address.id === preferredId)
-      ? preferredId
-      : addresses.some((address) => address.id === current)
-        ? current
-        : addresses.find((address) => address.is_default)?.id ?? addresses[0]?.id ?? "");
+    setShippingAddressId((current) =>
+      preferredId && addresses.some((address) => address.id === preferredId)
+        ? preferredId
+        : addresses.some((address) => address.id === current)
+          ? current
+          : (addresses.find((address) => address.is_default)?.id ??
+            addresses[0]?.id ??
+            ""),
+    );
   };
 
   const saveCheckoutAddress = async () => {
@@ -536,14 +573,25 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
     setAddressBusy(true);
     try {
       const { data } = await getSupabaseBrowserClient().auth.getSession();
-      if (!data.session?.access_token) throw new Error("로그인 후 배송지를 관리할 수 있습니다.");
+      if (!data.session?.access_token)
+        throw new Error("로그인 후 배송지를 관리할 수 있습니다.");
       const response = await fetch("/api/account/addresses", {
         method: editingAddressId ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` },
-        body: JSON.stringify({ id: editingAddressId ?? undefined, ...addressForm }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${data.session.access_token}`,
+        },
+        body: JSON.stringify({
+          id: editingAddressId ?? undefined,
+          ...addressForm,
+        }),
       });
-      const payload = await response.json().catch(() => null) as { address?: ShippingAddress; error?: string } | null;
-      if (!response.ok) throw new Error(payload?.error ?? "배송지를 저장하지 못했습니다.");
+      const payload = (await response.json().catch(() => null)) as {
+        address?: ShippingAddress;
+        error?: string;
+      } | null;
+      if (!response.ok)
+        throw new Error(payload?.error ?? "배송지를 저장하지 못했습니다.");
       invalidateCheckoutRequest();
       await reloadCheckoutAddresses(payload?.address?.id);
       setAddressEditorOpen(false);
@@ -551,7 +599,11 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
       setMessage("배송지를 저장하고 결제 배송지로 선택했습니다.");
     } catch (error) {
       setMessageKind("error");
-      setMessage(error instanceof Error ? error.message : "배송지를 저장하지 못했습니다.");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "배송지를 저장하지 못했습니다.",
+      );
     } finally {
       setAddressBusy(false);
     }
@@ -566,14 +618,21 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
     setAddressBusy(true);
     try {
       const { data } = await getSupabaseBrowserClient().auth.getSession();
-      if (!data.session?.access_token) throw new Error("로그인 후 배송지를 관리할 수 있습니다.");
+      if (!data.session?.access_token)
+        throw new Error("로그인 후 배송지를 관리할 수 있습니다.");
       const response = await fetch("/api/account/addresses", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${data.session.access_token}`,
+        },
         body: JSON.stringify({ id: address.id }),
       });
-      const payload = await response.json().catch(() => null) as { error?: string } | null;
-      if (!response.ok) throw new Error(payload?.error ?? "배송지를 삭제하지 못했습니다.");
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      if (!response.ok)
+        throw new Error(payload?.error ?? "배송지를 삭제하지 못했습니다.");
       if (shippingAddressId === address.id) invalidateCheckoutRequest();
       setPendingDeleteAddressId(null);
       await reloadCheckoutAddresses();
@@ -581,7 +640,11 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
       setMessage("배송지를 삭제했습니다.");
     } catch (error) {
       setMessageKind("error");
-      setMessage(error instanceof Error ? error.message : "배송지를 삭제하지 못했습니다.");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "배송지를 삭제하지 못했습니다.",
+      );
     } finally {
       setAddressBusy(false);
     }
@@ -607,7 +670,9 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
         cache: "no-store",
       });
       if (!response.ok) return [];
-      const payload = await response.json() as { products?: PublishedFixedProduct[] };
+      const payload = (await response.json()) as {
+        products?: PublishedFixedProduct[];
+      };
       const wanted = new Set(productIds);
       return (payload.products ?? [])
         .filter((product) => wanted.has(product.id))
@@ -641,7 +706,9 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
     };
 
     const loadSession = async (session: Session | null) => {
-      cartRefreshRef.current = () => { void loadSession(session); };
+      cartRefreshRef.current = () => {
+        void loadSession(session);
+      };
       const sequence = ++loadSequence;
       const nextUserId = session?.user.id ?? null;
       const identityChanged = authUserId.current !== nextUserId;
@@ -698,17 +765,35 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
 
         if (!isCurrent()) return;
         setAccess("member");
-        const addressResponse = await fetch("/api/account/addresses", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-        const addressPayload = addressResponse.ok ? await addressResponse.json() as { addresses?: ShippingAddress[] } : { addresses: [] };
-        if (isCurrent()) {
-          const addresses = Array.isArray(addressPayload.addresses) ? addressPayload.addresses : [];
-          setShippingAddresses(addresses);
-          setShippingAddressId((current) => addresses.some((address) => address.id === current) ? current : addresses.find((address) => address.is_default)?.id ?? addresses[0]?.id ?? "");
-        }
-        const response = await fetch(`/api/cart?shippingRegion=${shippingRegion}`, {
+        const addressResponse = await fetch("/api/account/addresses", {
           headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
         });
+        const addressPayload = addressResponse.ok
+          ? ((await addressResponse.json()) as {
+              addresses?: ShippingAddress[];
+            })
+          : { addresses: [] };
+        if (isCurrent()) {
+          const addresses = Array.isArray(addressPayload.addresses)
+            ? addressPayload.addresses
+            : [];
+          setShippingAddresses(addresses);
+          setShippingAddressId((current) =>
+            addresses.some((address) => address.id === current)
+              ? current
+              : (addresses.find((address) => address.is_default)?.id ??
+                addresses[0]?.id ??
+                ""),
+          );
+        }
+        const response = await fetch(
+          `/api/cart?shippingRegion=${shippingRegion}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          },
+        );
         if (!isCurrent()) return;
         if (!response.ok) {
           if (response.status === 401 || response.status === 403) {
@@ -753,9 +838,18 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           throw new Error("배송비 설정을 확인하지 못했습니다.");
         }
         setShippingAvailable(nextShippingAvailable);
-        if (!activeRequest) setShippingFee(cartProducts.length > 0 && nextShippingAvailable ? nextShippingFee : 0);
+        if (!activeRequest)
+          setShippingFee(
+            cartProducts.length > 0 && nextShippingAvailable
+              ? nextShippingFee
+              : 0,
+          );
         if (!activeRequest) {
-          setShippingCharges(nextShippingAvailable && Array.isArray(payload.shippingCharges) ? payload.shippingCharges : []);
+          setShippingCharges(
+            nextShippingAvailable && Array.isArray(payload.shippingCharges)
+              ? payload.shippingCharges
+              : [],
+          );
           if (!nextShippingAvailable) setIncludeShippingFee(false);
         }
         const ids =
@@ -772,10 +866,17 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
         const cachedIds = useCommerceStore.getState().cartIds;
         const cachedProducts = await loadCachedCartProducts(cachedIds);
         if (!isCurrent()) return;
-        setLiveProducts((current) => current.length > 0 ? current : cachedProducts);
+        setLiveProducts((current) =>
+          current.length > 0 ? current : cachedProducts,
+        );
         setMessageKind("warning");
-        setMessage("장바구니 결제 정보를 갱신하지 못했습니다. 상품 목록은 임시 저장된 정보로 표시합니다.");
-        console.error("[cart] server refresh failed; rendered cached products", loadError);
+        setMessage(
+          "장바구니 결제 정보를 갱신하지 못했습니다. 상품 목록은 임시 저장된 정보로 표시합니다.",
+        );
+        console.error(
+          "[cart] server refresh failed; rendered cached products",
+          loadError,
+        );
       } finally {
         if (!isCurrent()) return;
         setProductsLoading(false);
@@ -851,19 +952,26 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
     }
     const channel = client
       .channel("member-cart-product-events")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, (payload) => {
-        const record = payload.new && typeof payload.new === "object"
-          ? payload.new as Record<string, unknown>
-          : payload.old && typeof payload.old === "object"
-            ? payload.old as Record<string, unknown>
-            : null;
-        const productId = typeof record?.id === "string" ? record.id : null;
-        if (productId && cartIdsRef.current.includes(productId)) {
-          cartRefreshRef.current?.();
-        }
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        (payload) => {
+          const record =
+            payload.new && typeof payload.new === "object"
+              ? (payload.new as Record<string, unknown>)
+              : payload.old && typeof payload.old === "object"
+                ? (payload.old as Record<string, unknown>)
+                : null;
+          const productId = typeof record?.id === "string" ? record.id : null;
+          if (productId && cartIdsRef.current.includes(productId)) {
+            cartRefreshRef.current?.();
+          }
+        },
+      )
       .subscribe();
-    return () => { void client.removeChannel(channel); };
+    return () => {
+      void client.removeChannel(channel);
+    };
   }, [access]);
 
   const products = useMemo(() => {
@@ -879,12 +987,23 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
     const visibleProducts = visibleIds
       .map((productId) => productById.get(productId))
       .filter((product): product is CartProduct => Boolean(product));
-    if (heldCheckoutIds.length > 0 || !selectedProductId) return visibleProducts;
-    return visibleProducts.filter((product) => product.id === selectedProductId);
-  }, [cartIds, heldCheckoutIds, liveProducts, restoredCheckoutProducts, selectedProductId]);
-  const productTotal = products.reduce((sum, product) => sum + product.price, 0);
-  const expectedTotal =
-    productTotal + (includeShippingFee ? shippingFee : 0);
+    if (heldCheckoutIds.length > 0 || !selectedProductId)
+      return visibleProducts;
+    return visibleProducts.filter(
+      (product) => product.id === selectedProductId,
+    );
+  }, [
+    cartIds,
+    heldCheckoutIds,
+    liveProducts,
+    restoredCheckoutProducts,
+    selectedProductId,
+  ]);
+  const productTotal = products.reduce(
+    (sum, product) => sum + product.price,
+    0,
+  );
+  const expectedTotal = productTotal + (includeShippingFee ? shippingFee : 0);
   const hasPendingCheckout = heldCheckoutIds.length > 0;
   const checkout = async () => {
     if (
@@ -1105,15 +1224,21 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const checkoutButtonLabel = busy
     ? "결제 준비 중..."
     : paymentMode === "manual_transfer"
-        ? "주문하고 입금계좌 확인"
-        : "결제 설정 확인 중";
+      ? "주문하고 입금계좌 확인"
+      : "결제 설정 확인 중";
 
   return (
     <div className="space-y-10">
-      <div className={`flex items-start gap-3 border-b border-ink pb-6 ${surface === "desktop" ? "flex-row items-end justify-between" : "flex-col"}`}>
+      <div
+        className={`flex items-start gap-3 border-b border-ink pb-6 ${surface === "desktop" ? "flex-row items-end justify-between" : "flex-col"}`}
+      >
         <div>
-          <p className="eyebrow text-muted">{selectedProductId ? "즉시구매 / 단일 상품" : "장바구니 / 즉시구매"}</p>
-          <h1 className={`mt-3 font-black tracking-[-0.08em] ${surface === "desktop" ? "text-4xl" : "text-3xl"}`}>
+          <p className="eyebrow text-muted">
+            {selectedProductId ? "즉시구매 / 단일 상품" : "장바구니 / 즉시구매"}
+          </p>
+          <h1
+            className={`mt-3 font-black tracking-[-0.08em] ${surface === "desktop" ? "text-4xl" : "text-3xl"}`}
+          >
             {selectedProductId ? "바로 결제" : "장바구니"}
           </h1>
         </div>
@@ -1126,8 +1251,8 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           aria-live="polite"
           className="border border-amber-200 bg-amber-500/10 px-4 py-3 text-xs text-amber-900"
         >
-          판매가 완료·공개 종료되었거나 현재 계정으로 구매할 수 없는 상품 {staleCount}개를
-          장바구니에서 제외했습니다.
+          판매가 완료·공개 종료되었거나 현재 계정으로 구매할 수 없는 상품{" "}
+          {staleCount}개를 장바구니에서 제외했습니다.
         </div>
       )}
       {hasPendingCheckout && !busy && (
@@ -1157,7 +1282,10 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                 결제 요청 해제
               </button>
             )}
-            <Link className="font-bold underline" href={`${basePath}/account/orders`}>
+            <Link
+              className="font-bold underline"
+              href={`${basePath}/account/orders`}
+            >
               주문 상태 확인
             </Link>
           </div>
@@ -1176,7 +1304,10 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
         >
           {message}{" "}
           {messageKind === "success" && (
-            <Link className="ml-2 font-bold underline" href={`${basePath}/account/orders`}>
+            <Link
+              className="ml-2 font-bold underline"
+              href={`${basePath}/account/orders`}
+            >
               내 주문 확인
             </Link>
           )}
@@ -1210,10 +1341,13 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           </Link>
         </div>
       ) : (
-        <div className={`grid items-start gap-10 ${surface === "desktop" ? "grid-cols-[1fr_360px]" : "grid-cols-1"}`}>
+        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,7fr)_minmax(280px,5fr)] lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-10">
           <div className="divide-y divide-line border-y border-line">
             {products.map((product) => (
-              <div className={`flex py-5 ${surface === "desktop" ? "gap-5" : "gap-4"}`} key={product.id}>
+              <div
+                className={`flex py-5 ${surface === "desktop" ? "gap-5" : "gap-4"}`}
+                key={product.id}
+              >
                 <CatalogImage
                   alt={product.title}
                   className={`${surface === "desktop" ? "size-28" : "size-24"} shrink-0 object-cover`}
@@ -1263,7 +1397,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
               </div>
             ))}
           </div>
-          <aside className={`h-fit self-start border-t-2 border-ink bg-surface p-6 ${surface === "desktop" ? "sticky top-28" : ""}`}>
+          <aside className="h-fit self-start border-t-2 border-ink bg-surface p-5 md:sticky md:top-28 lg:p-6">
             <div className="flex justify-between text-xs">
               <span>상품 금액</span>
               <strong className="font-mono">
@@ -1272,11 +1406,64 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
             </div>
             <fieldset className="mt-5 grid gap-2">
               <legend className="mb-2 text-xs font-bold">상품 수령 방법</legend>
-              <label className={`cursor-pointer border p-4 text-xs ${!includeShippingFee ? "border-ink bg-paper shadow-sm" : "border-line"}`}>
-                <span className="flex items-start gap-3"><input checked={!includeShippingFee} disabled={busy || hasPendingCheckout} name="shipping-mode" onChange={() => { invalidateCheckoutRequest(); setIncludeShippingFee(false); }} type="radio" /><span><strong className="block">보관함 보관 후 묶음 배송</strong><small className="mt-1 block leading-5 text-muted">최대 14일 무료 보관 · 다른 상품과 묶어 배송비를 절약할 수 있습니다.</small></span></span>
+              <label
+                className={`cursor-pointer border p-4 text-xs ${!includeShippingFee ? "border-ink bg-paper shadow-sm" : "border-line"}`}
+              >
+                <span className="flex items-start gap-3">
+                  <input
+                    checked={!includeShippingFee}
+                    disabled={busy || hasPendingCheckout}
+                    name="shipping-mode"
+                    onChange={() => {
+                      invalidateCheckoutRequest();
+                      setIncludeShippingFee(false);
+                    }}
+                    type="radio"
+                  />
+                  <span>
+                    <strong className="block">보관함 보관 후 묶음 배송</strong>
+                    <small className="mt-1 block leading-5 text-muted">
+                      최대 14일 무료 보관 · 다른 상품과 묶어 배송비를 절약할 수
+                      있습니다.
+                    </small>
+                  </span>
+                </span>
               </label>
-              <label className={`cursor-pointer border p-4 text-xs ${includeShippingFee ? "border-ink bg-paper shadow-sm" : "border-line"}`}>
-                <span className="flex items-start gap-3"><input checked={includeShippingFee} disabled={busy || hasPendingCheckout || !shippingAvailable || shippingFee < 1} name="shipping-mode" onChange={() => { invalidateCheckoutRequest(); setIncludeShippingFee(true); }} type="radio" /><span className="flex-1"><strong className="flex justify-between gap-2"><span>즉시 발송 · 배송비 함께 결제</span><span className="font-mono">{shippingAvailable ? `${shippingFee.toLocaleString("ko-KR")}원` : "견적 확인 중"}</span></strong><small className="mt-1 block leading-5 text-muted">{shippingAvailable ? "결제 확인 후 선택한 배송지로 택배 접수합니다." : "보관함 보관은 계속 선택할 수 있습니다."}</small></span></span>
+              <label
+                className={`cursor-pointer border p-4 text-xs ${includeShippingFee ? "border-ink bg-paper shadow-sm" : "border-line"}`}
+              >
+                <span className="flex items-start gap-3">
+                  <input
+                    checked={includeShippingFee}
+                    disabled={
+                      busy ||
+                      hasPendingCheckout ||
+                      !shippingAvailable ||
+                      shippingFee < 1
+                    }
+                    name="shipping-mode"
+                    onChange={() => {
+                      invalidateCheckoutRequest();
+                      setIncludeShippingFee(true);
+                    }}
+                    type="radio"
+                  />
+                  <span className="flex-1">
+                    <strong className="flex justify-between gap-2">
+                      <span>즉시 발송 · 배송비 함께 결제</span>
+                      <span className="font-mono">
+                        {shippingAvailable
+                          ? `${shippingFee.toLocaleString("ko-KR")}원`
+                          : "견적 확인 중"}
+                      </span>
+                    </strong>
+                    <small className="mt-1 block leading-5 text-muted">
+                      {shippingAvailable
+                        ? "결제 확인 후 선택한 배송지로 택배 접수합니다."
+                        : "보관함 보관은 계속 선택할 수 있습니다."}
+                    </small>
+                  </span>
+                </span>
               </label>
             </fieldset>
             <label className="mt-3 block text-xs font-bold">
@@ -1286,7 +1473,11 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                 disabled={busy || hasPendingCheckout}
                 onChange={(event) => {
                   invalidateCheckoutRequest();
-                  setShippingRegion(event.target.value === "remote_area" ? "remote_area" : "regular");
+                  setShippingRegion(
+                    event.target.value === "remote_area"
+                      ? "remote_area"
+                      : "regular",
+                  );
                 }}
                 value={shippingRegion}
               >
@@ -1295,62 +1486,258 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
               </select>
             </label>
             <div className="mt-3 block text-xs font-bold">
-              배송지 선택 <span className="font-normal text-red-600">(필수)</span>
+              배송지 선택{" "}
+              <span className="font-normal text-red-600">(필수)</span>
               <div className="mt-2 space-y-2">
-                {shippingAddresses.length > 0 ? shippingAddresses.map((address) => (
-                  <div className={`flex items-start gap-3 border p-3 ${shippingAddressId === address.id ? "border-ink bg-surface" : "border-line bg-paper"}`} key={address.id}>
-                    <input
-                      aria-label={`${address.label} 배송지 선택`}
-                      checked={shippingAddressId === address.id}
-                      className="mt-1"
-                      disabled={busy || hasPendingCheckout || addressBusy}
-                      name="checkout-shipping-address"
-                      onChange={() => { invalidateCheckoutRequest(); setShippingAddressId(address.id); }}
-                      type="radio"
-                    />
-                    <button className="min-w-0 flex-1 text-left" disabled={busy || hasPendingCheckout || addressBusy} onClick={() => { invalidateCheckoutRequest(); setShippingAddressId(address.id); }} type="button">
-                      <span className="block text-xs font-black">{address.label} · {address.recipient_name}{address.is_default && <span className="ml-2 border border-line px-1.5 py-0.5 text-[9px]">기본</span>}</span>
-                      <span className="mt-1 block text-[11px] font-normal leading-5 text-muted">{address.phone} · {address.postal_code ? `[${address.postal_code}] ` : ""}{address.address}</span>
-                    </button>
-                    <div className="flex shrink-0 gap-1">
-                      <button className="border border-line px-2 py-2 text-[10px] font-bold" disabled={busy || hasPendingCheckout || addressBusy} onClick={() => openAddressEdit(address)} type="button">수정</button>
-                      <button className={`border px-2 py-2 text-[10px] font-bold ${pendingDeleteAddressId === address.id ? "border-rose-700 bg-rose-700 text-white" : "border-rose-300 text-rose-700"}`} disabled={busy || hasPendingCheckout || addressBusy} onClick={() => void deleteCheckoutAddress(address)} type="button">{pendingDeleteAddressId === address.id ? "삭제 확인" : "삭제"}</button>
+                {shippingAddresses.length > 0 ? (
+                  shippingAddresses.map((address) => (
+                    <div
+                      className={`flex items-start gap-3 border p-3 ${shippingAddressId === address.id ? "border-ink bg-surface" : "border-line bg-paper"}`}
+                      key={address.id}
+                    >
+                      <input
+                        aria-label={`${address.label} 배송지 선택`}
+                        checked={shippingAddressId === address.id}
+                        className="mt-1"
+                        disabled={busy || hasPendingCheckout || addressBusy}
+                        name="checkout-shipping-address"
+                        onChange={() => {
+                          invalidateCheckoutRequest();
+                          setShippingAddressId(address.id);
+                        }}
+                        type="radio"
+                      />
+                      <button
+                        className="min-w-0 flex-1 text-left"
+                        disabled={busy || hasPendingCheckout || addressBusy}
+                        onClick={() => {
+                          invalidateCheckoutRequest();
+                          setShippingAddressId(address.id);
+                        }}
+                        type="button"
+                      >
+                        <span className="block text-xs font-black">
+                          {address.label} · {address.recipient_name}
+                          {address.is_default && (
+                            <span className="ml-2 border border-line px-1.5 py-0.5 text-[9px]">
+                              기본
+                            </span>
+                          )}
+                        </span>
+                        <span className="mt-1 block text-[11px] font-normal leading-5 text-muted">
+                          {address.phone} ·{" "}
+                          {address.postal_code
+                            ? `[${address.postal_code}] `
+                            : ""}
+                          {address.address}
+                        </span>
+                      </button>
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          className="border border-line px-2 py-2 text-[10px] font-bold"
+                          disabled={busy || hasPendingCheckout || addressBusy}
+                          onClick={() => openAddressEdit(address)}
+                          type="button"
+                        >
+                          수정
+                        </button>
+                        <button
+                          className={`border px-2 py-2 text-[10px] font-bold ${pendingDeleteAddressId === address.id ? "border-rose-700 bg-rose-700 text-white" : "border-rose-300 text-rose-700"}`}
+                          disabled={busy || hasPendingCheckout || addressBusy}
+                          onClick={() => void deleteCheckoutAddress(address)}
+                          type="button"
+                        >
+                          {pendingDeleteAddressId === address.id
+                            ? "삭제 확인"
+                            : "삭제"}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )) : <span className="block border border-amber-200 bg-amber-500/10 px-3 py-3 text-[11px] font-normal leading-5 text-amber-900">저장된 배송지가 없습니다. 아래에서 바로 추가해 주세요.</span>}
-                {!hasPendingCheckout && <button className="min-h-11 w-full border border-ink px-3 py-2 text-xs font-bold" disabled={busy || addressBusy} onClick={openAddressCreate} type="button">{shippingAddresses.length > 0 ? "배송지 추가" : "배송지 추가하고 선택"}</button>}
+                  ))
+                ) : (
+                  <span className="block border border-amber-200 bg-amber-500/10 px-3 py-3 text-[11px] font-normal leading-5 text-amber-900">
+                    저장된 배송지가 없습니다. 아래에서 바로 추가해 주세요.
+                  </span>
+                )}
+                {!hasPendingCheckout && (
+                  <button
+                    className="min-h-11 w-full border border-ink px-3 py-2 text-xs font-bold"
+                    disabled={busy || addressBusy}
+                    onClick={openAddressCreate}
+                    type="button"
+                  >
+                    {shippingAddresses.length > 0
+                      ? "배송지 추가"
+                      : "배송지 추가하고 선택"}
+                  </button>
+                )}
               </div>
             </div>
-            {addressEditorOpen && <div className="mt-3 border border-ink bg-surface p-4">
-              <p className="text-xs font-black">{editingAddressId ? "배송지 수정" : "새 배송지 추가"}</p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <input aria-label="배송지 이름" className="border border-line bg-paper px-3 py-3 text-xs" disabled={addressBusy} onChange={(event) => setAddressForm({ ...addressForm, label: event.target.value })} placeholder="배송지 이름" value={addressForm.label} />
-                <input aria-label="수령인" className="border border-line bg-paper px-3 py-3 text-xs" disabled={addressBusy} onChange={(event) => setAddressForm({ ...addressForm, recipientName: event.target.value })} placeholder="수령인" value={addressForm.recipientName} />
-                <label className="grid gap-1 text-[10px] font-bold">연락처<input aria-label="연락처" className="border border-line bg-paper px-3 py-3 text-xs font-normal" disabled={addressBusy} inputMode="tel" onChange={(event) => setAddressForm({ ...addressForm, phone: formatPhoneNumber(event.target.value) })} placeholder="010-0000-0000" value={addressForm.phone} /><span className={/^010-\d{4}-\d{4}$/u.test(addressForm.phone) || !addressForm.phone ? "sr-only" : "text-red-600"}>010-0000-0000 형식으로 입력해 주세요.</span></label>
-                <div className="grid grid-cols-[1fr_auto] gap-2"><input aria-label="우편번호" className="min-w-0 border border-line bg-paper px-3 py-3 text-xs" disabled={addressBusy} inputMode="numeric" maxLength={5} onChange={(event) => setAddressForm({ ...addressForm, postalCode: event.target.value.replace(/\D/gu, "") })} placeholder="우편번호 5자리" value={addressForm.postalCode} /><PostcodeSearchButton disabled={addressBusy} onSelect={(result) => setAddressForm((current) => ({ ...current, ...result }))} /></div>
-                <input aria-label="주소" className="border border-line bg-paper px-3 py-3 text-xs sm:col-span-2" disabled={addressBusy} onChange={(event) => setAddressForm({ ...addressForm, address: event.target.value })} placeholder="주소" value={addressForm.address} />
-                <label className="flex items-center gap-2 text-xs sm:col-span-2"><input checked={addressForm.isDefault} disabled={addressBusy} onChange={(event) => setAddressForm({ ...addressForm, isDefault: event.target.checked })} type="checkbox" />기본 배송지로 저장</label>
+            {addressEditorOpen && (
+              <div className="mt-3 border border-ink bg-surface p-4">
+                <p className="text-xs font-black">
+                  {editingAddressId ? "배송지 수정" : "새 배송지 추가"}
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <input
+                    aria-label="배송지 이름"
+                    className="border border-line bg-paper px-3 py-3 text-xs"
+                    disabled={addressBusy}
+                    onChange={(event) =>
+                      setAddressForm({
+                        ...addressForm,
+                        label: event.target.value,
+                      })
+                    }
+                    placeholder="배송지 이름"
+                    value={addressForm.label}
+                  />
+                  <input
+                    aria-label="수령인"
+                    className="border border-line bg-paper px-3 py-3 text-xs"
+                    disabled={addressBusy}
+                    onChange={(event) =>
+                      setAddressForm({
+                        ...addressForm,
+                        recipientName: event.target.value,
+                      })
+                    }
+                    placeholder="수령인"
+                    value={addressForm.recipientName}
+                  />
+                  <label className="grid gap-1 text-[10px] font-bold">
+                    연락처
+                    <input
+                      aria-label="연락처"
+                      className="border border-line bg-paper px-3 py-3 text-xs font-normal"
+                      disabled={addressBusy}
+                      inputMode="tel"
+                      onChange={(event) =>
+                        setAddressForm({
+                          ...addressForm,
+                          phone: formatPhoneNumber(event.target.value),
+                        })
+                      }
+                      placeholder="010-0000-0000"
+                      value={addressForm.phone}
+                    />
+                    <span
+                      className={
+                        /^010-\d{4}-\d{4}$/u.test(addressForm.phone) ||
+                        !addressForm.phone
+                          ? "sr-only"
+                          : "text-red-600"
+                      }
+                    >
+                      010-0000-0000 형식으로 입력해 주세요.
+                    </span>
+                  </label>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <input
+                      aria-label="우편번호"
+                      className="min-w-0 border border-line bg-paper px-3 py-3 text-xs"
+                      disabled={addressBusy}
+                      inputMode="numeric"
+                      maxLength={5}
+                      onChange={(event) =>
+                        setAddressForm({
+                          ...addressForm,
+                          postalCode: event.target.value.replace(/\D/gu, ""),
+                        })
+                      }
+                      placeholder="우편번호 5자리"
+                      value={addressForm.postalCode}
+                    />
+                    <PostcodeSearchButton
+                      disabled={addressBusy}
+                      onSelect={(result) =>
+                        setAddressForm((current) => ({ ...current, ...result }))
+                      }
+                    />
+                  </div>
+                  <input
+                    aria-label="주소"
+                    className="border border-line bg-paper px-3 py-3 text-xs sm:col-span-2"
+                    disabled={addressBusy}
+                    onChange={(event) =>
+                      setAddressForm({
+                        ...addressForm,
+                        address: event.target.value,
+                      })
+                    }
+                    placeholder="주소"
+                    value={addressForm.address}
+                  />
+                  <label className="flex items-center gap-2 text-xs sm:col-span-2">
+                    <input
+                      checked={addressForm.isDefault}
+                      disabled={addressBusy}
+                      onChange={(event) =>
+                        setAddressForm({
+                          ...addressForm,
+                          isDefault: event.target.checked,
+                        })
+                      }
+                      type="checkbox"
+                    />
+                    기본 배송지로 저장
+                  </label>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    className="min-h-11 flex-1 border border-line px-3 py-2 text-xs font-bold"
+                    disabled={addressBusy}
+                    onClick={() => setAddressEditorOpen(false)}
+                    type="button"
+                  >
+                    취소
+                  </button>
+                  <button
+                    className="min-h-11 flex-1 bg-ink px-3 py-2 text-xs font-bold text-paper"
+                    disabled={addressBusy}
+                    onClick={() => void saveCheckoutAddress()}
+                    type="button"
+                  >
+                    {addressBusy
+                      ? "저장 중…"
+                      : editingAddressId
+                        ? "수정 저장"
+                        : "추가하고 선택"}
+                  </button>
+                </div>
               </div>
-              <div className="mt-3 flex gap-2">
-                <button className="min-h-11 flex-1 border border-line px-3 py-2 text-xs font-bold" disabled={addressBusy} onClick={() => setAddressEditorOpen(false)} type="button">취소</button>
-                <button className="min-h-11 flex-1 bg-ink px-3 py-2 text-xs font-bold text-paper" disabled={addressBusy} onClick={() => void saveCheckoutAddress()} type="button">{addressBusy ? "저장 중…" : editingAddressId ? "수정 저장" : "추가하고 선택"}</button>
-              </div>
-            </div>}
-            <p className="mt-3 border border-amber-200 bg-amber-500/10 px-3 py-3 text-[11px] leading-5 text-amber-900">즉시구매는 구매 시 선택한 배송지로 결제 확인 후 바로 배송 접수됩니다. 입금은 주문 후 최대 6시간 이내에 완료해야 하며, 미입금 취소가 반복되면 구매·입찰 이용이 제한될 수 있습니다.</p>
+            )}
+            <p className="mt-3 border border-amber-200 bg-amber-500/10 px-3 py-3 text-[11px] leading-5 text-amber-900">
+              즉시구매는 구매 시 선택한 배송지로 결제 확인 후 바로 배송
+              접수됩니다. 입금은 주문 후 최대 6시간 이내에 완료해야 하며, 미입금
+              취소가 반복되면 구매·입찰 이용이 제한될 수 있습니다.
+            </p>
             {shippingCharges.length > 0 ? (
               <div className="mt-3 space-y-2 border border-line bg-paper p-3 text-[11px]">
                 <p className="font-bold">배송비 {shippingCharges.length}건</p>
                 {shippingCharges.map((charge) => (
-                  <div className="border-t border-line pt-2 first:border-t-0 first:pt-0" key={charge.chargeKey}>
+                  <div
+                    className="border-t border-line pt-2 first:border-t-0 first:pt-0"
+                    key={charge.chargeKey}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <span>
                         <strong className="block">{charge.unitName}</strong>
-                        <span className="text-muted">{charge.storeNames.join(", ")} · 처리 {charge.billingStoreName}</span>
+                        <span className="text-muted">
+                          {charge.storeNames.join(", ")} · 처리{" "}
+                          {charge.billingStoreName}
+                        </span>
                       </span>
-                      <strong className="shrink-0 font-mono">{Number(charge.amount).toLocaleString("ko-KR")}원</strong>
+                      <strong className="shrink-0 font-mono">
+                        {Number(charge.amount).toLocaleString("ko-KR")}원
+                      </strong>
                     </div>
                     <p className="mt-1 text-muted">
-                      {charge.products.map((product) => product.title).join(" · ")} · 상품 {Number(charge.productSubtotal).toLocaleString("ko-KR")}원
+                      {charge.products
+                        .map((product) => product.title)
+                        .join(" · ")}{" "}
+                      · 상품{" "}
+                      {Number(charge.productSubtotal).toLocaleString("ko-KR")}원
                     </p>
                   </div>
                 ))}
@@ -1358,7 +1745,10 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
             ) : null}
             <div className="mt-6 flex justify-between border-t border-line pt-5">
               <span className="text-sm font-bold">예상 결제 금액</span>
-              <strong className="font-mono text-xl transition-all duration-200" aria-live="polite">
+              <strong
+                className="font-mono text-xl transition-all duration-200"
+                aria-live="polite"
+              >
                 {expectedTotal.toLocaleString("ko-KR")}원
               </strong>
             </div>
@@ -1374,11 +1764,39 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
                 결제 운영 모드를 확인하고 있습니다.
               </div>
             )}
-            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]" aria-label="결제 수단">
-              <span className="border border-ink bg-paper px-3 py-3 font-bold">계좌이체 <small className="block font-normal text-muted">현재 이용 가능</small></span>
-              {['토스페이먼츠', '카카오페이', '신용카드'].map((method) => <span aria-disabled="true" className="border border-line px-3 py-3 text-muted opacity-60" key={method}>{method}<small className="block">준비 중</small></span>)}
+            <div
+              className="mt-3 grid grid-cols-2 gap-2 text-[11px]"
+              aria-label="결제 수단"
+            >
+              <span className="border border-ink bg-paper px-3 py-3 font-bold">
+                계좌이체{" "}
+                <small className="block font-normal text-muted">
+                  현재 이용 가능
+                </small>
+              </span>
+              {["토스페이먼츠", "카카오페이", "신용카드"].map((method) => (
+                <span
+                  aria-disabled="true"
+                  className="border border-line px-3 py-3 text-muted opacity-60"
+                  key={method}
+                >
+                  {method}
+                  <small className="block">준비 중</small>
+                </span>
+              ))}
             </div>
-            <label className="mt-4 flex items-start gap-2 border border-line bg-paper p-3 text-[11px] leading-5"><input checked={termsAccepted} className="mt-1" onChange={(event) => setTermsAccepted(event.target.checked)} type="checkbox" /><span><strong className="block">필수 약관 전체 동의</strong>구매 조건, 결제 및 배송·보관 정책을 확인하고 동의합니다.</span></label>
+            <label className="mt-4 flex items-start gap-2 border border-line bg-paper p-3 text-[11px] leading-5">
+              <input
+                checked={termsAccepted}
+                className="mt-1"
+                onChange={(event) => setTermsAccepted(event.target.checked)}
+                type="checkbox"
+              />
+              <span>
+                <strong className="block">필수 약관 전체 동의</strong>구매 조건,
+                결제 및 배송·보관 정책을 확인하고 동의합니다.
+              </span>
+            </label>
             <button
               className="mt-4 h-13 w-full bg-ink text-xs font-bold text-paper disabled:opacity-50"
               disabled={checkoutDisabled}

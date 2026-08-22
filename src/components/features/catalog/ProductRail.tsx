@@ -9,7 +9,10 @@ import { ProductFeedTags } from "@/components/features/catalog/ProductFeedTags";
 import { AuctionEmptyState } from "@/components/features/auction/AuctionEmptyState";
 
 function toItem(product: PublishedProduct) {
-  const status = product.status === "pending" || product.status === "closed" ? product.status : "active";
+  const status =
+    product.status === "pending" || product.status === "closed"
+      ? product.status
+      : "active";
   const saleType = product.saleType === "fixed" ? "fixed" : "auction";
   return {
     id: product.id,
@@ -20,11 +23,18 @@ function toItem(product: PublishedProduct) {
     description: product.description,
     gender: product.gender,
     conditionGrade: product.conditionGrade,
-    imageUrl: getCatalogImageUrl(product.thumbnailUrls[0] ?? product.imageUrls[0] ?? ""),
-    thumbnailUrl: getCatalogImageUrl(product.thumbnailUrls[0] ?? product.imageUrls[0] ?? ""),
+    imageUrl: getCatalogImageUrl(
+      product.thumbnailUrls[0] ?? product.imageUrls[0] ?? "",
+    ),
+    thumbnailUrl: getCatalogImageUrl(
+      product.thumbnailUrls[0] ?? product.imageUrls[0] ?? "",
+    ),
     startingPrice: product.startingPrice,
     currentBid: product.currentPrice,
-    fixedPrice: saleType === "fixed" ? product.fixedPrice ?? product.currentPrice : null,
+    fixedPrice:
+      saleType === "fixed"
+        ? (product.fixedPrice ?? product.currentPrice)
+        : null,
     bidCount: product.participantCount,
     status,
     saleType,
@@ -35,9 +45,115 @@ function toItem(product: PublishedProduct) {
   } as const;
 }
 
-export function ProductRail({ basePath = "", products, title, eyebrow, href = "/feed", compact = false, surface = "desktop" }: { basePath?: "" | "/m"; products: PublishedProduct[]; title: string; eyebrow: string; href?: string; compact?: boolean; surface?: "desktop" | "mobile" }) {
+export function ProductRail({
+  basePath = "",
+  products,
+  title,
+  eyebrow,
+  href = "/feed",
+  compact = false,
+  surface = "desktop",
+}: {
+  basePath?: "" | "/m";
+  products: PublishedProduct[];
+  title: string;
+  eyebrow: string;
+  href?: string;
+  compact?: boolean;
+  surface?: "desktop" | "mobile";
+}) {
   const railClass = compact
-    ? surface === "desktop" ? "grid grid-cols-3 gap-2" : "grid grid-cols-1 gap-2"
-    : surface === "desktop" ? "grid grid-cols-5 gap-x-3 gap-y-9" : "grid grid-cols-2 gap-x-3 gap-y-9 min-[700px]:grid-cols-3";
-  return <section className={surface === "desktop" ? "mt-20" : "mt-12"}><SectionHeading action={<Link className="flex items-center gap-1 text-xs font-bold hover:underline" href={href} prefetch={false}>전체 보기 <ArrowUpRight size={14} /></Link>} className="mb-6" eyebrow={eyebrow} title={title} titleClassName="mt-2 text-2xl font-black tracking-[-0.06em]" />{compact ? <div className={railClass}>{products.map((product) => <Link className="flex min-w-0 items-center gap-3 border-b border-line py-3 transition-colors hover:bg-surface" href={`${basePath}/auction/${product.id}`} key={product.id} prefetch={false}><CatalogImage alt="" className="size-14 shrink-0 object-cover" loading="lazy" maxDimension={320} sizes="56px" src={product.thumbnailUrls[0] ?? product.imageUrls[0] ?? ""} /><div className="min-w-0 flex-1"><span className="block truncate text-xs font-bold">{product.title}</span><ProductFeedTags description={product.description} gender={product.gender} size={product.sizeLabel} /><span className="mt-1 block text-[10px] text-muted">{product.saleType === "fixed" ? "즉시 구매" : "경매"}</span></div><span className="shrink-0 text-right"><span className="block font-mono text-xs font-bold">{(product.saleType === "fixed" ? product.fixedPrice ?? product.currentPrice : product.currentPrice).toLocaleString("ko-KR")}원</span><span className="mt-1 block text-[10px] text-muted">{product.saleType === "fixed" ? "즉시 구매" : "진행 중"}</span></span></Link>)}</div> : <div className={railClass}>{products.map((product) => <AuctionCard basePath={basePath} item={toItem(product)} key={product.id} surface={surface} />)}</div>}{products.length === 0 && (eyebrow.includes("경매") ? <AuctionEmptyState basePath={basePath} /> : <div className="rounded-3xl border border-dashed border-line bg-surface/50 px-6 py-16 text-center"><p className="text-sm font-bold">새로운 상품을 준비하고 있습니다.</p><p className="mt-2 text-xs text-muted">조금 뒤 다시 확인하거나 센터몰의 다른 상품을 둘러보세요.</p></div>)}</section>;
+    ? surface === "desktop"
+      ? "grid grid-cols-3 gap-2"
+      : "grid grid-cols-1 gap-2"
+    : "grid grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3 md:gap-x-4 lg:grid-cols-4 lg:gap-x-5 xl:grid-cols-5";
+  return (
+    <section className={surface === "desktop" ? "mt-20" : "mt-12"}>
+      <SectionHeading
+        action={
+          <Link
+            className="flex items-center gap-1 text-xs font-bold hover:underline"
+            href={href}
+            prefetch={false}
+          >
+            전체 보기 <ArrowUpRight size={14} />
+          </Link>
+        }
+        className="mb-6"
+        eyebrow={eyebrow}
+        title={title}
+        titleClassName="mt-2 text-2xl font-black tracking-[-0.06em]"
+      />
+      {compact ? (
+        <div className={railClass}>
+          {products.map((product) => (
+            <Link
+              className="flex min-w-0 items-center gap-3 border-b border-line py-3 transition-colors hover:bg-surface"
+              href={`${basePath}/auction/${product.id}`}
+              key={product.id}
+              prefetch={false}
+            >
+              <CatalogImage
+                alt=""
+                className="size-14 shrink-0 object-cover"
+                loading="lazy"
+                maxDimension={320}
+                sizes="56px"
+                src={product.thumbnailUrls[0] ?? product.imageUrls[0] ?? ""}
+              />
+              <div className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-bold">
+                  {product.title}
+                </span>
+                <ProductFeedTags
+                  description={product.description}
+                  gender={product.gender}
+                  size={product.sizeLabel}
+                />
+                <span className="mt-1 block text-[10px] text-muted">
+                  {product.saleType === "fixed" ? "즉시 구매" : "경매"}
+                </span>
+              </div>
+              <span className="shrink-0 text-right">
+                <span className="block font-mono text-xs font-bold">
+                  {(product.saleType === "fixed"
+                    ? (product.fixedPrice ?? product.currentPrice)
+                    : product.currentPrice
+                  ).toLocaleString("ko-KR")}
+                  원
+                </span>
+                <span className="mt-1 block text-[10px] text-muted">
+                  {product.saleType === "fixed" ? "즉시 구매" : "진행 중"}
+                </span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className={railClass}>
+          {products.map((product) => (
+            <AuctionCard
+              basePath={basePath}
+              item={toItem(product)}
+              key={product.id}
+              surface={surface}
+            />
+          ))}
+        </div>
+      )}
+      {products.length === 0 &&
+        (eyebrow.includes("경매") ? (
+          <AuctionEmptyState basePath={basePath} />
+        ) : (
+          <div className="rounded-3xl border border-dashed border-line bg-surface/50 px-6 py-16 text-center">
+            <p className="text-sm font-bold">
+              새로운 상품을 준비하고 있습니다.
+            </p>
+            <p className="mt-2 text-xs text-muted">
+              조금 뒤 다시 확인하거나 센터몰의 다른 상품을 둘러보세요.
+            </p>
+          </div>
+        ))}
+    </section>
+  );
 }

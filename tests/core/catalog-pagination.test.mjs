@@ -67,7 +67,7 @@ test("public product API and feed retain bounded, stable, abortable full-catalog
   assert.doesNotMatch(route, /searchParams\.get\("sort"\)/);
   assert.doesNotMatch(grid, /sort:/);
   assert.match(grid, /mergeCatalogProductBatch\(products, batch\)/);
-  assert.match(grid, /const visibleCards = useMemo\(\(\) => cards\.filter/);
+  assert.match(grid, /const visibleCards = useMemo\([\s\S]*?\(\) =>[\s\S]*?cards[\s\S]*?\.filter/);
   assert.doesNotMatch(grid, /sortCatalogProducts\(products, sort\)/);
   assert.match(grid, /pagination\.offset !== offset/);
   assert.match(grid, /computedNextOffset === null/);

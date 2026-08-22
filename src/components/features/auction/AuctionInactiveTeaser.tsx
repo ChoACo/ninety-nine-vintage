@@ -41,10 +41,13 @@ export function AuctionInactiveTeaser({
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/products?limit=${TEASER_PRODUCT_LIMIT}&saleType=auction&view=sold`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
+    fetch(
+      `/api/products?limit=${TEASER_PRODUCT_LIMIT}&saleType=auction&view=sold`,
+      {
+        cache: "no-store",
+        signal: controller.signal,
+      },
+    )
       .then((response) => {
         if (!response.ok) {
           throw new Error("판매 완료 상품을 불러오지 못했습니다.");
@@ -53,15 +56,23 @@ export function AuctionInactiveTeaser({
       })
       .then((payload) => {
         const batch = Array.isArray(payload.products) ? payload.products : [];
-        setProducts(batch.slice(0, TEASER_PRODUCT_LIMIT).map((product) => ({
-          ...product,
-          imageUrl: product.imageUrl
-            ?? product.imageUrls?.[0]
-            ?? product.thumbnailUrls?.[0]
-            ?? "",
-          soldAt: product.soldAt ?? product.closesAt ?? "",
-          soldPrice: product.soldPrice ?? product.finalBidAmount ?? product.fixedPrice ?? product.currentPrice ?? 0,
-        })));
+        setProducts(
+          batch.slice(0, TEASER_PRODUCT_LIMIT).map((product) => ({
+            ...product,
+            imageUrl:
+              product.imageUrl ??
+              product.imageUrls?.[0] ??
+              product.thumbnailUrls?.[0] ??
+              "",
+            soldAt: product.soldAt ?? product.closesAt ?? "",
+            soldPrice:
+              product.soldPrice ??
+              product.finalBidAmount ??
+              product.fixedPrice ??
+              product.currentPrice ??
+              0,
+          })),
+        );
       })
       .catch(() => setProducts([]));
     return () => controller.abort();
@@ -73,7 +84,10 @@ export function AuctionInactiveTeaser({
       : "현재 진행 중인 경매가 없습니다. 다음 경매는 매일 오전 10시에 시작됩니다.";
 
   return (
-    <section aria-labelledby="auction-inactive-heading" className="border-t border-line pt-8">
+    <section
+      aria-labelledby="auction-inactive-heading"
+      className="border-t border-line pt-8"
+    >
       <div className="mb-8 border border-dashed border-line bg-surface px-6 py-8 text-center">
         <p id="auction-inactive-heading" className="text-sm font-bold">
           경매 비활성 시간대
@@ -107,13 +121,19 @@ export function AuctionInactiveTeaser({
       </div>
 
       {products === null ? (
-        <div className={`grid grid-cols-2 gap-y-9 ${surface === "desktop" ? "grid-cols-4 gap-x-5" : "gap-x-3 min-[700px]:grid-cols-3"}`}>
-          {Array.from({ length: Math.min(8, TEASER_PRODUCT_LIMIT) }).map((_, index) => (
-            <div aria-hidden="true" className="aspect-[4/5] animate-pulse bg-surface" key={index} />
-          ))}
+        <div className="grid grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3 md:gap-x-4 lg:grid-cols-4 lg:gap-x-5">
+          {Array.from({ length: Math.min(8, TEASER_PRODUCT_LIMIT) }).map(
+            (_, index) => (
+              <div
+                aria-hidden="true"
+                className="aspect-[4/5] animate-pulse bg-surface"
+                key={index}
+              />
+            ),
+          )}
         </div>
       ) : products.length > 0 ? (
-        <div className={`grid grid-cols-2 gap-y-9 ${surface === "desktop" ? "grid-cols-4 gap-x-5" : "gap-x-3 min-[700px]:grid-cols-3"}`}>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3 md:gap-x-4 lg:grid-cols-4 lg:gap-x-5">
           {products.map((product) => (
             <div key={product.id}>
               <SoldFeedCard

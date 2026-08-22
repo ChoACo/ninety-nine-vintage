@@ -13,7 +13,11 @@ import {
 } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { OnboardingChatPanel } from "@/components/features/chat/OnboardingChatPanel";
-import { ImageAttachmentPicker, uploadSupportImages, type PendingSupportImage } from "@/components/features/chat/ImageAttachmentPicker";
+import {
+  ImageAttachmentPicker,
+  uploadSupportImages,
+  type PendingSupportImage,
+} from "@/components/features/chat/ImageAttachmentPicker";
 
 interface ChatStore {
   id: string;
@@ -68,14 +72,19 @@ export function ChatPanel({
   const [stores, setStores] = useState<ChatStore[]>([]);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
-  const [conversation, setConversation] = useState<ChatConversation | null>(null);
+  const [conversation, setConversation] = useState<ChatConversation | null>(
+    null,
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [message, setMessage] = useState("");
   const [token, setToken] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  const [retryMessage, setRetryMessage] = useState<{ body: string; clientNonce: string } | null>(null);
+  const [retryMessage, setRetryMessage] = useState<{
+    body: string;
+    clientNonce: string;
+  } | null>(null);
   const [pendingImages, setPendingImages] = useState<PendingSupportImage[]>([]);
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
 
@@ -97,14 +106,20 @@ export function ChatPanel({
   const loadMessages = useCallback(
     async (conversationId: string, accessToken: string) => {
       const [response, attachmentResponse] = await Promise.all([
-        fetch(`/api/chat?conversationId=${encodeURIComponent(conversationId)}`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-          cache: "no-store",
-        }),
-        fetch(`/api/chat/attachments?conversationId=${encodeURIComponent(conversationId)}`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-          cache: "no-store",
-        }),
+        fetch(
+          `/api/chat?conversationId=${encodeURIComponent(conversationId)}`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            cache: "no-store",
+          },
+        ),
+        fetch(
+          `/api/chat/attachments?conversationId=${encodeURIComponent(conversationId)}`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            cache: "no-store",
+          },
+        ),
       ]);
       const payload = (await response.json().catch(() => null)) as {
         conversation?: ChatConversation;
@@ -117,7 +132,9 @@ export function ChatPanel({
       setSelectedStoreId(payload.conversation.store_id);
       setMessages(payload.messages ?? []);
       if (attachmentResponse.ok) {
-        const attachmentPayload = await attachmentResponse.json() as { attachments?: ChatAttachment[] };
+        const attachmentPayload = (await attachmentResponse.json()) as {
+          attachments?: ChatAttachment[];
+        };
         setAttachments(attachmentPayload.attachments ?? []);
       } else {
         setAttachments([]);
@@ -143,7 +160,9 @@ export function ChatPanel({
       conversations?: ChatConversation[];
     } | null;
     if (!response.ok || !payload) {
-      throw new Error(messageError(payload, "매장 상담 목록을 불러오지 못했습니다."));
+      throw new Error(
+        messageError(payload, "매장 상담 목록을 불러오지 못했습니다."),
+      );
     }
 
     const nextStores = payload.stores ?? [];
@@ -157,18 +176,35 @@ export function ChatPanel({
     const requestedStoreContext = params.get("storeContext");
     const requestedProductId = params.get("productId");
     const requestedDraft = params.get("draft");
-    if (requestedDraft && requestedDraft.length <= 500) setMessage(requestedDraft);
+    if (requestedDraft && requestedDraft.length <= 500)
+      setMessage(requestedDraft);
     if (requestedConversationId) {
       await loadMessages(requestedConversationId, session.access_token);
       return;
     }
 
-    let contextualStoreId = requestedStoreId ?? nextStores.find((store) => store.id === requestedStoreContext || store.slug === requestedStoreContext)?.id ?? null;
+    let contextualStoreId =
+      requestedStoreId ??
+      nextStores.find(
+        (store) =>
+          store.id === requestedStoreContext ||
+          store.slug === requestedStoreContext,
+      )?.id ??
+      null;
     if (!contextualStoreId && requestedProductId) {
-      const productResponse = await fetch(`/api/products/${encodeURIComponent(requestedProductId)}`, { cache: "no-store" });
+      const productResponse = await fetch(
+        `/api/products/${encodeURIComponent(requestedProductId)}`,
+        { cache: "no-store" },
+      );
       if (productResponse.ok) {
-        const productPayload = await productResponse.json() as { product?: { storeId?: string | null } };
-        contextualStoreId = nextStores.some((store) => store.id === productPayload.product?.storeId) ? productPayload.product?.storeId ?? null : null;
+        const productPayload = (await productResponse.json()) as {
+          product?: { storeId?: string | null };
+        };
+        contextualStoreId = nextStores.some(
+          (store) => store.id === productPayload.product?.storeId,
+        )
+          ? (productPayload.product?.storeId ?? null)
+          : null;
       }
     }
     const nextStoreId =
@@ -191,7 +227,9 @@ export function ChatPanel({
     const timer = window.setTimeout(() => {
       void loadIndex().catch((error: unknown) =>
         setNotice(
-          error instanceof Error ? error.message : "상담을 불러오지 못했습니다.",
+          error instanceof Error
+            ? error.message
+            : "상담을 불러오지 못했습니다.",
         ),
       );
     }, 0);
@@ -215,9 +253,10 @@ export function ChatPanel({
     [selectedStoreId, stores],
   );
   const conversationStores = useMemo(
-    () => stores.filter((store) =>
-      conversations.some((item) => item.store_id === store.id)
-    ),
+    () =>
+      stores.filter((store) =>
+        conversations.some((item) => item.store_id === store.id),
+      ),
     [conversations, stores],
   );
 
@@ -234,7 +273,9 @@ export function ChatPanel({
         await loadMessages(nextConversation.id, token);
       } catch (error) {
         setNotice(
-          error instanceof Error ? error.message : "상담을 불러오지 못했습니다.",
+          error instanceof Error
+            ? error.message
+            : "상담을 불러오지 못했습니다.",
         );
       }
     } else {
@@ -242,7 +283,10 @@ export function ChatPanel({
     }
   };
 
-  const send = async (event?: FormEvent<HTMLFormElement>, retry: { body: string; clientNonce: string } | null = null) => {
+  const send = async (
+    event?: FormEvent<HTMLFormElement>,
+    retry: { body: string; clientNonce: string } | null = null,
+  ) => {
     event?.preventDefault();
     const outgoing = retry?.body ?? message.trim();
     if (!outgoing || !token || !selectedStoreId || busy) return;
@@ -273,7 +317,12 @@ export function ChatPanel({
       }
       setMessages((current) => [...current, payload.message as ChatMessage]);
       if (pendingImages.length > 0) {
-        await uploadSupportImages({ token, conversationId, messageId: payload.message.id, images: pendingImages });
+        await uploadSupportImages({
+          token,
+          conversationId,
+          messageId: payload.message.id,
+          images: pendingImages,
+        });
         pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
         setPendingImages([]);
       }
@@ -309,20 +358,8 @@ export function ChatPanel({
   };
 
   return (
-    <div
-      className={`grid border border-line ${
-        surface === "desktop"
-          ? "min-h-[620px] grid-cols-[280px_1fr]"
-          : "min-h-[70svh] grid-cols-1"
-      }`}
-    >
-      <aside
-        className={`bg-surface ${
-          surface === "desktop"
-            ? "border-r border-line p-5"
-            : "border-b border-line p-4"
-        }`}
-      >
+    <div className="grid min-h-[70svh] grid-cols-1 border border-line md:min-h-[620px] md:grid-cols-[minmax(220px,1fr)_minmax(0,2fr)]">
+      <aside className="border-b border-line bg-surface p-4 md:border-b-0 md:border-r md:p-5">
         <p className="eyebrow text-muted">매장별 상담</p>
         <p className="mt-3 text-xs leading-5 text-muted">
           문의할 매장을 선택하면 해당 매장 운영자와 연결됩니다.
@@ -362,7 +399,8 @@ export function ChatPanel({
                   </span>
                   {responseStatus(thread ?? null) && (
                     <span className="mt-1 block text-[9px] font-bold opacity-70">
-                      {responseStatus(thread ?? null)} · {peerReadStatus(thread ?? null) ?? "내가 읽음"}
+                      {responseStatus(thread ?? null)} ·{" "}
+                      {peerReadStatus(thread ?? null) ?? "내가 읽음"}
                     </span>
                   )}
                 </span>
@@ -377,7 +415,9 @@ export function ChatPanel({
             </p>
           )}
         </div>
-        <div className="mt-4"><OnboardingChatPanel /></div>
+        <div className="mt-4">
+          <OnboardingChatPanel />
+        </div>
       </aside>
 
       <section className="flex min-w-0 flex-col">
@@ -395,7 +435,8 @@ export function ChatPanel({
           </p>
           {responseStatus(conversation) && (
             <p className="mt-2 text-[10px] font-bold text-muted">
-              {selectedStore?.name} · {responseStatus(conversation)} · {peerReadStatus(conversation) ?? "내가 읽음"}
+              {selectedStore?.name} · {responseStatus(conversation)} ·{" "}
+              {peerReadStatus(conversation) ?? "내가 읽음"}
             </p>
           )}
         </div>
@@ -460,14 +501,53 @@ export function ChatPanel({
                 </Link>
               )}
               <p className="whitespace-pre-wrap break-words">{item.body}</p>
-              {attachments.some((attachment) => attachment.messageId === item.id) && <div className="mt-3 flex flex-wrap gap-2">{attachments.filter((attachment) => attachment.messageId === item.id).map((attachment, index) => <a href={attachment.signedUrl} key={attachment.id} rel="noreferrer" target="_blank"><Image alt={`상담 첨부 이미지 ${index + 1}`} className="size-28 rounded-lg object-cover" height={112} src={attachment.signedUrl} unoptimized width={112} /></a>)}</div>}
+              {attachments.some(
+                (attachment) => attachment.messageId === item.id,
+              ) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {attachments
+                    .filter((attachment) => attachment.messageId === item.id)
+                    .map((attachment, index) => (
+                      <a
+                        href={attachment.signedUrl}
+                        key={attachment.id}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        <Image
+                          alt={`상담 첨부 이미지 ${index + 1}`}
+                          className="size-28 rounded-lg object-cover"
+                          height={112}
+                          src={attachment.signedUrl}
+                          unoptimized
+                          width={112}
+                        />
+                      </a>
+                    ))}
+                </div>
+              )}
               <time className="mt-2 block text-[10px] opacity-60">
                 {new Date(item.created_at).toLocaleString("ko-KR")}
               </time>
             </article>
           ))}
           {notice && (
-            <div className="flex items-center justify-between gap-3 text-xs font-bold text-red-700" role="alert"><span>{notice}</span>{retryMessage && <button className="shrink-0 underline" disabled={busy} onClick={() => void send(undefined, retryMessage)} type="button">같은 내용 재전송</button>}</div>
+            <div
+              className="flex items-center justify-between gap-3 text-xs font-bold text-red-700"
+              role="alert"
+            >
+              <span>{notice}</span>
+              {retryMessage && (
+                <button
+                  className="shrink-0 underline"
+                  disabled={busy}
+                  onClick={() => void send(undefined, retryMessage)}
+                  type="button"
+                >
+                  같은 내용 재전송
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -475,44 +555,51 @@ export function ChatPanel({
           className={`border-t border-line ${surface === "desktop" ? "p-5" : "p-3"}`}
           onSubmit={send}
         >
-          <ImageAttachmentPicker disabled={!token || !selectedStoreId || busy} images={pendingImages} maxCount={1} onChange={setPendingImages} onError={setNotice} />
-          <div className={`mt-3 flex ${surface === "desktop" ? "gap-3" : "gap-2"}`}><textarea
-            aria-label="문의 메시지"
-            className={`max-h-36 min-h-11 min-w-0 flex-1 resize-none border border-line bg-paper py-3 text-xs outline-none focus:border-ink disabled:bg-surface ${
-              surface === "desktop" ? "px-4" : "px-3"
-            }`}
+          <ImageAttachmentPicker
             disabled={!token || !selectedStoreId || busy}
-            maxLength={2_000}
-            onChange={(event) => {
-              setMessage(event.target.value);
-              event.currentTarget.style.height = "auto";
-              event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 144)}px`;
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }
-            }}
-            placeholder={
-              token
-                ? selectedStoreId
-                  ? "메시지를 입력하세요"
-                  : "먼저 매장을 선택하세요"
-                : "로그인 후 이용할 수 있습니다"
-            }
-            value={message}
+            images={pendingImages}
+            maxCount={1}
+            onChange={setPendingImages}
+            onError={setNotice}
           />
-          <button
-            aria-label="메시지 보내기"
-            className="grid size-11 shrink-0 place-items-center bg-ink text-paper disabled:opacity-40"
-            disabled={
-              !token || !selectedStoreId || busy || !message.trim()
-            }
-            type="submit"
+          <div
+            className={`mt-3 flex ${surface === "desktop" ? "gap-3" : "gap-2"}`}
           >
-            <Send size={15} />
-          </button>
+            <textarea
+              aria-label="문의 메시지"
+              className={`max-h-36 min-h-11 min-w-0 flex-1 resize-none border border-line bg-paper py-3 text-xs outline-none focus:border-ink disabled:bg-surface ${
+                surface === "desktop" ? "px-4" : "px-3"
+              }`}
+              disabled={!token || !selectedStoreId || busy}
+              maxLength={2_000}
+              onChange={(event) => {
+                setMessage(event.target.value);
+                event.currentTarget.style.height = "auto";
+                event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 144)}px`;
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+              placeholder={
+                token
+                  ? selectedStoreId
+                    ? "메시지를 입력하세요"
+                    : "먼저 매장을 선택하세요"
+                  : "로그인 후 이용할 수 있습니다"
+              }
+              value={message}
+            />
+            <button
+              aria-label="메시지 보내기"
+              className="grid size-11 shrink-0 place-items-center bg-ink text-paper disabled:opacity-40"
+              disabled={!token || !selectedStoreId || busy || !message.trim()}
+              type="submit"
+            >
+              <Send size={15} />
+            </button>
           </div>
         </form>
       </section>

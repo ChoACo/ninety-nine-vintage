@@ -151,7 +151,8 @@ test("premium detail actions use confirmation dialogs only for consequential mut
   assert.match(quickCartAction, /장바구니 바로가기/);
   assert.doesNotMatch(sticky, /<QuickCartModal/);
   assert.doesNotMatch(quickCartAction, /router\.push\("\/cart"\)/);
-  assert.match(sticky, /surface === "desktop"[\s\S]*sticky col-span-5 p-6 pb-6[\s\S]*: "p-5 pb-32"/);
+  assert.match(sticky, /md:sticky md:col-span-5/);
+  assert.match(sticky, /p-5 pb-32 md:pb-6/);
   assert.match(scrollLock, /activeBodyScrollLocks \+= 1/);
   assert.match(scrollLock, /activeBodyScrollLocks === 0/);
 });

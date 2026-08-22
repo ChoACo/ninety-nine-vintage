@@ -142,7 +142,7 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   assert.match(dashboard, /"전체보기"/);
   assert.match(dashboard, /배송 가능 상품 전체 선택/);
   assert.match(dashboard, /v2Storage\.slice\(0, 6\)/);
-  assert.match(dashboard, /surface === "desktop" \? "grid-cols-6" : "grid-cols-2"/);
+  assert.match(dashboard, /grid-cols-2 gap-2 p-1 md:grid-cols-3 xl:grid-cols-6/);
   assert.match(dashboard, /visibleRequestEligibleItems\.length/);
   assert.match(dashboard, /aria-label=\{`\$\{item\.title\} 배송 선택`\}/);
   assert.match(dashboard, /우편번호 5자리/);
@@ -156,10 +156,10 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   assert.match(cart, /deleteCheckoutAddress/);
   assert.match(cart, /name="checkout-shipping-address"/);
   assert.match(cart, /배송지 선택/);
-  assert.match(dashboard, /col-start-2 row-start-1[\s\S]*id="storage"/);
+  assert.match(dashboard, /md:col-start-2 md:row-start-1[\s\S]*id="storage"/);
   assert.match(
     dashboard,
-    /col-start-1 row-start-1[\s\S]*id="shipping-request"/,
+    /md:col-start-1 md:row-start-1[\s\S]*id="shipping-request"/,
   );
   assert.doesNotMatch(dashboard, /id="shipping-credit"/);
   assert.match(dashboard, /<details[^>]*id="refunds"/);

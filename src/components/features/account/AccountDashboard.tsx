@@ -1241,13 +1241,13 @@ function AccountDashboardForSession({
       </section>
       <div
         hidden={!showStorage && !showShippingRequest}
-        className={`grid gap-10 ${surface === "desktop" && showStorage && showShippingRequest ? "grid-cols-[1.4fr_.8fr]" : "grid-cols-1"}`}
+        className={`grid gap-6 lg:gap-10 ${showStorage && showShippingRequest ? "md:grid-cols-[minmax(0,8fr)_minmax(280px,4fr)]" : "grid-cols-1"}`}
       >
         <section className="contents">
           <div
             className={
-              surface === "desktop" && showShippingRequest
-                ? "col-start-2 row-start-1"
+              showShippingRequest
+                ? "md:col-start-2 md:row-start-1 md:sticky md:top-28 md:self-start"
                 : ""
             }
             hidden={!showStorage}
@@ -1354,9 +1354,7 @@ function AccountDashboardForSession({
                       {visibleRequestEligibleItems.length}개
                     </label>
                   )}
-                  <div
-                    className={`grid gap-2 p-1 ${surface === "desktop" ? "grid-cols-6" : "grid-cols-2"}`}
-                  >
+                  <div className="grid grid-cols-2 gap-2 p-1 md:grid-cols-3 xl:grid-cols-6">
                     {visibleV2Storage.map((item) => {
                       const startedAt = item.storageStartedAt
                         ? Date.parse(item.storageStartedAt)
@@ -1425,8 +1423,12 @@ function AccountDashboardForSession({
                             sizes={surface === "desktop" ? "16vw" : "50vw"}
                             src={item.imageUrl}
                           />
-                          <div className={surface === "desktop" ? "p-2" : "p-3"}>
-                            <p className={`line-clamp-2 font-bold ${surface === "desktop" ? "min-h-8 text-xs" : "min-h-10 text-sm"}`}>
+                          <div
+                            className={surface === "desktop" ? "p-2" : "p-3"}
+                          >
+                            <p
+                              className={`line-clamp-2 font-bold ${surface === "desktop" ? "min-h-8 text-xs" : "min-h-10 text-sm"}`}
+                            >
                               {item.title}
                             </p>
                             <p className="mt-2 text-[11px] text-muted">
@@ -1625,11 +1627,7 @@ function AccountDashboardForSession({
             </div>
           </div>
           <div
-            className={
-              surface === "desktop" && showStorage
-                ? "col-start-1 row-start-1"
-                : ""
-            }
+            className={showStorage ? "md:col-start-1 md:row-start-1" : ""}
             hidden={!showShippingRequest}
             id="shipping-request"
           >
@@ -2102,9 +2100,7 @@ function AccountDashboardForSession({
                     : "찜한 상품이 없습니다."}
           </div>
         ) : (
-          <div
-            className={`grid grid-cols-2 gap-3 ${surface === "desktop" ? "grid-cols-4" : "min-[700px]:grid-cols-3"}`}
-          >
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
             {liked.map((product) => (
               <Link href={`${basePath}/auction/${product.id}`} key={product.id}>
                 <CatalogImage

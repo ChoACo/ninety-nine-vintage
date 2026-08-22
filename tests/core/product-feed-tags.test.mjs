@@ -59,7 +59,7 @@ test("active fixed and auction feed cards render the shared compact tag row", as
   }
   assert.match(feed, /gender: product\.gender/);
   assert.match(rail, /gender: product\.gender/);
-  assert.match(rail, /description=\{product\.description\} gender=\{product\.gender\} size=\{product\.sizeLabel\}/);
+  assert.match(rail, /description=\{product\.description\}[\s\S]*?gender=\{product\.gender\}[\s\S]*?size=\{product\.sizeLabel\}/);
   assert.match(tags, /aria-label="상품 요약 태그"/);
   assert.match(tags, /text-\[9px\]/);
 });

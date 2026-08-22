@@ -35,11 +35,11 @@ test("the storefront renders separate mobile and fluid desktop presentation tree
   assert.match(header, /max-w-\[1440px\]/);
   assert.match(header, /form className="flex h-10 w-40/);
   assert.match(header, /(?:sm|md|lg|xl):/);
-  assert.match(productRail, /surface === "desktop" \? "grid grid-cols-3 gap-2"/);
-  assert.match(productRail, /surface === "desktop" \? "grid grid-cols-5 gap-x-3 gap-y-9"/);
-  assert.match(centerMall, /grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4/);
+  assert.match(productRail, /surface === "desktop"\s*\? "grid grid-cols-3 gap-2"/);
+  assert.match(productRail, /grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3[\s\S]*lg:grid-cols-4[\s\S]*xl:grid-cols-5/);
+  assert.match(centerMall, /grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4/);
   assert.match(centerMall, /aspect-\[16\/10\]/);
-  assert.match(centerSkeletons, /grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4/);
+  assert.match(centerSkeletons, /grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4/);
   assert.match(home, /text-\[clamp\(2rem,5vw,3\.5rem\)\]/);
   assert.match(home, /text-balance/);
   assert.match(home, /"only screen and \(max-width: 1279px\)": "\/m\/home"/);
@@ -103,10 +103,10 @@ test("product, login, and bid navigation support intercepted modals and direct f
   );
 
   assert.match(interceptedProduct, /<ModalShell label="상품 상세" size="wide"><AuctionDetailView compact id=\{id\} \/><\/ModalShell>/);
-  assert.match(detailView, /surface === "desktop" \? "grid-cols-12 gap-12" : "grid-cols-1"/);
-  assert.match(detailView, /surface === "desktop" \? "col-span-7 min-w-0"/);
-  assert.match(stickyBidPanel, /surface === "desktop"[\s\S]*sticky col-span-5/);
-  assert.match(stickyBidPanel, /compact \? "top-6" : "top-\[100px\]"/);
+  assert.match(detailView, /grid grid-cols-1 items-start gap-6 md:grid-cols-12 lg:gap-12/);
+  assert.match(detailView, /min-w-0 md:col-span-7/);
+  assert.match(stickyBidPanel, /md:sticky md:col-span-5/);
+  assert.match(stickyBidPanel, /compact \? "md:top-6" : "md:top-\[100px\]"/);
   assert.match(directProduct, /<AuctionDetailView id=\{id\} \/>/);
   assert.match(interceptedLogin, /<ModalShell label="로그인"><LoginPrompt dismissToPrevious returnTo=\{safeReturnTo\(query\.next\)\} \/><\/ModalShell>/);
   assert.match(directLogin, /<LoginPrompt returnTo=\{safeReturnTo\(query\.next\)\} \/>/);

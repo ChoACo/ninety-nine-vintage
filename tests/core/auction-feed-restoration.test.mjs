@@ -260,7 +260,7 @@ test("restored feed UI uses separated desktop and mobile routes with authoritati
   assert.match(grid, /routeSearchParams\.get\("date"\) \?\? "all"/);
   assert.match(grid, /catalog-filter-options/);
   assert.match(grid, /판매 완료 상품만 보기/);
-  assert.match(grid, /showSoldOnly\s*\?\s*<SoldFeedCard/);
+  assert.match(grid, /showSoldOnly\s*\?[\s\S]*?<SoldFeedCard/);
   assert.match(grid, /dates:\s*dateKeys/);
   assert.doesNotMatch(grid, /마감 임박순/);
   assert.doesNotMatch(sidebar, /현재 입찰가 높은순|현재 입찰가 낮은순|경매 상태|구제 의류/);
@@ -280,7 +280,7 @@ test("restored feed UI uses separated desktop and mobile routes with authoritati
   assert.match(grid, /event: "\*"/);
   assert.match(grid, /antiSnipingBaseClosesAt: snapshot\.antiSnipingBaseClosesAt/);
   assert.match(grid, /antiSnipingExtendedAt: snapshot\.antiSnipingExtendedAt/);
-  assert.match(grid, /antiSnipingExtensionCount: snapshot\.antiSnipingExtensionCount/);
+  assert.match(grid, /antiSnipingExtensionCount:\s*snapshot\.antiSnipingExtensionCount/);
   assert.match(grid, /useAuctionPolicyClock/);
   assert.match(grid, /getDailyAuctionPhase/);
   assert.doesNotMatch(grid, /table: "auction_bids"/);
@@ -375,10 +375,10 @@ test("inactive auction feed falls back to a schedule panel and sold-product teas
   assert.match(grid, /hasAnyFilter/);
   assert.match(
     grid,
-    /<AuctionInactiveTeaser basePath=\{basePath\} dailyPhase=\{dailyAuctionPhase\} onViewSold=\{\(\) => \{ setShowSoldOnly\(true\); setPage\(1\); \}\} surface=\{surface\} \/>/,
+    /<AuctionInactiveTeaser[\s\S]*?basePath=\{basePath\}[\s\S]*?dailyPhase=\{dailyAuctionPhase\}[\s\S]*?setShowSoldOnly\(true\)[\s\S]*?setPage\(1\)[\s\S]*?surface=\{surface\}/,
   );
-  assert.match(grid, /showSoldOnly \? <div className="grid min-h-64 place-items-center[\s\S]*?판매 완료 상품이 없습니다\./);
-  assert.match(grid, /hasAnyFilter \? <div className="grid min-h-64 place-items-center/);
+  assert.match(grid, /showSoldOnly\s*\?[\s\S]*?<div className="grid min-h-64 place-items-center[\s\S]*?판매 완료 상품이 없습니다\./);
+  assert.match(grid, /hasAnyFilter\s*\?[\s\S]*?<div className="grid min-h-64 place-items-center/);
 
   assert.match(teaser, /판매 완료 상품 보기/);
   assert.match(teaser, /판매 완료 상품만 보기/);

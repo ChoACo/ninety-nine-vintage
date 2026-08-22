@@ -679,7 +679,7 @@ test("all public v2 RPCs pin search_path and receive explicit authenticated gran
 });
 
 test("payment API remains strict but mutations and navigation are owner-only", async () => {
-  await access(new URL("src/app/(admin)/admin/operator/payments/page.tsx", rootUrl));
+  await assert.rejects(access(new URL("src/app/(admin)/admin/operator/payments/page.tsx", rootUrl)));
   const [queueRoute, confirmRoute, consoleSource, layout] = await Promise.all([
     source("src/app/api/admin/operator/payments/route.ts"),
     source("src/app/api/admin/operator/payments/[kind]/[id]/confirm/route.ts"),
@@ -866,7 +866,7 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
   assert.doesNotMatch(dashboard, /fetch\("\/api\/orders"/);
   assert.doesNotMatch(dashboard, /orderId:\s*selectedLegacyOrder\?\.id/);
   assert.doesNotMatch(dashboard, /physicalStatus|locationKind|exceptionPublicReason|lineStatus/);
-  assert.match(dashboard, /서로\s+다른 매장 상품도\s+한 번에 신청/);
+  assert.match(dashboard, /서로\s+다른 매장\s+상품도\s+한 번에 신청/);
   assert.match(dashboard, /상품 상세보기/);
   assert.match(dashboard, /환불 진행 상황/);
   assert.match(dashboard, /환불 계좌 등록/);
@@ -936,12 +936,11 @@ test("operator exceptions use private signed evidence while Owner alone reveals 
 });
 
 test("v2 operations return stable Korean problem contracts with CAS and business states separated", async () => {
-  const [commerceServer, ownerServer, payments, confirm, fulfillment, shipping, exceptions, evidence, refunds, refundAccount] = await Promise.all([
+  const [commerceServer, ownerServer, payments, confirm, shipping, exceptions, evidence, refunds, refundAccount] = await Promise.all([
     source("src/lib/commerce/server.ts"),
     source("src/lib/ownerAccess/server.ts"),
     source("src/app/api/admin/operator/payments/route.ts"),
     source("src/app/api/admin/operator/payments/[kind]/[id]/confirm/route.ts"),
-    source("src/app/api/admin/operator/fulfillment/route.ts"),
     source("src/app/api/admin/operator/shipping/route.ts"),
     source("src/app/api/admin/operator/exceptions/route.ts"),
     source("src/app/api/admin/operator/exceptions/[id]/evidence/route.ts"),
@@ -958,9 +957,7 @@ test("v2 operations return stable Korean problem contracts with CAS and business
     assert.match(route, /\["PT409", "23505", "40001"\]/);
     assert.match(route, /error\.code === "55000"[\s\S]{0,500}\b422\b/);
   }
-  assert.match(fulfillment, /operator_fulfillment_retired/);
-  assert.match(fulfillment, /410/);
-  assert.doesNotMatch(fulfillment, /release_buyer_/);
+  await assert.rejects(access(new URL("src/app/api/admin/operator/fulfillment/route.ts", rootUrl)));
   assert.match(confirm, /\["PT409", "40001"\]/);
   assert.match(confirm, /error\.code === "23505"/);
   assert.match(confirm, /payment_fulfillment_conflict/);

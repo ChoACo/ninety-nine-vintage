@@ -70,12 +70,16 @@ test("band members retain a visible deadline while combined payment keeps the ex
 test("employee and operator navigation use storage and one-step shipping without intake management", async () => {
   await Promise.all([
     access(new URL("src/app/(admin)/admin/employee/inquiries/page.tsx", rootUrl)),
-    access(new URL("src/app/(admin)/admin/employee/fulfillment/page.tsx", rootUrl)),
     access(new URL("src/app/(admin)/admin/employee/parcels/page.tsx", rootUrl)),
-    access(new URL("src/app/(admin)/admin/employee/center/page.tsx", rootUrl)),
-    access(new URL("src/app/(admin)/admin/operator/center/page.tsx", rootUrl)),
     access(new URL("src/app/(admin)/admin/operator/chat/page.tsx", rootUrl)),
   ]);
+  for (const path of [
+    "src/app/(admin)/admin/employee/fulfillment/page.tsx",
+    "src/app/(admin)/admin/employee/center/page.tsx",
+    "src/app/(admin)/admin/operator/center/page.tsx",
+  ]) {
+    await assert.rejects(access(new URL(path, rootUrl)));
+  }
   const [session, boundary, employeeLayout, operatorLayout, header] =
     await Promise.all([
       source("src/app/api/admin/session/route.ts"),

@@ -208,7 +208,7 @@ test("customer UI keeps v2 and legacy-compat shipping surfaces mutually exclusiv
   assert.match(account, /useV2\s*\?\s*"\/api\/shipping\/requests"\s*:\s*"\/api\/shipping\/requests\/legacy-order"/);
   assert.match(account, /visibleRequestEligibleItems\.map\(\s*\(item\)\s*=>\s*item\.id/);
   assert.match(account, /disabled=\{disabled\}/);
-  assert.match(account, /결제 완료 상품은 매장 출고 전에도[\s\S]*?서로\s+다른 매장 상품도 한 번에 신청할 수 있습니다/);
+  assert.match(account, /결제 완료 상품은 바로 선택할 수 있으며,[\s\S]*?서로\s+다른 매장\s+상품도 한 번에 신청할 수 있습니다/);
   assert.match(account, /전환 전 결제 완료 상품은 주문 단위로[\s\S]*?전체 배송을 신청할 수\s+있습니다/);
   assert.match(account, /setSelectedOrderId\(""\)/);
   assert.match(account, /setSelectedInventoryItemIds\(\[\]\)/);

@@ -47,6 +47,7 @@ const contentSecurityPolicy = [
   "font-src 'self' data:",
   "form-action 'self'",
   "frame-ancestors 'none'",
+  "frame-src 'self' https://postcode.map.kakao.com",
   `img-src 'self' data: blob: https://*.supabase.co https://storage.googleapis.com https://*.s3.amazonaws.com https://*.r2.cloudflarestorage.com${r2PublicDomain ? ` https://${r2PublicDomain}` : ""}`,
   "manifest-src 'self'",
   "media-src 'self' blob:",
@@ -54,7 +55,7 @@ const contentSecurityPolicy = [
   // React's dev-mode source-mapping relies on eval(), which the strict
   // production policy intentionally omits. Keep the relaxation dev-only so
   // the deployed worker never enables code execution.
-  `script-src 'self' 'unsafe-inline'${
+  `script-src 'self' 'unsafe-inline' https://t1.kakaocdn.net${
     process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""
   }`,
   "style-src 'self' 'unsafe-inline'",

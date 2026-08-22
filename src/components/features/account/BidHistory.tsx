@@ -13,18 +13,21 @@ interface BidItem {
   amount: number;
   currentPrice: number;
   closesAt: string;
-  state: "leading" | "final" | "outbid" | "closed";
+  state: "leading" | "final" | "settled" | "outbid" | "closed";
   createdAt: string;
+  paymentDueAt: string | null;
+  paymentSettled: boolean;
 }
 
 interface BidPayload {
   items?: BidItem[];
-  summary?: { total: number; leading: number; final: number; outbid: number };
+  summary?: { total: number; leading: number; final: number; settled: number; outbid: number };
 }
 
 const stateLabels: Record<BidItem["state"], string> = {
   leading: "현재 최고 입찰",
   final: "낙찰·결제 확인",
+  settled: "결제 완료 · 보관함 이동",
   outbid: "상위 입찰 필요",
   closed: "경매 종료",
 };
@@ -76,11 +79,11 @@ export function BidHistory({ basePath = "", surface = "mobile" }: { basePath?: "
   if (loading || !session || !payload) return null;
   const items = payload.items ?? [];
   const summary = payload.summary;
-  const tabItems = items.filter((item) => activeTab === "won" ? item.state === "final" : activeTab === "closed" ? item.state === "closed" : item.state === "leading" || item.state === "outbid");
+  const tabItems = items.filter((item) => activeTab === "won" ? item.state === "final" : activeTab === "closed" ? item.state === "closed" || item.state === "settled" : item.state === "leading" || item.state === "outbid");
   const tabs = [
     { id: "active" as const, label: "입찰 중", count: items.filter((item) => item.state === "leading" || item.state === "outbid").length },
     { id: "won" as const, label: "낙찰 완료 (결제 대기)", count: items.filter((item) => item.state === "final").length },
-    { id: "closed" as const, label: "종료/유찰", count: items.filter((item) => item.state === "closed").length },
+    { id: "closed" as const, label: "종료·결제 완료", count: items.filter((item) => item.state === "closed" || item.state === "settled").length },
   ];
   return (
     <section id="bids">
@@ -146,7 +149,7 @@ export function BidHistory({ basePath = "", surface = "mobile" }: { basePath?: "
                     {item.title}
                   </Link>
                   <span
-                    className={`shrink-0 text-[10px] font-bold ${item.state === "leading" || item.state === "final" ? "text-emerald-700" : "text-amber-700"}`}
+                    className={`shrink-0 text-[10px] font-bold ${item.state === "leading" || item.state === "final" || item.state === "settled" ? "text-emerald-700" : "text-amber-700"}`}
                   >
                     {stateLabels[item.state]}
                   </span>
@@ -159,7 +162,8 @@ export function BidHistory({ basePath = "", surface = "mobile" }: { basePath?: "
                   {new Date(item.createdAt).toLocaleString("ko-KR")} · 마감{" "}
                   {new Date(item.closesAt).toLocaleString("ko-KR")}
                 </p>
-                {item.state === "final" && <Link className="mt-3 inline-flex min-h-10 items-center bg-ink px-4 text-xs font-bold text-paper" href={`${basePath}/account/payments`}>결제하기</Link>}
+                {item.state === "final" && <Link className="mt-3 inline-flex min-h-10 items-center bg-ink px-4 text-xs font-bold text-paper" href={`${basePath}/account/payments?productId=${item.productId}`}>결제하기</Link>}
+                {item.state === "settled" && <Link className="mt-3 inline-flex min-h-10 items-center border border-line px-4 text-xs font-bold" href={`${basePath}/account/storage`}>보관함에서 확인</Link>}
               </div>
             </article>
           ))}

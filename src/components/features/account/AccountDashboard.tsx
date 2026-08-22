@@ -22,6 +22,7 @@ import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { PostcodeSearchButton } from "@/components/features/account/PostcodeSearchButton";
 import { logoutBrowserSession } from "@/lib/auth/logout";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
+import { formatStorageDday, storageClassLabel } from "@/utils/shipping";
 
 interface ProductSummary {
   id: string;
@@ -1112,9 +1113,14 @@ const [shippingMessage, setShippingMessage] = useState("");
                 )}
                 <div className={`grid gap-3 p-1 ${surface === "desktop" ? "grid-cols-3" : "grid-cols-2"}`}>
                   {visibleV2Storage.map((item) => {
-                    const expires = item.storageExpiresAt ? new Date(item.storageExpiresAt) : null;
+                    const startedAt = item.storageStartedAt ? Date.parse(item.storageStartedAt) : Number.NaN;
+                    const explicitExpiresAt = item.storageExpiresAt ? Date.parse(item.storageExpiresAt) : Number.NaN;
+                    const calculatedExpiresAt = Number.isFinite(startedAt) ? startedAt + item.storageDurationDays * 86_400_000 : Number.NaN;
+                    const expiresAt = Number.isFinite(explicitExpiresAt) ? explicitExpiresAt : calculatedExpiresAt;
+                    const expires = Number.isFinite(expiresAt) ? new Date(expiresAt) : null;
                     const daysRemaining = expires && now > 0 ? Math.max(0, Math.ceil((expires.getTime() - now) / 86_400_000)) : null;
-                    const progress = daysRemaining === null ? 0 : Math.max(0, Math.min(100, (daysRemaining / item.storageDurationDays) * 100));
+                    const progress = daysRemaining === null ? 100 : Math.max(0, Math.min(100, (daysRemaining / item.storageDurationDays) * 100));
+                    const storageWarning = daysRemaining !== null && daysRemaining <= 3;
                     const disabled = !item.requestEligible || Boolean(item.activeShipmentId);
                     const isSelected = selectedInventoryItemIds.includes(item.id);
                     return (
@@ -1138,14 +1144,14 @@ const [shippingMessage, setShippingMessage] = useState("");
                           <p className="line-clamp-2 min-h-10 text-sm font-bold">{item.title}</p>
                           <p className="mt-2 text-[11px] text-muted">{item.originStoreName ?? "매장 상품"}</p>
                           <p className={`mt-1 text-[11px] font-bold ${expires && expires.getTime() <= now ? "text-red-600" : "text-muted"}`}>
-                            {item.storageClass === "large" ? "대형 · 1주 보관" : "소형 · 2주 보관"}
+                            {storageClassLabel(item.storageDurationDays)}
                             {expires
                               ? expires.getTime() <= now
                                 ? " · 보관 만료"
                                 : ` · ${expires.toLocaleDateString("ko-KR")}까지`
-                              : ""}
+                              : " · 매장 입고 후 시작"}
                           </p>
-                          {daysRemaining !== null && <div className="mt-3" aria-label={`남은 보관 기간 D-${daysRemaining} / ${item.storageDurationDays}일`}><div className="flex justify-between text-[10px] font-bold"><span>남은 보관 기간</span><span className={daysRemaining <= 2 ? "text-red-600" : "text-muted"}>D-{daysRemaining} / {item.storageDurationDays}일</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line"><span className={`block h-full rounded-full ${daysRemaining <= 2 ? "bg-red-600" : "bg-emerald-600"}`} style={{ width: `${progress}%` }} /></div></div>}
+                          <div className="mt-3" aria-label={daysRemaining === null ? `보관 시작 전 · 입고 후 ${item.storageDurationDays}일` : `남은 보관 기간 ${formatStorageDday(daysRemaining)} / ${item.storageDurationDays}일`}><div className="flex justify-between text-[10px] font-bold"><span>{daysRemaining === null ? "보관 시작 전" : "남은 보관 기간"}</span><span className={storageWarning ? "text-red-600" : "text-muted"}>{daysRemaining === null ? `입고 후 D-${item.storageDurationDays} 시작` : `${formatStorageDday(daysRemaining)} / ${item.storageDurationDays}일`}</span></div><div className="mt-1.5 h-2 overflow-hidden rounded-full bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={item.storageDurationDays} aria-valuenow={daysRemaining ?? item.storageDurationDays}><span className={`block h-full rounded-full transition-[width] duration-300 ${daysRemaining === null ? "bg-zinc-500" : storageWarning ? "bg-red-600" : "bg-emerald-600"}`} style={{ width: `${progress}%` }} /></div></div>
                           {disabled && (
                             <p className="mt-2 text-[11px] text-amber-700">
                               {item.activeShipmentId ? "이미 배송 신청에 포함된 상품입니다." : "현재 배송 신청할 수 없습니다."}

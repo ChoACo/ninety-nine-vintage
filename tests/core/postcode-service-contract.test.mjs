@@ -14,7 +14,14 @@ test("Kakao postcode search is allowed by CSP and recovers from script failures"
   assert.match(config, /script-src[^`]*https:\/\/t1\.kakaocdn\.net/);
   assert.match(config, /frame-src 'self' https:\/\/postcode\.map\.kakao\.com/);
   assert.match(button, /id="kakao-postcode-service"/);
+  assert.match(button, /h-\[450px\]/);
+  assert.match(button, /window\.setInterval/);
+  assert.match(button, /Date\.now\(\) - startedAt >= 8_000/);
+  assert.match(button, /event\.key === "Escape"/);
   assert.match(button, /onReady=\{markReady\}/);
-  assert.match(button, /onError=\{\(\) => \{ setReady\(false\); setLoadError\(true\); \}\}/);
+  assert.match(
+    button,
+    /onError=\{\(\) => \{[\s\S]{0,80}setReady\(false\);[\s\S]{0,80}setLoadError\(true\);/,
+  );
   assert.match(button, /주소 검색 서비스를 불러오지 못했습니다/);
 });

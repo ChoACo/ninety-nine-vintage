@@ -17,7 +17,10 @@ test("storefront cart, route highlighting, and shipping totals update in client 
   assert.doesNotMatch(detail, /<QuickCartModal/);
   assert.match(detail, /이미 장바구니에 담긴 상품입니다/);
   assert.match(detail, /장바구니에 상품을 담았습니다/);
-  assert.match(detail, /action: \{ label: "장바구니 바로가기", href: `\$\{basePath\}\/cart` \}/);
+  assert.match(
+    detail,
+    /action: \{ label: "장바구니 바로가기", href: `\$\{basePath\}\/cart` \}/,
+  );
 
   assert.match(header, /pathname\.startsWith\(`\$\{href\}\/`\)/);
   assert.match(header, /after:bg-amber-500/);
@@ -25,7 +28,14 @@ test("storefront cart, route highlighting, and shipping totals update in client 
 
   assert.match(cartStore, /shippingModes:Record<string,CartShippingMode>/);
   assert.match(cart, /state\.shippingModes\.checkout \?\? "ship"/);
-  assert.match(cart, /setShippingMode\("checkout", include \? "ship" : "vault"\)/);
-  assert.match(cart, /productTotal \+ \(includeShippingFee \? shippingFee : 0\)/);
+  assert.match(
+    cart,
+    /setShippingMode\("checkout", include \? "ship" : "vault"\)/,
+  );
+  assert.match(cart, /productTotal \+ selectedShippingFee/);
+  assert.match(
+    cart,
+    /includeShippingFee[\s\S]*shippingFee[\s\S]*vaultShippingFee/,
+  );
   assert.match(cart, /transition-all duration-200/);
 });

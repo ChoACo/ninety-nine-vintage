@@ -451,6 +451,7 @@ export function CartView({
   const [staleCount, setStaleCount] = useState(0);
   const [paymentMode, setPaymentMode] = useState<CartPaymentMode>("loading");
   const [shippingFee, setShippingFee] = useState(0);
+  const [vaultShippingFee, setVaultShippingFee] = useState(0);
   const [shippingCharges, setShippingCharges] = useState<ShippingCharge[]>([]);
   const [shippingAvailable, setShippingAvailable] = useState(true);
   const shippingMode = useCartStore(
@@ -695,6 +696,7 @@ export function CartView({
       setStaleCount(0);
       setPaymentMode("loading");
       setShippingFee(0);
+      setVaultShippingFee(0);
       setShippingCharges([]);
       setShippingAvailable(true);
       setShippingAddresses([]);
@@ -814,6 +816,7 @@ export function CartView({
           staleProductIds?: string[];
           items?: PublishedFixedProduct[];
           shippingFee?: unknown;
+          vaultShippingFee?: unknown;
           shippingCharges?: ShippingCharge[];
           shippingAvailable?: boolean;
         };
@@ -829,6 +832,7 @@ export function CartView({
         }
         const cartProducts = (payload.items ?? []).map(toCartProduct);
         const nextShippingFee = Number(payload.shippingFee);
+        const nextVaultShippingFee = Number(payload.vaultShippingFee);
         const nextShippingAvailable = payload.shippingAvailable !== false;
         if (
           cartProducts.length > 0 &&
@@ -838,6 +842,14 @@ export function CartView({
           throw new Error("배송비 설정을 확인하지 못했습니다.");
         }
         setShippingAvailable(nextShippingAvailable);
+        if (!activeRequest) {
+          setVaultShippingFee(
+            Number.isSafeInteger(nextVaultShippingFee) &&
+              nextVaultShippingFee >= 0
+              ? nextVaultShippingFee
+              : nextShippingFee,
+          );
+        }
         if (!activeRequest)
           setShippingFee(
             cartProducts.length > 0 && nextShippingAvailable
@@ -1003,7 +1015,10 @@ export function CartView({
     (sum, product) => sum + product.price,
     0,
   );
-  const expectedTotal = productTotal + (includeShippingFee ? shippingFee : 0);
+  const selectedShippingFee = includeShippingFee
+    ? shippingFee
+    : vaultShippingFee;
+  const expectedTotal = productTotal + selectedShippingFee;
   const hasPendingCheckout = heldCheckoutIds.length > 0;
   const checkout = async () => {
     if (
@@ -1058,7 +1073,7 @@ export function CartView({
         pendingRequest?.includeShippingFee ?? includeShippingFee;
       const requestShippingFee =
         pendingRequest?.shippingFeeQuote ??
-        (requestIncludesShipping ? shippingFee : 0);
+        (requestIncludesShipping ? shippingFee : vaultShippingFee);
       // The order RPC reserves products and removes the server cart. Retain the
       // current rows locally until payment is actually verified or abandoned.
       setHeldCheckoutIds(productIds);
@@ -1423,8 +1438,9 @@ export function CartView({
                   <span>
                     <strong className="block">보관함 보관 후 묶음 배송</strong>
                     <small className="mt-1 block leading-5 text-muted">
-                      최대 14일 무료 보관 · 다른 상품과 묶어 배송비를 절약할 수
-                      있습니다.
+                      {vaultShippingFee > 0
+                        ? `잔여 배송권이 없는 센터 배송비 ${vaultShippingFee.toLocaleString("ko-KR")}원이 포함되며, 결제 완료 후 1회권이 적립됩니다.`
+                        : "선결제 배송권 적용 · 최대 14일 무료 보관 후 추가 배송비 없이 묶음 배송할 수 있습니다."}
                     </small>
                   </span>
                 </span>
@@ -1743,6 +1759,18 @@ export function CartView({
                 ))}
               </div>
             ) : null}
+            <div className="mt-5 flex justify-between text-xs">
+              <span>
+                {includeShippingFee
+                  ? "즉시 발송 배송비"
+                  : "보관함 선결제 배송비"}
+              </span>
+              <strong className="font-mono">
+                {selectedShippingFee > 0
+                  ? `${selectedShippingFee.toLocaleString("ko-KR")}원`
+                  : "배송권 적용 · 0원"}
+              </strong>
+            </div>
             <div className="mt-6 flex justify-between border-t border-line pt-5">
               <span className="text-sm font-bold">예상 결제 금액</span>
               <strong

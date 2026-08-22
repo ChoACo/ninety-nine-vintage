@@ -110,18 +110,25 @@ test("test catalog and withdrawn-member cleanup is cutoff-bound and restores imm
   assert.match(migration, /cleanup_withdrawn_member\([\s\S]*purge_due_at/);
   assert.match(migration, /disable trigger security_activity_logs_append_only/);
   assert.match(migration, /enable trigger security_activity_logs_append_only/);
-  assert.match(migration, /add constraint inventory_shipments_shipping_credit_ledger_id_fkey/);
-  assert.match(migration, /add constraint inventory_shipments_shipping_fee_payment_id_fkey/);
+  assert.match(
+    migration,
+    /add constraint inventory_shipments_shipping_credit_ledger_id_fkey/,
+  );
+  assert.match(
+    migration,
+    /add constraint inventory_shipments_shipping_fee_payment_id_fkey/,
+  );
   assert.match(migration, /테스트 상품 정리 범위를 벗어난 주문·환불·예외 참조/);
   assert.match(migration, /commit;\s*$/);
 });
 
 test("center assignment capabilities are revoked after direct-store cutover", async () => {
-  const [migration, cutover] =
-    await Promise.all([
-      source(migrationPath),
-      source("supabase/migrations/20260724063531_simplify_direct_store_fulfillment.sql"),
-    ]);
+  const [migration, cutover] = await Promise.all([
+    source(migrationPath),
+    source(
+      "supabase/migrations/20260724063531_simplify_direct_store_fulfillment.sql",
+    ),
+  ]);
 
   assert.match(
     migration,
@@ -131,28 +138,44 @@ test("center assignment capabilities are revoked after direct-store cutover", as
     migration,
     /receive_at_center,\s*create_shipments[\s\S]*true,\s*true/i,
   );
-  assert.match(migration, /function public\.delete_fulfillment_center_staff_assignment/i);
+  assert.match(
+    migration,
+    /function public\.delete_fulfillment_center_staff_assignment/i,
+  );
   assert.match(
     migration,
     /delete from public\.fulfillment_center_staff_assignments as assignments[\s\S]*where not exists[\s\S]*roles\.role_code in \('operator', 'employee'\)/i,
   );
-  assert.match(cutover, /revoke all on function public\.configure_fulfillment_center_staff_assignment/);
-  assert.match(cutover, /revoke all on function public\.delete_fulfillment_center_staff_assignment/);
-  assert.match(cutover, /revoke all on function public\.configure_store_fulfillment_route/);
+  assert.match(
+    cutover,
+    /revoke all on function public\.configure_fulfillment_center_staff_assignment/,
+  );
+  assert.match(
+    cutover,
+    /revoke all on function public\.delete_fulfillment_center_staff_assignment/,
+  );
+  assert.match(
+    cutover,
+    /revoke all on function public\.configure_store_fulfillment_route/,
+  );
 });
 
 test("only the owner confirms shared payments while operators retain fulfillment", async () => {
-  const [migration, platformMigration, ownerLayout, operatorLayout] = await Promise.all([
-    source(migrationPath), source("supabase/migrations/20260803173529_multi_operator_store_platform.sql"),
-    source("src/app/(admin)/admin/owner/layout.tsx"),
-    source("src/app/(admin)/admin/operator/layout.tsx"),
-  ]);
+  const [migration, platformMigration, ownerLayout, operatorLayout] =
+    await Promise.all([
+      source(migrationPath),
+      source(
+        "supabase/migrations/20260803173529_multi_operator_store_platform.sql",
+      ),
+      source("src/app/(admin)/admin/owner/layout.tsx"),
+      source("src/app/(admin)/admin/operator/layout.tsx"),
+    ]);
 
+  assert.match(migration, /can_confirm_shared_payment/i);
   assert.match(
-    migration,
-    /can_confirm_shared_payment/i,
+    platformMigration,
+    /can_confirm_shared_payment[\s\S]*public\.is_owner\(\)/i,
   );
-  assert.match(platformMigration, /can_confirm_shared_payment[\s\S]*public\.is_owner\(\)/i);
   assert.match(ownerLayout, /label: "시스템"/);
   assert.match(ownerLayout, /label: "회원"/);
   assert.doesNotMatch(ownerLayout, /센터·매장 구조/);
@@ -163,15 +186,30 @@ test("only the owner confirms shared payments while operators retain fulfillment
 });
 
 test("checkout quotes shipping by store or fulfillment group and snapshots each charge", async () => {
-  const [migration, platformMigration, cartRoute, checkoutRoute, cartView] = await Promise.all([
+  const [
+    migration,
+    platformMigration,
+    entitlementMigration,
+    cartRoute,
+    checkoutRoute,
+    cartView,
+  ] = await Promise.all([
     source(migrationPath),
-    source("supabase/migrations/20260803173529_multi_operator_store_platform.sql"),
+    source(
+      "supabase/migrations/20260803173529_multi_operator_store_platform.sql",
+    ),
+    source(
+      "supabase/migrations/20260822195048_unify_store_shipping_entitlements.sql",
+    ),
     source("src/app/api/cart/route.ts"),
     source("src/app/api/orders/checkout/route.ts"),
     source("src/components/features/commerce/CartView.tsx"),
   ]);
 
-  assert.match(migration, /create table public\.commerce_order_shipping_fee_allocations/i);
+  assert.match(
+    migration,
+    /create table public\.commerce_order_shipping_fee_allocations/i,
+  );
   assert.match(migration, /p_include_shipping_fee boolean/i);
   assert.match(migration, /apply_commerce_checkout_shipping_fee/i);
   assert.match(migration, /project_prepaid_shipping_entitlements/i);
@@ -185,13 +223,15 @@ test("checkout quotes shipping by store or fulfillment group and snapshots each 
   assert.match(cartRoute, /quote_commerce_shipping_fee/);
   assert.match(cartRoute, /shippingCharges/);
   assert.match(cartRoute, /shippingFee/);
+  assert.match(cartRoute, /vaultShippingFee/);
+  assert.match(entitlementMigration, /shipping_fee_waiver_entitlements/);
   assert.match(checkoutRoute, /p_include_shipping_fee:\s*includeShippingFee/);
   assert.match(cartView, /useState\(true\)/);
   assert.match(cartView, /배송비 함께 결제/);
   assert.match(cartView, /배송비 \{shippingCharges\.length\}건/);
-  assert.match(cartView, /includeShippingFee:\s*currentRequest\.includeShippingFee/);
   assert.match(
     cartView,
-    /productTotal \+ \(includeShippingFee \? shippingFee : 0\)/,
+    /includeShippingFee:\s*currentRequest\.includeShippingFee/,
   );
+  assert.match(cartView, /productTotal \+ selectedShippingFee/);
 });

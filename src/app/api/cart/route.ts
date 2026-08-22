@@ -1,4 +1,7 @@
-import { authenticateMemberRlsRequest, commerceJson } from "@/lib/commerce/server";
+import {
+  authenticateMemberRlsRequest,
+  commerceJson,
+} from "@/lib/commerce/server";
 import { ACTIVE_COMMERCE_PAYMENT_MODE } from "@/lib/commerce/paymentMode";
 import { getCatalogImageUrl } from "@/lib/images";
 import { getManualTransferAccount } from "@/lib/manualTransferConfig";
@@ -30,7 +33,10 @@ type ShippingQuote = {
 };
 
 type RpcClient = {
-  rpc: (name: string, args: Record<string, unknown>) => Promise<{
+  rpc: (
+    name: string,
+    args: Record<string, unknown>,
+  ) => Promise<{
     data: unknown;
     error: { message?: string } | null;
   }>;
@@ -44,17 +50,23 @@ export async function GET(request: Request) {
     .then(() => true)
     .catch((paymentError: unknown) => {
       console.error("[cart:get] manual transfer account unavailable", {
-        message: paymentError instanceof Error ? paymentError.message : "unknown error",
+        message:
+          paymentError instanceof Error
+            ? paymentError.message
+            : "unknown error",
       });
       return false;
     });
   const reservationResult = await auth.user.rpc("get_my_cart_reservations");
   let reservations = reservationResult.data ?? [];
   if (reservationResult.error) {
-    console.error("[cart:get] reservation RPC failed; using RLS table fallback", {
-      code: reservationResult.error.code,
-      message: reservationResult.error.message,
-    });
+    console.error(
+      "[cart:get] reservation RPC failed; using RLS table fallback",
+      {
+        code: reservationResult.error.code,
+        message: reservationResult.error.message,
+      },
+    );
     const fallbackResult = await auth.user
       .from("cart_items")
       .select("product_id,created_at,reserved_until")
@@ -73,7 +85,7 @@ export async function GET(request: Request) {
       server_time: serverTime,
     }));
   }
-  const paymentMode = await paymentStatusPromise
+  const paymentMode = (await paymentStatusPromise)
     ? ACTIVE_COMMERCE_PAYMENT_MODE
     : "unavailable";
   const ids = reservations.map((item) => item.product_id);
@@ -106,11 +118,15 @@ export async function GET(request: Request) {
   const liveIds = (products ?? []).map((product) => product.id);
   const eligibility = await Promise.all(
     liveIds.map(async (productId) => {
-      const { data: canPurchase, error: eligibilityError } = await auth.user.rpc(
-        "can_purchase_product",
-        { p_product_id: productId },
-      );
-      return { canPurchase: canPurchase === true, error: eligibilityError, productId };
+      const { data: canPurchase, error: eligibilityError } =
+        await auth.user.rpc("can_purchase_product", {
+          p_product_id: productId,
+        });
+      return {
+        canPurchase: canPurchase === true,
+        error: eligibilityError,
+        productId,
+      };
     }),
   );
   if (eligibility.some((result) => result.error)) {
@@ -124,7 +140,7 @@ export async function GET(request: Request) {
     .map((result) => result.productId);
   const purchasableIdSet = new Set(purchasableIds);
   const purchasableProducts = (products ?? []).filter((product) =>
-    purchasableIdSet.has(product.id)
+    purchasableIdSet.has(product.id),
   );
   if (purchasableIds.length === 0) {
     return commerceJson({
@@ -140,53 +156,104 @@ export async function GET(request: Request) {
       staleProductIds: ids,
     });
   }
-  const shippingRegion = new URL(request.url).searchParams.get("shippingRegion") === "remote_area"
-    ? "remote_area"
-    : "regular";
+  const shippingRegion =
+    new URL(request.url).searchParams.get("shippingRegion") === "remote_area"
+      ? "remote_area"
+      : "regular";
   const quoteResult = await (auth.user as unknown as RpcClient).rpc(
     "quote_commerce_shipping_fee",
     { p_product_ids: purchasableIds, p_shipping_region: shippingRegion },
   );
-  const quote = quoteResult.data && typeof quoteResult.data === "object"
-    ? quoteResult.data as ShippingQuote
-    : null;
+  const quote =
+    quoteResult.data && typeof quoteResult.data === "object"
+      ? (quoteResult.data as ShippingQuote)
+      : null;
   if (quoteResult.error || !quote) {
     console.error("[cart:get] shipping quote unavailable", {
       message: quoteResult.error?.message ?? "empty quote",
     });
   }
   const shippingFee = Number(quote?.shippingFee ?? 0);
-  const chargesAreValid = Array.isArray(quote?.charges) && quote.charges.length > 0 &&
-    quote.charges.every((charge) =>
-      charge && typeof charge.chargeKey === "string" &&
-      (charge.unitKind === "store" || charge.unitKind === "fulfillment_group") &&
-      typeof charge.unitName === "string" && Boolean(charge.unitName.trim()) &&
-      typeof charge.billingStoreName === "string" && Boolean(charge.billingStoreName.trim()) &&
-      Number.isSafeInteger(Number(charge.amount)) && Number(charge.amount) > 0 &&
-      Number.isSafeInteger(Number(charge.productSubtotal)) && Number(charge.productSubtotal) > 0 &&
-      Array.isArray(charge.storeIds) && charge.storeIds.length > 0 &&
-      Array.isArray(charge.productIds) && charge.productIds.length > 0 &&
-      Array.isArray(charge.products) && charge.products.length === charge.productIds.length,
+  const chargesAreValid =
+    Array.isArray(quote?.charges) &&
+    quote.charges.length > 0 &&
+    quote.charges.every(
+      (charge) =>
+        charge &&
+        typeof charge.chargeKey === "string" &&
+        (charge.unitKind === "store" ||
+          charge.unitKind === "fulfillment_group") &&
+        typeof charge.unitName === "string" &&
+        Boolean(charge.unitName.trim()) &&
+        typeof charge.billingStoreName === "string" &&
+        Boolean(charge.billingStoreName.trim()) &&
+        Number.isSafeInteger(Number(charge.amount)) &&
+        Number(charge.amount) > 0 &&
+        Number.isSafeInteger(Number(charge.productSubtotal)) &&
+        Number(charge.productSubtotal) > 0 &&
+        Array.isArray(charge.storeIds) &&
+        charge.storeIds.length > 0 &&
+        Array.isArray(charge.productIds) &&
+        charge.productIds.length > 0 &&
+        Array.isArray(charge.products) &&
+        charge.products.length === charge.productIds.length,
     );
-  const shippingAvailable = !quoteResult.error && Number.isSafeInteger(shippingFee) &&
-    shippingFee > 0 && chargesAreValid;
-  if (!shippingAvailable) console.error("[cart:get] invalid shipping quote shape");
+  const shippingAvailable =
+    !quoteResult.error &&
+    Number.isSafeInteger(shippingFee) &&
+    shippingFee > 0 &&
+    chargesAreValid;
+  if (!shippingAvailable)
+    console.error("[cart:get] invalid shipping quote shape");
+  const quotedCharges =
+    shippingAvailable && Array.isArray(quote?.charges) ? quote.charges : [];
+  const quotedStoreIds = [
+    ...new Set(quotedCharges.flatMap((charge) => charge.storeIds)),
+  ];
+  const [storeRows, entitlementRows] = await Promise.all([
+    quotedStoreIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : admin.from("stores").select("id, business_id").in("id", quotedStoreIds),
+    admin
+      .from("shipping_fee_waiver_entitlements")
+      .select("business_id")
+      .eq("member_id", auth.userId)
+      .eq("status", "available"),
+  ]);
+  const storeBusinessIds = new Map(
+    (storeRows.data ?? []).map((store) => [store.id, store.business_id]),
+  );
+  const availableBusinessIds = new Set(
+    (entitlementRows.data ?? []).map((row) => row.business_id),
+  );
+  const creditStateAvailable = !storeRows.error && !entitlementRows.error;
+  const vaultShippingFee = creditStateAvailable
+    ? quotedCharges.reduce((total, charge) => {
+        const businessId = charge.storeIds
+          .map((storeId) => storeBusinessIds.get(storeId))
+          .find((value): value is string => typeof value === "string");
+        return (
+          total +
+          (businessId && availableBusinessIds.has(businessId)
+            ? 0
+            : charge.amount)
+        );
+      }, 0)
+    : shippingFee;
   const reservationByProduct = new Map(
     reservations.map((reservation) => [
       reservation.product_id,
       reservation.reserved_until,
     ]),
   );
-  const items = purchasableProducts
-    .map(mapPublishedProduct)
-    .map((product) => ({
-      ...product,
-      imageUrls: product.imageUrls.map((image) => getCatalogImageUrl(image)),
-      thumbnailUrls: product.thumbnailUrls.map((image) =>
-        getCatalogImageUrl(image, 320),
-      ),
-      reservationExpiresAt: reservationByProduct.get(product.id) ?? null,
-    }));
+  const items = purchasableProducts.map(mapPublishedProduct).map((product) => ({
+    ...product,
+    imageUrls: product.imageUrls.map((image) => getCatalogImageUrl(image)),
+    thumbnailUrls: product.thumbnailUrls.map((image) =>
+      getCatalogImageUrl(image, 320),
+    ),
+    reservationExpiresAt: reservationByProduct.get(product.id) ?? null,
+  }));
   return commerceJson({
     items,
     paymentMode,
@@ -197,9 +264,15 @@ export async function GET(request: Request) {
     })),
     serverTime: reservations[0]?.server_time ?? null,
     shippingFee: shippingAvailable ? shippingFee : 0,
-    shippingCharges: shippingAvailable && Array.isArray(quote?.charges) ? quote.charges : [],
+    shippingCharges: quotedCharges,
+    vaultShippingFee,
+    shippingCreditBusinessIds: creditStateAvailable
+      ? [...availableBusinessIds]
+      : [],
     shippingAvailable,
-    quoteTotal: shippingAvailable ? Number(quote?.total) : Number(quote?.productSubtotal ?? 0),
+    quoteTotal: shippingAvailable
+      ? Number(quote?.total)
+      : Number(quote?.productSubtotal ?? 0),
     staleProductIds: ids.filter((id) => !purchasableIdSet.has(id)),
   });
 }
@@ -209,8 +282,11 @@ export async function POST(request: Request) {
   if (!auth.ok) return auth.response;
   const rateLimit = await enforceCartRateLimit(request, auth.userId);
   if (!rateLimit.ok) return rateLimit.response;
-  const body = await request.json().catch(() => null) as { productId?: string } | null;
-  if (!body?.productId) return commerceJson({ error: "상품을 선택해 주세요." }, 400);
+  const body = (await request.json().catch(() => null)) as {
+    productId?: string;
+  } | null;
+  if (!body?.productId)
+    return commerceJson({ error: "상품을 선택해 주세요." }, 400);
 
   const { data, error } = await auth.user
     .rpc("reserve_fixed_product_for_cart", {
@@ -218,37 +294,43 @@ export async function POST(request: Request) {
     })
     .single();
   if (error) {
-    const status = error.code === "22023"
-      ? 400
-      : error.code === "42501"
-        ? 403
-        : error.code === "P0002"
-          ? 404
-          : ["23505", "P0001"].includes(error.code ?? "")
-            ? 409
-            : 503;
+    const status =
+      error.code === "22023"
+        ? 400
+        : error.code === "42501"
+          ? 403
+          : error.code === "P0002"
+            ? 404
+            : ["23505", "P0001"].includes(error.code ?? "")
+              ? 409
+              : 503;
     return commerceJson(
       { error: error.message || "cart_update_failed" },
       status,
     );
   }
   if (!data) return commerceJson({ error: "cart_update_failed" }, 503);
-  return commerceJson({
-    productId: data.product_id,
-    reservedUntil: data.reserved_until,
-    serverTime: data.server_time,
-  }, 201);
+  return commerceJson(
+    {
+      productId: data.product_id,
+      reservedUntil: data.reserved_until,
+      serverTime: data.server_time,
+    },
+    201,
+  );
 }
 
 export async function DELETE(request: Request) {
   const auth = await authenticateMemberRlsRequest(request, true);
   if (!auth.ok) return auth.response;
-  const body = await request.json().catch(() => null) as { productId?: string } | null;
-  if (!body?.productId) return commerceJson({ error: "상품을 선택해 주세요." }, 400);
-  const { data, error } = await auth.user.rpc(
-    "release_my_cart_reservation",
-    { p_product_id: body.productId },
-  );
+  const body = (await request.json().catch(() => null)) as {
+    productId?: string;
+  } | null;
+  if (!body?.productId)
+    return commerceJson({ error: "상품을 선택해 주세요." }, 400);
+  const { data, error } = await auth.user.rpc("release_my_cart_reservation", {
+    p_product_id: body.productId,
+  });
   if (error) return commerceJson({ error: "cart_update_failed" }, 503);
   return commerceJson({
     removed: data,

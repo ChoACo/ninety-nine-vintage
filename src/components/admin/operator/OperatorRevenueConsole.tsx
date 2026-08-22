@@ -139,7 +139,7 @@ export function OperatorRevenueConsole() {
       <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-4">
         <article className="bg-paper p-5"><p className="text-xs text-muted">선택 기간 총매출</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(totals.gross)}</p></article>
         <article className="bg-paper p-5"><p className="text-xs text-muted">이번 주 매출</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(settlementSummary.weeklySales)}</p></article>
-        <article className="bg-ink p-5 text-paper"><p className="text-xs text-zinc-400">다음 정산 예정</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(settlementSummary.nextSettlementEstimate)}</p><p className="mt-2 text-[10px] text-zinc-400">월·목요일 09:00 KST 기준</p></article>
+        <article className="bg-ink p-5 text-paper"><p className="text-xs text-zinc-400">다음 정산 예정</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(settlementSummary.nextSettlementEstimate)}</p><p className="mt-2 text-[10px] text-zinc-400">월·목요일 18:00 KST 기준</p></article>
         <article className="bg-paper p-5"><p className="text-xs text-muted">누적 지급 완료</p><p className="mt-3 font-mono text-2xl font-bold">{formatKRW(settlementSummary.paidTotal)}</p></article>
       </div>
 

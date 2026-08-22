@@ -7,12 +7,15 @@ const migration = await readFile(migrationPath, "utf8");
 const cron = await readFile(new URL("../../src/app/api/cron/generate-settlements/route.ts", import.meta.url), "utf8");
 const vercel = JSON.parse(await readFile(new URL("../../vercel.json", import.meta.url), "utf8"));
 const desk = await readFile(new URL("../../src/components/admin/owner/OwnerPayoutDesk.tsx", import.meta.url), "utf8");
+const operatorRevenue = await readFile(new URL("../../src/components/admin/operator/OperatorRevenueConsole.tsx", import.meta.url), "utf8");
 
 test("regular settlement runs Monday and Thursday at 18:00 KST through an authenticated cron", () => {
   assert.match(migration, /18:00:00 Asia\/Seoul/);
   assert.match(migration, /extract\(isodow from p_settlement_date\) not in \(1,4\)/);
   assert.match(cron, /CRON_SECRET/);
   assert.deepEqual(vercel.crons.find((entry) => entry.path === "/api/cron/generate-settlements"), { path: "/api/cron/generate-settlements", schedule: "0 9 * * 1,4" });
+  assert.match(operatorRevenue, /월·목요일 18:00 KST 기준/);
+  assert.doesNotMatch(operatorRevenue, /월·목요일 09:00 KST 기준/);
 });
 
 test("fee applications preserve the immutable fee ledger and prevent duplicate deductions", () => {

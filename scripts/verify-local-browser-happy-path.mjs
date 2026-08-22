@@ -248,13 +248,13 @@ try {
   const auctionHref = await evaluate(
     client,
     `(() => {
-      const link = [...document.querySelectorAll('a[href^="/auction/"]')]
+      const link = [...document.querySelectorAll('a[href^="/auction/"][href$="/bid"]')]
         .find((element) =>
-          element.innerText.includes("경매") &&
           element.getClientRects().length > 0 &&
           getComputedStyle(element).visibility !== "hidden"
         );
-      return link?.getAttribute("href") ?? null;
+      const href = link?.getAttribute("href");
+      return href ? href.slice(0, -4) : null;
     })()`,
   );
   assert.match(auctionHref ?? "", /^\/auction\/[0-9a-f-]+$/i);
@@ -297,12 +297,13 @@ try {
     client,
     `(() => {
       const bidHref = ${JSON.stringify(`${auctionHref}/bid`)};
-      const bidLink = [...document.querySelectorAll("a[href]")]
+      const scope = document.querySelector('[role="dialog"]') ?? document.querySelector("main");
+      const bidLink = [...scope.querySelectorAll("a[href]")]
         .find((element) => element.getAttribute("href") === bidHref);
       return {
         text: document.body.innerText,
-        hasCartAction: [...document.querySelectorAll("button, a")]
-          .some((element) => element.innerText.trim() === "장바구니"),
+        hasCartAction: [...scope.querySelectorAll("button, a")]
+          .some((element) => /^(장바구니|장바구니 담기)$/.test(element.innerText.trim())),
         bidHref: bidLink?.getAttribute("href") ?? null,
       };
     })()`,

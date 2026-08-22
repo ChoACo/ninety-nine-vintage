@@ -41,6 +41,8 @@ test("database checkout charges immediate shipping and grants tokens only for va
     migration,
     /get_my_auction_payment_quote\(\)[\s\S]*begin_my_combined_auction_payment\(text,boolean,uuid\[\]\)/i,
   );
+  assert.match(migration, /pg_get_functiondef/);
+  assert.match(migration, /\(\.\|\\n\)\*\?/);
   assert.doesNotMatch(migration, /user_store_shipping_credits/i);
 });
 

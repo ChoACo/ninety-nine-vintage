@@ -245,7 +245,10 @@ declare
   v_signature regprocedure;
   v_definition text;
   v_rewritten text;
-  v_old_pattern text := $pattern$\(\s*select count\(\*\)::integer\s*from public\.customer_inventory_items as inventory\s*join public\.inventory_item_fulfillments as fulfillments\s*on fulfillments\.inventory_item_id = inventory\.id\s*where inventory\.member_id = v_actor\s*and inventory\.business_id = stores\.business_id\s*and inventory\.ownership_status = 'active'\s*and not fulfillments\.is_blocked\s*and fulfillments\.current_stage in \([^\)]*\)\s*\) > 0$pattern$;
+  -- pg_get_functiondef() preserves line breaks and may normalize whitespace
+  -- around operators. Match the bounded stored-inventory subquery instead of
+  -- depending on one exact pretty-printed representation.
+  v_old_pattern text := $pattern$\(\s*select count\(\*\)::integer(.|\n)*?from public\.customer_inventory_items as inventory(.|\n)*?where inventory\.member_id = v_actor(.|\n)*?and inventory\.business_id = stores\.business_id(.|\n)*?and fulfillments\.current_stage in \((.|\n)*?\)\s*\)\s*>\s*0$pattern$;
   v_new_expression text := $replacement$exists (
           select 1
           from public.shipping_fee_waiver_entitlements as entitlements

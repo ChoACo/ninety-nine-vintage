@@ -38,13 +38,14 @@ const kakaoClientId = publicOnly ? "" : required("KAKAO_REST_API_KEY");
 if (!publicOnly) required("KAKAO_CLIENT_SECRET");
 const kakaoRedirectUri = publicOnly ? "" : required("KAKAO_OIDC_REDIRECT_URI");
 
-async function checkRest(name, path, init = {}) {
+async function checkRest(name, path, init = {}, { publicAccess = false } = {}) {
   try {
+    const accessKey = publicAccess ? publishableKey : serviceKey || publishableKey;
     const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}${path}`, {
       ...init,
       headers: {
-        apikey: serviceKey || publishableKey,
-        Authorization: `Bearer ${serviceKey || publishableKey}`,
+        apikey: accessKey,
+        Authorization: `Bearer ${accessKey}`,
         "Content-Type": "application/json",
         ...init.headers,
       },
@@ -77,7 +78,7 @@ if (supabaseUrl && (serviceKey || publishableKey)) {
   await checkRest("supabase:auction-clock-rpc", "/rest/v1/rpc/get_auction_server_time", {
     method: "POST",
     body: "{}",
-  });
+  }, { publicAccess: true });
   if (!publicOnly) {
     await checkRest(
       "supabase:manual-transfer-account-rpc",

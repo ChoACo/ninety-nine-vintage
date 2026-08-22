@@ -36,7 +36,7 @@ function replaceSqlFragmentExactlyOnce(source, before, after, label) {
 }
 
 test("auction countdown and soft close remain anchored to the database clock", async () => {
-  const [migration, boundaryMigration, clockHook] = await Promise.all([
+  const [migration, boundaryMigration, clockHook, integrationVerifier] = await Promise.all([
     source(
       "supabase/migrations/20260718102000_live_auction_revenue_defense.sql",
     ),
@@ -44,6 +44,7 @@ test("auction countdown and soft close remain anchored to the database clock", a
       "supabase/migrations/20260721070000_include_exact_three_minute_soft_close.sql",
     ),
     source("src/hooks/useAuctionPolicyClock.ts"),
+    source("scripts/verify-integrations.mjs"),
   ]);
 
   const previousDefinition = extractPlaceBidDefinition(migration);
@@ -91,6 +92,10 @@ test("auction countdown and soft close remain anchored to the database clock", a
     /anti_sniping_extension_count = v_product\.anti_sniping_extension_count\s*\+ case when v_should_extend then 1 else 0 end/i,
   );
   assert.match(clockHook, /rpc\("get_auction_server_time"\)/);
+  assert.match(
+    integrationVerifier,
+    /supabase:auction-clock-rpc[\s\S]*publicAccess: true/,
+  );
   assert.match(
     clockHook,
     /serverOffsetMs = serverTime - \(requestedAt \+ receivedAt\) \/ 2/,

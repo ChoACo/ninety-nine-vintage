@@ -6,13 +6,15 @@ const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 test("the storefront renders separate mobile and fluid desktop presentation trees", async () => {
-  const [home, mobileHome, layout, mobileLayout, header, productRail, css] = await Promise.all([
+  const [home, mobileHome, layout, mobileLayout, header, productRail, centerMall, centerSkeletons, css] = await Promise.all([
     source("src/app/(shop)/home/page.tsx"),
     source("src/app/(mobile)/m/home/page.tsx"),
     source("src/components/layout/PcLayout.tsx"),
     source("src/components/mobile/MobileSiteLayout.tsx"),
     source("src/components/layout/PcHeader.tsx"),
     source("src/components/features/catalog/ProductRail.tsx"),
+    source("src/components/features/catalog/CenterMallHub.tsx"),
+    source("src/components/features/catalog/CenterSkeletons.tsx"),
     source("src/app/globals.css"),
   ]);
 
@@ -35,6 +37,9 @@ test("the storefront renders separate mobile and fluid desktop presentation tree
   assert.match(header, /(?:sm|md|lg|xl):/);
   assert.match(productRail, /surface === "desktop" \? "grid grid-cols-3 gap-2"/);
   assert.match(productRail, /surface === "desktop" \? "grid grid-cols-5 gap-x-3 gap-y-9"/);
+  assert.match(centerMall, /grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4/);
+  assert.match(centerMall, /aspect-\[16\/10\]/);
+  assert.match(centerSkeletons, /grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4/);
   assert.match(home, /text-\[clamp\(2rem,5vw,3\.5rem\)\]/);
   assert.match(home, /text-balance/);
   assert.match(home, /"only screen and \(max-width: 1279px\)": "\/m\/home"/);

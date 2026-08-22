@@ -141,6 +141,8 @@ test("member addresses use the owner-safe RPC and storage shows policy, full lis
   assert.match(dashboard, /소형 2주, 대형 1주/);
   assert.match(dashboard, /"전체보기"/);
   assert.match(dashboard, /배송 가능 상품 전체 선택/);
+  assert.match(dashboard, /v2Storage\.slice\(0, 6\)/);
+  assert.match(dashboard, /surface === "desktop" \? "grid-cols-6" : "grid-cols-2"/);
   assert.match(dashboard, /visibleRequestEligibleItems\.length/);
   assert.match(dashboard, /aria-label=\{`\$\{item\.title\} 배송 선택`\}/);
   assert.match(dashboard, /우편번호 5자리/);

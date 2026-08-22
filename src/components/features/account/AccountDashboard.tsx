@@ -557,7 +557,7 @@ function AccountDashboardForSession({
       : selectedLegacyOrder
         ? "legacy"
         : null;
-  const visibleV2Storage = showAllStorage ? v2Storage : v2Storage.slice(0, 4);
+  const visibleV2Storage = showAllStorage ? v2Storage : v2Storage.slice(0, 6);
   const visibleRequestEligibleItems = useMemo(
     () =>
       visibleV2Storage.filter(
@@ -1355,7 +1355,7 @@ function AccountDashboardForSession({
                     </label>
                   )}
                   <div
-                    className={`grid gap-3 p-1 ${surface === "desktop" ? "grid-cols-3" : "grid-cols-2"}`}
+                    className={`grid gap-2 p-1 ${surface === "desktop" ? "grid-cols-6" : "grid-cols-2"}`}
                   >
                     {visibleV2Storage.map((item) => {
                       const startedAt = item.storageStartedAt
@@ -1422,11 +1422,11 @@ function AccountDashboardForSession({
                           <CatalogImage
                             alt=""
                             className="aspect-square w-full object-cover"
-                            sizes={surface === "desktop" ? "220px" : "50vw"}
+                            sizes={surface === "desktop" ? "16vw" : "50vw"}
                             src={item.imageUrl}
                           />
-                          <div className="p-3">
-                            <p className="line-clamp-2 min-h-10 text-sm font-bold">
+                          <div className={surface === "desktop" ? "p-2" : "p-3"}>
+                            <p className={`line-clamp-2 font-bold ${surface === "desktop" ? "min-h-8 text-xs" : "min-h-10 text-sm"}`}>
                               {item.title}
                             </p>
                             <p className="mt-2 text-[11px] text-muted">

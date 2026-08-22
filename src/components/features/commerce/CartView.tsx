@@ -1075,8 +1075,8 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
           aria-live="polite"
           className="border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900"
         >
-          판매가 완료되었거나 공개가 종료된 상품 {staleCount}개를 장바구니에서
-          제외했습니다.
+          판매가 완료·공개 종료되었거나 현재 계정으로 구매할 수 없는 상품 {staleCount}개를
+          장바구니에서 제외했습니다.
         </div>
       )}
       {hasPendingCheckout && !busy && (

@@ -123,7 +123,7 @@ test("cart API can only reserve and release inventory through authoritative RPCs
   assert.doesNotMatch(route, /from\("cart_items"\)[\s\S]{0,120}\.delete\(\)/);
   assert.match(route, /reservedUntil: data\.reserved_until/);
   assert.match(route, /serverTime: data\.server_time/);
-  assert.match(route, /if \(liveIds\.length === 0\)/);
+  assert.match(route, /if \(purchasableIds\.length === 0\)/);
   assert.match(route, /staleProductIds: ids/);
 });
 

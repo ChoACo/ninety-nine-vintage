@@ -70,7 +70,26 @@ export async function GET(request: Request) {
     .lte("publish_at", new Date().toISOString());
   if (productError) return commerceJson({ error: "cart_unavailable" }, 503);
   const liveIds = (products ?? []).map((product) => product.id);
-  if (liveIds.length === 0) {
+  const eligibility = await Promise.all(
+    liveIds.map(async (productId) => {
+      const { data: canPurchase, error: eligibilityError } = await auth.user.rpc(
+        "can_purchase_product",
+        { p_product_id: productId },
+      );
+      return { canPurchase: canPurchase === true, error: eligibilityError, productId };
+    }),
+  );
+  if (eligibility.some((result) => result.error)) {
+    return commerceJson({ error: "cart_unavailable" }, 503);
+  }
+  const purchasableIds = eligibility
+    .filter((result) => result.canPurchase)
+    .map((result) => result.productId);
+  const purchasableIdSet = new Set(purchasableIds);
+  const purchasableProducts = (products ?? []).filter((product) =>
+    purchasableIdSet.has(product.id)
+  );
+  if (purchasableIds.length === 0) {
     return commerceJson({
       items: [],
       paymentMode,
@@ -88,7 +107,7 @@ export async function GET(request: Request) {
     : "regular";
   const quoteResult = await (auth.user as unknown as RpcClient).rpc(
     "quote_commerce_shipping_fee",
-    { p_product_ids: liveIds, p_shipping_region: shippingRegion },
+    { p_product_ids: purchasableIds, p_shipping_region: shippingRegion },
   );
   if (quoteResult.error || !quoteResult.data || typeof quoteResult.data !== "object") {
     return commerceJson({ error: "shipping_fee_unavailable" }, 503);
@@ -116,7 +135,7 @@ export async function GET(request: Request) {
       reservation.reserved_until,
     ]),
   );
-  const items = (products ?? [])
+  const items = purchasableProducts
     .map(mapPublishedProduct)
     .map((product) => ({
       ...product,
@@ -129,7 +148,7 @@ export async function GET(request: Request) {
   return commerceJson({
     items,
     paymentMode,
-    productIds: liveIds,
+    productIds: purchasableIds,
     reservations: reservations.map((reservation) => ({
       productId: reservation.product_id,
       reservedUntil: reservation.reserved_until,
@@ -138,7 +157,7 @@ export async function GET(request: Request) {
     shippingFee,
     shippingCharges: Array.isArray(quote.charges) ? quote.charges : [],
     quoteTotal: Number(quote.total),
-    staleProductIds: ids.filter((id) => !liveIds.includes(id)),
+    staleProductIds: ids.filter((id) => !purchasableIdSet.has(id)),
   });
 }
 

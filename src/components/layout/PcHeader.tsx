@@ -32,6 +32,10 @@ export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean })
     { label: "아카이브 숍", href: "/shop", icon: Store },
     { label: "보관함 안내", href: "/my/vault", icon: Package },
   ];
+  const isActiveRoute = (href: string) =>
+    pathname === href ||
+    pathname.startsWith(`${href}/`) ||
+    (href === "/live" && pathname === "/feed");
   useEffect(() => { const onKey = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchRef.current?.focus(); } }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, []);
   const navigation = simpleMode.enabled
     ? [
@@ -48,14 +52,14 @@ export function PcHeader({ hasLiveTicker = false }: { hasLiveTicker?: boolean })
         <Link className="shrink-0 whitespace-nowrap text-lg font-black tracking-[-0.06em]" href="/home" prefetch={false}>NINETY-NINE <span className="hidden lg:inline">VINTAGE</span></Link>
         <ThemeToggle className="ml-1 shrink-0 size-10 px-0 xl:ml-4" />
         {simpleMode.enabled && <nav className="flex min-w-0 flex-1 items-center justify-center gap-5 whitespace-nowrap" aria-label="주요 메뉴">
-          {navigation.map((item) => <Link className="border-b-2 border-transparent py-2 text-sm font-bold tracking-[0.02em] transition-colors hover:border-ink" href={item.href} key={item.href}>{item.label}</Link>)}
+          {navigation.map((item) => { const active = isActiveRoute(item.href); return <Link aria-current={active ? "page" : undefined} className={`border-b-2 py-2 text-sm font-bold tracking-[0.02em] transition-colors ${active ? "border-amber-500 text-ink" : "border-transparent text-muted hover:border-ink hover:text-ink"}`} href={item.href} key={item.href}>{item.label}</Link>; })}
         </nav>}
         <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
           {!simpleMode.enabled && <nav aria-label="주요 메뉴" className="mr-1 flex shrink-0 items-center gap-1 xl:mr-4 xl:gap-1.5">
             {standardNavigation.map((item) => {
               const Icon = item.icon;
-              const active = pathname === item.href || (item.href === "/live" && pathname === "/feed");
-              return <Link aria-current={active ? "page" : undefined} aria-label={item.label} className={`relative inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap border px-2 text-[11px] font-bold transition-colors min-[1180px]:px-3 ${active ? "border-ink bg-surface text-ink" : "border-line text-muted hover:border-ink hover:text-ink"}`} href={item.href} key={item.href}>{<Icon size={15} strokeWidth={1.75} />}<span className="hidden min-[1180px]:inline">{item.label}</span>{item.href === "/live" && <span className="absolute -right-1 -top-2 rounded-full bg-rose-600 px-1.5 py-0.5 text-[7px] font-black text-white before:absolute before:inset-0 before:-z-10 before:animate-ping before:rounded-full before:bg-rose-500/50">LIVE</span>}</Link>;
+              const active = isActiveRoute(item.href);
+              return <Link aria-current={active ? "page" : undefined} aria-label={item.label} className={`relative inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap border px-2 text-[11px] font-bold transition-colors after:absolute after:inset-x-1 after:-bottom-px after:h-0.5 after:transition-colors min-[1180px]:px-3 ${active ? "border-ink bg-surface text-ink after:bg-amber-500" : "border-line text-muted after:bg-transparent hover:border-ink hover:text-ink"}`} href={item.href} key={item.href}>{<Icon size={15} strokeWidth={1.75} />}<span className="hidden min-[1180px]:inline">{item.label}</span>{item.href === "/live" && <span className="absolute -right-1 -top-2 rounded-full bg-rose-600 px-1.5 py-0.5 text-[7px] font-black text-white before:absolute before:inset-0 before:-z-10 before:animate-ping before:rounded-full before:bg-rose-500/50">LIVE</span>}</Link>;
             })}
           </nav>}
           {!simpleMode.enabled && <>

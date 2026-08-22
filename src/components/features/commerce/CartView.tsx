@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { persistCart } from "@/lib/commerce/client";
@@ -12,6 +12,7 @@ import {
   type CommercePaymentMode,
 } from "@/lib/commerce/paymentMode";
 import { useCommerceStore } from "@/store/useCommerceStore";
+import { useCartStore } from "@/store/useCartStore";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { PostcodeSearchButton } from "@/components/features/account/PostcodeSearchButton";
 
@@ -439,7 +440,15 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
   const [paymentMode, setPaymentMode] = useState<CartPaymentMode>("loading");
   const [shippingFee, setShippingFee] = useState(0);
   const [shippingCharges, setShippingCharges] = useState<ShippingCharge[]>([]);
-  const [includeShippingFee, setIncludeShippingFee] = useState(true);
+  const shippingMode = useCartStore(
+    (state) => state.shippingModes.checkout ?? "ship",
+  );
+  const setShippingMode = useCartStore((state) => state.setShippingMode);
+  const includeShippingFee = shippingMode === "ship";
+  const setIncludeShippingFee = useCallback(
+    (include: boolean) => setShippingMode("checkout", include ? "ship" : "vault"),
+    [setShippingMode],
+  );
   const [shippingRegion, setShippingRegion] = useState<"regular" | "remote_area">("regular");
   const [shippingAddresses, setShippingAddresses] = useState<ShippingAddress[]>([]);
   const [shippingAddressId, setShippingAddressId] = useState("");
@@ -803,7 +812,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
         authGeneration.current += 1;
       };
     }
-  }, [replaceCart, shippingRegion]);
+  }, [replaceCart, setIncludeShippingFee, shippingRegion]);
 
   useEffect(() => {
     if (access !== "member") return;
@@ -1320,7 +1329,7 @@ export function CartView({ basePath = "", selectedProductId, surface = "mobile" 
             ) : null}
             <div className="mt-6 flex justify-between border-t border-line pt-5">
               <span className="text-sm font-bold">예상 결제 금액</span>
-              <strong className="font-mono text-xl">
+              <strong className="font-mono text-xl transition-all duration-200" aria-live="polite">
                 {expectedTotal.toLocaleString("ko-KR")}원
               </strong>
             </div>

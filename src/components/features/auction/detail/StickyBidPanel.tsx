@@ -18,7 +18,6 @@ import type { BidHistoryEntry, ItemDetail } from "@/types/detail";
 import { measurementEntries } from "@/lib/catalog/measurements";
 import { ProductInquiryModal } from "@/components/features/auction/detail/ProductInquiryModal";
 import { SizeComparisonScanner } from "@/components/features/auction/detail/SizeComparisonScanner";
-import { QuickCartModal } from "@/components/features/auction/detail/QuickCartModal";
 import { ShareProductButton } from "@/components/ui/ShareProductButton";
 import { AuctionBidHistoryModal } from "@/components/features/auction/AuctionBidHistoryModal";
 import { useAccountAuctionBids } from "@/components/features/auction/AuctionBidSummary";
@@ -33,6 +32,7 @@ import {
 } from "@/components/features/auction/auctionFeedLogic";
 import { SettlementActions } from "@/components/features/auction/detail/SettlementActions";
 import { useCommerceStore } from "@/store/useCommerceStore";
+import { useToastStore } from "@/store/useToastStore";
 import { persistWishlist, reserveCartProduct } from "@/lib/commerce/client";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 import { getDailyAuctionPhase } from "@/utils/auctionBidPolicy";
@@ -140,8 +140,6 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
   const [buyNoticeKind, setBuyNoticeKind] = useState<"success" | "error">(
     "success",
   );
-  const [cartReserved, setCartReserved] = useState(false);
-  const [quickCartOpen, setQuickCartOpen] = useState(false);
   const [auctionSnapshot, setAuctionSnapshot] = useState(() => ({
     bidLockedAt: item.bidLockedAt ?? null,
     closesAt: item.closesAt ?? "",
@@ -167,6 +165,10 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
     (state) => state.replaceAuthoritative,
   );
   const addToCart = useCommerceStore((state) => state.addToCart);
+  const cartContainsItem = useCommerceStore((state) =>
+    state.cartIds.includes(item.id),
+  );
+  const pushToast = useToastStore((state) => state.pushToast);
   const liked = useCommerceStore((state) => state.likedIds.includes(item.id));
   const toggleLike = useCommerceStore((state) => state.toggleLike);
   const hydrateCommerce = useCommerceStore((state) => state.hydrate);
@@ -389,15 +391,19 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
 
   const addFixedToCart = async () => {
     if (buying) return;
+    if (cartContainsItem) {
+      pushToast("success", "이미 장바구니에 담긴 상품입니다.", {
+        action: { label: "장바구니 바로가기", href: `${basePath}/cart` },
+      });
+      return;
+    }
     setBuying(true);
-    setCartReserved(false);
     setBuyNotice("");
     setBuyNoticeKind("success");
     try {
       const { data } = await getSupabaseBrowserClient().auth.getSession();
       const session = data.session;
       if (!session?.access_token) {
-        setQuickCartOpen(false);
         rememberFixedPurchaseIntent(item.id, "cart");
         router.push(
           `${basePath}/account/login?next=${encodeURIComponent(`${basePath}/auction/${item.id}?purchaseIntent=cart`)}`,
@@ -406,13 +412,10 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
       }
       await reserveCartProduct(item.id, session.user.id);
       addToCart(item.id);
-      setCartReserved(true);
-      setBuyNoticeKind("success");
-      setBuyNotice(
-        "장바구니에 담았습니다. 구매 가능 여부는 결제 시 다시 확인됩니다.",
-      );
+      pushToast("success", "장바구니에 상품을 담았습니다.", {
+        action: { label: "장바구니 바로가기", href: `${basePath}/cart` },
+      });
     } catch (error) {
-      setCartReserved(false);
       setBuyNoticeKind("error");
       setBuyNotice(
         error instanceof Error ? error.message : "장바구니에 담지 못했습니다.",
@@ -747,7 +750,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
           <button
             className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-zinc-950 text-sm font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 disabled:opacity-50"
             disabled={buying}
-            onClick={() => { setBuyNotice(""); setBuyNoticeKind("success"); setCartReserved(false); setQuickCartOpen(true); }}
+            onClick={() => void addFixedToCart()}
             type="button"
           >
             <ShoppingBag size={15} /> 장바구니 담기
@@ -763,7 +766,7 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
         </div>
         </>
       )}
-      {buyNotice && !quickCartOpen && (
+      {buyNotice && (
         <p
           aria-live="polite"
           className={`mt-3 text-xs font-bold ${
@@ -821,19 +824,6 @@ export function StickyBidPanel({ basePath = "", compact = false, item, surface =
         productId={item.id}
         productTitle={item.name}
       />
-      {item.saleType === "fixed" && (
-        <QuickCartModal
-          busy={buying}
-          completed={cartReserved}
-          notice={buyNotice}
-          onClose={() => !buying && setQuickCartOpen(false)}
-          onConfirm={() => void addFixedToCart()}
-          onViewCart={() => router.push(`${basePath}/cart`)}
-          open={quickCartOpen}
-          price={displayPrice}
-          productTitle={item.name}
-        />
-      )}
       <SizeComparisonScanner
         itemMeasurements={item.measurements}
         onClose={() => setScannerOpen(false)}

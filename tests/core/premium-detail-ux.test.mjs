@@ -69,7 +69,7 @@ test("contain fitting and pinch transforms stay finite at malformed gesture boun
   assert.equal(Object.values(malformedBounds).every(Number.isFinite), true);
 });
 
-test("premium detail actions stay in layered rounded dialogs before server mutation", async () => {
+test("premium detail actions use confirmation dialogs only for consequential mutations", async () => {
   const [styles, modal, routeModal, condition, cart, bid, gallery, catalogImage, sticky, scrollLock] = await Promise.all([
     source("src/app/globals.css"),
     source("src/components/ui/PremiumDialog.tsx"),
@@ -148,9 +148,11 @@ test("premium detail actions stay in layered rounded dialogs before server mutat
   );
   assert.match(
     quickCartAction,
-    /reserveCartProduct\(item\.id, session\.user\.id\)[\s\S]*addToCart\(item\.id\)[\s\S]*setCartReserved\(true\)/,
+    /reserveCartProduct\(item\.id, session\.user\.id\)[\s\S]*addToCart\(item\.id\)[\s\S]*장바구니에 상품을 담았습니다/,
   );
-  assert.match(quickCartAction, /setQuickCartOpen\(false\)/);
+  assert.match(quickCartAction, /cartContainsItem[\s\S]*이미 장바구니에 담긴 상품입니다/);
+  assert.match(quickCartAction, /장바구니 바로가기/);
+  assert.doesNotMatch(sticky, /<QuickCartModal/);
   assert.doesNotMatch(quickCartAction, /router\.push\("\/cart"\)/);
   assert.match(sticky, /surface === "desktop"[\s\S]*sticky col-span-5 p-6 pb-6[\s\S]*: "p-5 pb-32"/);
   assert.match(scrollLock, /activeBodyScrollLocks \+= 1/);

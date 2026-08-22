@@ -20,9 +20,9 @@ test("background single registration reports completion and failure via a modal"
     /setRegistrationResult\(\{[\s\S]{0,80}kind: "failure"/,
   );
   assert.match(consoleSource, /<PremiumDialog[\s\S]*?single-registration-result-title/);
-  assert.match(consoleSource, />등록 완료</);
-  assert.match(consoleSource, />등록 실패</);
-  assert.match(consoleSource, />재시도 진행 중입니다</);
+  assert.match(consoleSource, />\s*등록 완료\s*</);
+  assert.match(consoleSource, />\s*등록 실패\s*</);
+  assert.match(consoleSource, />\s*재시도 진행 중입니다\s*</);
   const retryingWindow = consoleSource.slice(
     consoleSource.indexOf('kind === "retrying" &&'),
     consoleSource.indexOf('kind === "failure" &&'),
@@ -55,10 +55,10 @@ test("retry reruns the background job and failure confirm restores inputs with p
   );
   assert.match(
     consoleSource,
-    /onClick=\{\(\) => restoreFailedRegistration\(registrationResult\.jobId\)\}[^>]*>확인</,
+    /onClick=\{\(\) =>[\s\S]{0,100}restoreFailedRegistration\(registrationResult\.jobId\)[\s\S]{0,100}>\s*확인\s*</,
   );
   assert.match(
     consoleSource,
-    /onClick=\{\(\) => retrySingleRegistration\(registrationResult\.jobId\)\}[^>]*>재시도</,
+    /onClick=\{\(\) =>[\s\S]{0,100}retrySingleRegistration\(registrationResult\.jobId\)[\s\S]{0,100}>\s*재시도\s*</,
   );
 });

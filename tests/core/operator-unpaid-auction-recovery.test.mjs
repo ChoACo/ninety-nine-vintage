@@ -104,7 +104,7 @@ test("registration form states that bid increments are per-product", async () =>
   assert.match(consoleSource, /최소 입찰 단위 \(원\)/);
   assert.match(
     consoleSource,
-    /기본값은 1,000원이며 입력칸에서 상품별로 자유롭게 수정할 수 있습니다/,
+    /기본값은 1,000원이며 입력칸에서 상품별로 자유롭게 수정할 수\s*있습니다/,
   );
   assert.doesNotMatch(consoleSource, /입찰 최소 단위는 1,000원으로 자동 적용됩니다/);
 });

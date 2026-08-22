@@ -63,9 +63,9 @@ test("single product registration is separate, defaults to immediate publication
     consoleSource.indexOf("1. 상품 사진 선택")
       < consoleSource.indexOf('placeholder="상품명 (필수)"'),
   );
-  assert.match(consoleSource, /브랜드 \(선택\)/);
-  assert.match(consoleSource, /카테고리 미입력/);
-  assert.match(consoleSource, /사이즈 \(선택\)/);
+  assert.match(consoleSource, /<GenderCategorySelect/);
+  assert.doesNotMatch(consoleSource, /aria-label="브랜드"/);
+  assert.doesNotMatch(consoleSource, /aria-label="사이즈"/);
   assert.doesNotMatch(consoleSource, /상태등급 미입력/);
   assert.match(
     consoleSource,
@@ -73,7 +73,7 @@ test("single product registration is separate, defaults to immediate publication
   );
   assert.match(
     consoleSource,
-    /<TextArea aria-label="상품 설명"/,
+    /<TextArea[\s\S]{0,80}aria-label="상품 설명"/,
   );
   assert.match(
     consoleSource,
@@ -83,7 +83,7 @@ test("single product registration is separate, defaults to immediate publication
   assert.match(consoleSource, /aria-label="최소 입찰 단위"/);
   assert.match(
     consoleSource,
-    /기본값은 1,000원이며 입력칸에서 상품별로 자유롭게 수정할 수 있습니다/,
+    /기본값은 1,000원이며 입력칸에서 상품별로 자유롭게 수정할 수\s*있습니다/,
   );
   assert.doesNotMatch(consoleSource, /입찰 최소 단위는 1,000원으로 자동 적용됩니다/);
   assert.equal(
@@ -91,9 +91,9 @@ test("single product registration is separate, defaults to immediate publication
     1,
     "판매 방식 입력은 기존 상품 수정 폼에만 남아야 합니다.",
   );
-  assert.match(consoleSource, /useState<PublicationMode>\("now"\)/);
-  assert.match(consoleSource, /<option value="scheduled">예약 공개<\/option>/);
-  assert.match(consoleSource, /Array\.from\(\{ length: 24 \}/);
+  assert.match(consoleSource, /useState<PublicationMode>\("scheduled"\)/);
+  assert.match(consoleSource, /getAvailablePublishSlots/);
+  assert.match(consoleSource, /publishSlots\.map/);
   assert.match(consoleSource, /singleImages\.length \+ selected\.length > 15/);
   assert.match(consoleSource, /type="file"/);
   assert.match(consoleSource, /moveSingleImage\(index,\s*-1\)/);
@@ -103,17 +103,17 @@ test("single product registration is separate, defaults to immediate publication
 
   assert.match(route, /registrationMode === "single"/);
   assert.match(route, /const title = text\(body\?\.title\)/);
-  assert.match(route, /!title \|\| title\.length > 160/);
+  assert.match(route, /!title \|\|\s*title\.length > 160/);
   assert.match(route, /\(!singleRegistration && !description\)/);
   assert.match(route, /description\.length > 10000/);
-  assert.match(route, /normalizeProductBrand\("빈티지"\)/);
-  assert.match(route, /const gender = \["남성", "여성", "공용"\]/);
+  assert.match(route, /parseBrandAndSizeFromTitle\(title\)/);
+  assert.match(route, /auth\.selectedStoreId/);
   assert.match(route, /const category = text\(body\?\.category, "기타"\)/);
   assert.doesNotMatch(route, /getRelativeKoreanDateTime\(1,\s*"10:00:00"/);
-  assert.match(route, /nextKoreanScheduledHour\(scheduledHourKst\)/);
+  assert.match(route, /getAvailablePublishSlots\(\)\[0\]\.value/);
   assert.match(route, /value\.length > 15/);
   assert.match(route, /p_permission:\s*"publish_products"/);
-  assert.match(route, /size_label:\s*text\(body\?\.sizeLabel\)/);
+  assert.match(route, /size_label:[\s\S]*parsedTitle\.size/);
   assert.match(route, /inspection_notes:\s*Array\.isArray\(body\?\.inspectionNotes\)/);
   assert.match(consoleSource, /하자 상세 매핑/);
   assert.doesNotMatch(route, /구제 의류/);
@@ -151,7 +151,7 @@ test("single registration resets immediately and finishes safely in the backgrou
   );
   assert.match(consoleSource, /단품 백그라운드 저장/);
   assert.match(consoleSource, /건 처리 중/);
-  assert.match(consoleSource, /간편등록칸에서 다음 상품을 계속 등록할 수 있습니다/);
+  assert.match(consoleSource, /간편등록칸에서 다음 상품을 계속\s*등록할 수 있습니다/);
   assert.match(consoleSource, /setBlankSingleRegistration\(form\.saleType,\s*true\)/);
   assert.match(consoleSource, /바로 다음 \$\{snapshot\.form\.saleType/);
   assert.match(consoleSource, /beforeunload/);

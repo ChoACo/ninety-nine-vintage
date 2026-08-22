@@ -72,8 +72,8 @@ test("registration form opens preset fields from the selected category and persi
     source("src/app/api/admin/operator/products/route.ts"),
     source("src/app/api/admin/operator/products/[id]/route.ts"),
   ]);
-  assert.match(consoleSource, /updateCategory\(event\.target\.value\)/);
-  assert.match(consoleSource, /MeasurementFields category=\{form\.category\}/);
+  assert.match(consoleSource, /<GenderCategorySelect/);
+  assert.match(consoleSource, /<MeasurementFields[\s\S]{0,120}category=\{form\.category\}/);
   assert.match(consoleSource, /measurements: collectMeasurements\(snapshot\.form\.measurements\)/);
   assert.match(consoleSource, /measurements: collectMeasurements\(form\.measurements\)/);
   assert.match(postRoute, /measurements: normalizeMeasurements\(body\?\.measurements\)/);

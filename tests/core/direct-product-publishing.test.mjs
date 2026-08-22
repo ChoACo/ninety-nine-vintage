@@ -36,14 +36,14 @@ test("product management treats pending as scheduled inventory and keeps one bat
   assert.match(consoleSource, /업로드 예정으로 저장/);
   assert.match(consoleSource, /await publishProductNow\(token, productId\)/);
   assert.match(consoleSource, /점검·하자 메모/);
-  assert.match(consoleSource, /MeasurementFields category=\{form\.category\}/);
+  assert.match(consoleSource, /<MeasurementFields[\s\S]{0,120}category=\{form\.category\}/);
   assert.doesNotMatch(consoleSource, /measurementShoulder/);
   assert.doesNotMatch(consoleSource, /parseBulkCsv|일괄 등록 CSV|CSV 일괄 등록 실행/);
   assert.match(xlsxSource, /등록이 끝난 상품은 즉시 공개됩니다/);
   assert.match(productsRoute, /from\("store_memberships"\)/);
   assert.match(productsRoute, /p_permission:\s*"manage_products"/);
   assert.match(productsRoute, /const canMutate = stores\.length > 0/);
-  assert.match(consoleSource, /product\.store_id !== null && publishableStoreIds\.has\(product\.store_id\)/);
+  assert.match(consoleSource, /product\.store_id !== null &&\s*publishableStoreIds\.has\(product\.store_id\)/);
   assert.match(consoleSource, /store\.id === product\.store_id && store\.canPublish/);
 });
 

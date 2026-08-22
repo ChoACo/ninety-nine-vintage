@@ -16,11 +16,11 @@ test("publication preferences persist per operator and store with hourly KST sch
   assert.match(migration, /scheduled_hour_kst between 0 and 23/i);
   assert.match(migration, /has_store_permission\(p_store_id,'manage_products'\)/i);
   assert.match(route, /set_operator_product_publication_preference/);
-  assert.match(consoleSource, /useState<PublicationMode>\("now"\)/);
-  assert.match(consoleSource, /form\.saleType !== "auction"/);
-  assert.match(consoleSource, /Array\.from\(\{ length: 24 \}/);
-  assert.match(productRoute, /nextKoreanScheduledHour/);
-  assert.match(productRoute, /const publicationMode = saleType === "auction" \? "now"/);
+  assert.match(consoleSource, /useState<PublicationMode>\("scheduled"\)/);
+  assert.match(consoleSource, /getAvailablePublishSlots/);
+  assert.match(consoleSource, /publishSlots\.map/);
+  assert.match(productRoute, /getAvailablePublishSlots\(\)\[0\]\.value/);
+  assert.match(productRoute, /body\?\.publicationMode === "now" \? "now" : "scheduled"/);
 });
 
 test("store malls split into main, new, auction, buy, and info pages", async () => {

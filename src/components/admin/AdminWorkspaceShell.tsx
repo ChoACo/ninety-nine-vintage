@@ -20,6 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAdminSidebarStore } from "@/store/useAdminSidebarStore";
+import { lockBodyScroll } from "@/lib/browser/bodyScrollLock";
 
 const WORKSPACE_ICONS: Record<string, LucideIcon> = {
   auctions: Gavel,
@@ -123,14 +124,13 @@ export function AdminWorkspaceShell({
 
   useEffect(() => {
     if (!mobileOpen) return undefined;
-    const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setMobileOpen(false);
     };
-    document.body.style.overflow = "hidden";
+    const releaseBodyScroll = lockBodyScroll();
     window.addEventListener("keydown", closeOnEscape);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      releaseBodyScroll();
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [mobileOpen]);
@@ -193,6 +193,7 @@ export function AdminWorkspaceShell({
           className={`fixed inset-y-0 left-0 z-[90] flex w-[min(18rem,calc(100vw-2rem))] translate-x-[var(--workspace-sidebar-offset)] flex-col overflow-hidden rounded-r-2xl border-r shadow-2xl transition-transform duration-300 ease-in-out md:sticky md:top-0 md:z-auto md:h-full md:min-h-0 md:w-full md:translate-x-0 md:rounded-2xl md:border ${darkMode ? "border-zinc-800 bg-zinc-950 text-zinc-100 shadow-zinc-950/20" : "border-line bg-surface text-ink"}`}
           id={`${sidebarMode}-workspace-sidebar`}
           role={mobileOpen ? "dialog" : undefined}
+          data-mobile-drawer-open={mobileOpen ? "true" : undefined}
           style={{
             "--workspace-sidebar-offset": mobileOpen ? "0%" : "-100%",
           } as CSSProperties}

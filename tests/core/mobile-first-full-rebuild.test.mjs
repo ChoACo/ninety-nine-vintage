@@ -13,6 +13,14 @@ test("floating chat clears navigation and sticky commerce actions", async () => 
   assert.match(chat, /size-12/);
 });
 
+test("cache consent clears chat, navigation, and mobile commerce actions", async () => {
+  const consent = await source("src/components/layout/CacheConsentBanner.tsx");
+  assert.match(consent, /\^\\\/\(\?:m\\\/\)\?\(\?:auction\|live\)\\\/\[\^\/\]\+\$/);
+  assert.match(consent, /top-\[calc\(5rem\+env\(safe-area-inset-top\)\)\]/);
+  assert.match(consent, /bottom-\[calc\(10\.5rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(consent, /surface === "desktop" \? "bottom-6 right-24"/);
+});
+
 test("mobile header auto-hides on downward scroll and restores sticky offsets", async () => {
   const [hook, header, layout, css] = await Promise.all([
     source("src/hooks/useScrollDirection.ts"),

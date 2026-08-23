@@ -96,7 +96,7 @@ function EnabledAuctionCard({ basePath = "", detailRoute, item }: AuctionCardPro
           {item.imageUrl ? <CatalogImage alt={`${item.brand} ${item.name}`} className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105" fill loading="lazy" sizes="(max-width: 639px) 50vw, (max-width: 767px) 33vw, (max-width: 1279px) 25vw, (max-width: 1535px) 20vw, 16vw" src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
           <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
             {grade && <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold shadow-sm ${gradeClass}`}>GRADE {grade}</span>}
-            {!isFixed && <span className="rounded-md bg-rose-600 px-2 py-0.5 text-[10px] font-black tracking-tight text-white shadow-sm">LIVE</span>}
+            {!isFixed && <span className="rounded-md bg-rose-600 px-2 py-0.5 text-[10px] font-black tracking-tight text-white shadow-sm dark:text-zinc-950">LIVE</span>}
             {isNew && <span className="rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-black tracking-tight text-white shadow-sm">NEW</span>}
           </div>
           <div className="absolute right-2 top-2 flex flex-col items-end gap-2">

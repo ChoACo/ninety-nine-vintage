@@ -11,6 +11,13 @@ import {
 
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
+const createStyle = (initial = {}) => ({
+  ...initial,
+  removeProperty(property) {
+    const key = property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+    this[key] = "";
+  },
+});
 const bounds = {
   contentHeight: 600,
   contentWidth: 800,
@@ -158,8 +165,11 @@ test("premium detail actions use confirmation dialogs only for consequential mut
   assert.match(sticky, /action: \{ href: bidLoginHref, label: "카카오 로그인" \}/);
   assert.match(sticky, /disabled=\{!guestCanSignInToBid\}/);
   assert.match(sticky, /break-keep rounded-2xl[\s\S]*p-3[\s\S]*sm:p-4/);
-  assert.match(scrollLock, /activeBodyScrollLocks \+= 1/);
-  assert.match(scrollLock, /activeBodyScrollLocks === 0/);
+  assert.match(scrollLock, /activeBodyScrollLocks\.add\(lockToken\)/);
+  assert.match(scrollLock, /activeBodyScrollLocks\.size === 0/);
+  assert.match(scrollLock, /document\.documentElement\.style\.overflow = "hidden"/);
+  assert.match(scrollLock, /document\.documentElement\.style\.overscrollBehavior = "none"/);
+  assert.match(scrollLock, /export function recoverBodyScroll/);
 });
 
 test("fixed navigation and operator dialogs share the accessible portaled lifecycle", async () => {
@@ -198,4 +208,64 @@ test("fixed navigation and operator dialogs share the accessible portaled lifecy
   assert.match(operatorImport, /closeDisabled=\{isSubmitting\}/);
   assert.doesNotMatch(operatorImport, /window\.addEventListener\("keydown"/);
   assert.doesNotMatch(operatorImport, /document\.body\.style\.overflow/);
+});
+
+test("route recovery and admin drawers share the reference-counted document lock", async () => {
+  const [layout, recovery, workspace, styles] = await Promise.all([
+    source("src/app/layout.tsx"),
+    source("src/components/layout/ScrollLockRecovery.tsx"),
+    source("src/components/admin/AdminWorkspaceShell.tsx"),
+    source("src/app/globals.css"),
+  ]);
+
+  assert.match(layout, /<ScrollLockRecovery \/>/);
+  assert.match(recovery, /usePathname\(\)/);
+  assert.match(recovery, /pageshow/);
+  assert.match(recovery, /visibilitychange/);
+  assert.match(recovery, /!document\.querySelector\(ACTIVE_OVERLAY_SELECTOR\)/);
+  assert.match(workspace, /const releaseBodyScroll = lockBodyScroll\(\)/);
+  assert.match(workspace, /data-mobile-drawer-open=/);
+  assert.doesNotMatch(workspace, /document\.body\.style\.overflow = "hidden"/);
+  assert.match(styles, /-webkit-overflow-scrolling:\s*touch/);
+});
+
+test("nested document locks restore scrolling regardless of release order", async () => {
+  const originalDocument = globalThis.document;
+  const documentElement = {
+    dataset: {},
+    style: createStyle({ overflow: "auto", overscrollBehavior: "contain" }),
+  };
+  const body = { style: createStyle({ overflow: "" }) };
+  globalThis.document = { body, documentElement };
+
+  try {
+    const scrollLock = await import(
+      `../../src/lib/browser/bodyScrollLock.ts?test=${Date.now()}`
+    );
+    const releaseDrawer = scrollLock.lockBodyScroll();
+    const releaseDialog = scrollLock.lockBodyScroll();
+
+    assert.equal(documentElement.style.overflow, "hidden");
+    assert.equal(documentElement.style.overscrollBehavior, "none");
+    assert.equal(body.style.overflow, "hidden");
+    assert.equal(documentElement.dataset.scrollLocked, "true");
+
+    releaseDrawer();
+    assert.equal(body.style.overflow, "hidden");
+    releaseDialog();
+    assert.equal(documentElement.style.overflow, "auto");
+    assert.equal(documentElement.style.overscrollBehavior, "contain");
+    assert.equal(body.style.overflow, "");
+    assert.equal(documentElement.dataset.scrollLocked, undefined);
+
+    documentElement.style.overflow = "hidden";
+    documentElement.style.overscrollBehavior = "none";
+    body.style.overflow = "hidden";
+    scrollLock.recoverBodyScroll();
+    assert.equal(documentElement.style.overflow, "");
+    assert.equal(documentElement.style.overscrollBehavior, "");
+    assert.equal(body.style.overflow, "");
+  } finally {
+    globalThis.document = originalDocument;
+  }
 });

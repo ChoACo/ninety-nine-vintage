@@ -95,7 +95,7 @@ export function ModalShell({
             <p className="truncate px-4 text-xs font-bold">{label}</p>
             <button aria-label={`${label} 닫기`} className="grid size-10 place-items-center rounded-xl transition-all duration-300 hover:-translate-y-0.5 hover:bg-surface active:scale-95" onClick={close} type="button"><X size={18} /></button>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto p-6">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-6" data-route-modal-scroll>{children}</div>
         </div>
       </div>
     </div>

@@ -79,6 +79,7 @@ test("desktop global search supports slash without stealing editable input keys"
   assert.match(header, /target\.isContentEditable/);
   assert.match(header, /target\.tagName === "INPUT"/);
   assert.match(header, /searchRef\.current\?\.focus\(\)/);
+  assert.match(header, /id="global-product-search" name="q"/);
   assert.match(header, /aria-keyshortcuts="\/ Meta\+K Control\+K"/);
   assert.match(header, /<kbd[\s\S]*>\[\/\]<\/kbd>/);
 });

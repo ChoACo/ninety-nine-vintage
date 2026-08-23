@@ -61,7 +61,7 @@ export function CacheConsentBanner({ surface = "mobile" }: { surface?: "desktop"
   }, []);
 
   if (pathname === "/") return null;
-  const detailHasFixedMobileAction = /^\/auction\/[^/]+$/.test(pathname);
+  const detailHasFixedMobileAction = /^\/(?:m\/)?(?:auction|live)\/[^/]+$/.test(pathname);
   const accept = () => {
     setConsent("accepted");
     writeCacheConsent("accepted");
@@ -72,10 +72,10 @@ export function CacheConsentBanner({ surface = "mobile" }: { surface?: "desktop"
     writeCacheConsent("declined");
     void clearPublicCache().catch(() => undefined);
   };
-  const mobileBottom = detailHasFixedMobileAction
-    ? "bottom-[calc(9rem+env(safe-area-inset-bottom))]"
-    : "bottom-[calc(5rem+env(safe-area-inset-bottom))]";
-  const placement = surface === "desktop" ? "bottom-6 right-6" : `inset-x-3 mx-auto ${mobileBottom}`;
+  const mobilePlacement = detailHasFixedMobileAction
+    ? "inset-x-3 top-[calc(5rem+env(safe-area-inset-top))] mx-auto"
+    : "inset-x-3 bottom-[calc(10.5rem+env(safe-area-inset-bottom))] mx-auto";
+  const placement = surface === "desktop" ? "bottom-6 right-24" : mobilePlacement;
   return <AnimatePresence>{consent === "unknown" && <motion.aside animate={{ opacity: 1, y: 0 }} aria-label="공개 캐시 사용 선택" className={`theme-invariant-dark fixed z-[80] flex w-[calc(100%-1.5rem)] max-w-lg items-start gap-3 rounded-2xl border border-zinc-700 bg-zinc-950/95 p-4 text-white shadow-2xl shadow-black/30 backdrop-blur-xl ${placement}`} exit={{ opacity: 0, y: 16 }} initial={{ opacity: 0, y: 16 }} role="region" transition={{ duration: .24, ease: "easeOut" }}><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-zinc-800 text-emerald-400"><Database size={17} strokeWidth={1.75} /></span><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="text-xs font-bold">빠른 로딩을 위한 공개 캐시</p><span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/10 px-2 py-1 text-[9px] font-bold text-emerald-300"><ShieldCheck size={11} strokeWidth={1.75} /> 개인정보 제외</span></div><p className="mt-1.5 text-[11px] leading-5 text-zinc-400">공개 상품·이미지·정적 리소스만 기기에 저장합니다. 계정·주문·결제 정보는 저장하지 않습니다.</p><div className="mt-3 flex gap-2"><button className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-card px-4 text-[11px] font-bold text-zinc-950 transition-all hover:-translate-y-0.5 hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-emerald-400 active:scale-[.98]" onClick={accept} type="button"><Check size={13} strokeWidth={1.75} /> 허용</button><button className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-zinc-700 px-4 text-[11px] font-bold text-zinc-300 transition-colors hover:border-zinc-400 hover:text-white focus-visible:ring-2 focus-visible:ring-white" onClick={decline} type="button"><X size={13} strokeWidth={1.75} /> 거부</button></div></div></motion.aside>}</AnimatePresence>;
 }
 

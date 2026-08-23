@@ -269,7 +269,7 @@ export function ActiveBidProducts({
                       sizes={surface === "desktop" ? "360px" : "50vw"}
                       src={item.imageUrl}
                     />
-                    <span className={outbid ? "absolute inset-x-2 top-2 bg-rose-600 px-2 py-2 text-center text-[10px] font-black text-white" : "absolute inset-x-2 top-2 bg-emerald-700 px-2 py-2 text-center text-[10px] font-black text-white"}>
+                    <span className={outbid ? "absolute inset-x-2 top-2 bg-rose-600 px-2 py-2 text-center text-[10px] font-black text-white dark:text-zinc-950" : "absolute inset-x-2 top-2 bg-emerald-700 px-2 py-2 text-center text-[10px] font-black text-white dark:text-zinc-950"}>
                       {outbid ? "다른 회원이 더 높은 가격으로 입찰했습니다" : "현재 최고 입찰자입니다"}
                     </span>
                   </div>

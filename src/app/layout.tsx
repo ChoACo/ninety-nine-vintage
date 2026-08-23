@@ -5,6 +5,7 @@ import { GlobalToastHost } from "@/components/features/notifications/GlobalToast
 import { NotificationExperienceProvider } from "@/components/features/notifications/NotificationExperienceProvider";
 import { SimpleModeProvider } from "@/components/features/accessibility/SimpleModeProvider";
 import { ReturnScrollCapture } from "@/components/layout/ReturnScrollCapture";
+import { ScrollLockRecovery } from "@/components/layout/ScrollLockRecovery";
 import "./globals.css";
 
 const themeInitializationScript = `
@@ -72,6 +73,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </SimpleModeProvider>
         <GlobalToastHost />
         <ReturnScrollCapture />
+        <ScrollLockRecovery />
       </body>
     </html>
   );

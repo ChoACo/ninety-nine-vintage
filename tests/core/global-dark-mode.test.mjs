@@ -61,13 +61,15 @@ assert.match(css, /:root\s*\{/);
   assert.match(rootBlock, /--theme-paper:\s*255 255 255/);
   assert.match(darkBlock, /--theme-paper:\s*9 9 11/);
   assert.match(darkBlock, /--theme-surface:\s*24 24 27/);
+  assert.match(darkBlock, /--theme-muted:\s*192 192 200/);
   assert.match(darkBlock, /--theme-line:\s*39 39 42/);
+  assert.match(darkBlock, /--color-zinc-500:\s*#a1a1aa/);
   assert.match(css, /--store-card-1:\s*#554b40/);
   assert.match(modernBlock, /color-scheme: light/);
   assert.match(modernBlock, /--theme-paper:\s*255 255 255/);
   assert.match(css, /\.theme-invariant-dark/);
   assert.ok(contrast([9, 9, 11], [250, 250, 250]) >= 7, "paper and ink must meet enhanced contrast");
-  assert.ok(contrast([9, 9, 11], [161, 161, 170]) >= 4.5, "muted text must remain readable");
+  assert.ok(contrast([85, 75, 64], [192, 192, 200]) >= 4.5, "muted text must remain readable on dark editorial cards");
   assert.ok(contrast([24, 24, 27], [250, 250, 250]) >= 7, "surface and ink must meet enhanced contrast");
   for (const token of ["background", "foreground", "card", "card-foreground", "popover", "popover-foreground", "primary", "primary-foreground", "muted", "muted-foreground", "accent", "accent-foreground", "border", "input", "ring"]) {
     assert.match(css, new RegExp(`--${token}:`));
@@ -75,6 +77,25 @@ assert.match(css, /:root\s*\{/);
   for (const token of ["ink", "paper", "line", "muted", "surface", "inverse"]) {
     assert.match(tailwind, new RegExp(`rgb\\(var\\(--theme-${token}\\) \\/ <alpha-value>\\)`));
   }
+});
+
+test("dark status chips and fixed dark panels keep readable foregrounds", async () => {
+  const [home, mall, header, card, feedCard, intro, activeBids] = await Promise.all([
+    source("src/app/(shop)/home/page.tsx"),
+    source("src/components/features/catalog/StoreMallExperience.tsx"),
+    source("src/components/layout/PcHeader.tsx"),
+    source("src/components/features/auction/AuctionCard.tsx"),
+    source("src/components/features/auction/AuctionFeedCard.tsx"),
+    source("src/components/features/auction/live/LiveAuctionIntro.tsx"),
+    source("src/components/features/auction/ActiveBidProducts.tsx"),
+  ]);
+  for (const panel of [home, mall]) {
+    assert.match(panel, /text-emerald-50 dark:text-emerald-100/);
+  }
+  for (const chip of [header, card, feedCard, intro, activeBids]) {
+    assert.match(chip, /dark:text-zinc-950/);
+  }
+  assert.ok(contrast([255, 143, 165], [9, 9, 11]) >= 4.5);
 });
 
 test("legacy fixed light surfaces and status notices have dark palette coverage", async () => {

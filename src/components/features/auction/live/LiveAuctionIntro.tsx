@@ -46,7 +46,7 @@ export function LiveAuctionIntro({
               }
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent" />
-            <span className="absolute left-5 top-5 rounded-full bg-rose-600 px-3 py-1 text-[10px] font-black">
+            <span className="absolute left-5 top-5 rounded-full bg-rose-600 px-3 py-1 text-[10px] font-black text-white dark:text-zinc-950">
               HEADLINER · LIVE
             </span>
           </div>

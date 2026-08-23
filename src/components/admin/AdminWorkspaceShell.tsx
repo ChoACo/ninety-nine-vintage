@@ -2,17 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Banknote,
   Boxes,
   ChartNoAxesCombined,
+  ChevronLeft,
+  ChevronRight,
   CircleHelp,
   Gavel,
   LayoutDashboard,
+  Menu,
   PackagePlus,
   Settings,
   Truck,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { useAdminSidebarStore } from "@/store/useAdminSidebarStore";
@@ -79,6 +83,7 @@ export function AdminWorkspaceShell({
   workspaceMode = "default",
 }: Readonly<AdminWorkspaceShellProps>) {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
   const darkMode = operatorMode || workspaceMode !== "default";
   const sidebarMode = workspaceMode === "owner" ? "owner" : "operator";
   const sidebarStorageKey =
@@ -116,6 +121,20 @@ export function AdminWorkspaceShell({
     return () => window.removeEventListener("keydown", onShortcut);
   }, [darkMode, sidebarMode, sidebarStorageKey, toggleSidebar]);
 
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [mobileOpen]);
+
   const handleToggleSidebar = () => {
     const next = !collapsed;
     toggleSidebar(sidebarMode);
@@ -134,19 +153,51 @@ export function AdminWorkspaceShell({
     {},
   );
 
+  const workspaceSidebarWidth = darkMode && collapsed ? "5rem" : "18rem";
+
   return (
     <div
-      className={`grid min-w-0 gap-6 transition-[grid-template-columns] duration-200 sm:grid-cols-[160px_minmax(0,1fr)] sm:gap-5 md:grid-cols-[256px_minmax(0,1fr)] md:gap-0 lg:gap-0 ${darkMode ? (collapsed ? "lg:grid-cols-[64px_minmax(0,1fr)]" : "lg:grid-cols-[256px_minmax(0,1fr)]") : "lg:grid-cols-[256px_minmax(0,1fr)]"}`}
+      className="relative min-w-0"
       data-admin-workspace={operatorMode ? "operator" : workspaceMode}
+      data-sidebar-collapsed={darkMode && collapsed ? "true" : "false"}
     >
-      <aside className="h-fit min-w-0 sm:sticky sm:top-6 sm:self-start md:w-64 md:shrink-0 md:border-r md:border-line/40 md:pr-4">
-        <div
-          className={`${darkMode ? "rounded-2xl border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl shadow-zinc-950/20" : "border-line bg-surface"} border p-4 sm:p-5 md:p-3 ${collapsed ? "lg:p-3" : "lg:p-5"}`}
+      <button
+        aria-controls={`${sidebarMode}-workspace-sidebar`}
+        aria-expanded={mobileOpen}
+        className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface px-4 text-xs font-black shadow-sm md:hidden"
+        onClick={() => setMobileOpen(true)}
+        type="button"
+      >
+        <Menu aria-hidden="true" size={18} />
+        업무 메뉴
+      </button>
+
+      {mobileOpen && (
+        <button
+          aria-label="업무 메뉴 닫기"
+          className="fixed inset-0 z-[80] bg-black/60 md:hidden"
+          onClick={() => setMobileOpen(false)}
+          type="button"
+        />
+      )}
+
+      <div
+        className="grid min-w-0 items-start gap-6 transition-[grid-template-columns] duration-300 ease-in-out md:grid-cols-[var(--workspace-sidebar-width)_minmax(0,1fr)] md:gap-0"
+        style={{
+          "--workspace-sidebar-width": workspaceSidebarWidth,
+        } as CSSProperties}
+      >
+        <aside
+          aria-label={`${title} 업무 사이드바`}
+          aria-modal={mobileOpen ? true : undefined}
+          className={`fixed inset-y-0 left-0 z-[90] flex w-[min(18rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-r-2xl border-r shadow-2xl transition-transform duration-300 ease-in-out md:sticky md:top-6 md:z-auto md:h-[calc(100vh-3rem)] md:w-full md:translate-x-0 md:rounded-2xl md:border ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${darkMode ? "border-zinc-800 bg-zinc-950 text-zinc-100 shadow-zinc-950/20" : "border-line bg-surface text-ink"}`}
+          id={`${sidebarMode}-workspace-sidebar`}
+          role={mobileOpen ? "dialog" : undefined}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div
-              className={collapsed ? "lg:hidden" : "lg:block"}
-            >
+          <div
+            className={`flex shrink-0 items-start justify-between gap-3 border-b p-4 ${darkMode ? "border-zinc-800" : "border-line"} ${collapsed ? "md:items-center md:justify-center md:px-3" : "md:p-5"}`}
+          >
+            <div className={collapsed ? "md:hidden" : undefined}>
               <p
                 className={`eyebrow ${darkMode ? "text-zinc-500" : "text-muted"}`}
               >
@@ -161,106 +212,128 @@ export function AdminWorkspaceShell({
                 {description}
               </p>
             </div>
+            <button
+              aria-label="업무 메뉴 닫기"
+              className="grid size-11 shrink-0 place-items-center rounded-xl border border-current/20 md:hidden"
+              onClick={() => setMobileOpen(false)}
+              type="button"
+            >
+              <X aria-hidden="true" size={18} />
+            </button>
             {darkMode && (
               <button
                 aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
-                className="hidden size-11 shrink-0 place-items-center rounded-xl border border-zinc-700 text-zinc-300 transition hover:border-zinc-400 focus-visible:ring-2 focus-visible:ring-amber-500 lg:grid"
+                className="hidden size-11 shrink-0 place-items-center rounded-xl border border-zinc-700 text-zinc-300 transition hover:border-zinc-400 focus-visible:ring-2 focus-visible:ring-amber-500 md:grid"
                 onClick={handleToggleSidebar}
                 title="Cmd+B"
                 type="button"
               >
-                {collapsed ? "→" : "←"}
+                {collapsed ? (
+                  <ChevronRight aria-hidden="true" size={18} />
+                ) : (
+                  <ChevronLeft aria-hidden="true" size={18} />
+                )}
               </button>
             )}
           </div>
+
           {utility && (
             <div
-              className={`mt-4 border-t pt-4 ${darkMode ? "border-zinc-800" : "border-line"} sm:hidden ${collapsed ? "lg:hidden" : "lg:block"}`}
+              className={`shrink-0 border-b p-4 md:hidden ${darkMode ? "border-zinc-800" : "border-line"}`}
             >
               {utility}
             </div>
           )}
-        </div>
-        <nav
-          aria-label={`${title} 주요 메뉴`}
-          className={`${darkMode ? "rounded-2xl border border-zinc-800 bg-zinc-950 p-2" : ""} mt-3 flex max-w-full gap-2 overflow-x-auto pb-1 [scrollbar-width:none] sm:grid sm:gap-2 sm:overflow-visible`}
-        >
-          {Object.entries(groups).map(([group, items]) => (
-            <div key={group}>
-              <p
-                className={`mb-1 px-3 pt-2 text-[10px] font-black tracking-[.14em] ${darkMode ? "text-zinc-500" : "text-muted"} ${collapsed ? "lg:hidden" : "lg:block"}`}
-              >
-                {group}
-              </p>
-              <div className="grid gap-1">
-                {items.map((item) => {
-                  const active = isActive(pathname, item);
-                  const Icon = item.icon
-                    ? WORKSPACE_ICONS[item.icon]
-                    : undefined;
-                  return (
-                    <Link
-                      aria-current={active ? "page" : undefined}
-                      aria-label={item.label}
-                      className={`group block min-w-[145px] rounded-xl border px-3 py-3 transition-colors sm:min-h-11 sm:min-w-0 ${collapsed ? "lg:grid lg:place-items-center lg:px-0 lg:py-0" : "lg:block lg:px-3 lg:py-3"} ${darkMode ? (active ? "border-amber-500/50 bg-zinc-800 text-zinc-50" : "border-transparent text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100") : active ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink"}`}
-                      href={item.href}
-                      key={item.href}
-                      title={collapsed ? item.label : undefined}
-                    >
-                      <span
-                        className={`flex items-center gap-2 ${collapsed ? "lg:justify-center" : "lg:justify-start"}`}
+
+          <nav
+            aria-label={`${title} 주요 메뉴`}
+            className="flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 [scrollbar-width:thin]"
+          >
+            {Object.entries(groups).map(([group, items]) => (
+              <div key={group}>
+                <p
+                  className={`mb-1 px-3 pt-2 text-[10px] font-black tracking-[.14em] ${darkMode ? "text-zinc-500" : "text-muted"} ${collapsed ? "md:hidden" : ""}`}
+                >
+                  {group}
+                </p>
+                <div className="grid gap-1">
+                  {items.map((item) => {
+                    const active = isActive(pathname, item);
+                    const Icon = item.icon
+                      ? WORKSPACE_ICONS[item.icon]
+                      : undefined;
+                    return (
+                      <Link
+                        aria-current={active ? "page" : undefined}
+                        aria-label={item.label}
+                        className={`group block min-h-11 min-w-0 rounded-xl border px-3 py-3 transition-colors ${collapsed ? "md:grid md:min-h-12 md:place-items-center md:px-0 md:py-0" : "md:block"} ${darkMode ? (active ? "border-amber-500/50 bg-zinc-800 text-zinc-50" : "border-transparent text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100") : active ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink"}`}
+                        href={item.href}
+                        key={item.href}
+                        onClick={() => setMobileOpen(false)}
+                        title={collapsed ? item.label : undefined}
                       >
-                        {Icon && (
-                          <Icon
-                            className={
-                              active && darkMode ? "text-amber-400" : undefined
-                            }
-                            size={16}
-                            strokeWidth={1.75}
-                          />
+                        <span
+                          className={`flex items-center gap-2 ${collapsed ? "md:justify-center" : "md:justify-start"}`}
+                        >
+                          {Icon && (
+                            <Icon
+                              aria-hidden="true"
+                              className={`shrink-0 ${active && darkMode ? "text-amber-400" : ""}`}
+                              size={18}
+                              strokeWidth={1.75}
+                            />
+                          )}
+                          <span
+                            className={`truncate text-xs font-black ${collapsed ? "md:hidden" : "md:block"}`}
+                          >
+                            {item.label}
+                          </span>
+                          <span className={collapsed ? "md:hidden" : "md:inline"}>
+                            {item.badge}
+                          </span>
+                        </span>
+                        {item.description && (
+                          <span
+                            className={`mt-1 hidden text-[10px] leading-4 ${collapsed ? "md:hidden" : "md:block"} ${darkMode ? "text-zinc-500" : active ? "text-paper/70" : "text-muted"}`}
+                          >
+                            {item.description}
+                          </span>
                         )}
-                        <span
-                          className={`truncate text-xs font-black ${collapsed ? "lg:hidden" : "lg:block"}`}
-                        >
-                          {item.label}
-                        </span>
-                        <span
-                          className={collapsed ? "lg:hidden" : "lg:inline"}
-                        >
-                          {item.badge}
-                        </span>
-                      </span>
-                      {item.description && (
-                        <span
-                          className={`mt-1 hidden text-[10px] leading-4 ${collapsed ? "lg:hidden" : "lg:block"} ${darkMode ? "text-zinc-500" : active ? "text-paper/70" : "text-muted"}`}
-                        >
-                          {item.description}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </nav>
-        <Link
-          aria-label="구매자 MY로 이동"
-          className={`mt-3 hidden min-h-11 items-center justify-center rounded-xl border text-xs font-bold sm:flex ${collapsed ? "px-0" : "lg:px-4"} ${darkMode ? "border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-100" : "border-line bg-paper"}`}
-          href="/my"
-          title={collapsed ? "구매자 MY로 이동" : undefined}
+            ))}
+          </nav>
+
+          <div
+            className={`shrink-0 border-t p-3 ${darkMode ? "border-zinc-800" : "border-line"}`}
+          >
+            <Link
+              aria-label="구매자 MY로 이동"
+              className={`flex min-h-11 items-center justify-center rounded-xl border px-3 text-xs font-bold ${darkMode ? "border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-100" : "border-line bg-paper"}`}
+              href="/my"
+              onClick={() => setMobileOpen(false)}
+              title={collapsed ? "구매자 MY로 이동" : undefined}
+            >
+              <span className={collapsed ? "hidden md:inline" : "hidden"}>MY</span>
+              <span className={collapsed ? "md:hidden" : undefined}>
+                구매자 MY로 이동
+              </span>
+            </Link>
+          </div>
+        </aside>
+
+        <section
+          className="min-w-0 self-start pb-24 md:p-6 md:pb-8"
+          data-admin-workspace-content
         >
-          <span className={collapsed ? undefined : "lg:hidden"}>MY</span>
-          {!collapsed && (
-            <span className="hidden lg:inline">구매자 MY로 이동</span>
-          )}
-        </Link>
-      </aside>
-      <section className="min-w-0 self-start pb-24 md:p-6 md:pb-8" data-admin-workspace-content>
-        {contextBar}
-        {contentHeader}
-        {children}
-      </section>
+          {contextBar}
+          {contentHeader}
+          {children}
+        </section>
+      </div>
     </div>
   );
 }

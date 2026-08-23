@@ -24,7 +24,7 @@ test("root and primary workspaces preserve the document as the single vertical s
   assert.match(globals, /body\s*\{[\s\S]*?overflow-y:\s*visible;/);
   assert.doesNotMatch(account, /h-screen[^\n]*overflow-y-auto|overflow-hidden[^\n]*h-screen/);
   assert.doesNotMatch(operatorChat, /overflow-y-auto/);
-  assert.match(workspace, /sm:sticky sm:top-6 sm:self-start/);
+  assert.match(workspace, /md:sticky md:top-6/);
 });
 
 test("ticker and GNB share one sticky viewport header on desktop and mobile", () => {

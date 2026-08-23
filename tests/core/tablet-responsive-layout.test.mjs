@@ -53,7 +53,19 @@ test("tablet hero, PDP, cart and workspaces use balanced split panes", async () 
   assert.match(cart, /md:grid-cols-5/);
   assert.match(cart, /sm:col-span-7 md:col-span-3/);
   assert.match(cart, /sm:col-span-5 md:col-span-2 md:top-24/);
-  assert.match(workspace, /md:grid-cols-\[256px_minmax\(0,1fr\)\]/);
-  assert.match(workspace, /md:w-64 md:shrink-0 md:border-r/);
+  assert.match(workspace, /workspaceSidebarWidth = darkMode && collapsed \? "5rem" : "18rem"/);
+  assert.match(workspace, /md:grid-cols-\[var\(--workspace-sidebar-width\)_minmax\(0,1fr\)\]/);
+  assert.match(workspace, /md:w-full md:translate-x-0/);
   assert.match(workspace, /md:p-6 md:pb-8/);
+});
+
+test("workspace header toggle navigation and footer share one bounded aside", async () => {
+  const workspace = await source("src/components/admin/AdminWorkspaceShell.tsx");
+  assert.equal((workspace.match(/<aside\b/g) ?? []).length, 1);
+  assert.match(
+    workspace,
+    /<aside[\s\S]*aria-label=\{`\$\{title\} 주요 메뉴`\}[\s\S]*구매자 MY로 이동[\s\S]*<\/aside>/,
+  );
+  assert.match(workspace, /data-sidebar-collapsed=/);
+  assert.match(workspace, /transition-\[grid-template-columns\] duration-300 ease-in-out/);
 });

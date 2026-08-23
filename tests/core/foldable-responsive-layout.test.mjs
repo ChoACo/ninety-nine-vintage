@@ -60,10 +60,10 @@ test("foldable navigation, cart and PDP use centered and split layouts", async (
   assert.match(css, /@media \(max-width: 639px\)[\s\S]*mobile-detail-cta/);
 });
 
-test("foldable workspace uses a slim persistent left rail before md", async () => {
+test("foldable workspace uses an off-canvas drawer before md", async () => {
   const workspace = await source("src/components/admin/AdminWorkspaceShell.tsx");
-  assert.match(workspace, /sm:grid-cols-\[160px_minmax\(0,1fr\)\]/);
-  assert.match(workspace, /sm:sticky sm:top-6 sm:self-start/);
-  assert.match(workspace, /sm:grid sm:gap-2 sm:overflow-visible/);
-  assert.match(workspace, /sm:min-h-11 sm:min-w-0/);
+  assert.match(workspace, /-translate-x-full/);
+  assert.match(workspace, /fixed inset-0 z-\[80\] bg-black\/60 md:hidden/);
+  assert.match(workspace, /md:sticky md:top-6/);
+  assert.match(workspace, /md:grid-cols-\[var\(--workspace-sidebar-width\)_minmax\(0,1fr\)\]/);
 });

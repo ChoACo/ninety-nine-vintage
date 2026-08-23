@@ -190,9 +190,12 @@ export function AdminWorkspaceShell({
         <aside
           aria-label={`${title} 업무 사이드바`}
           aria-modal={mobileOpen ? true : undefined}
-          className={`fixed inset-y-0 left-0 z-[90] flex w-[min(18rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-r-2xl border-r shadow-2xl transition-transform duration-300 ease-in-out md:sticky md:top-6 md:z-auto md:h-[calc(100vh-3rem)] md:w-full md:translate-x-0 md:rounded-2xl md:border ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${darkMode ? "border-zinc-800 bg-zinc-950 text-zinc-100 shadow-zinc-950/20" : "border-line bg-surface text-ink"}`}
+          className={`fixed inset-y-0 left-0 z-[90] flex w-[min(18rem,calc(100vw-2rem))] translate-x-[var(--workspace-sidebar-offset)] flex-col overflow-hidden rounded-r-2xl border-r shadow-2xl transition-transform duration-300 ease-in-out md:sticky md:top-6 md:z-auto md:h-[calc(100vh-3rem)] md:w-full md:translate-x-0 md:rounded-2xl md:border ${darkMode ? "border-zinc-800 bg-zinc-950 text-zinc-100 shadow-zinc-950/20" : "border-line bg-surface text-ink"}`}
           id={`${sidebarMode}-workspace-sidebar`}
           role={mobileOpen ? "dialog" : undefined}
+          style={{
+            "--workspace-sidebar-offset": mobileOpen ? "0%" : "-100%",
+          } as CSSProperties}
         >
           <div
             className={`flex shrink-0 items-start justify-between gap-3 border-b p-4 ${darkMode ? "border-zinc-800" : "border-line"} ${collapsed ? "md:items-center md:justify-center md:px-3" : "md:p-5"}`}

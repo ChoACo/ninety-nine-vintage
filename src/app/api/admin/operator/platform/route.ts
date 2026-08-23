@@ -11,18 +11,48 @@ export async function GET(request: Request) {
   if (error) return commerceJson({error:error.message??'platform_unavailable'},503);
   const management = data && typeof data === "object" ? data as { stores?: Array<Record<string, unknown>> } : {};
   const storeIds = (management.stores ?? []).map((store) => String(store.id));
-const [{ data: fees, error: feeError }, { data: subscriptions, error: subscriptionError }, { data: profiles, error: profileError }] = storeIds.length
+  const [storeResult, subscriptionResult, profileResult] = storeIds.length
     ? await Promise.all([
       auth.admin.from("stores").select("id,name,description,regular_shipping_fee,remote_area_shipping_fee,mall_info,mall_image,logo_url,banner_url,concept_tags,default_courier,announcement_text,announcement_enabled,updated_at").in("id", storeIds),
       auth.admin.from("store_service_subscriptions").select("store_id,unpaid_fee_balance,fee_rollover_count,overdue_notice_sent_at").in("store_id", storeIds),
       auth.admin.from("store_enterprise_profiles").select("store_id,representative_name,business_registration_number,mail_order_registration_number,business_postal_code,business_address,business_address_detail").in("store_id", storeIds),
     ])
     : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }];
-  if (feeError || subscriptionError || profileError) return commerceJson({ error: "store_settings_unavailable" }, 503);
+  if (storeResult.error) {
+    console.error("operator_store_settings_query_failed", {
+      code: storeResult.error.code,
+      message: storeResult.error.message,
+    });
+    return commerceJson(
+      {
+        error: "store_settings_unavailable",
+        message: "매장 설정을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      503,
+    );
+  }
+  const warnings: string[] = [];
+  if (subscriptionResult.error) {
+    console.error("operator_store_subscription_query_failed", {
+      code: subscriptionResult.error.code,
+      message: subscriptionResult.error.message,
+    });
+    warnings.push("이용료 현황을 일시적으로 불러오지 못했습니다.");
+  }
+  if (profileResult.error) {
+    console.error("operator_store_profile_query_failed", {
+      code: profileResult.error.code,
+      message: profileResult.error.message,
+    });
+    warnings.push("사업자 정보를 일시적으로 불러오지 못했습니다.");
+  }
+  const fees = storeResult.data;
+  const subscriptions = subscriptionResult.data ?? [];
+  const profiles = profileResult.data ?? [];
   const feeByStore = new Map((fees ?? []).map((fee) => [fee.id, fee]));
   const subscriptionByStore = new Map((subscriptions ?? []).map((subscription) => [subscription.store_id, subscription]));
   const profileByStore = new Map((profiles ?? []).map((profile) => [profile.store_id, profile]));
-  return commerceJson({management:{...management,stores:(management.stores ?? []).map((store) => ({
+  return commerceJson({warnings,management:{...management,stores:(management.stores ?? []).map((store) => ({
     ...store,
     regularShippingFee: feeByStore.get(String(store.id))?.regular_shipping_fee ?? null,
     remoteAreaShippingFee: feeByStore.get(String(store.id))?.remote_area_shipping_fee ?? null,

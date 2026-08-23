@@ -82,6 +82,10 @@ export function AuctionInactiveTeaser({
     dailyPhase === "closed"
       ? "오후 9시 정산 시간입니다. 미판매 상품은 오후 10시부터 다시 입찰할 수 있습니다."
       : "현재 진행 중인 경매가 없습니다. 다음 경매는 매일 오전 10시에 시작됩니다.";
+  const teaserGridClass =
+    surface === "desktop"
+      ? "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-4 lg:gap-5 xl:grid-cols-5 2xl:grid-cols-6"
+      : "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4";
 
   return (
     <section
@@ -121,21 +125,21 @@ export function AuctionInactiveTeaser({
       </div>
 
       {products === null ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4">
+        <div className={teaserGridClass}>
           {Array.from({ length: Math.min(8, TEASER_PRODUCT_LIMIT) }).map(
             (_, index) => (
               <div
                 aria-hidden="true"
-                className="aspect-[4/5] animate-pulse bg-surface"
+                className="mx-auto aspect-[3/4] w-full max-w-[260px] animate-pulse rounded-xl bg-surface"
                 key={index}
               />
             ),
           )}
         </div>
       ) : products.length > 0 ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4">
+        <div className={teaserGridClass}>
           {products.map((product) => (
-            <div key={product.id}>
+            <div className="mx-auto w-full max-w-[260px]" key={product.id}>
               <SoldFeedCard
                 basePath={basePath}
                 brand={product.brand}

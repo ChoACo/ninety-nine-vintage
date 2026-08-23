@@ -42,6 +42,7 @@ import {
   type FixedPurchaseIntent,
 } from "@/lib/commerce/purchaseIntent";
 import { formatConditionGrade } from "@/lib/catalog/conditions";
+import { MobileBidBar } from "@/components/mobile/MobileBidBar";
 
 interface StickyBidPanelProps {
   basePath?: "" | "/m";
@@ -598,40 +599,40 @@ export function StickyBidPanel({
       data-bid-panel="sticky"
     >
       <div className="border-b border-border py-6">
-        <p className="mb-3 text-xs font-medium tracking-[0.1em] text-zinc-500">
+        <p className="mb-3 text-xs font-medium tracking-[0.1em] text-muted-foreground">
           {item.brand}
         </p>
         <h1 className="text-3xl font-black leading-snug tracking-tight text-foreground [text-wrap:balance]">
           {item.name}
         </h1>
-        <dl className={`mt-5 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 text-[11px] ${conditionLabel ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+        <dl className={`mt-5 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border/50 bg-border/50 text-[11px] ${conditionLabel ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
           <div className="bg-card px-3 py-3">
-            <dt className="text-zinc-500">카테고리</dt>
+            <dt className="text-muted-foreground">카테고리</dt>
             <dd className="mt-1 truncate font-bold">
               {item.category || "미분류"}
             </dd>
           </div>
           <div className="bg-card px-3 py-3">
-            <dt className="text-zinc-500">사이즈</dt>
+            <dt className="text-muted-foreground">사이즈</dt>
             <dd className="mt-1 truncate font-bold">
               {item.size || "표기 없음"}
             </dd>
           </div>
           {conditionLabel && <div className="bg-card px-3 py-3">
-            <dt className="text-zinc-500">상태</dt>
+            <dt className="text-muted-foreground">상태</dt>
             <dd className="mt-1 truncate font-bold" title={conditionLabel}>
               {conditionLabel}
             </dd>
           </div>}
         </dl>
-        <p className="mt-5 whitespace-pre-line text-xs leading-relaxed text-zinc-600">
+        <p className="mt-5 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
           {item.description || "상세 사진과 컨디션 리포트를 확인해 주세요."}
         </p>
         <div
           className={`mt-8 flex items-start gap-3 ${surface === "desktop" ? "flex-row items-end justify-between" : "flex-col"}`}
         >
           <div>
-            <p className="mb-2 text-xs text-zinc-500">
+            <p className="mb-2 text-xs text-muted-foreground">
               {item.saleType === "fixed" ? "판매 정가" : "현재 최고 입찰가"}
             </p>
             <p className="font-mono text-3xl font-bold tracking-[-0.04em]">
@@ -639,17 +640,17 @@ export function StickyBidPanel({
               <span className="ml-1 text-base">원</span>
             </p>
           </div>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted-foreground">
             {item.saleType === "fixed"
               ? "즉시 구매 가능"
               : `입찰 ${activeVisibleBids.length}건 · 참여 ${auctionSnapshot.participantCount}명`}
           </p>
         </div>
         {measurementChips.length > 0 && (
-          <div className="mt-5 flex flex-wrap gap-2 text-[11px] text-zinc-600">
+          <div className="mt-5 flex flex-wrap gap-2 text-[11px] text-foreground">
             {measurementChips.map(([label, value]) => (
               <span
-                className="rounded-xl border border-zinc-200 bg-muted px-3 py-2 shadow-sm"
+                className="rounded-xl border border-border/50 bg-muted px-3 py-2 shadow-sm"
                 key={label}
               >
                 {label} {value}cm
@@ -658,7 +659,7 @@ export function StickyBidPanel({
           </div>
         )}
         <button
-          className="mt-4 flex h-11 w-full items-center justify-between rounded-2xl border border-zinc-200 px-4 text-xs font-bold shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95"
+          className="mt-4 flex h-11 w-full items-center justify-between rounded-2xl border border-border/50 px-4 text-xs font-bold text-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-foreground hover:shadow-lg active:scale-95"
           onClick={() => setScannerOpen(true)}
           type="button"
         >
@@ -671,11 +672,11 @@ export function StickyBidPanel({
 
       {LIVE_AUCTION_ENABLED && item.saleType === "auction" && (
         <div
-          className={`my-6 rounded-2xl border px-5 py-5 text-white shadow-xl shadow-black/15 transition-colors ${isLastMinute ? "animate-pulse border-red-400/60 bg-red-950" : "border-white/10 bg-zinc-950"}`}
+          className={`my-6 rounded-2xl border px-5 py-5 shadow-xl shadow-black/15 transition-colors ${isLastMinute ? "animate-pulse border-red-400/60 bg-red-950 text-white" : "border-border/50 bg-foreground text-background"}`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs text-zinc-400">라이브 옥션 남은 시간</span>
-            <span className="inline-flex items-center gap-2 text-[10px] text-zinc-300">
+            <span className="text-xs opacity-75">라이브 옥션 남은 시간</span>
+            <span className="inline-flex items-center gap-2 text-[10px] opacity-80">
               <span
                 className={`h-2 w-2 rounded-full ${realtimeState === "connected" ? "animate-pulse bg-emerald-400" : realtimeState === "reconnecting" ? "bg-amber-400" : "bg-red-500"}`}
               />
@@ -691,23 +692,23 @@ export function StickyBidPanel({
           >
             {timeLeft}
           </p>
-          <p className="mt-2 text-[11px] text-zinc-400">
+          <p className="mt-2 text-[11px] opacity-75">
             21:00–22:00 정산 점검 · 20:56 이후 신규 참여 제한
           </p>
-          <p className="mt-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-zinc-300">
+          <p className="mt-2 rounded-xl border border-current/15 bg-current/5 px-3 py-2 text-[11px] opacity-80">
             마감 3분 전 유효 입찰 시 남은 시간이 3분으로 자동 연장됩니다.
           </p>
         </div>
       )}
 
       {LIVE_AUCTION_ENABLED && item.saleType === "auction" && (
-        <div className="border-b border-zinc-200 pb-5">
+        <div className="border-b border-border/50 pb-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xs font-bold tracking-[0.08em]">
               실시간 입찰 내역
             </h2>
             <button
-              className="inline-flex items-center gap-1 text-[10px] text-zinc-400 underline"
+              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground underline"
               onClick={() => setHistoryOpen(true)}
               type="button"
             >
@@ -720,9 +721,9 @@ export function StickyBidPanel({
                 className="flex items-center justify-between text-xs"
                 key={bid.id}
               >
-                <span className="text-zinc-500">
+                <span className="text-muted-foreground">
                   {bid.bidderMaskedId}{" "}
-                  <span className="ml-2 text-[10px] text-zinc-400">
+                  <span className="ml-2 text-[10px] text-muted-foreground">
                     {bid.timeLabel}
                   </span>
                 </span>
@@ -741,7 +742,7 @@ export function StickyBidPanel({
             {canStartBid ? (
               <Link
                 aria-describedby="auction-settlement-summary"
-                className={`${surface === "mobile" ? "mobile-detail-cta" : ""} mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-950 text-sm font-bold text-white shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:bg-zinc-800 hover:shadow-xl active:scale-95`}
+                className={`${surface === "mobile" ? "hidden lg:flex" : "flex"} mt-6 h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-bold text-primary-foreground shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:bg-primary/90 hover:shadow-xl active:scale-95`}
                 href={`${basePath}/auction/${item.id}/bid`}
               >
                 <LockKeyhole size={15} /> {bidButtonLabel}
@@ -749,7 +750,7 @@ export function StickyBidPanel({
             ) : (
               <button
                 aria-describedby="auction-settlement-summary"
-                className={`${surface === "mobile" ? "mobile-detail-cta" : ""} mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-sm font-bold text-white ${guestCanSignInToBid ? "bg-zinc-950 shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:bg-zinc-800 hover:shadow-xl active:scale-95" : "cursor-not-allowed bg-zinc-300"}`}
+                className={`${surface === "mobile" ? "hidden lg:flex" : "flex"} mt-6 h-14 w-full items-center justify-center gap-2 rounded-2xl text-sm font-bold ${guestCanSignInToBid ? "bg-primary text-primary-foreground shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:bg-primary/90 hover:shadow-xl active:scale-95" : "cursor-not-allowed bg-muted text-muted-foreground"}`}
                 disabled={!guestCanSignInToBid}
                 onClick={explainUnavailableBid}
                 type="button"
@@ -757,8 +758,20 @@ export function StickyBidPanel({
                 <LockKeyhole size={15} /> {bidButtonLabel}
               </button>
             )}
+            {surface === "mobile" && (
+              <MobileBidBar
+                actionHref={
+                  canStartBid ? `${basePath}/auction/${item.id}/bid` : undefined
+                }
+                actionLabel={bidButtonLabel}
+                currentBid={displayPrice}
+                disabled={!canStartBid && !guestCanSignInToBid}
+                onAction={guestCanSignInToBid ? explainUnavailableBid : undefined}
+                remainingTime={timeLeft}
+              />
+            )}
             <p
-              className="mt-3 text-[11px] leading-5 text-zinc-500"
+              className="mt-3 text-[11px] leading-5 text-muted-foreground"
               id="auction-settlement-summary"
             >
               낙찰 후 서버가 확정한 결제 마감까지 입금 · 미결제 시 낙찰
@@ -780,7 +793,7 @@ export function StickyBidPanel({
             )}
           </>
         ) : (
-          <div className="mt-6 rounded-2xl border border-zinc-200 bg-muted p-4 text-xs leading-5 text-zinc-600 shadow-sm">
+          <div className="mt-6 rounded-2xl border border-border/50 bg-muted p-4 text-xs leading-5 text-muted-foreground shadow-sm">
             실시간 경매는 현재 점검 중입니다. 즉시 구매 상품은 정상적으로 이용할
             수 있습니다.
           </div>
@@ -800,14 +813,14 @@ export function StickyBidPanel({
             <button
               aria-label={liked ? "찜 해제" : "찜하기"}
               aria-pressed={liked}
-              className="flex h-14 min-w-11 items-center justify-center rounded-2xl border border-zinc-950 text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95"
+              className="flex h-14 min-w-11 items-center justify-center rounded-2xl border border-border text-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-foreground hover:shadow-lg active:scale-95"
               onClick={() => void updateWishlist()}
               type="button"
             >
               <Heart fill={liked ? "currentColor" : "none"} size={18} />
             </button>
             <button
-              className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-zinc-950 text-sm font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 disabled:opacity-50"
+              className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-border text-sm font-bold text-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-foreground hover:shadow-lg active:scale-95 disabled:opacity-50"
               disabled={buying}
               onClick={() => void addFixedToCart()}
               type="button"
@@ -815,7 +828,7 @@ export function StickyBidPanel({
               <ShoppingBag size={15} /> <span className="truncate">장바구니 담기</span>
             </button>
             <button
-              className="flex h-14 items-center justify-center rounded-2xl bg-zinc-950 text-sm font-bold text-white shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-95 disabled:opacity-50"
+              className="flex h-14 items-center justify-center rounded-2xl bg-primary text-sm font-bold text-primary-foreground shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:bg-primary/90 hover:shadow-xl active:scale-95 disabled:opacity-50"
               disabled={buying}
               onClick={() => void buyNow()}
               type="button"
@@ -838,7 +851,7 @@ export function StickyBidPanel({
       )}
       {item.saleType === "auction" && (
         <button
-          className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 text-xs font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95 disabled:opacity-50"
+          className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-border/50 text-xs font-bold text-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-foreground hover:shadow-lg active:scale-95 disabled:opacity-50"
           onClick={() => void updateWishlist()}
           type="button"
         >
@@ -847,14 +860,14 @@ export function StickyBidPanel({
         </button>
       )}
       <button
-        className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 text-xs font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95 disabled:opacity-50"
+        className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-border/50 text-xs font-bold text-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-foreground hover:shadow-lg active:scale-95 disabled:opacity-50"
         onClick={() => setInquiryOpen(true)}
         type="button"
       >
         <MessageCircle size={15} /> 상품 문의하기
       </button>
       <ShareProductButton
-        className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 text-xs font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95"
+        className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-border/50 text-xs font-bold text-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-foreground hover:shadow-lg active:scale-95"
         label="공유하기"
         priceText={`${item.saleType === "fixed" ? "판매 정가" : "현재 최고 입찰가"} ${displayPrice.toLocaleString("ko-KR")}원`}
         title={`${item.name} | ${item.brand}`}

@@ -65,6 +65,6 @@ test("foldable workspace uses an off-canvas drawer before md", async () => {
   assert.match(workspace, /--workspace-sidebar-offset/);
   assert.match(workspace, /mobileOpen \? "0%" : "-100%"/);
   assert.match(workspace, /fixed inset-0 z-\[80\] bg-black\/60 md:hidden/);
-  assert.match(workspace, /md:sticky md:top-6/);
+  assert.match(workspace, /md:sticky md:top-0/);
   assert.match(workspace, /md:grid-cols-\[var\(--workspace-sidebar-width\)_minmax\(0,1fr\)\]/);
 });

@@ -32,11 +32,14 @@ test("catalog cards use a mobile portrait ratio and stable one-line titles", asy
     source("src/components/features/auction/AuctionFeedCard.tsx"),
     source("src/components/features/auction/SoldFeedCard.tsx"),
   ]);
-  for (const component of [card, liveCard, soldCard]) {
+  for (const component of [card, liveCard]) {
     assert.match(component, /aspect-\[3\/4\] w-full/);
-    assert.match(component, /min-h-\[1\.5rem\]/);
-    assert.match(component, /line-clamp-1[^\n]*text-sm font-medium/);
+    assert.match(component, /min-h-\[1\.25rem\]/);
+    assert.match(component, /line-clamp-1[^\n]*text-xs font-medium[^\n]*sm:text-sm/);
   }
+  assert.match(soldCard, /aspect-\[3\/4\] w-full/);
+  assert.match(soldCard, /min-h-\[1\.5rem\]/);
+  assert.match(soldCard, /line-clamp-1[^\n]*text-sm font-medium/);
 });
 
 test("mobile store detail has a centered sticky header and compact banner", async () => {

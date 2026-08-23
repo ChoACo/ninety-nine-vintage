@@ -110,7 +110,7 @@ test("product, login, and bid navigation support intercepted modals and direct f
 
   assert.match(interceptedProduct, /<ModalShell label="상품 상세" size="wide"><AuctionDetailView compact id=\{id\} \/><\/ModalShell>/);
   assert.match(detailView, /grid w-full max-w-\[1400px\] grid-cols-1 items-start gap-6 p-0 sm:grid-cols-12/);
-  assert.match(detailView, /min-w-0 sm:col-span-6/);
+  assert.match(detailView, /min-w-0[\s\S]*sm:col-span-6/);
   assert.match(stickyBidPanel, /sm:sticky sm:col-span-6/);
   assert.match(stickyBidPanel, /compact \? "sm:top-6" : "sm:top-20 md:top-24"/);
   assert.match(directProduct, /<AuctionDetailView id=\{id\} \/>/);

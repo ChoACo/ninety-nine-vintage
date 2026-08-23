@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { StoreImageUploader } from "@/components/common/StoreImageUploader";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { NewCenterModal } from "./NewCenterModal";
 
@@ -57,6 +58,8 @@ interface ManagedStore {
   slug: string;
   name: string;
   description: string;
+  bannerUrl: string | null;
+  mallImage: string | null;
   operatorId: string;
   operatorName: string;
   isActive: boolean;
@@ -76,6 +79,7 @@ interface StoreDraft {
   slug: string;
   name: string;
   description: string;
+  bannerUrl: string;
   operatorId: string;
 }
 
@@ -91,6 +95,7 @@ function storeDraft(store: ManagedStore): StoreDraft {
     slug: store.slug,
     name: store.name,
     description: store.description,
+    bannerUrl: store.bannerUrl ?? store.mallImage ?? "",
     operatorId: store.operatorId,
   };
 }
@@ -266,6 +271,20 @@ export function OwnerStoreManagementConsole() {
         ...draft,
       },
       "센터(매장) 정보와 운영자 배치를 저장했습니다.",
+    );
+  };
+
+  const saveStoreBanner = async (store: ManagedStore) => {
+    const draft = drafts[store.id] ?? storeDraft(store);
+    await mutate(
+      `banner_update:${store.id}:${store.version}`,
+      {
+        action: "banner_update",
+        bannerUrl: draft.bannerUrl,
+        expectedVersion: store.version,
+        storeId: store.id,
+      },
+      "스토어 대표 배너를 저장했습니다.",
     );
   };
 
@@ -620,6 +639,39 @@ export function OwnerStoreManagementConsole() {
 
                 <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(300px,.9fr)]">
                   <div>
+                    <div className="mb-5 border-b border-line pb-5">
+                      <StoreImageUploader
+                        aspectClassName="aspect-[16/7]"
+                        kind="banner"
+                        label="스토어 대표 배너 이미지 (권장 16:7 · 1200×525)"
+                        onChange={(bannerUrl) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [store.id]: { ...draft, bannerUrl },
+                          }))
+                        }
+                        placeholder="센터 상단에 노출될 대표 배너 이미지를 업로드하세요."
+                        storeId={store.id}
+                        value={draft.bannerUrl}
+                      />
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <p className="text-[11px] leading-5 text-muted">
+                          업로드 후 배너 저장을 눌러야 센터 상세 화면에 반영됩니다.
+                        </p>
+                        <button
+                          className="min-h-11 shrink-0 border border-ink px-4 text-xs font-bold disabled:opacity-40"
+                          disabled={
+                            busyKey !== null ||
+                            draft.bannerUrl ===
+                              (store.bannerUrl ?? store.mallImage ?? "")
+                          }
+                          onClick={() => void saveStoreBanner(store)}
+                          type="button"
+                        >
+                          배너 저장
+                        </button>
+                      </div>
+                    </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <label className="text-xs font-bold">
                         매장 코드

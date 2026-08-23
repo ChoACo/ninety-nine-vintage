@@ -90,14 +90,14 @@ function EnabledAuctionCard({ basePath = "", detailRoute, item }: AuctionCardPro
     }
   };
   return (
-    <article className="product-card group min-w-0">
+    <article className="product-card group mx-auto w-full max-w-[260px] min-w-0">
       <Link className="block" href={`${basePath}/${resolvedDetailRoute}/${item.id}`} prefetch={false}>
-        <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-line/30 bg-muted/20 shadow-sm transition-all duration-300 group-hover:border-line/80 group-hover:-translate-y-1 group-hover:shadow-xl">
-          {item.imageUrl ? <CatalogImage alt={`${item.brand} ${item.name}`} className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105" fill loading="lazy" sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw" src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
-          <div className="absolute left-2.5 top-2.5 flex flex-col items-start gap-1.5">
-            {grade && <span className={`rounded-full px-2 py-1 font-mono text-[9px] font-black tracking-[0.08em] shadow-sm ${gradeClass}`}>GRADE {grade}</span>}
-            {!isFixed && <span className="rounded-full bg-rose-600 px-2 py-1 text-[9px] font-black tracking-[0.12em] text-white shadow-sm">LIVE</span>}
-            {isNew && <span className="rounded-full bg-emerald-600 px-2 py-1 text-[9px] font-black tracking-[0.12em] text-white shadow-sm">NEW</span>}
+        <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-line/30 bg-muted/20 shadow-sm transition-all duration-300 group-hover:border-line/80 group-hover:-translate-y-1 group-hover:shadow-xl">
+          {item.imageUrl ? <CatalogImage alt={`${item.brand} ${item.name}`} className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105" fill loading="lazy" sizes="(max-width: 639px) 50vw, (max-width: 767px) 33vw, (max-width: 1279px) 25vw, (max-width: 1535px) 20vw, 16vw" src={item.imageUrl} /> : <div className="grid h-full place-items-center text-xs text-muted">이미지 준비 중</div>}
+          <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
+            {grade && <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold shadow-sm ${gradeClass}`}>GRADE {grade}</span>}
+            {!isFixed && <span className="rounded-md bg-rose-600 px-2 py-0.5 text-[10px] font-black tracking-tight text-white shadow-sm">LIVE</span>}
+            {isNew && <span className="rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-black tracking-tight text-white shadow-sm">NEW</span>}
           </div>
           <div className="absolute right-2 top-2 flex flex-col items-end gap-2">
             <button aria-label={liked ? `${item.name} 찜 해제` : `${item.name} 찜하기`} className={`grid size-9 place-items-center rounded-xl bg-paper/90 shadow-sm backdrop-blur-md transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ink active:scale-95 ${liked ? "text-red-700" : "text-ink"}`} onClick={(event) => { event.preventDefault(); void updateWishlist(); }} type="button"><Heart className={liked ? "scale-110" : "scale-100"} fill={liked ? "currentColor" : "none"} size={16} strokeWidth={1.75} /></button>
@@ -114,12 +114,12 @@ function EnabledAuctionCard({ basePath = "", detailRoute, item }: AuctionCardPro
           )}
         </div>
       </Link>
-      <div className="pt-3">
-        <div className="flex items-center justify-between gap-2 text-[10px] text-muted"><span className="truncate">{item.brand}</span><span className="shrink-0 font-mono tabular-nums">{item.timeLeft ?? "진행 중"}</span></div>
-        <Link className="mt-1 block min-h-[1.5rem] line-clamp-1 break-keep text-sm font-medium text-foreground/90 hover:underline focus-visible:ring-2 focus-visible:ring-ink" href={`${basePath}/${resolvedDetailRoute}/${item.id}`} prefetch={false}>{item.enhancedTitle || item.name}</Link>
+      <div className="pt-2">
+        <div className="flex items-center justify-between gap-2 text-[11px] text-muted"><span className="line-clamp-1 min-w-0">{item.brand}</span><span className="shrink-0 font-mono text-[10px] tabular-nums">{item.timeLeft ?? "진행 중"}</span></div>
+        <Link className="mt-1 block min-h-[1.25rem] line-clamp-1 break-keep text-xs font-medium text-foreground/90 hover:underline focus-visible:ring-2 focus-visible:ring-ink sm:text-sm" href={`${basePath}/${resolvedDetailRoute}/${item.id}`} prefetch={false}>{item.enhancedTitle || item.name}</Link>
         <ProductFeedTags description={item.description} gender={item.gender} hashtags={item.hashtags} size={item.size} />
-        <div className="mt-3 flex items-end justify-between gap-2">
-          <div><p className="text-[10px] text-muted">{isFixed ? "판매 정가" : "현재 입찰가"}</p><p className="mt-1 font-mono text-base font-bold text-foreground tabular-nums">{price.toLocaleString("ko-KR")}원</p></div>
+        <div className="mt-2 flex items-end justify-between gap-2">
+          <div><p className="text-[10px] text-muted">{isFixed ? "판매 정가" : "현재 입찰가"}</p><p className="mt-0.5 font-mono text-sm font-bold text-foreground tabular-nums sm:text-base">{price.toLocaleString("ko-KR")}원</p></div>
           <p className="text-[10px] text-muted">{isFixed ? "즉시 구매" : `입찰 ${item.bidCount}건`}</p>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2">

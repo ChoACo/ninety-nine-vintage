@@ -25,12 +25,32 @@ test("desktop product imagery reserves a portrait box and uses Next Image fill w
   for (const content of [card, feedCard]) {
     assert.match(content, /relative aspect-\[3\/4\]/);
     assert.match(content, /<CatalogImage[\s\S]{0,300}\bfill\b/);
-    assert.match(content, /\(max-width: 768px\) 100vw, \(max-width: 1200px\) 50vw, 25vw/);
+    assert.match(content, /\(max-width: 639px\) 50vw, \(max-width: 767px\) 33vw, \(max-width: 1279px\) 25vw, \(max-width: 1535px\) 20vw, 16vw/);
     assert.match(content, /group-hover:scale-105/);
   }
   assert.match(image, /const fillsContainer = props\.fill === true/);
   assert.match(image, /height=\{fillsContainer \? undefined/);
   assert.match(image, /width=\{fillsContainer \? undefined/);
+});
+
+test("desktop shop and auction feeds use bounded five-to-six column cards", async () => {
+  const [grid, card, feedCard, shopSkeleton, auctionSkeleton] = await Promise.all([
+    source("src/components/features/auction/AuctionFeedGrid.tsx"),
+    source("src/components/features/auction/AuctionCard.tsx"),
+    source("src/components/features/auction/AuctionFeedCard.tsx"),
+    source("src/components/skeletons/ShopSkeletons.tsx"),
+    source("src/components/skeletons/AuctionSkeletons.tsx"),
+  ]);
+  for (const content of [grid, shopSkeleton, auctionSkeleton]) {
+    assert.match(content, /md:grid-cols-4[\s\S]{0,80}xl:grid-cols-5 2xl:grid-cols-6/);
+  }
+  for (const content of [card, feedCard]) {
+    assert.match(content, /max-w-\[260px\]/);
+    assert.match(content, /aspect-\[3\/4\][\s\S]{0,80}rounded-xl/);
+  }
+  assert.match(feedCard, /absolute bottom-2 left-2 right-2[\s\S]*bg-black\/70/);
+  assert.match(feedCard, /\{bidCount\}건 입찰/);
+  assert.match(feedCard, /h-11[\s\S]*sm:h-8/);
 });
 
 test("desktop PDP and cart use bounded editorial master-detail ratios", async () => {

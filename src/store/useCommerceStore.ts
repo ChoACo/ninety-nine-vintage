@@ -7,6 +7,12 @@ import {
   shouldPersistCommerceLocally,
   type CommerceOwnerMode,
 } from "@/lib/commerce/cacheOwnership";
+import {
+  clearCommerceLocalCache,
+  clearEmptyProductDataCaches,
+  readCommerceLocalCache,
+  writeCommerceLocalCache,
+} from "@/lib/cache/localCache";
 
 interface CommerceState {
   hydrated: boolean;
@@ -28,22 +34,13 @@ interface CommerceState {
   replaceCart: (ids: string[]) => void;
 }
 
-const KEY = "ninetynine-commerce-cache";
 let syncGeneration = 0;
 let syncQueued = false;
 let serverUserId: string | null | undefined;
 const save = (likedIds: string[], cartIds: string[]) => {
-  if (typeof window !== "undefined") window.localStorage.setItem(KEY, JSON.stringify({ likedIds, cartIds }));
+  writeCommerceLocalCache({ likedIds, cartIds });
 };
-const readLocal = () => {
-  if (typeof window === "undefined") return { likedIds: [] as string[], cartIds: [] as string[] };
-  try {
-    const raw = JSON.parse(window.localStorage.getItem(KEY) ?? "{}") as { likedIds?: string[]; cartIds?: string[] };
-    return { likedIds: raw.likedIds ?? [], cartIds: raw.cartIds ?? [] };
-  } catch {
-    return { likedIds: [], cartIds: [] };
-  }
-};
+const readLocal = readCommerceLocalCache;
 
 export const useCommerceStore = create<CommerceState>((set, get) => ({
   hydrated: false, syncing: false, serverInitialized: false, ownerMode: "unknown", ownerUserId: null, likedIds: [], cartIds: [],
@@ -166,8 +163,21 @@ export const useCommerceStore = create<CommerceState>((set, get) => ({
         expectedAccessToken: token,
         currentSession: commitSession,
       })) return;
-      const serverCartIds = cartPayload.productIds ?? [];
-      const serverLikedIds = wishlistPayload.productIds ?? [];
+      const serverCartIds = Array.isArray(cartPayload.productIds)
+        ? cartPayload.productIds.filter(
+            (id): id is string => typeof id === "string" && Boolean(id),
+          )
+        : [];
+      const serverLikedIds = Array.isArray(wishlistPayload.productIds)
+        ? wishlistPayload.productIds.filter(
+            (id): id is string => typeof id === "string" && Boolean(id),
+          )
+        : [];
+      if (serverCartIds.length === 0 && serverLikedIds.length === 0) {
+        clearEmptyProductDataCaches();
+      } else {
+        clearCommerceLocalCache();
+      }
       set({ cartIds: serverCartIds, likedIds: serverLikedIds, hydrated: true, serverInitialized: true, ownerMode: "member-ready", ownerUserId: authenticatedUserId });
     } catch {
       // A session read or member API failure is not proof of logout. Preserve
@@ -214,5 +224,11 @@ export const useCommerceStore = create<CommerceState>((set, get) => ({
     });
   },
   clearCart: () => { const persistLocally = shouldPersistCommerceLocally(get().ownerMode); set({ cartIds: [] }); if (persistLocally) save(get().likedIds, []); },
-  replaceCart: (ids) => { const cartIds = [...new Set(ids)]; set({ cartIds, serverInitialized: true, ownerMode: get().ownerMode === "guest" ? "guest" : "member-ready" }); },
+  replaceCart: (ids) => {
+    const cartIds = [...new Set(ids.filter(Boolean))];
+    const ownerMode = get().ownerMode === "guest" ? "guest" : "member-ready";
+    set({ cartIds, serverInitialized: true, ownerMode });
+    if (ownerMode === "guest") save(get().likedIds, cartIds);
+    else clearCommerceLocalCache();
+  },
 }));

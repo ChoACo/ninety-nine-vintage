@@ -125,7 +125,10 @@ export async function AuctionDetailView({
       data-detail-layout={compact ? "intercepted" : "page"}
       data-detail-surface={surface}
     >
-      <div className="min-w-0 sm:col-span-6 md:col-span-7 lg:col-auto">
+      <div
+        className="no-scrollbar min-w-0 overscroll-contain sm:col-span-6 md:col-span-7 lg:col-auto lg:h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pr-2"
+        data-detail-gallery-scroll
+      >
         <ItemGallery compact={compact} item={item} surface={surface} />
         <ConditionReport item={item} surface={surface} />
       </div>

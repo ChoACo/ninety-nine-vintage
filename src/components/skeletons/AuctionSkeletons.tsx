@@ -21,14 +21,22 @@ export function AuctionTimelineSkeleton() {
     </div>
   );
 }
-export function AuctionGridSkeleton() {
+export function AuctionGridSkeleton({
+  surface = "desktop",
+}: {
+  surface?: "desktop" | "mobile";
+} = {}) {
+  const gridClass =
+    surface === "desktop"
+      ? "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-4 lg:gap-5 xl:grid-cols-5 2xl:grid-cols-6"
+      : "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4";
   return (
     <div
       aria-label="옥션 상품 불러오는 중"
-      className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4"
+      className={gridClass}
     >
       {Array.from({ length: 8 }, (_, i) => (
-        <div className="space-y-3" key={i}>
+        <div className="mx-auto w-full max-w-[260px] space-y-3" key={i}>
           <Pulse className="aspect-[3/4]" />
           <Pulse className="h-4 w-3/4" />
           <Pulse className="h-5 w-1/2" />

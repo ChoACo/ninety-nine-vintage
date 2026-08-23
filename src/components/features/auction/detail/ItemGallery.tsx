@@ -36,7 +36,7 @@ export function ItemGallery({ compact = false, item, surface = "desktop" }: Item
 
   return (
     <section className="min-w-0">
-      <button aria-label={`${item.name} 사진 크게 보기`} className="group relative block aspect-[4/5] w-full overflow-hidden rounded-3xl border border-white/10 bg-zinc-100 text-left shadow-xl shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl active:scale-[0.99]" disabled={images.length === 0} onClick={() => setGalleryOpen(true)} type="button">
+      <button aria-label={`${item.name} 사진 크게 보기`} className="group relative block aspect-[4/5] w-full overflow-hidden rounded-3xl border border-border/50 bg-muted text-left shadow-xl shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl active:scale-[0.99]" disabled={images.length === 0} onClick={() => setGalleryOpen(true)} type="button">
         <CatalogImage alt={`${item.name} 대표 이미지`} className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.035]" decoding="async" fetchPriority="high" loading="eager" maxDimension={surface === "desktop" ? 1600 : 1280} sizes={imageSizes} src={images[activeImage] ?? ""} />
         <span className={`absolute rounded-xl border border-white/60 bg-white/90 px-3 py-2 text-xs font-bold text-zinc-950 shadow-lg backdrop-blur-md ${surface === "desktop" ? "left-5 top-5" : "left-3 top-3"}`}>{formatProductDisplayNumber(item.id)}</span>
         {conditionLabel && <span className={`absolute rounded-xl border border-white/10 bg-zinc-950/90 px-3 py-2 text-xs font-bold text-white shadow-lg backdrop-blur-md ${surface === "desktop" ? "right-5 top-5" : "right-3 top-3"}`}>{conditionLabel}</span>}
@@ -46,7 +46,7 @@ export function ItemGallery({ compact = false, item, surface = "desktop" }: Item
         {images.map((image, index) => (
           <button
             aria-label={`${item.name} 이미지 ${index + 1} 보기`}
-            className={`relative aspect-square overflow-hidden rounded-2xl bg-zinc-100 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 lg:aspect-[3/4] ${activeImage === index ? "ring-2 ring-zinc-950 ring-offset-2 ring-offset-paper" : "opacity-60 hover:opacity-100"}`}
+            className={`relative aspect-square overflow-hidden rounded-2xl bg-muted shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 lg:aspect-[3/4] ${activeImage === index ? "ring-2 ring-foreground ring-offset-2 ring-offset-background" : "opacity-60 hover:opacity-100"}`}
             key={image}
             onClick={() => setActiveImage(index)}
             type="button"

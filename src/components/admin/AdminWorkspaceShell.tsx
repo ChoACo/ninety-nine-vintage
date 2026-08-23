@@ -157,7 +157,7 @@ export function AdminWorkspaceShell({
 
   return (
     <div
-      className="relative min-w-0"
+      className="relative min-w-0 md:h-full md:min-h-0 md:flex-1"
       data-admin-workspace={operatorMode ? "operator" : workspaceMode}
       data-sidebar-collapsed={darkMode && collapsed ? "true" : "false"}
     >
@@ -182,7 +182,7 @@ export function AdminWorkspaceShell({
       )}
 
       <div
-        className="grid min-w-0 items-start gap-6 transition-[grid-template-columns] duration-300 ease-in-out md:grid-cols-[var(--workspace-sidebar-width)_minmax(0,1fr)] md:gap-0"
+        className="grid min-w-0 items-start gap-6 transition-[grid-template-columns] duration-300 ease-in-out md:h-full md:min-h-0 md:grid-cols-[var(--workspace-sidebar-width)_minmax(0,1fr)] md:gap-0 md:overflow-hidden"
         style={{
           "--workspace-sidebar-width": workspaceSidebarWidth,
         } as CSSProperties}
@@ -190,7 +190,7 @@ export function AdminWorkspaceShell({
         <aside
           aria-label={`${title} 업무 사이드바`}
           aria-modal={mobileOpen ? true : undefined}
-          className={`fixed inset-y-0 left-0 z-[90] flex w-[min(18rem,calc(100vw-2rem))] translate-x-[var(--workspace-sidebar-offset)] flex-col overflow-hidden rounded-r-2xl border-r shadow-2xl transition-transform duration-300 ease-in-out md:sticky md:top-6 md:z-auto md:h-[calc(100vh-3rem)] md:w-full md:translate-x-0 md:rounded-2xl md:border ${darkMode ? "border-zinc-800 bg-zinc-950 text-zinc-100 shadow-zinc-950/20" : "border-line bg-surface text-ink"}`}
+          className={`fixed inset-y-0 left-0 z-[90] flex w-[min(18rem,calc(100vw-2rem))] translate-x-[var(--workspace-sidebar-offset)] flex-col overflow-hidden rounded-r-2xl border-r shadow-2xl transition-transform duration-300 ease-in-out md:sticky md:top-0 md:z-auto md:h-full md:min-h-0 md:w-full md:translate-x-0 md:rounded-2xl md:border ${darkMode ? "border-zinc-800 bg-zinc-950 text-zinc-100 shadow-zinc-950/20" : "border-line bg-surface text-ink"}`}
           id={`${sidebarMode}-workspace-sidebar`}
           role={mobileOpen ? "dialog" : undefined}
           style={{
@@ -250,7 +250,7 @@ export function AdminWorkspaceShell({
 
           <nav
             aria-label={`${title} 주요 메뉴`}
-            className="flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 [scrollbar-width:thin]"
+            className="independent-scroll no-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3"
           >
             {Object.entries(groups).map(([group, items]) => (
               <div key={group}>
@@ -329,7 +329,7 @@ export function AdminWorkspaceShell({
         </aside>
 
         <section
-          className="min-w-0 self-start pb-24 md:p-6 md:pb-8"
+          className="independent-scroll no-scrollbar min-w-0 self-start pb-24 md:h-full md:min-h-0 md:overflow-y-auto md:overscroll-contain md:p-6 md:pb-8"
           data-admin-workspace-content
         >
           {contextBar}

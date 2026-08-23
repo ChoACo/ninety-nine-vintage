@@ -26,7 +26,10 @@ test("storefront cart, route highlighting, and shipping totals update in client 
   assert.match(header, /after:bg-amber-500/);
   assert.match(header, /aria-current=\{active \? "page" : undefined\}/);
 
-  assert.match(cartStore, /shippingModes:Record<string,CartShippingMode>/);
+  assert.match(
+    cartStore,
+    /shippingModes:\s*Record<string,\s*CartShippingMode>/,
+  );
   assert.match(cart, /state\.shippingModes\.checkout \?\? "ship"/);
   assert.match(
     cart,

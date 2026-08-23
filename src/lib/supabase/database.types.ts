@@ -10529,6 +10529,16 @@ current_price: number
         }
         Returns: Json
       }
+      update_owner_store_banner: {
+        Args: {
+          p_banner_url: string | null
+          p_expected_version: number
+          p_idempotency_key: string
+          p_reason: string
+          p_store_id: string
+        }
+        Returns: Json
+      }
       update_operator_product: {
         Args: {
           p_bid_increment: number

@@ -21,6 +21,10 @@ import { CatalogImage } from "@/components/ui/CatalogImage";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { PostcodeSearchButton } from "@/components/features/account/PostcodeSearchButton";
 import { logoutBrowserSession } from "@/lib/auth/logout";
+import {
+  clearLegacyEmptyDataIndexedDbCaches,
+  clearLegacyEmptyDataLocalCaches,
+} from "@/lib/cache/localCache";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { formatStorageDday, storageClassLabel } from "@/utils/shipping";
 
@@ -391,7 +395,11 @@ function AccountDashboardForSession({
         const legacyOrdersData = legacyOrdersResponse.ok
           ? ((await legacyOrdersResponse.json()) as LegacyEligibleOrdersPayload)
           : {};
-        const ids = wishlistData.productIds ?? [];
+        const ids = Array.isArray(wishlistData.productIds)
+          ? wishlistData.productIds.filter(
+              (id): id is string => typeof id === "string" && Boolean(id),
+            )
+          : [];
         const [auctionResponse, fixedResponse] =
           ids.length > 0
             ? await Promise.all([
@@ -410,23 +418,43 @@ function AccountDashboardForSession({
           ? ((await fixedResponse.json()) as { products?: ProductSummary[] })
           : {};
         const allProducts = [
-          ...(auctionData.products ?? []),
-          ...(fixedData.products ?? []),
+          ...(Array.isArray(auctionData.products) ? auctionData.products : []),
+          ...(Array.isArray(fixedData.products) ? fixedData.products : []),
         ];
         if (!cancelled) {
+          const storageItems = Array.isArray(storageData.items)
+            ? storageData.items
+            : [];
+          const legacyAuctionWins = Array.isArray(
+            storageData.legacyAuctionWins,
+          )
+            ? storageData.legacyAuctionWins
+            : [];
+          const paymentCenterGroups = Array.isArray(
+            storageData.auctionPaymentQuote?.groups,
+          )
+            ? storageData.auctionPaymentQuote.groups
+            : [];
+          const shippingTokens = Array.isArray(storageData.centerShippingTokens)
+            ? storageData.centerShippingTokens
+            : [];
+          if (storageResponse.ok && storageItems.length === 0) {
+            clearLegacyEmptyDataLocalCaches();
+            void clearLegacyEmptyDataIndexedDbCaches();
+          }
           const serverNow = Date.parse(storageData.serverTime ?? "");
           setNow(Number.isFinite(serverNow) ? serverNow : Date.now());
           setPaymentServerTime(storageData.serverTime ?? null);
-          setStorage(storageData.items ?? []);
-          setLegacyAuctionWins(storageData.legacyAuctionWins ?? []);
+          setStorage(storageItems);
+          setLegacyAuctionWins(legacyAuctionWins);
           setDeadlineEnforcementExempt(
             storageData.deadlineEnforcementExempt === true,
           );
           setRememberedDepositorName(
             storageData.rememberedDepositorName ?? null,
           );
-          setPaymentGroups(storageData.auctionPaymentQuote?.groups ?? []);
-          setCenterShippingTokens(storageData.centerShippingTokens ?? []);
+          setPaymentGroups(paymentCenterGroups);
+          setCenterShippingTokens(shippingTokens);
           setSelectedInventoryItemIds([]);
           setShipments(shipmentData.shipments ?? []);
           setLegacyEligibleOrders(legacyOrdersData.orders ?? []);
@@ -1325,7 +1353,7 @@ function AccountDashboardForSession({
                 settledLegacyAuctionWins.length === 0 &&
                 legacyEligibleOrders.length === 0 && (
                   <p className="py-12 text-center text-sm text-muted">
-                    결제 완료 후 보관 상품이 표시됩니다.
+                    현재 보관 중인 상품이 없습니다.
                   </p>
                 )}
               {v2Storage.length > 0 && (

@@ -227,6 +227,7 @@ function EnabledAuctionFeedGrid({
   title,
 }: AuctionFeedGridProps) {
   const routeSearchParams = useSearchParams();
+  const catalogRootRef = useRef<HTMLElement>(null);
   const routeQuery = routeSearchParams.get("q") ?? "";
   const routeCategory = routeSearchParams.get("category") ?? "";
   const routeGrade = routeSearchParams.get("grade") ?? "";
@@ -274,7 +275,7 @@ function EnabledAuctionFeedGrid({
   const accountBidCapability = accountBids.capability;
   const refreshAccountBids = accountBids.refresh;
   const catalogGridClass = surface === "desktop"
-    ? "grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+    ? "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-4 lg:gap-5 xl:grid-cols-5 2xl:grid-cols-6"
     : "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4";
 
   const lastRouteQuery = useRef(routeQuery);
@@ -289,20 +290,29 @@ function EnabledAuctionFeedGrid({
 
   useEffect(() => {
     const key = `ninety-nine:${saleType}:scroll`;
+    const scrollPane = catalogRootRef.current?.closest<HTMLElement>(
+      "[data-independent-scroll-main]",
+    );
     const restore = () => {
       const value = Number(sessionStorage.getItem(key) ?? "0");
-      if (value > 0)
+      if (value > 0) {
         window.requestAnimationFrame(() =>
-          window.scrollTo({
+          (scrollPane ?? window).scrollTo({
             top: value,
             behavior: "instant" as ScrollBehavior,
           }),
         );
+      }
     };
-    const save = () => sessionStorage.setItem(key, String(window.scrollY));
+    const save = () =>
+      sessionStorage.setItem(
+        key,
+        String(scrollPane?.scrollTop ?? window.scrollY),
+      );
+    const scrollTarget = scrollPane ?? window;
     restore();
-    window.addEventListener("scroll", save, { passive: true });
-    return () => window.removeEventListener("scroll", save);
+    scrollTarget.addEventListener("scroll", save, { passive: true });
+    return () => scrollTarget.removeEventListener("scroll", save);
   }, [saleType]);
 
   useEffect(() => {
@@ -907,7 +917,7 @@ function EnabledAuctionFeedGrid({
   ]);
 
   return (
-    <section className={`min-w-0 ${className}`}>
+    <section className={`min-w-0 ${className}`} ref={catalogRootRef}>
       <div className="mb-6 border-b border-ink pb-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -958,7 +968,7 @@ function EnabledAuctionFeedGrid({
           {Array.from({ length: 12 }).map((_, index) => (
             <div
               aria-hidden="true"
-              className="aspect-[4/5] animate-pulse bg-surface"
+              className="mx-auto aspect-[3/4] w-full max-w-[260px] animate-pulse rounded-xl bg-surface"
               key={index}
             />
           ))}
@@ -987,6 +997,15 @@ function EnabledAuctionFeedGrid({
               </p>
             </div>
           </div>
+        ) : saleType === "fixed" ? (
+          <div className="grid min-h-64 place-items-center border border-dashed border-line px-6 text-center">
+            <div>
+              <p className="text-sm font-bold">등록된 상품이 없습니다.</p>
+              <p className="mt-2 text-xs text-muted">
+                새로운 아카이브 상품을 준비하고 있습니다.
+              </p>
+            </div>
+          </div>
         ) : (
           <AuctionInactiveTeaser
             basePath={basePath}
@@ -1004,7 +1023,14 @@ function EnabledAuctionFeedGrid({
             {pagination.items.map((item) => {
               const source = productById.get(item.id);
               return (
-                <div key={item.id}>
+                <div
+                  className={
+                    surface === "desktop"
+                      ? "mx-auto w-full max-w-[260px]"
+                      : "min-w-0"
+                  }
+                  key={item.id}
+                >
                   {showSoldOnly ? (
                     <SoldFeedCard
                       basePath={basePath}

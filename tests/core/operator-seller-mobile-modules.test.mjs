@@ -39,14 +39,15 @@ test("seller operational modules use mobile cards, D-Day progress, quick replies
 });
 
 test("store notice and settings persist through scoped RPCs with compressed 16 by 7 media", async () => {
-  const [settings, notice, route, migration, storefront] = await Promise.all([
+  const [settings, uploader, notice, route, migration, storefront] = await Promise.all([
     source("src/components/operator/platform/StoreSettingsWorkspace.tsx"),
+    source("src/components/common/StoreImageUploader.tsx"),
     source("src/components/admin/operator/StoreNoticeManager.tsx"),
     source("src/app/api/admin/operator/platform/route.ts"),
     source("supabase/migrations/20260823123000_add_operator_store_notice.sql"),
     source("src/components/features/catalog/StoreMallExperience.tsx"),
   ]);
-  assert.match(settings, /compressProductImageForUpload/);
+  assert.match(uploader, /compressProductImageForUpload/);
   assert.match(settings, /aspect-\[16\/7\]/);
   assert.match(settings, /safe-area-inset-bottom/);
   assert.match(notice, /모바일 미리보기/);

@@ -68,8 +68,8 @@ export function AuctionBidHistoryModal({
           <button aria-label="입찰 현황 닫기" className="grid size-10 shrink-0 place-items-center rounded-xl text-muted transition-all duration-300 hover:-translate-y-0.5 hover:bg-surface hover:text-ink active:scale-95" onClick={onClose} type="button"><X size={19} /></button>
         </header>
 
-        <div className="min-h-0 overflow-y-auto px-6 py-5">
-          <div className="rounded-2xl border border-white/10 bg-surface px-4 py-3 text-xs leading-5 text-muted shadow-sm">
+        <div className="no-scrollbar min-h-0 overflow-y-auto overscroll-contain px-6 py-5">
+          <div className="rounded-2xl border border-border/50 bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground shadow-sm">
             서버 입찰 원장을 최신순으로 표시합니다. 이 화면에서는 입찰 기록을 수정하거나 삭제할 수 없습니다.
           </div>
 
@@ -84,7 +84,7 @@ export function AuctionBidHistoryModal({
                     <div className="flex items-center gap-2">
                       <strong className="break-all text-sm">{maskBidder(bid.bidderName || "회원")}</strong>
                       {cancelled
-                        ? <span className="rounded-lg border border-zinc-300 bg-zinc-100 px-2 py-1 text-[9px] font-bold text-zinc-600">{outcomeLabel}</span>
+                        ? <span className="rounded-lg border border-border bg-muted px-2 py-1 text-[9px] font-bold text-muted-foreground">{outcomeLabel}</span>
                         : bid.id === latestActiveId && <span className="rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1 text-[9px] font-bold text-emerald-800">최신 유효 입찰</span>}
                     </div>
                     <time className="mt-1 block font-mono text-[10px] text-muted" dateTime={bid.bidAt} title={formatBidTime(bid.bidAt)}>{relativeBidTime(bid.bidAt)}</time>

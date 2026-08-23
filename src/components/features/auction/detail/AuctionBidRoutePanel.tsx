@@ -122,7 +122,7 @@ export function AuctionBidRoutePanel({ basePath = "", bidIncrement, currentPrice
         <button aria-label={`입찰 금액 ${bidIncrement.toLocaleString("ko-KR")}원 늘리기`} className="ml-2 grid size-10 shrink-0 place-items-center rounded-xl border border-line text-lg font-bold disabled:opacity-35" disabled={busy || loading || !session} onClick={() => setAmount(String(Math.max(minimumBid, Number(amount || minimumBid)) + bidIncrement))} type="button">+</button>
       </div>
       <div aria-label="빠른 입찰 금액 추가" className="mt-2 grid grid-cols-3 gap-2">
-        {[1_000, 3_000, 5_000].map((step) => (
+        {[1_000, 5_000, 10_000].map((step) => (
           <button className="h-10 rounded-xl border border-line bg-surface font-mono text-xs font-bold transition hover:border-ink hover:bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink disabled:opacity-40" disabled={busy || loading || !session} key={step} onClick={() => addQuickAmount(step)} type="button">+{step.toLocaleString("ko-KR")}원</button>
         ))}
       </div>

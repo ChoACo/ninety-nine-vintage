@@ -171,10 +171,13 @@ export function AdminAccessBoundary({
   }
 
   return (
-    <div key={`${userId}:${identityRevision}`}>
+    <div
+      className="md:flex md:h-full md:min-h-0 md:flex-col"
+      key={`${userId}:${identityRevision}`}
+    >
       <nav
         aria-label="관리자 영역"
-        className="mb-8 flex items-center gap-2 border-b border-line pb-4 text-[11px] font-bold"
+        className="mb-8 flex shrink-0 items-center gap-2 border-b border-line pb-4 text-[11px] font-bold md:mb-4"
       >
         <Link
           className={

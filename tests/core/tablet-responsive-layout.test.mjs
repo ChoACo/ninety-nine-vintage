@@ -56,7 +56,25 @@ test("tablet hero, PDP, cart and workspaces use balanced split panes", async () 
   assert.match(workspace, /workspaceSidebarWidth = darkMode && collapsed \? "5rem" : "18rem"/);
   assert.match(workspace, /md:grid-cols-\[var\(--workspace-sidebar-width\)_minmax\(0,1fr\)\]/);
   assert.match(workspace, /md:w-full md:translate-x-0/);
-  assert.match(workspace, /md:p-6 md:pb-8/);
+  assert.match(workspace, /md:h-full md:min-h-0 md:overflow-y-auto md:overscroll-contain md:p-6 md:pb-8/);
+});
+
+test("desktop catalog facets and results use independent contained scroll panes", async () => {
+  const [layout, shop, filters, grid, css] = await Promise.all([
+    source("src/components/layout/DualScrollLayout.tsx"),
+    source("src/app/(shop)/shop/page.tsx"),
+    source("src/components/features/auction/AuctionFilterSidebar.tsx"),
+    source("src/components/features/auction/AuctionFeedGrid.tsx"),
+    source("src/app/globals.css"),
+  ]);
+  assert.match(layout, /data-independent-scroll-sidebar/);
+  assert.match(layout, /data-independent-scroll-main/);
+  assert.match(layout, /overflow-y-auto overscroll-contain/);
+  assert.match(shop, /<DualScrollLayout/);
+  assert.match(shop, /presentation="sidebar"/);
+  assert.match(filters, /presentation\?: "dialog" \| "sidebar"/);
+  assert.match(grid, /closest<HTMLElement>\([\s\S]*data-independent-scroll-main/);
+  assert.match(css, /\.independent-scroll[\s\S]*overscroll-behavior: contain/);
 });
 
 test("workspace header toggle navigation and footer share one bounded aside", async () => {

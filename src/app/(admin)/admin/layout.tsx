@@ -19,8 +19,8 @@ export default function AdminLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="min-h-screen min-w-0 bg-paper text-ink" data-admin-surface>
-      <header className="border-b border-line bg-paper/95 backdrop-blur-md">
+    <div className="min-h-screen min-w-0 bg-paper text-ink md:flex md:h-screen md:flex-col md:overflow-hidden" data-admin-surface>
+      <header className="shrink-0 border-b border-line bg-paper/95 backdrop-blur-md">
         <div className="mx-auto flex min-h-18 max-w-[1680px] flex-col items-stretch justify-between gap-3 px-4 py-4 sm:flex-row sm:items-center sm:gap-4 sm:px-6 md:px-10">
           <Link
             className="whitespace-nowrap text-sm font-black tracking-[0.08em] sm:tracking-[0.14em]"
@@ -36,7 +36,7 @@ export default function AdminLayout({
           </div>
         </div>
       </header>
-      <main className="mx-auto min-h-[calc(100vh-4.5rem)] max-w-[1600px] px-4 py-6 sm:px-6 md:px-10 md:py-8">
+      <main className="mx-auto min-h-[calc(100vh-4.5rem)] w-full max-w-[1600px] px-4 py-6 sm:px-6 md:min-h-0 md:flex-1 md:overflow-hidden md:px-10 md:py-6">
         <AdminAccessBoundary>{children}</AdminAccessBoundary>
       </main>
     </div>

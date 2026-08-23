@@ -49,10 +49,14 @@ test("desktop remains a compact PC surface at split-screen width", async () => {
   assert.match(header, /min-\[900px\]:flex lg:w-36 xl:w-44/);
   assert.doesNotMatch(header, /MobileSiteHeader|hamburger/i);
 
-  for (const grid of [productRail, centerGrid, storeGrid, auctionGrid]) {
+  for (const grid of [productRail, centerGrid, storeGrid]) {
     assert.match(
       grid,
       /grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5/,
     );
   }
+  assert.match(
+    auctionGrid,
+    /grid grid-cols-2 gap-3[\s\S]{0,100}md:grid-cols-4[\s\S]{0,100}xl:grid-cols-5 2xl:grid-cols-6/,
+  );
 });

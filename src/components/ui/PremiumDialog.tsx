@@ -189,7 +189,7 @@ export function PremiumDialog({
         aria-label={ariaLabel}
         aria-labelledby={labelledBy}
         aria-modal="true"
-        className={`premium-dialog-surface ${resolvedPanelViewportClassName} ${panelPlacementClassName} overflow-x-hidden overflow-y-auto border border-white/10 bg-paper text-ink shadow-2xl shadow-black/20 outline-none ${panelClassName}`.trim()}
+        className={`premium-dialog-surface ${resolvedPanelViewportClassName} ${panelPlacementClassName} overflow-x-hidden overflow-y-auto overscroll-contain border border-border/50 bg-card text-card-foreground shadow-2xl shadow-black/20 outline-none ${panelClassName}`.trim()}
         data-state={visible ? "open" : "closed"}
         ref={dialogRef}
         role="dialog"

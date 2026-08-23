@@ -109,7 +109,7 @@ export function HomeFeaturedAuction({
               오늘의 대표 경매
             </p>
             <p className="mt-2 text-sm font-bold">
-              새로운 실시간 경매를 준비 중입니다.
+              오늘 밤의 실시간 경매를 준비 중입니다.
             </p>
           </div>
           <span

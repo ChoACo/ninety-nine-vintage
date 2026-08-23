@@ -32,18 +32,18 @@ export function ConditionReport({ item, surface = "desktop" }: ConditionReportPr
       <div className={`rounded-3xl border border-border bg-card text-card-foreground shadow-xl shadow-black/5 ${surface === "desktop" ? "p-6" : "p-5"}`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="mb-2 text-[11px] font-bold tracking-[0.15em] text-zinc-500">상품 상태 정보</p>
-            <h2 className="text-lg font-black leading-snug tracking-tight">빈티지 상품 상태 안내</h2>
+            <p className="mb-2 text-[11px] font-bold tracking-[0.15em] text-muted-foreground">상품 상태 정보</p>
+            <h2 className="text-lg font-black leading-snug tracking-tight text-foreground">빈티지 상품 상태 안내</h2>
           </div>
           {conditionLabel && <span className="rounded-xl border border-border bg-surface px-3 py-2 text-[11px] font-bold text-foreground shadow-sm">{conditionLabel}</span>}
         </div>
-        <p className="mt-4 line-clamp-2 text-xs leading-relaxed text-zinc-600">{notes.join(" · ")}</p>
+        <p className="mt-4 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{notes.join(" · ")}</p>
         {defects.length > 0 && (
           <ul className="mt-3 flex flex-wrap gap-1.5">
-            {defects.map((label) => <li className="rounded-full border border-zinc-200 bg-card px-2.5 py-1 text-[10px] font-bold text-zinc-600" key={label}>{label}</li>)}
+            {defects.map((label) => <li className="rounded-full border border-border/50 bg-muted px-2.5 py-1 text-[10px] font-bold text-foreground" key={label}>{label}</li>)}
           </ul>
         )}
-        <button className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-card text-xs font-bold shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-zinc-950 hover:shadow-lg active:scale-95" onClick={() => setOpen(true)} type="button">
+        <button className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-border/50 bg-card text-xs font-bold text-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-foreground hover:shadow-lg active:scale-95" onClick={() => setOpen(true)} type="button">
           <Eye size={15} /> 상품 상태 상세 보기
         </button>
       </div>
@@ -64,8 +64,8 @@ export function ConditionReport({ item, surface = "desktop" }: ConditionReportPr
               <dl className="grid grid-cols-2 gap-px bg-line">
                 {rows.map(([label, value]) => (
                   <div className="flex items-center justify-between gap-3 bg-paper px-4 py-3 text-xs" key={label}>
-                    <dt className="text-zinc-500">{label}</dt>
-                    <dd className="font-mono font-bold text-zinc-950">{value}cm</dd>
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className="font-mono font-bold text-foreground">{value}cm</dd>
                   </div>
                 ))}
               </dl>
@@ -78,9 +78,9 @@ export function ConditionReport({ item, surface = "desktop" }: ConditionReportPr
                 {defects.map((label) => <li className="rounded-full border border-line bg-card px-3 py-1.5 text-[10px] font-bold" key={label}>{label}</li>)}
               </ul>
             )}
-            {defects.length === 0 && <p className="mt-4 rounded-xl border border-white/70 bg-card px-4 py-3 text-xs text-zinc-600">표시된 하자·오염 항목이 없습니다.</p>}
-            <ul className="mt-4 space-y-3 text-xs leading-relaxed text-zinc-600">
-              {notes.map((note) => <li className="rounded-xl border border-white/70 bg-card px-4 py-3 shadow-sm" key={note}>{note}</li>)}
+            {defects.length === 0 && <p className="mt-4 rounded-xl border border-border/50 bg-card px-4 py-3 text-xs text-muted-foreground">표시된 하자·오염 항목이 없습니다.</p>}
+            <ul className="mt-4 space-y-3 text-xs leading-relaxed text-muted-foreground">
+              {notes.map((note) => <li className="rounded-xl border border-border/50 bg-card px-4 py-3 shadow-sm" key={note}>{note}</li>)}
             </ul>
           </section>
         </div>

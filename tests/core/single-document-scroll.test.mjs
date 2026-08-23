@@ -19,12 +19,14 @@ const [globals, workspace, account, operatorChat, cart, detail, bidPanel, pcLayo
   read("src/components/mobile/MobileSiteHeader.tsx"),
 ]);
 
-test("root and primary workspaces preserve the document as the single vertical scroll context", () => {
+test("root pages retain document scrolling while admin workspaces isolate both desktop panes", () => {
   assert.match(globals, /html\s*\{[\s\S]*?min-height:\s*100%;[\s\S]*?overflow-y:\s*visible;/);
   assert.match(globals, /body\s*\{[\s\S]*?overflow-y:\s*visible;/);
   assert.doesNotMatch(account, /h-screen[^\n]*overflow-y-auto|overflow-hidden[^\n]*h-screen/);
   assert.doesNotMatch(operatorChat, /overflow-y-auto/);
-  assert.match(workspace, /md:sticky md:top-6/);
+  assert.match(workspace, /md:sticky md:top-0/);
+  assert.match(workspace, /independent-scroll no-scrollbar min-h-0 flex-1[\s\S]*overflow-y-auto overscroll-contain/);
+  assert.match(workspace, /independent-scroll no-scrollbar[\s\S]*md:h-full md:min-h-0 md:overflow-y-auto md:overscroll-contain[\s\S]*data-admin-workspace-content/);
 });
 
 test("ticker and GNB share one sticky viewport header on desktop and mobile", () => {
@@ -45,5 +47,7 @@ test("MY, cart, and product detail panels use items-start and fit-content sticky
   assert.match(cart, /grid max-w-\[1400px\] grid-cols-1 items-start gap-6[\s\S]*sm:grid-cols-/);
   assert.match(cart, /h-fit self-start/);
   assert.match(detail, /grid w-full max-w-\[1400px\] grid-cols-1 items-start gap-6 p-0 sm:grid-cols-12/);
+  assert.match(detail, /data-detail-gallery-scroll/);
+  assert.match(detail, /no-scrollbar[\s\S]*overscroll-contain[\s\S]*lg:h-\[calc\(100dvh-6rem\)\][\s\S]*lg:overflow-y-auto/);
   assert.match(bidPanel, /h-fit self-start[\s\S]*sm:sticky sm:col-span-6/);
 });

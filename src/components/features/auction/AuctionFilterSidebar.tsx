@@ -35,8 +35,10 @@ function dateFilterLabel(dateKey: string) {
 }
 
 export function AuctionFilterSidebar({
+  presentation = "dialog",
   surface = "mobile",
 }: {
+  presentation?: "dialog" | "sidebar";
   saleType?: "auction" | "fixed";
   surface?: "desktop" | "mobile";
 }) {
@@ -125,7 +127,7 @@ export function AuctionFilterSidebar({
 
   const filterContent = (
     <>
-      <div className="flex items-center justify-between border-b border-zinc-200 py-4">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200 bg-card py-4">
         <h2 className="text-xs font-bold tracking-[0.12em]">
           필터
           {surface === "mobile" && (
@@ -140,13 +142,15 @@ export function AuctionFilterSidebar({
           >
             <RotateCcw size={12} /> 초기화
           </button>
-          <button
-            aria-label="필터 닫기"
-            onClick={() => setFilterOpen(false)}
-            type="button"
-          >
-            <X size={18} />
-          </button>
+          {presentation === "dialog" && (
+            <button
+              aria-label="필터 닫기"
+              onClick={() => setFilterOpen(false)}
+              type="button"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -273,7 +277,9 @@ export function AuctionFilterSidebar({
 
   return (
     <>
-      {surface === "desktop" ? (
+      {presentation === "sidebar" ? (
+        <div className="min-w-0">{filterContent}</div>
+      ) : surface === "desktop" ? (
         <div className="mb-6">
           <button
             aria-expanded={filterOpen}

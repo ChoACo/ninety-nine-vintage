@@ -29,6 +29,9 @@ test("Owner dashboard removes shop status cards and links center(store) manageme
   assert.match(consoleSource, /applyOperatorAssignment/);
   assert.match(consoleSource, /직원 배치/);
   assert.match(consoleSource, /수정 저장/);
+  assert.match(consoleSource, /스토어 대표 배너 이미지/);
+  assert.match(consoleSource, /saveStoreBanner/);
+  assert.match(consoleSource, /banner_update/);
   assert.match(consoleSource, /삭제된 센터\(매장\)/);
 });
 
@@ -40,10 +43,27 @@ test("Owner store API is authenticated, origin-checked, and routes mutations thr
   assert.match(route, /"get_owner_store_management"/);
   assert.match(route, /"manage_owner_store"/);
   assert.match(route, /"set_owner_store_employee"/);
+  assert.match(route, /"update_owner_store_banner"/);
+  assert.match(route, /banner_url,mall_image/);
   assert.match(route, /p_expected_version:\s*expectedVersion/);
   assert.match(route, /p_expected_store_version:\s*expectedStoreVersion/);
   assert.match(route, /p_idempotency_key:\s*idempotencyKey/);
   assert.doesNotMatch(route, /\.from\("stores"\)\.(?:insert|update|delete)/);
+});
+
+test("Owner banner changes use CAS, idempotency, and an audit event", async () => {
+  const migration = await source(
+    "supabase/migrations/20260823111213_add_owner_store_banner_management.sql",
+  );
+  assert.match(migration, /function public\.update_owner_store_banner/);
+  assert.match(migration, /app_private\.require_grade_zero_owner\(\)/);
+  assert.match(migration, /v_before\.version <> p_expected_version/);
+  assert.match(migration, /pg_advisory_xact_lock/);
+  assert.match(migration, /'banner_update'/);
+  assert.match(migration, /owner_store_management_events/);
+  assert.match(migration, /banner_url =/);
+  assert.match(migration, /mall_image =/);
+  assert.match(migration, /grant execute[\s\S]*to authenticated/);
 });
 
 test("center(store) migration supports Owner-only CAS CRUD and explicit staff placement", async () => {

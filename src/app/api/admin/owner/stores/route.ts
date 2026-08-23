@@ -46,11 +46,37 @@ export async function GET(request: Request) {
       "get_owner_store_management",
     );
     if (error) return rpcError(error, "store_management_unavailable");
+    const management =
+      data && typeof data === "object"
+        ? (data as { stores?: Array<Record<string, unknown>> })
+        : {};
+    const stores = management.stores ?? [];
+    const storeIds = stores.map((store) => String(store.id));
+    const { data: branding, error: brandingError } = storeIds.length
+      ? await access.admin
+          .from("stores")
+          .select("id,banner_url,mall_image")
+          .in("id", storeIds)
+      : { data: [], error: null };
+    if (brandingError) {
+      console.error("owner_store_branding_query_failed", {
+        code: brandingError.code,
+        message: brandingError.message,
+      });
+    }
+    const brandingByStore = new Map(
+      (branding ?? []).map((item) => [String(item.id), item]),
+    );
     return ownerAccessJsonResponse({
-      management:
-        data && typeof data === "object"
-          ? (data as Record<string, unknown>)
-          : {},
+      management: {
+        ...management,
+        stores: stores.map((store) => ({
+          ...store,
+          bannerUrl:
+            brandingByStore.get(String(store.id))?.banner_url ?? null,
+          mallImage: brandingByStore.get(String(store.id))?.mall_image ?? null,
+        })),
+      },
     });
   } catch (error) {
     return ownerAccessErrorResponse(error);
@@ -71,6 +97,44 @@ export async function PATCH(request: Request) {
         },
         400,
       );
+    }
+
+    if (action === "banner_update") {
+      const storeId = readUuid(body.storeId);
+      const expectedVersion = readVersion(body.expectedVersion);
+      const bannerUrl =
+        typeof body.bannerUrl === "string" ? body.bannerUrl.trim() : null;
+      let validBannerUrl = bannerUrl === "";
+      if (bannerUrl) {
+        try {
+          const url = new URL(bannerUrl);
+          validBannerUrl =
+            ["http:", "https:"].includes(url.protocol) && bannerUrl.length <= 500;
+        } catch {
+          validBannerUrl = false;
+        }
+      }
+      if (!storeId || expectedVersion === null || !validBannerUrl) {
+        return ownerAccessJsonResponse(
+          {
+            error: "invalid_store_banner",
+            message: "스토어 배너 이미지 정보를 확인해 주세요.",
+          },
+          422,
+        );
+      }
+      const { data, error } = await access.userClient.rpc(
+        "update_owner_store_banner",
+        {
+          p_banner_url: bannerUrl || null,
+          p_expected_version: expectedVersion,
+          p_idempotency_key: idempotencyKey,
+          p_reason: "소유자센터에서 스토어 대표 배너 수정",
+          p_store_id: storeId,
+        },
+      );
+      if (error) return rpcError(error, "store_banner_update_failed");
+      return ownerAccessJsonResponse({ result: data });
     }
 
     if (

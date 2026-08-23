@@ -1,17 +1,11 @@
 "use client";
 
-import { ImagePlus, RotateCcw, Save, Store, Truck } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { RotateCcw, Save, Store, Truck } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { PostcodeSearchButton } from "@/components/features/account/PostcodeSearchButton";
-import { CatalogImage } from "@/components/ui/CatalogImage";
+import { StoreImageUploader } from "@/components/common/StoreImageUploader";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import {
-  hasSupportedProductImageSignature,
-  isSupportedProductImageMimeType,
-} from "@/lib/supabase/productImagePolicy";
 import { useToastStore } from "@/store/useToastStore";
-import { compressProductImageForUpload } from "@/lib/images/productImageCompression";
 
 const BANKS = [
   "국민은행",
@@ -108,91 +102,6 @@ function initial(s: StoreData): Form {
   };
 }
 
-async function upload(storeId: string, kind: string, file: File) {
-  if (
-    !isSupportedProductImageMimeType(file.type) ||
-    file.size <= 0 ||
-    file.size > 10 * 1024 * 1024 ||
-    !(await hasSupportedProductImageSignature(file))
-  )
-    throw new Error("10MB 이하 JPG·PNG·WEBP 이미지를 선택해 주세요.");
-  const compressed = await compressProductImageForUpload(file);
-  const ext = (compressed.name.split(".").pop() ?? "webp").replace(/[^a-z0-9]/giu, "");
-  const client = getSupabaseBrowserClient();
-  const path = `${storeId}/${kind}-${crypto.randomUUID()}.${ext}`;
-  const { data, error } = await client.storage
-    .from("store-mall-images")
-    .upload(path, compressed, { contentType: compressed.type, cacheControl: "31536000" });
-  if (error || !data) throw new Error("이미지 업로드에 실패했습니다.");
-  return client.storage.from("store-mall-images").getPublicUrl(data.path).data
-    .publicUrl;
-}
-function Dropzone({
-  label,
-  kind,
-  ratio,
-  value,
-  storeId,
-  onChange,
-}: {
-  label: string;
-  kind: string;
-  ratio: string;
-  value: string;
-  storeId: string;
-  onChange: (url: string) => void;
-}) {
-  const input = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  return (
-    <div>
-      <p className="mb-2 text-xs font-bold text-zinc-300">{label}</p>
-      <button
-        className={`${ratio} group relative grid w-full place-items-center overflow-hidden rounded-2xl border border-dashed border-zinc-700 bg-zinc-950`}
-        onClick={() => input.current?.click()}
-        type="button"
-      >
-        {value ? (
-          <CatalogImage
-            alt={`${label} 미리보기`}
-            className="h-full w-full object-cover"
-            height={360}
-            src={value}
-            width={900}
-          />
-        ) : (
-          <span className="flex flex-col items-center gap-2 text-xs text-zinc-400">
-            <ImagePlus size={20} />
-            {busy ? "업로드 중…" : "이미지 선택"}
-          </span>
-        )}
-        <span className="absolute inset-0 hidden place-items-center bg-black/60 text-xs font-bold text-white group-hover:grid">
-          이미지 변경
-        </span>
-      </button>
-      <input
-        accept="image/jpeg,image/png,image/webp,image/avif"
-        className="sr-only"
-        ref={input}
-        type="file"
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          setBusy(true);
-          try {
-            onChange(await upload(storeId, kind, file));
-          } catch (error) {
-            window.alert(error instanceof Error ? error.message : "이미지 업로드에 실패했습니다.");
-          } finally {
-            setBusy(false);
-            e.target.value = "";
-          }
-        }}
-      />
-    </div>
-  );
-}
-
 export function StoreBrandingCard({
   storeId,
   form,
@@ -209,21 +118,25 @@ export function StoreBrandingCard({
         매장 브랜딩 및 소개
       </h2>
       <div className="mt-5 grid gap-5 md:grid-cols-[140px_1fr]">
-        <Dropzone
+        <StoreImageUploader
+          aspectClassName="aspect-square max-w-[120px]"
           kind="logo"
           label="매장 로고 (1:1)"
           onChange={(logoUrl) => set({ logoUrl })}
-          ratio="aspect-square max-w-[120px]"
+          placeholder="로고 이미지 선택"
           storeId={storeId}
           value={form.logoUrl}
+          variant="dark"
         />
-        <Dropzone
+        <StoreImageUploader
+          aspectClassName="aspect-[16/7]"
           kind="banner"
-          label="와이드 배너 (16:7)"
+          label="스토어 대표 배너 이미지 (권장 16:7 · 1200×525)"
           onChange={(bannerUrl) => set({ bannerUrl })}
-          ratio="aspect-[16/7]"
+          placeholder="센터 상단에 노출될 대표 배너 이미지를 업로드하세요."
           storeId={storeId}
           value={form.bannerUrl}
+          variant="dark"
         />
       </div>
       <label className="mt-5 block text-xs font-bold text-zinc-300">
@@ -589,19 +502,43 @@ export function StoreSettingsWorkspace() {
   const token = session?.access_token ?? null;
   const [stores, setStores] = useState<StoreData[]>([]);
   const [error, setError] = useState("");
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const load = useCallback(async () => {
-    if (!token) return;
-    const r = await fetch("/api/admin/operator/platform", {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
-    const p = await r.json();
-    if (!r.ok) {
-      setError(p.error ?? "매장 설정을 불러오지 못했습니다.");
+    if (!token) {
+      setLoading(false);
       return;
     }
-    setStores(p.management?.stores ?? []);
-    setError("");
+    setLoading(true);
+    try {
+      const r = await fetch("/api/admin/operator/platform", {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      const p = (await r.json()) as {
+        error?: string;
+        message?: string;
+        management?: { stores?: StoreData[] };
+        warnings?: string[];
+      };
+      if (!r.ok) {
+        setError(
+          p.message ?? "매장 설정을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        );
+        setStores([]);
+        setWarnings([]);
+        return;
+      }
+      setStores(p.management?.stores ?? []);
+      setWarnings(p.warnings ?? []);
+      setError("");
+    } catch {
+      setError("네트워크 연결을 확인한 뒤 다시 시도해 주세요.");
+      setStores([]);
+      setWarnings([]);
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -621,19 +558,42 @@ export function StoreSettingsWorkspace() {
           이용 플랜은 기본 3만원 또는 프리미엄 5만원이며, 다음 청구일 전 변경·해지를 요청할 수 있습니다.
         </p>
       </header>
-      {error ? (
-        <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300">
-          {error}
-        </p>
+      {loading ? (
+        <div aria-label="매장 설정 불러오는 중" className="space-y-4" role="status">
+          <div className="h-40 animate-pulse rounded-2xl bg-zinc-900" />
+          <div className="h-64 animate-pulse rounded-2xl bg-zinc-900" />
+          <span className="sr-only">매장 설정을 불러오는 중입니다.</span>
+        </div>
+      ) : error ? (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200" role="alert">
+          <p>{error}</p>
+          <button
+            className="mt-3 min-h-11 rounded-xl border border-rose-300/40 px-4 text-xs font-bold hover:bg-rose-500/10"
+            onClick={() => void load()}
+            type="button"
+          >
+            다시 시도
+          </button>
+        </div>
       ) : null}
-      {stores.map((store) => (
+      {!loading && !error && warnings.length > 0 ? (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs leading-5 text-amber-200" role="status">
+          {warnings.join(" ")}
+        </div>
+      ) : null}
+      {!loading && !error && stores.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-zinc-700 p-8 text-center text-sm text-zinc-400">
+          연결된 운영 매장이 없습니다. 소유자에게 매장 배정을 요청해 주세요.
+        </div>
+      ) : null}
+      {!loading && !error ? stores.map((store) => (
         <Settings
           key={store.id}
           reload={load}
           store={store}
           token={token ?? ""}
         />
-      ))}
+      )) : null}
     </div>
   );
 }

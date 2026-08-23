@@ -463,6 +463,7 @@ export function CartView({
     (state) => state.shippingModes.checkout ?? "ship",
   );
   const setShippingMode = useCartStore((state) => state.setShippingMode);
+  const reconcileCartIds = useCartStore((state) => state.reconcileCartIds);
   const includeShippingFee = shippingMode === "ship";
   const setIncludeShippingFee = useCallback(
     (include: boolean) =>
@@ -676,18 +677,28 @@ export function CartView({
     let lastSessionKey: string | null = null;
 
     const loadCachedCartProducts = async (productIds: readonly string[]) => {
-      if (productIds.length === 0) return [];
+      if (productIds.length === 0) {
+        return { authoritative: true, products: [] as CartProduct[] };
+      }
       const response = await fetch("/api/products?saleType=fixed&limit=100", {
         cache: "no-store",
       });
-      if (!response.ok) return [];
+      if (!response.ok) {
+        return { authoritative: false, products: [] as CartProduct[] };
+      }
       const payload = (await response.json()) as {
         products?: PublishedFixedProduct[];
       };
       const wanted = new Set(productIds);
-      return (payload.products ?? [])
-        .filter((product) => wanted.has(product.id))
-        .map(toCartProduct);
+      const publishedProducts = Array.isArray(payload.products)
+        ? payload.products
+        : [];
+      return {
+        authoritative: true,
+        products: publishedProducts
+          .filter((product) => wanted.has(product.id))
+          .map(toCartProduct),
+      };
     };
 
     const clearMemberState = (clearRecovery = true, preserveCart = false) => {
@@ -733,9 +744,14 @@ export function CartView({
         setAccess("guest");
         setProductsLoading(guestCartIds.length > 0);
         setCartLoading(false);
-        const cachedProducts = await loadCachedCartProducts(guestCartIds);
+        const cachedResult = await loadCachedCartProducts(guestCartIds);
         if (!disposed && authUserId.current === null) {
-          setLiveProducts(cachedProducts);
+          setLiveProducts(cachedResult.products);
+          if (cachedResult.authoritative) {
+            const liveIds = cachedResult.products.map((product) => product.id);
+            replaceCart(liveIds);
+            reconcileCartIds(liveIds);
+          }
           setProductsLoading(false);
         }
         return;
@@ -839,7 +855,9 @@ export function CartView({
         } else {
           setPaymentMode(payload.paymentMode);
         }
-        const cartProducts = (payload.items ?? []).map(toCartProduct);
+        const cartProducts = Array.isArray(payload.items)
+          ? payload.items.map(toCartProduct)
+          : [];
         const nextShippingFee = Number(payload.shippingFee);
         const nextShippingAvailable = payload.shippingAvailable !== false;
         if (
@@ -858,11 +876,19 @@ export function CartView({
           );
           if (!nextShippingAvailable) setIncludeShippingFee(false);
         }
-        const ids =
-          payload.productIds ?? cartProducts.map((product) => product.id);
+        const ids = Array.isArray(payload.productIds)
+          ? payload.productIds.filter(
+              (id): id is string => typeof id === "string" && Boolean(id),
+            )
+          : cartProducts.map((product) => product.id);
         setLiveProducts(cartProducts);
         replaceCart(ids);
-        setStaleCount(payload.staleProductIds?.length ?? 0);
+        reconcileCartIds(ids);
+        setStaleCount(
+          Array.isArray(payload.staleProductIds)
+            ? payload.staleProductIds.length
+            : 0,
+        );
       } catch (loadError) {
         if (!isCurrent()) return;
         // A transient cart/API failure must not masquerade as logout or expose
@@ -870,10 +896,10 @@ export function CartView({
         setAccess("member");
         setPaymentMode("unavailable");
         const cachedIds = useCommerceStore.getState().cartIds;
-        const cachedProducts = await loadCachedCartProducts(cachedIds);
+        const cachedResult = await loadCachedCartProducts(cachedIds);
         if (!isCurrent()) return;
         setLiveProducts((current) =>
-          current.length > 0 ? current : cachedProducts,
+          current.length > 0 ? current : cachedResult.products,
         );
         setMessageKind("warning");
         setMessage(
@@ -946,7 +972,7 @@ export function CartView({
         authGeneration.current += 1;
       };
     }
-  }, [replaceCart, setIncludeShippingFee, shippingRegion]);
+  }, [reconcileCartIds, replaceCart, setIncludeShippingFee, shippingRegion]);
 
   useEffect(() => {
     if (access !== "member") return;

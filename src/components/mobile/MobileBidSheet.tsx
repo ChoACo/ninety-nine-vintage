@@ -39,7 +39,7 @@ export function MobileBidSheet({ children, productId }: { children: ReactNode; p
         <div><p className="eyebrow text-muted">빠른 거래</p><h1 className="mt-1 text-lg font-black" id="mobile-quick-bid-title">빠른 입찰</h1></div>
         <button aria-label="빠른 입찰 닫기" className="grid size-11 place-items-center" onClick={close} type="button"><X size={20} /></button>
       </header>
-      <div className="max-h-[75svh] overflow-y-auto p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">{children}</div>
+      <div className="no-scrollbar max-h-[75svh] overflow-y-auto overscroll-contain p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">{children}</div>
     </PremiumDialog>
   );
 }

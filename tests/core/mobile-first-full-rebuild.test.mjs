@@ -29,18 +29,18 @@ test("mobile header auto-hides on downward scroll and restores sticky offsets", 
   assert.match(css, /data-mobile-header-hidden="true"[\s\S]*--mobile-sticky-header-offset: 0rem/);
 });
 
-test("mobile cards use airy portrait hierarchy with floating grade and live chips", async () => {
+test("catalog cards use a compact portrait hierarchy with floating grade and live chips", async () => {
   const cards = await Promise.all([
     source("src/components/features/auction/AuctionCard.tsx"),
     source("src/components/features/auction/AuctionFeedCard.tsx"),
   ]);
   for (const card of cards) {
-    assert.match(card, /aspect-\[3\/4\] w-full overflow-hidden rounded-2xl border border-line\/30/);
-    assert.match(card, /left-2\.5 top-2\.5/);
+    assert.match(card, /aspect-\[3\/4\] w-full overflow-hidden rounded-xl border border-line\/30/);
+    assert.match(card, /left-2 top-2/);
     assert.match(card, /GRADE \{grade\}/);
     assert.match(card, /LIVE/);
-    assert.match(card, /line-clamp-1 break-keep text-sm font-medium text-foreground\/90/);
-    assert.match(card, /text-base font-bold text-foreground/);
+    assert.match(card, /line-clamp-1 break-keep text-xs font-medium text-foreground\/90[^"]*sm:text-sm/);
+    assert.match(card, /text-sm font-bold text-foreground/);
   }
 });
 

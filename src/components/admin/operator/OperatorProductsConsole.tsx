@@ -2713,7 +2713,21 @@ export function OperatorProductsConsole({
           </div>
         </div>
       )}
-      <div className="overflow-x-auto border-y border-line">
+      <div className="grid gap-3 md:hidden">
+        {visibleProducts.map((product) => {
+          const manageable = isManageableProductStatus(product.status);
+          const canPublishStore = stores.some((store) => store.id === product.store_id && store.canPublish);
+          const isActive = product.status === "active";
+          return <article className="w-full max-w-full overflow-hidden break-keep rounded-2xl border border-line bg-paper p-4" key={product.id}>
+            <div className="flex min-w-0 gap-3"><CatalogImage alt="" className="size-16 shrink-0 rounded-xl object-cover" src={product.image_urls?.[0] ?? ""} /><div className="min-w-0 flex-1"><p className="line-clamp-2 text-sm font-bold">{product.title}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="rounded-md border border-line px-2 py-1 text-[10px] font-bold">Grade {product.condition_grade || "A"}</span><span className="rounded-md border border-line px-2 py-1 text-[10px]">{product.sale_type === "fixed" ? "판매중" : "경매중"}</span></div><p className="mt-2 font-mono text-sm font-bold">{(product.fixed_price ?? product.current_price).toLocaleString("ko-KR")}원</p></div>
+              <button aria-label={`${product.title} ${isActive ? "판매 일시중지" : "판매 공개"}`} aria-pressed={isActive} className="grid min-h-11 min-w-11 shrink-0 place-items-center" disabled={busy || !permissions.canMutate || (isActive ? !manageable : !canPublishStore || product.status !== "pending")} onClick={() => void (isActive ? pause(product) : publish(product))} type="button"><span className={`relative h-6 w-11 rounded-full transition ${isActive ? "bg-emerald-500" : "bg-zinc-300"}`}><span className={`absolute top-1 size-4 rounded-full bg-white transition-transform ${isActive ? "translate-x-5" : "translate-x-1"}`} /></span></button>
+            </div>
+            <div className="mt-3 flex gap-2"><button className="min-h-11 flex-1 rounded-xl border border-line text-xs font-bold disabled:opacity-40" disabled={busy || !permissions.canMutate || !manageable} onClick={() => edit(product)} type="button">수정</button>{isActive && <Link className="grid min-h-11 flex-1 place-items-center rounded-xl border border-line text-xs font-bold" href={`/auction/${product.id}`}>보기</Link>}</div>
+          </article>;
+        })}
+        {visibleProducts.length === 0 && <p className="py-16 text-center text-sm text-muted">조건에 맞는 상품이 없습니다.</p>}
+      </div>
+      <div className="hidden overflow-x-auto border-y border-line md:block">
         <table className="w-full min-w-[1080px] text-left text-xs">
           <thead className="border-b border-line bg-surface text-[10px] tracking-[.12em] text-muted">
             <tr>

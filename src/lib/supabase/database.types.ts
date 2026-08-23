@@ -34,6 +34,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      platform_config: {
+        Row: {
+          banners: Json
+          config_key: string
+          global_delivery_fee: number
+          home_sections: Json
+          policy_markdown: string
+          storage_duration_days: number
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          banners?: Json
+          config_key?: string
+          global_delivery_fee?: number
+          home_sections?: Json
+          policy_markdown?: string
+          storage_duration_days?: number
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          banners?: Json
+          config_key?: string
+          global_delivery_fee?: number
+          home_sections?: Json
+          policy_markdown?: string
+          storage_duration_days?: number
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: []
+      }
       staff_board_comments: {
         Row: {
           author_id: string | null
@@ -7116,6 +7152,8 @@ current_price: number
           home_fulfillment_center_id: string | null
           id: string
           is_active: boolean
+          announcement_enabled: boolean
+          announcement_text: string | null
           banner_url: string | null
           concept_tags: string[]
           default_courier: string
@@ -7137,6 +7175,8 @@ current_price: number
           home_fulfillment_center_id?: string | null
           id?: string
           is_active?: boolean
+          announcement_enabled?: boolean
+          announcement_text?: string | null
           banner_url?: string | null
           concept_tags?: string[]
           default_courier?: string
@@ -7158,6 +7198,8 @@ current_price: number
           home_fulfillment_center_id?: string | null
           id?: string
           is_active?: boolean
+          announcement_enabled?: boolean
+          announcement_text?: string | null
           banner_url?: string | null
           concept_tags?: string[]
           default_courier?: string
@@ -10474,6 +10516,18 @@ current_price: number
           configured: boolean
           updated_at: string
         }[]
+      }
+      update_owner_platform_config: {
+        Args: {
+          p_banners: Json
+          p_expected_version: number
+          p_global_delivery_fee: number
+          p_home_sections: Json
+          p_policy_markdown: string
+          p_reason: string
+          p_storage_duration_days: number
+        }
+        Returns: Json
       }
       update_operator_product: {
         Args: {

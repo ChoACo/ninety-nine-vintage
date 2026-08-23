@@ -4,6 +4,7 @@ import test from "node:test";
 
 const migrationPath = new URL("../../supabase/migrations/20260822161639_add_regular_settlement_rollovers.sql", import.meta.url);
 const migration = await readFile(migrationPath, "utf8");
+const payoutWindowMigration = await readFile(new URL("../../supabase/migrations/20260823065524_enforce_settlement_payout_window.sql", import.meta.url), "utf8");
 const cron = await readFile(new URL("../../src/app/api/cron/generate-settlements/route.ts", import.meta.url), "utf8");
 const vercel = JSON.parse(await readFile(new URL("../../vercel.json", import.meta.url), "utf8"));
 const desk = await readFile(new URL("../../src/components/admin/owner/OwnerPayoutDesk.tsx", import.meta.url), "utf8");
@@ -16,6 +17,7 @@ test("regular settlement runs Monday and Thursday at 18:00 KST through an authen
   assert.deepEqual(vercel.crons.find((entry) => entry.path === "/api/cron/generate-settlements"), { path: "/api/cron/generate-settlements", schedule: "0 9 * * 1,4" });
   assert.match(operatorRevenue, /월·목요일 18:00 KST 기준/);
   assert.doesNotMatch(operatorRevenue, /월·목요일 09:00 KST 기준/);
+  assert.match(desk, /오후 6시~오후 9시/);
 });
 
 test("fee applications preserve the immutable fee ledger and prevent duplicate deductions", () => {
@@ -24,6 +26,13 @@ test("fee applications preserve the immutable fee ledger and prevent duplicate d
   assert.match(migration, /v_deduct := least\(greatest\(v_net_before_fee,0\),v_fee_due\)/);
   assert.match(migration, /v_rollovers := case when v_remaining=0 then 0 else v_store\.fee_rollover_count\+1 end/);
   assert.match(migration, /v_rollovers>=4/);
+});
+
+test("manual settlement completion is limited to the 18:00-21:00 KST payout window", () => {
+  assert.match(payoutWindowMigration, /18:00:00 Asia\/Seoul/);
+  assert.match(payoutWindowMigration, /21:00:00 Asia\/Seoul/);
+  assert.match(payoutWindowMigration, /정산 송금 가능 시간은 오후 6시부터 오후 9시까지입니다/);
+  assert.match(payoutWindowMigration, /v_now < v_window_start or v_now >= v_window_end/);
 });
 
 test("owner payout desk keeps bank details masked until an audited reveal", () => {

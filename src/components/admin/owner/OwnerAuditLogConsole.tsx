@@ -60,7 +60,49 @@ function severityClass(severity: string) {
 
 function formatAt(value: string) {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("ko-KR");
+  if (Number.isNaN(date.getTime())) return value;
+  const parts = new Intl.DateTimeFormat("ko-KR", {
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    month: "2-digit",
+    second: "2-digit",
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}.${part("month")}.${part("day")} ${part("hour")}:${part("minute")}:${part("second")}`;
+}
+
+function relativeAt(value: string) {
+  const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 1000));
+  if (!Number.isFinite(seconds) || seconds < 60) return "방금 전";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}분 전`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}시간 전`;
+  return `${Math.floor(hours / 24)}일 전`;
+}
+
+function actionClass(row: AuditActivityRow) {
+  const action = `${row.event_type} ${row.action}`.toUpperCase();
+  if (action.includes("AUTH_LOGIN")) return "border-blue-500/40 bg-blue-500/10 text-blue-700";
+  if (action.includes("SETTLEMENT_APPROVED")) return "border-emerald-500/40 bg-emerald-500/10 text-emerald-700";
+  if (action.includes("ITEM_DELETED")) return "border-red-500/40 bg-red-500/10 text-red-700";
+  if (action.includes("CONFIG_CHANGED")) return "border-violet-500/40 bg-violet-500/10 text-violet-700";
+  return "border-line bg-paper text-muted";
+}
+
+type QuickCategory = "all" | "auth" | "settlement" | "config";
+
+function quickCategoryMatch(row: AuditActivityRow, category: QuickCategory) {
+  if (category === "all") return true;
+  const value = `${row.category} ${row.event_type} ${row.action}`.toLowerCase();
+  if (category === "auth") return /auth|login|session|security/.test(value);
+  if (category === "settlement") return /settlement|payment|payout/.test(value);
+  return /config|setting|platform/.test(value);
 }
 
 function csvCell(value: unknown): string {
@@ -83,6 +125,7 @@ export function OwnerAuditLogConsole() {
   const [categoryInput, setCategoryInput] = useState("");
   const [userIdInput, setUserIdInput] = useState("");
   const [quickQuery, setQuickQuery] = useState("");
+  const [quickCategory, setQuickCategory] = useState<QuickCategory>("all");
   const [rows, setRows] = useState<AuditActivityRow[]>([]);
   const [loadedSignature, setLoadedSignature] = useState("");
   const [offset, setOffset] = useState(0);
@@ -212,9 +255,10 @@ export function OwnerAuditLogConsole() {
   const visibleRows = useMemo(() => {
     if (resultsStale) return [];
     const query = quickQuery.trim().toLowerCase();
-    if (!query) return rows;
-    return rows.filter((row) =>
-      [
+    return rows.filter((row) => {
+      if (!quickCategoryMatch(row, quickCategory)) return false;
+      if (!query) return true;
+      return [
         row.actor_display_name,
         row.actor_user_id,
         row.subject_display_name,
@@ -226,9 +270,9 @@ export function OwnerAuditLogConsole() {
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
-        .includes(query),
-    );
-  }, [quickQuery, resultsStale, rows]);
+        .includes(query);
+    });
+  }, [quickCategory, quickQuery, resultsStale, rows]);
 
   return (
     <section className="border border-line bg-surface p-5">
@@ -310,9 +354,31 @@ export function OwnerAuditLogConsole() {
         </label>
       </div>
 
+      <div aria-label="감사 로그 빠른 필터" className="mt-4 flex gap-2 overflow-x-auto pb-1" role="group">
+        {([['all','전체'],['auth','인증'],['settlement','정산'],['config','설정']] as const).map(([value, label]) => (
+          <button aria-pressed={quickCategory === value} className={`min-h-11 shrink-0 rounded-full border px-4 text-xs font-black ${quickCategory === value ? "border-ink bg-ink text-paper" : "border-line bg-paper"}`} key={value} onClick={() => setQuickCategory(value)} type="button">{label}</button>
+        ))}
+      </div>
+
       {notice && <p aria-live="polite" className="mt-4 border border-line bg-paper px-4 py-3 text-xs">{notice}</p>}
 
-      <div className="mt-4 overflow-x-auto border border-line">
+      <div className="mt-4 flex flex-col gap-3 md:hidden">
+        {visibleRows.map((row) => (
+          <article className="min-w-0 border border-line bg-paper p-4" key={row.log_key}>
+            <div className="flex items-start justify-between gap-3"><div><time className="font-mono text-[11px]" dateTime={row.occurred_at}>{formatAt(row.occurred_at)}</time><span className="ml-2 text-[10px] text-muted">{relativeAt(row.occurred_at)}</span></div><span className={`shrink-0 border px-2 py-1 text-[10px] font-bold ${severityClass(row.severity)}`}>{severityLabels[row.severity] ?? row.severity}</span></div>
+            <div className="mt-3 flex flex-wrap gap-2"><span className={`border px-2 py-1 font-mono text-[10px] font-bold ${actionClass(row)}`}>{row.action}</span><span className="border border-line px-2 py-1 font-mono text-[10px]">{row.category}</span></div>
+            <p className="mt-3 break-words text-xs font-bold">{row.event_type}</p>
+            <dl className="mt-3 grid gap-2 text-[11px]"><div><dt className="text-muted">작업자</dt><dd className="break-all">{row.actor_display_name ?? "-"} · {row.actor_user_id ?? "-"}</dd></div><div><dt className="text-muted">대상</dt><dd className="break-all">{row.subject_display_name ?? "-"} · {row.subject_user_id ?? "-"}</dd></div><div><dt className="text-muted">출처</dt><dd className="break-all font-mono">{row.source} · {row.ip_address ?? "-"}</dd></div></dl>
+          </article>
+        ))}
+        {!loading && visibleRows.length === 0 ? (
+          <p className="border border-dashed border-line py-10 text-center text-xs text-muted">
+            {resultsStale ? "조회 조건이 변경되었습니다. 다시 조회해 주세요." : rows.length === 0 ? "조회 조건에 맞는 감사 로그가 없습니다." : "빠른 필터 조건에 맞는 결과가 없습니다."}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="mt-4 hidden overflow-x-auto border border-line md:block">
         <table className="w-full min-w-[900px] text-left text-xs">
           <thead className="border-b border-line bg-paper text-[10px] tracking-[.12em] text-muted">
             <tr>
@@ -328,10 +394,10 @@ export function OwnerAuditLogConsole() {
           <tbody className="divide-y divide-line">
             {visibleRows.map((row) => (
               <tr key={row.log_key}>
-                <td className="whitespace-nowrap px-3 py-3 font-mono text-[11px]">{formatAt(row.occurred_at)}</td>
+                <td className="whitespace-nowrap px-3 py-3 font-mono text-[11px]"><time dateTime={row.occurred_at}>{formatAt(row.occurred_at)}</time><span className="mt-1 block text-[10px] text-muted">{relativeAt(row.occurred_at)}</span></td>
                 <td className="px-3 py-3"><span className={`inline-block border px-2 py-1 text-[10px] font-bold ${severityClass(row.severity)}`}>{severityLabels[row.severity] ?? row.severity}</span></td>
                 <td className="px-3 py-3 font-mono text-[11px]">{row.category}</td>
-                <td className="px-3 py-3 font-mono text-[11px]" title={[row.entity_type ? `${row.entity_type}:${row.entity_id ?? ""}` : "", row.user_agent ?? ""].filter(Boolean).join(" · ")}>{row.event_type}<br /><span className="text-muted">{row.action}</span></td>
+                <td className="px-3 py-3 font-mono text-[11px]" title={[row.entity_type ? `${row.entity_type}:${row.entity_id ?? ""}` : "", row.user_agent ?? ""].filter(Boolean).join(" · ")}>{row.event_type}<br /><span className={`mt-1 inline-block border px-2 py-1 text-[10px] ${actionClass(row)}`}>{row.action}</span></td>
                 <td className="px-3 py-3">{row.actor_display_name ?? "-"}<br /><span className="font-mono text-[10px] text-muted">{row.actor_user_id ?? "-"}</span></td>
                 <td className="px-3 py-3">{row.subject_display_name ?? "-"}<br /><span className="font-mono text-[10px] text-muted">{row.subject_user_id ?? "-"}</span></td>
                 <td className="px-3 py-3 font-mono text-[11px]">{row.source}<br /><span className="text-muted">{row.ip_address ?? "-"}</span></td>

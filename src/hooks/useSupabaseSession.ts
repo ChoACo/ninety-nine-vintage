@@ -2,7 +2,10 @@
 
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  clearSupabaseBrowserSessionStorage,
+  getSupabaseBrowserClient,
+} from "@/lib/supabase/client";
 
 type BrowserClient = ReturnType<typeof getSupabaseBrowserClient>;
 
@@ -23,12 +26,26 @@ let sessionDiscardFlight: {
 
 function isAuthoritativeAuthRejection(reason: unknown) {
   if (!reason || typeof reason !== "object") return false;
-  const error = reason as { code?: unknown; name?: unknown; status?: unknown };
-  if (error.status === 401 || error.status === 403) return true;
+  const error = reason as { code?: unknown; name?: unknown; status?: unknown; message?: unknown };
+  const code = typeof error.code === "string" ? error.code.toLowerCase() : "";
+  const message = typeof error.message === "string" ? error.message.toLowerCase() : "";
+  const status = typeof error.status === "string"
+    ? Number.parseInt(error.status, 10)
+    : error.status;
+  if (status === 401 || status === 403) return true;
+  if (status === 400 && (
+    code === "invalid_grant"
+    || code === "refresh_token_not_found"
+    || code === "refresh_token_already_used"
+    || message.includes("invalid refresh token")
+    || message.includes("refresh token not found")
+    || message.includes("refresh token already used")
+    || message.includes("invalid grant")
+  )) return true;
   return error.name === "AuthSessionMissingError"
-    || error.code === "session_not_found"
-    || error.code === "bad_jwt"
-    || error.code === "invalid_jwt";
+    || code === "session_not_found"
+    || code === "bad_jwt"
+    || code === "invalid_jwt";
 }
 
 async function validateCurrentSession(
@@ -41,7 +58,13 @@ async function validateCurrentSession(
 
   const promise = (async (): Promise<SessionValidation> => {
     try {
-      const before = (await client.auth.getSession()).data.session;
+      const { data: beforeData, error: beforeError } = await client.auth.getSession();
+      if (beforeError) {
+        return isAuthoritativeAuthRejection(beforeError)
+          ? { kind: "invalid" }
+          : { kind: "unavailable" };
+      }
+      const before = beforeData.session;
       if (before?.access_token !== candidate.access_token) {
         return { kind: "superseded" };
       }
@@ -55,7 +78,13 @@ async function validateCurrentSession(
           : { kind: "unavailable" };
       }
 
-      const after = (await client.auth.getSession()).data.session;
+      const { data: afterData, error: afterError } = await client.auth.getSession();
+      if (afterError) {
+        return isAuthoritativeAuthRejection(afterError)
+          ? { kind: "invalid" }
+          : { kind: "unavailable" };
+      }
+      const after = afterData.session;
       if (!after || after.user.id !== data.user.id) return { kind: "invalid" };
       if (after.user.id !== candidate.user.id) return { kind: "superseded" };
       return { kind: "authenticated", session: after };
@@ -76,25 +105,42 @@ async function validateCurrentSession(
 
 async function discardInvalidSession(
   client: BrowserClient,
-  rejected: Session,
+  rejected: Session | null,
 ) {
-  if (sessionDiscardFlight?.accessToken === rejected.access_token) {
+  const accessToken = rejected?.access_token ?? "persisted-session";
+  if (sessionDiscardFlight?.accessToken === accessToken) {
     return sessionDiscardFlight.promise;
   }
 
   const promise = (async () => {
+    let needsStorageFallback = false;
     try {
-      const current = (await client.auth.getSession()).data.session;
-      if (current?.access_token === rejected.access_token) {
-        await client.auth.signOut({ scope: "local" });
+      const { data, error } = await client.auth.getSession();
+      if (error) needsStorageFallback = true;
+      const current = data.session;
+      if (!rejected || current?.access_token === rejected.access_token) {
+        const { error: signOutError } = await client.auth.signOut({
+          scope: "local"
+        });
+        needsStorageFallback ||= Boolean(signOutError);
       }
     } catch {
+      needsStorageFallback = true;
       // Publishing a guest state still prevents private requests when local
       // storage is unavailable or the auth client cannot finish local sign-out.
+    } finally {
+      if (needsStorageFallback) {
+        try {
+          clearSupabaseBrowserSessionStorage();
+        } catch {
+          // Privacy/storage restrictions can reject localStorage access. The
+          // hook still publishes a guest state and does not leak the rejection.
+        }
+      }
     }
   })();
 
-  sessionDiscardFlight = { accessToken: rejected.access_token, promise };
+  sessionDiscardFlight = { accessToken, promise };
   try {
     await promise;
   } finally {
@@ -190,9 +236,13 @@ export function useSupabaseSession(): SupabaseSessionState {
       const sequenceBeforeRead = authEventSequence;
       void client.auth
         .getSession()
-        .then(({ data }) => {
+        .then(({ data, error }) => {
           if (authEventSequence === sequenceBeforeRead) {
-            void validateAndPublish(client, data.session, sequenceBeforeRead);
+            if (error && isAuthoritativeAuthRejection(error)) {
+              void discardInvalidSession(client, null).finally(() => publish(null));
+            } else {
+              void validateAndPublish(client, data.session, sequenceBeforeRead);
+            }
           }
         })
         .catch(() => {

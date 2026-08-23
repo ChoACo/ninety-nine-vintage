@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const storeIds = (management.stores ?? []).map((store) => String(store.id));
 const [{ data: fees, error: feeError }, { data: subscriptions, error: subscriptionError }, { data: profiles, error: profileError }] = storeIds.length
     ? await Promise.all([
-      auth.admin.from("stores").select("id,name,description,regular_shipping_fee,remote_area_shipping_fee,mall_info,mall_image,logo_url,banner_url,concept_tags,default_courier,updated_at").in("id", storeIds),
+      auth.admin.from("stores").select("id,name,description,regular_shipping_fee,remote_area_shipping_fee,mall_info,mall_image,logo_url,banner_url,concept_tags,default_courier,announcement_text,announcement_enabled,updated_at").in("id", storeIds),
       auth.admin.from("store_service_subscriptions").select("store_id,unpaid_fee_balance,fee_rollover_count,overdue_notice_sent_at").in("store_id", storeIds),
       auth.admin.from("store_enterprise_profiles").select("store_id,representative_name,business_registration_number,mail_order_registration_number,business_postal_code,business_address,business_address_detail").in("store_id", storeIds),
     ])
@@ -32,6 +32,8 @@ const [{ data: fees, error: feeError }, { data: subscriptions, error: subscripti
     bannerUrl: feeByStore.get(String(store.id))?.banner_url ?? null,
     conceptTags: feeByStore.get(String(store.id))?.concept_tags ?? [],
     defaultCourier: feeByStore.get(String(store.id))?.default_courier ?? 'CJ대한통운',
+    announcementText: feeByStore.get(String(store.id))?.announcement_text ?? '',
+    announcementEnabled: feeByStore.get(String(store.id))?.announcement_enabled ?? false,
     updatedAt: feeByStore.get(String(store.id))?.updated_at ?? null,
     representativeName: profileByStore.get(String(store.id))?.representative_name ?? '',
     businessRegistrationNumber: profileByStore.get(String(store.id))?.business_registration_number ?? '',
@@ -70,6 +72,12 @@ export async function POST(request: Request) {
       p_regular_shipping_fee:body.regularShippingFee,p_remote_area_shipping_fee:body.remoteAreaShippingFee,
       p_bank_name:body.bankName,p_account_holder:body.accountHolder,
       p_account_number_ciphertext:encryptedAccount?.ciphertext??null,p_account_number_masked:encryptedAccount?.masked??null,
+    });
+} else if (body.action==='save_notice') {
+    result=await rpc.rpc('save_operator_store_notice',{
+      p_store_id:body.storeId,
+      p_announcement_text:body.announcementText,
+      p_announcement_enabled:body.announcementEnabled,
     });
 } else if (body.action==='save_shipping_fees') {
     result=await rpc.rpc('configure_store_shipping_fees',{

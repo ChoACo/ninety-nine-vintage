@@ -7,8 +7,9 @@ import {
   Clock3,
   Package,
   Truck,
+  RefreshCw,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { OperatorSecondChanceButton } from "@/components/admin/operator/OperatorSecondChanceButton";
 import { LocalTestMemberSwitcher } from "@/components/admin/LocalTestMemberSwitcher";
 import { CatalogImage } from "@/components/ui/CatalogImage";
@@ -56,9 +57,13 @@ export function OperatorConsole({
   const [netRevenue, setNetRevenue] = useState(0);
   const [canMutate, setCanMutate] = useState(false);
   const [notice, setNotice] = useState("");
+  const [unpaid, setUnpaid] = useState(0);
+  const [unanswered, setUnanswered] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const pullStartY = useRef<number | null>(null);
 
-  useEffect(() => {
-    void (async () => {
+  const load = useCallback(async () => {
+    setRefreshing(true);
       try {
         const session = (
           await getSupabaseBrowserClient().auth.getSession()
@@ -74,6 +79,8 @@ export function OperatorConsole({
           orderResponse,
           shippingResponse,
           revenueResponse,
+          unpaidResponse,
+          inquiryResponse,
         ] = await Promise.all([
           fetch("/api/admin/operator/products", { headers, cache: "no-store" }),
           fetch("/api/admin/operator/orders?summary=1", {
@@ -88,6 +95,8 @@ export function OperatorConsole({
             cache: "no-store",
             },
           ),
+          fetch("/api/admin/operator/auctions/unpaid", { headers, cache: "no-store" }),
+          fetch("/api/admin/operator/chat", { headers, cache: "no-store" }),
         ]);
         const productData = await productResponse.json() as ProductResponse;
         const orderData = await orderResponse.json() as {
@@ -101,6 +110,8 @@ export function OperatorConsole({
         const revenueData = await revenueResponse.json() as {
           stores?: { netSales?: number }[];
         };
+        const unpaidData = await unpaidResponse.json().catch(() => ({})) as { products?: unknown[] };
+        const inquiryData = await inquiryResponse.json().catch(() => ({})) as { conversations?: Array<{ unread_count?: number }> };
         if (!productResponse.ok) {
           throw new Error("운영자 권한을 확인할 수 없습니다.");
         }
@@ -113,6 +124,8 @@ export function OperatorConsole({
         setCanMutate(productData.permissions?.canMutate === true);
         setOrders(orderData.activeCount ?? 0);
         setShipping(shippingData.totalCount ?? shippingData.requests?.length ?? 0);
+        setUnpaid(unpaidResponse.ok ? (unpaidData.products?.length ?? 0) : 0);
+        setUnanswered(inquiryResponse.ok ? (inquiryData.conversations ?? []).reduce((sum, conversation) => sum + (conversation.unread_count ?? 0), 0) : 0);
         setNetRevenue(
           revenueResponse.ok
             ? (revenueData.stores ?? []).reduce(
@@ -127,9 +140,12 @@ export function OperatorConsole({
             ? error.message
             : "운영자 데이터를 불러오지 못했습니다.",
         );
+      } finally {
+        setRefreshing(false);
       }
-    })();
   }, []);
+
+  useEffect(() => { queueMicrotask(() => void load()); }, [load]);
 
   const stats = [
     [
@@ -147,7 +163,15 @@ export function OperatorConsole({
   );
 
   return (
-    <div className="space-y-10">
+    <div
+      className="space-y-10"
+      onTouchStart={(event) => { if (window.scrollY === 0) pullStartY.current = event.touches[0]?.clientY ?? null; }}
+      onTouchEnd={(event) => {
+        const start = pullStartY.current;
+        pullStartY.current = null;
+        if (start !== null && (event.changedTouches[0]?.clientY ?? start) - start > 72) void load();
+      }}
+    >
       <div className="flex flex-col items-stretch justify-between gap-5 border-b border-ink pb-7 sm:flex-row sm:items-end">
         <div>
           <p className="eyebrow text-muted">운영자 센터 / 통합 현황</p>
@@ -180,11 +204,13 @@ export function OperatorConsole({
             상품 등록 <ArrowUpRight size={14} />
           </Link>
         </div>
-        <div className="mt-6 grid gap-px bg-paper/20 sm:grid-cols-3">
-          <Link className="bg-ink p-4" href="/admin/operator/orders"><span className="text-xs text-paper/70">확인할 주문·결제</span><strong className="mt-2 block font-mono text-3xl">{orders}</strong></Link>
-          <Link className="bg-ink p-4" href="/admin/operator/shipping"><span className="text-xs text-paper/70">처리할 배송 요청</span><strong className="mt-2 block font-mono text-3xl">{shipping}</strong></Link>
-          <Link className="bg-ink p-4" href="/admin/operator/products"><span className="text-xs text-paper/70">공개 중인 상품</span><strong className="mt-2 block font-mono text-3xl">{products.filter((product) => product.status === "active").length}</strong></Link>
+        <div className="mt-6 grid grid-cols-2 gap-px bg-paper/20">
+          <Link className="flex min-h-24 w-full max-w-full flex-col justify-between overflow-hidden break-keep bg-ink p-4" href="/admin/operator/shipping"><span className="text-xs text-paper/70">신규 발송</span><strong className="mt-2 block font-mono text-3xl">{shipping}</strong></Link>
+          <Link className="flex min-h-24 w-full max-w-full flex-col justify-between overflow-hidden break-keep bg-ink p-4" href="/admin/operator/shipping?view=requested"><span className="text-xs text-paper/70">보관 출고 요청</span><strong className="mt-2 block font-mono text-3xl">{shipping}</strong></Link>
+          <Link className="flex min-h-24 w-full max-w-full flex-col justify-between overflow-hidden break-keep bg-ink p-4" href="/admin/operator/unpaid"><span className="text-xs text-paper/70">미결제 낙찰</span><strong className="mt-2 block font-mono text-3xl">{unpaid}</strong></Link>
+          <Link className="flex min-h-24 w-full max-w-full flex-col justify-between overflow-hidden break-keep bg-ink p-4" href="/admin/operator/inquiries"><span className="text-xs text-paper/70">미답변 문의</span><strong className="mt-2 block font-mono text-3xl">{unanswered}</strong></Link>
         </div>
+        <button className="mt-4 inline-flex min-h-11 items-center gap-2 text-xs font-bold text-paper/70" disabled={refreshing} onClick={() => void load()} type="button"><RefreshCw className={refreshing ? "animate-spin" : ""} size={14} />{refreshing ? "새로고침 중" : "아래로 당기거나 눌러 새로고침"}</button>
       </section>
 
       <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-4">

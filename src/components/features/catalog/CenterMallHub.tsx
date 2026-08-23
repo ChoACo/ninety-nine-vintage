@@ -3,6 +3,10 @@
 import { Heart, Search, ShieldCheck, Store, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
+import {
+  CategoryTabBar,
+  type CategoryTabItem,
+} from "@/components/common/CategoryTabBar";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import type { StoreMallCard } from "@/services/stores";
 
@@ -15,6 +19,15 @@ const filters = [
   "밀리터리/유러피안",
 ] as const;
 
+type CenterMallFilter = (typeof filters)[number];
+
+const filterItems: readonly CategoryTabItem<CenterMallFilter>[] = filters.map(
+  (value) => ({
+    label: value === "실시간 경매 진행중" ? `🔥 ${value}` : value,
+    value,
+  }),
+);
+
 export function CenterMallHub({
   cards,
   routeBase = "/centers",
@@ -22,11 +35,15 @@ export function CenterMallHub({
   cards: StoreMallCard[];
   routeBase?: "/centers" | "/stores" | "/m/centers" | "/m/stores";
 }) {
+  const isMobileRoute = routeBase.startsWith("/m/");
+  const storeGridClass = isMobileRoute
+    ? "grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4 lg:gap-5"
+    : "grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5";
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(
     query.trim().toLocaleLowerCase("ko-KR"),
   );
-  const [filter, setFilter] = useState<(typeof filters)[number]>("전체");
+  const [filter, setFilter] = useState<CenterMallFilter>("전체");
   const [sort, setSort] = useState("popular");
   const visible = useMemo(
     () =>
@@ -77,24 +94,18 @@ export function CenterMallHub({
             <option value="rating">평점 높은 순</option>
           </select>
         </div>
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-          {filters.map((item) => (
-            <button
-              className={`min-h-10 shrink-0 rounded-full border px-4 text-xs font-bold ${filter === item ? "border-amber-500 bg-amber-500 text-zinc-950" : "border-zinc-700 text-zinc-400"}`}
-              key={item}
-              onClick={() => setFilter(item)}
-              type="button"
-            >
-              {item === "실시간 경매 진행중" ? "🔥 " : ""}
-              {item}
-            </button>
-          ))}
-        </div>
+        <CategoryTabBar
+          ariaLabel="센터몰 카테고리"
+          className="mt-4"
+          items={filterItems}
+          onValueChange={setFilter}
+          value={filter}
+        />
       </section>
       {visible.length ? (
         <section
           aria-label="판매 센터 목록"
-          className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4 lg:gap-5"
+          className={storeGridClass}
         >
           {visible.map((card) => (
             <CenterCard card={card} key={card.id} routeBase={routeBase} />
@@ -119,7 +130,13 @@ function CenterCard({
   const [followed, setFollowed] = useState(false);
   const href = `${routeBase}/${encodeURIComponent(card.slug)}`;
   return (
-    <article className="group overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 text-zinc-100 transition-transform duration-300 hover:-translate-y-1">
+    <article className="group relative flex h-full cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900 text-zinc-100 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-amber-500/50 hover:shadow-xl hover:shadow-black/20">
+      <Link
+        aria-label={`${card.name} 센터 방문하기`}
+        className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-inset"
+        href={href}
+        prefetch={false}
+      />
       <div className="relative aspect-[16/10] bg-zinc-800">
         {card.mallImage ? (
           <CatalogImage
@@ -131,7 +148,8 @@ function CenterCard({
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-black/20" />
         <span
-          className={`absolute right-3 top-3 rounded-full border px-2.5 py-1.5 text-[9px] font-black ${card.liveAuctionCount ? "border-rose-500/40 bg-rose-500/15 text-rose-300" : "border-zinc-600 bg-zinc-950/70 text-zinc-400"}`}
+          className={`absolute right-3 top-3 max-w-[calc(100%-1.5rem)] truncate rounded-full border px-2.5 py-1.5 text-[9px] font-black ${card.liveAuctionCount ? "border-rose-500/40 bg-rose-500/15 text-rose-300" : "border-zinc-600 bg-zinc-950/70 text-zinc-400"}`}
+          title={card.liveAuctionCount ? "LIVE 경매 진행중" : "경매 준비중"}
         >
           <span
             className={`mr-1.5 inline-block size-2 rounded-full ${card.liveAuctionCount ? "animate-pulse bg-rose-500" : "bg-zinc-500"}`}
@@ -142,21 +160,23 @@ function CenterCard({
           {card.name.slice(0, 1)}
         </span>
       </div>
-      <div className="p-4 pt-8">
+      <div className="flex flex-1 flex-col p-5 pt-8">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h2 className="flex items-center gap-1.5 truncate text-base font-black">
-              {card.name}
+            <h2 className="flex min-h-8 min-w-0 items-start gap-1.5 text-xs font-black leading-4 sm:text-sm">
+              <span className="line-clamp-2 min-w-0" title={card.name}>
+                {card.name}
+              </span>
               <ShieldCheck className="shrink-0 text-sky-400" size={15} />
             </h2>
-            <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-zinc-400">
+            <p className="mt-2 line-clamp-2 min-h-10 text-[10px] leading-5 text-zinc-400 sm:text-[11px]">
               {card.mallInfo ?? card.description}
             </p>
           </div>
           <button
             aria-pressed={followed}
             aria-label={`${card.name} 단골 ${followed ? "해제" : "등록"}`}
-            className={`grid size-10 shrink-0 place-items-center rounded-full border ${followed ? "border-rose-500 text-rose-400" : "border-zinc-700"}`}
+            className={`relative z-20 grid size-11 shrink-0 place-items-center rounded-full border transition-colors hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-amber-400 ${followed ? "border-rose-500 text-rose-400" : "border-zinc-700"}`}
             onClick={() => setFollowed((value) => !value)}
             type="button"
           >
@@ -188,12 +208,9 @@ function CenterCard({
             />
           ))}
         </div>
-        <Link
-          className="mt-4 flex min-h-11 items-center justify-center rounded-xl bg-zinc-100 text-xs font-black text-zinc-950"
-          href={href}
-        >
+        <span className="mt-auto flex min-h-11 items-center justify-center rounded-xl bg-zinc-100 text-xs font-black text-zinc-950 transition-colors duration-300 group-hover:bg-amber-400">
           센터 방문하기
-        </Link>
+        </span>
       </div>
     </article>
   );

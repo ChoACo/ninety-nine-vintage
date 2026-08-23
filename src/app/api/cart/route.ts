@@ -24,6 +24,7 @@ type ShippingQuote = {
     billingStoreId: string;
     billingStoreName: string;
     amount: number;
+    vaultAmount?: number;
     productSubtotal: number;
     productIds: string[];
     products: Array<{ id: string; title: string; amount: number }>;
@@ -227,19 +228,24 @@ export async function GET(request: Request) {
     (entitlementRows.data ?? []).map((row) => row.business_id),
   );
   const creditStateAvailable = !storeRows.error && !entitlementRows.error;
-  const vaultShippingFee = creditStateAvailable
-    ? quotedCharges.reduce((total, charge) => {
-        const businessId = charge.storeIds
-          .map((storeId) => storeBusinessIds.get(storeId))
-          .find((value): value is string => typeof value === "string");
-        return (
-          total +
-          (businessId && availableBusinessIds.has(businessId)
-            ? 0
-            : charge.amount)
-        );
-      }, 0)
-    : shippingFee;
+  const shippingCharges = quotedCharges.map((charge) => {
+    const businessId = charge.storeIds
+      .map((storeId) => storeBusinessIds.get(storeId))
+      .find((value): value is string => typeof value === "string");
+    return {
+      ...charge,
+      vaultAmount:
+        creditStateAvailable &&
+        businessId &&
+        availableBusinessIds.has(businessId)
+          ? 0
+          : charge.amount,
+    };
+  });
+  const vaultShippingFee = shippingCharges.reduce(
+    (total, charge) => total + charge.vaultAmount,
+    0,
+  );
   const reservationByProduct = new Map(
     reservations.map((reservation) => [
       reservation.product_id,
@@ -264,7 +270,7 @@ export async function GET(request: Request) {
     })),
     serverTime: reservations[0]?.server_time ?? null,
     shippingFee: shippingAvailable ? shippingFee : 0,
-    shippingCharges: quotedCharges,
+    shippingCharges,
     vaultShippingFee,
     shippingCreditBusinessIds: creditStateAvailable
       ? [...availableBusinessIds]

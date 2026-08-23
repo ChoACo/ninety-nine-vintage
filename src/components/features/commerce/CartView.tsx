@@ -7,14 +7,17 @@ import type { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { persistCart } from "@/lib/commerce/client";
 import { COMMERCE_CHECKOUT_STORAGE_KEY } from "@/lib/commerce/checkoutStorage";
+import { deriveCartPricing } from "@/lib/commerce/cartPricing";
 import {
   readCommercePaymentMode,
   type CommercePaymentMode,
 } from "@/lib/commerce/paymentMode";
 import { useCommerceStore } from "@/store/useCommerceStore";
 import { useCartStore } from "@/store/useCartStore";
+import { useToastStore } from "@/store/useToastStore";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { PostcodeSearchButton } from "@/components/features/account/PostcodeSearchButton";
+import { usePlatformConfig } from "@/hooks/usePlatformConfig";
 
 interface PublishedFixedProduct {
   id: string;
@@ -44,6 +47,7 @@ interface ShippingCharge {
   billingStoreId: string;
   billingStoreName: string;
   amount: number;
+  vaultAmount?: number;
   productSubtotal: number;
   productIds: string[];
   products: Array<{ id: string; title: string; amount: number }>;
@@ -434,11 +438,14 @@ export function CartView({
   const hydrate = useCommerceStore((state) => state.hydrate);
   const cartIds = useCommerceStore((state) => state.cartIds);
   const removeFromCart = useCommerceStore((state) => state.removeFromCart);
+  const addToCart = useCommerceStore((state) => state.addToCart);
   const removePurchasedFromCart = useCommerceStore(
     (state) => state.removePurchasedFromCart,
   );
   const clearCart = useCommerceStore((state) => state.clearCart);
   const replaceCart = useCommerceStore((state) => state.replaceCart);
+  const pushToast = useToastStore((state) => state.pushToast);
+  const platformConfig = usePlatformConfig();
   const [liveProducts, setLiveProducts] = useState<CartProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [cartLoading, setCartLoading] = useState(true);
@@ -450,8 +457,6 @@ export function CartView({
   >("success");
   const [staleCount, setStaleCount] = useState(0);
   const [paymentMode, setPaymentMode] = useState<CartPaymentMode>("loading");
-  const [shippingFee, setShippingFee] = useState(0);
-  const [vaultShippingFee, setVaultShippingFee] = useState(0);
   const [shippingCharges, setShippingCharges] = useState<ShippingCharge[]>([]);
   const [shippingAvailable, setShippingAvailable] = useState(true);
   const shippingMode = useCartStore(
@@ -478,6 +483,7 @@ export function CartView({
     string | null
   >(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [mobileSummaryExpanded, setMobileSummaryExpanded] = useState(false);
   const [addressForm, setAddressForm] = useState({
     label: "집",
     recipientName: "",
@@ -487,6 +493,9 @@ export function CartView({
     isDefault: false,
   });
   const [heldCheckoutIds, setHeldCheckoutIds] = useState<string[]>([]);
+  const [pendingShippingFee, setPendingShippingFee] = useState<number | null>(
+    null,
+  );
   const [releaseCheckoutAllowed, setReleaseCheckoutAllowed] = useState(false);
   const [restoredCheckoutProducts, setRestoredCheckoutProducts] = useState<
     CartProduct[]
@@ -502,6 +511,7 @@ export function CartView({
   const invalidateCheckoutRequest = () => {
     checkoutRequest.current = null;
     setHeldCheckoutIds([]);
+    setPendingShippingFee(null);
     setRestoredCheckoutProducts([]);
     setReleaseCheckoutAllowed(false);
     clearStoredCheckoutRequest();
@@ -686,6 +696,7 @@ export function CartView({
       checkoutRequest.current = null;
       cartOwnerId.current = null;
       setHeldCheckoutIds([]);
+      setPendingShippingFee(null);
       setRestoredCheckoutProducts([]);
       setReleaseCheckoutAllowed(false);
       if (clearRecovery) clearStoredCheckoutRequest();
@@ -695,8 +706,6 @@ export function CartView({
       }
       setStaleCount(0);
       setPaymentMode("loading");
-      setShippingFee(0);
-      setVaultShippingFee(0);
       setShippingCharges([]);
       setShippingAvailable(true);
       setShippingAddresses([]);
@@ -753,13 +762,14 @@ export function CartView({
         if (activeRequest) {
           checkoutRequest.current = activeRequest;
           setHeldCheckoutIds(activeRequest.productIds);
+          setPendingShippingFee(activeRequest.shippingFeeQuote);
           setRestoredCheckoutProducts(activeRequest.productSnapshots);
           setReleaseCheckoutAllowed(!activeRequest.ledgerMayExist);
           setIncludeShippingFee(activeRequest.includeShippingFee);
-          setShippingFee(activeRequest.shippingFeeQuote);
         } else {
           checkoutRequest.current = null;
           setHeldCheckoutIds([]);
+          setPendingShippingFee(null);
           setRestoredCheckoutProducts([]);
           setReleaseCheckoutAllowed(false);
           clearStoredCheckoutRequest();
@@ -816,7 +826,6 @@ export function CartView({
           staleProductIds?: string[];
           items?: PublishedFixedProduct[];
           shippingFee?: unknown;
-          vaultShippingFee?: unknown;
           shippingCharges?: ShippingCharge[];
           shippingAvailable?: boolean;
         };
@@ -832,7 +841,6 @@ export function CartView({
         }
         const cartProducts = (payload.items ?? []).map(toCartProduct);
         const nextShippingFee = Number(payload.shippingFee);
-        const nextVaultShippingFee = Number(payload.vaultShippingFee);
         const nextShippingAvailable = payload.shippingAvailable !== false;
         if (
           cartProducts.length > 0 &&
@@ -842,20 +850,6 @@ export function CartView({
           throw new Error("배송비 설정을 확인하지 못했습니다.");
         }
         setShippingAvailable(nextShippingAvailable);
-        if (!activeRequest) {
-          setVaultShippingFee(
-            Number.isSafeInteger(nextVaultShippingFee) &&
-              nextVaultShippingFee >= 0
-              ? nextVaultShippingFee
-              : nextShippingFee,
-          );
-        }
-        if (!activeRequest)
-          setShippingFee(
-            cartProducts.length > 0 && nextShippingAvailable
-              ? nextShippingFee
-              : 0,
-          );
         if (!activeRequest) {
           setShippingCharges(
             nextShippingAvailable && Array.isArray(payload.shippingCharges)
@@ -1011,15 +1005,39 @@ export function CartView({
     restoredCheckoutProducts,
     selectedProductId,
   ]);
-  const productTotal = products.reduce(
-    (sum, product) => sum + product.price,
-    0,
-  );
-  const selectedShippingFee = includeShippingFee
-    ? shippingFee
-    : vaultShippingFee;
-  const expectedTotal = productTotal + selectedShippingFee;
   const hasPendingCheckout = heldCheckoutIds.length > 0;
+  const pricing = useMemo(
+    () =>
+      deriveCartPricing(
+        products,
+        shippingCharges,
+        includeShippingFee ? "ship" : "vault",
+      ),
+    [includeShippingFee, products, shippingCharges],
+  );
+  const {
+    activeCharges: activeShippingCharges,
+    activeProductIds,
+    productTotal,
+    shippingFee: derivedShippingFee,
+  } = pricing;
+  const selectedShippingFee = hasPendingCheckout
+    ? (pendingShippingFee ?? derivedShippingFee)
+    : derivedShippingFee;
+  const expectedTotal =
+    products.length === 0 ? 0 : productTotal + selectedShippingFee;
+  const activeImmediateShippingFee = useMemo(
+    () => activeShippingCharges.reduce((total, charge) => total + charge.amount, 0),
+    [activeShippingCharges],
+  );
+  const activeVaultShippingFee = useMemo(
+    () =>
+      activeShippingCharges.reduce(
+        (total, charge) => total + (charge.vaultAmount ?? charge.amount),
+        0,
+      ),
+    [activeShippingCharges],
+  );
   const checkout = async () => {
     if (
       busy ||
@@ -1072,11 +1090,11 @@ export function CartView({
       const requestIncludesShipping =
         pendingRequest?.includeShippingFee ?? includeShippingFee;
       const requestShippingFee =
-        pendingRequest?.shippingFeeQuote ??
-        (requestIncludesShipping ? shippingFee : vaultShippingFee);
+        pendingRequest?.shippingFeeQuote ?? selectedShippingFee;
       // The order RPC reserves products and removes the server cart. Retain the
       // current rows locally until payment is actually verified or abandoned.
       setHeldCheckoutIds(productIds);
+      setPendingShippingFee(requestShippingFee);
       setRestoredCheckoutProducts(productSnapshots);
       const productSignature = createProductSignature(productIds);
       const currentRequest: StoredCheckoutRequest = {
@@ -1182,6 +1200,7 @@ export function CartView({
         (productId) => void persistCart(productId, false, buyerId),
       );
       setHeldCheckoutIds([]);
+      setPendingShippingFee(null);
       setRestoredCheckoutProducts([]);
       checkoutRequest.current = null;
       clearStoredCheckoutRequest();
@@ -1224,6 +1243,31 @@ export function CartView({
     setMessage("");
   };
 
+  const removeProduct = async (productId: string) => {
+    if (busy || hasPendingCheckout) return;
+    const buyerId = cartOwnerId.current;
+    invalidateCheckoutRequest();
+    removeFromCart(productId);
+    pushToast("success", "상품이 장바구니에서 삭제되었습니다.");
+    if (!buyerId) return;
+
+    const persisted = await persistCart(productId, false, buyerId);
+    const commerceState = useCommerceStore.getState();
+    if (
+      !persisted &&
+      cartOwnerId.current === buyerId &&
+      commerceState.ownerUserId === buyerId
+    ) {
+      addToCart(productId);
+      pushToast(
+        "error",
+        "장바구니 삭제를 저장하지 못해 상품을 다시 복원했습니다.",
+      );
+      return;
+    }
+    if (cartOwnerId.current === buyerId) cartRefreshRef.current?.();
+  };
+
   const releaseCheckout = () => {
     if (busy || !releaseCheckoutAllowed) return;
     invalidateCheckoutRequest();
@@ -1233,6 +1277,7 @@ export function CartView({
 
   const checkoutDisabled =
     busy ||
+    products.length === 0 ||
     paymentMode !== "manual_transfer" ||
     !shippingAddressId ||
     !termsAccepted;
@@ -1243,7 +1288,7 @@ export function CartView({
       : "결제 설정 확인 중";
 
   return (
-    <div className="space-y-10">
+    <div className={`space-y-10 ${surface === "mobile" ? "pb-24 md:pb-0" : ""}`}>
       <div
         className={`flex items-start gap-3 border-b border-ink pb-6 ${surface === "desktop" ? "flex-row items-end justify-between" : "flex-col"}`}
       >
@@ -1346,18 +1391,44 @@ export function CartView({
           </Link>
         </div>
       ) : products.length === 0 ? (
-        <div className="border border-dashed border-line py-24 text-center">
-          <p className="text-sm font-bold">장바구니가 비어 있습니다.</p>
-          <Link
-            className="mt-5 inline-flex items-center gap-2 text-xs font-bold underline"
-            href={`${basePath}/home`}
-          >
-            오늘의 빈티지 둘러보기 <ArrowRight size={14} />
-          </Link>
+        <div className="mx-auto grid max-w-[1400px] grid-cols-1 items-start gap-6 sm:grid-cols-12 sm:gap-8 md:grid-cols-5 lg:grid-cols-[minmax(0,65fr)_minmax(320px,35fr)] lg:gap-10">
+          <div className="border border-dashed border-line py-24 text-center sm:col-span-7 md:col-span-3 lg:col-auto">
+            <p className="text-sm font-bold">장바구니가 비어 있습니다.</p>
+            <Link
+              className="mt-5 inline-flex items-center gap-2 text-xs font-bold underline"
+              href={`${basePath}/home`}
+            >
+              오늘의 빈티지 둘러보기 <ArrowRight size={14} />
+            </Link>
+          </div>
+          <aside className="sticky top-20 h-fit self-start rounded-2xl border border-line/40 bg-card p-5 shadow-sm sm:col-span-5 md:col-span-2 md:top-24 lg:col-auto lg:p-6">
+            <div className="flex justify-between text-xs">
+              <span>상품 금액</span>
+              <strong className="font-mono">0원</strong>
+            </div>
+            <div className="mt-5 flex justify-between text-xs">
+              <span>배송비</span>
+              <strong className="font-mono">0원</strong>
+            </div>
+            <div className="mt-6 flex justify-between border-t border-line pt-5">
+              <span className="text-sm font-bold">예상 결제 금액</span>
+              <strong className="font-mono text-xl" aria-live="polite">
+                0원
+              </strong>
+            </div>
+            <button
+              className="mt-4 h-13 w-full bg-ink text-xs font-bold text-paper disabled:opacity-50"
+              disabled
+              type="button"
+            >
+              상품을 담아주세요
+            </button>
+          </aside>
         </div>
       ) : (
-        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,7fr)_minmax(280px,5fr)] lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-10">
-          <div className="divide-y divide-line border-y border-line">
+        <>
+        <div className="mx-auto grid max-w-[1400px] grid-cols-1 items-start gap-6 sm:grid-cols-12 sm:gap-8 md:grid-cols-5 lg:grid-cols-[minmax(0,65fr)_minmax(320px,35fr)] lg:gap-10">
+          <div className="divide-y divide-line border-y border-line sm:col-span-7 md:col-span-3 lg:col-auto">
             {products.map((product) => (
               <div
                 className={`flex py-5 ${surface === "desktop" ? "gap-5" : "gap-4"}`}
@@ -1387,14 +1458,7 @@ export function CartView({
                       aria-label="장바구니에서 삭제"
                       className="text-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
                       disabled={busy || hasPendingCheckout}
-                      onClick={() => {
-                        if (busy || hasPendingCheckout) return;
-                        const buyerId = cartOwnerId.current;
-                        invalidateCheckoutRequest();
-                        removeFromCart(product.id);
-                        if (buyerId)
-                          void persistCart(product.id, false, buyerId);
-                      }}
+                      onClick={() => void removeProduct(product.id)}
                       type="button"
                     >
                       <Trash2 size={16} />
@@ -1412,7 +1476,7 @@ export function CartView({
               </div>
             ))}
           </div>
-          <aside className="h-fit self-start border-t-2 border-ink bg-surface p-5 md:sticky md:top-28 lg:p-6">
+          <aside className="sticky top-20 h-fit self-start rounded-2xl border border-line/40 bg-card p-5 shadow-sm sm:col-span-5 md:col-span-2 md:top-24 lg:col-auto lg:p-6">
             <div className="flex justify-between text-xs">
               <span>상품 금액</span>
               <strong className="font-mono">
@@ -1422,7 +1486,7 @@ export function CartView({
             <fieldset className="mt-5 grid gap-2">
               <legend className="mb-2 text-xs font-bold">상품 수령 방법</legend>
               <label
-                className={`cursor-pointer border p-4 text-xs ${!includeShippingFee ? "border-ink bg-paper shadow-sm" : "border-line"}`}
+                className={`cursor-pointer rounded-xl border p-3 text-xs ${!includeShippingFee ? "border-ink bg-paper shadow-sm" : "border-line"}`}
               >
                 <span className="flex items-start gap-3">
                   <input
@@ -1438,15 +1502,15 @@ export function CartView({
                   <span>
                     <strong className="block">보관함 보관 후 묶음 배송</strong>
                     <small className="mt-1 block leading-5 text-muted">
-                      {vaultShippingFee > 0
-                        ? `잔여 배송권이 없는 센터 배송비 ${vaultShippingFee.toLocaleString("ko-KR")}원이 포함되며, 결제 완료 후 1회권이 적립됩니다.`
-                        : "선결제 배송권 적용 · 최대 14일 무료 보관 후 추가 배송비 없이 묶음 배송할 수 있습니다."}
+                      {activeVaultShippingFee > 0
+                        ? `잔여 배송권이 없는 센터 배송비 ${activeVaultShippingFee.toLocaleString("ko-KR")}원이 포함되며, 결제 완료 후 1회권이 적립됩니다.`
+                        : `선결제 배송권 적용 · 최대 ${platformConfig.storageDurationDays}일 무료 보관 후 추가 배송비 없이 묶음 배송할 수 있습니다.`}
                     </small>
                   </span>
                 </span>
               </label>
               <label
-                className={`cursor-pointer border p-4 text-xs ${includeShippingFee ? "border-ink bg-paper shadow-sm" : "border-line"}`}
+                className={`cursor-pointer rounded-xl border p-3 text-xs ${includeShippingFee ? "border-ink bg-paper shadow-sm" : "border-line"}`}
               >
                 <span className="flex items-start gap-3">
                   <input
@@ -1455,7 +1519,7 @@ export function CartView({
                       busy ||
                       hasPendingCheckout ||
                       !shippingAvailable ||
-                      shippingFee < 1
+                      activeImmediateShippingFee < 1
                     }
                     name="shipping-mode"
                     onChange={() => {
@@ -1469,7 +1533,7 @@ export function CartView({
                       <span>즉시 발송 · 배송비 함께 결제</span>
                       <span className="font-mono">
                         {shippingAvailable
-                          ? `${shippingFee.toLocaleString("ko-KR")}원`
+                          ? `${activeImmediateShippingFee.toLocaleString("ko-KR")}원`
                           : "견적 확인 중"}
                       </span>
                     </strong>
@@ -1728,10 +1792,10 @@ export function CartView({
               접수됩니다. 입금은 주문 후 최대 6시간 이내에 완료해야 하며, 미입금
               취소가 반복되면 구매·입찰 이용이 제한될 수 있습니다.
             </p>
-            {shippingCharges.length > 0 ? (
+            {activeShippingCharges.length > 0 ? (
               <div className="mt-3 space-y-2 border border-line bg-paper p-3 text-[11px]">
-                <p className="font-bold">배송비 {shippingCharges.length}건</p>
-                {shippingCharges.map((charge) => (
+                <p className="font-bold">배송비 {activeShippingCharges.length}건</p>
+                {activeShippingCharges.map((charge) => (
                   <div
                     className="border-t border-line pt-2 first:border-t-0 first:pt-0"
                     key={charge.chargeKey}
@@ -1750,10 +1814,14 @@ export function CartView({
                     </div>
                     <p className="mt-1 text-muted">
                       {charge.products
+                        .filter((product) => activeProductIds.has(product.id))
                         .map((product) => product.title)
                         .join(" · ")}{" "}
                       · 상품{" "}
-                      {Number(charge.productSubtotal).toLocaleString("ko-KR")}원
+                      {charge.products
+                        .filter((product) => activeProductIds.has(product.id))
+                        .reduce((total, product) => total + product.amount, 0)
+                        .toLocaleString("ko-KR")}원
                     </p>
                   </div>
                 ))}
@@ -1826,7 +1894,7 @@ export function CartView({
               </span>
             </label>
             <button
-              className="mt-4 h-13 w-full bg-ink text-xs font-bold text-paper disabled:opacity-50"
+              className={`mt-4 h-13 w-full bg-ink text-xs font-bold text-paper disabled:opacity-50 ${surface === "mobile" ? "hidden sm:block" : ""}`}
               disabled={checkoutDisabled}
               onClick={() => void checkout()}
               type="button"
@@ -1843,6 +1911,25 @@ export function CartView({
             </button>
           </aside>
         </div>
+        {surface === "mobile" ? (
+          <section className="fixed inset-x-3 bottom-[calc(6.5rem+env(safe-area-inset-bottom,16px))] z-30 rounded-2xl border border-line bg-paper/95 px-3 py-2 shadow-2xl backdrop-blur-md sm:hidden" aria-label="모바일 결제 요약">
+            {mobileSummaryExpanded ? (
+              <div className="mx-auto mb-2 max-w-lg space-y-2 rounded-xl border border-line bg-surface p-3 text-xs" id="mobile-payment-breakdown">
+                <div className="flex justify-between gap-3"><span>상품 금액</span><strong className="font-mono">{productTotal.toLocaleString("ko-KR")}원</strong></div>
+                {activeShippingCharges.map((charge) => (
+                  <div className="flex justify-between gap-3 text-muted" key={charge.chargeKey}><span className="min-w-0 truncate">{charge.unitName} 배송비</span><strong className="shrink-0 font-mono text-ink">{(includeShippingFee ? charge.amount : charge.vaultAmount ?? charge.amount).toLocaleString("ko-KR")}원</strong></div>
+                ))}
+                <div className="flex justify-between gap-3 text-muted"><span>할인</span><strong className="font-mono text-ink">0원</strong></div>
+                <div className="flex justify-between gap-3 border-t border-line pt-2"><span className="font-bold">최종 결제 금액</span><strong className="font-mono">{expectedTotal.toLocaleString("ko-KR")}원</strong></div>
+              </div>
+            ) : null}
+            <div className="mx-auto grid max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+              <button aria-controls="mobile-payment-breakdown" aria-expanded={mobileSummaryExpanded} className="min-h-[44px] min-w-0 rounded-xl px-2 text-left" onClick={() => setMobileSummaryExpanded((expanded) => !expanded)} type="button"><span className="block text-[10px] text-muted">총 {products.length}개 · 결제 예정 금액</span><strong className="block truncate font-mono text-lg">{expectedTotal.toLocaleString("ko-KR")}원</strong></button>
+              <button className="min-h-[44px] rounded-xl bg-ink px-5 text-sm font-black text-paper disabled:opacity-50" disabled={checkoutDisabled} onClick={() => void checkout()} type="button">결제하기</button>
+            </div>
+          </section>
+        ) : null}
+        </>
       )}
     </div>
   );

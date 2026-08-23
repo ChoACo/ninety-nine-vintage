@@ -37,6 +37,18 @@
   --brand-kakao-foreground: 25 25 25;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .product-card:hover .product-quick-specs,
+  .product-card:focus-within .product-quick-specs {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .tablet-hero-showcase:hover .tablet-hero-media {
+    transform: scale(1.025) translate3d(0, -0.35rem, 0);
+  }
+}
+
 html[data-theme="dark"],
 .dark {
   color-scheme: dark;
@@ -241,7 +253,7 @@ html[data-theme="dark"] .theme-invariant-dark {
   html {
     min-width: 320px;
     min-height: 100%;
-    overflow-x: hidden;
+    overflow-x: auto;
     overflow-y: visible;
     background-color: rgb(var(--theme-paper));
     scrollbar-gutter: stable;
@@ -252,7 +264,7 @@ html[data-theme="dark"] .theme-invariant-dark {
     min-height: 100%;
     margin: 0;
     padding: 0;
-    overflow-x: hidden;
+    overflow-x: visible;
     overflow-y: visible;
     background-color: rgb(var(--background));
     color: rgb(var(--foreground));
@@ -451,6 +463,25 @@ html[data-theme="dark"] .theme-invariant-dark {
 /* Legacy console rows are intentionally compact on desktop, but become stacked
    work cards on narrow screens. Data tables keep their own horizontal scroller. */
 @media (max-width: 767px) {
+  [data-admin-workspace="operator"] [data-admin-workspace-content] {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  [data-admin-workspace="operator"] :is(button, a, [role="button"], [role="tab"]) {
+    min-height: 44px;
+  }
+
+  [data-admin-workspace="operator"] :is(article, section, form) {
+    max-width: 100%;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  textarea,
+  select {
+    font-size: 1rem !important;
+  }
+
   [data-admin-surface] form.grid-cols-2 { grid-template-columns: minmax(0, 1fr) !important; }
   [data-admin-surface] form.grid-cols-2 > .col-span-2 { grid-column: auto !important; }
   [data-admin-surface] form[class~="md:grid-cols-2"] { grid-template-columns: minmax(0, 1fr) !important; }
@@ -477,15 +508,19 @@ html[data-theme="dark"] .theme-invariant-dark {
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 639px) {
+  [data-ui-surface="mobile"][data-mobile-header-hidden="true"] {
+    --mobile-sticky-header-offset: 0rem !important;
+  }
+
   [data-ui-surface="mobile"] .mobile-detail-cta {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: calc(4rem + 1px + env(safe-area-inset-bottom));
+    bottom: calc(6.5rem + env(safe-area-inset-bottom, 12px));
     z-index: 20;
     margin-inline: 0;
-    padding: 0.5rem max(0.5rem, env(safe-area-inset-right)) 0.5rem max(0.5rem, env(safe-area-inset-left));
+    padding: 0.5rem max(0.5rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom, 12px)) max(0.5rem, env(safe-area-inset-left));
     background: rgb(var(--theme-paper) / 0.96);
     box-shadow: var(--theme-mobile-cta-shadow);
   }

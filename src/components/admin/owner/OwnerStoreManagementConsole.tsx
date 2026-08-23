@@ -95,6 +95,16 @@ function storeDraft(store: ManagedStore): StoreDraft {
   };
 }
 
+function storeApprovalStatus(store: ManagedStore) {
+  if (!store.isActive) {
+    return { className: "border-rose-500/40 bg-rose-500/10 text-rose-700", label: "운영 중지" };
+  }
+  if (!store.operatorId) {
+    return { className: "border-amber-500/40 bg-amber-500/10 text-amber-800", label: "심사 중" };
+  }
+  return { className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-800", label: "승인 완료" };
+}
+
 export function OwnerStoreManagementConsole() {
   const { loading: sessionLoading, session } = useSupabaseSession();
   const token = session?.access_token ?? null;
@@ -421,6 +431,30 @@ export function OwnerStoreManagementConsole() {
           {notice}
         </div>
       )}
+
+      <section aria-labelledby="seller-center-directory" className="overflow-hidden border border-line">
+        <div className="border-b border-line bg-surface p-4">
+          <h2 className="font-black" id="seller-center-directory">판매센터 조직 현황</h2>
+          <p className="mt-1 text-xs text-muted">모바일에서는 카드로, 넓은 화면에서는 표로 확인합니다.</p>
+        </div>
+        <table className="hidden w-full text-left text-xs md:table">
+          <thead className="border-b border-line bg-paper text-[10px] text-muted">
+            <tr><th className="p-3">센터</th><th className="p-3">사업체</th><th className="p-3">담당 운영자</th><th className="p-3">상태</th></tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {directory.stores.map((store) => {
+              const status = storeApprovalStatus(store);
+              return <tr key={store.id}><td className="p-3 font-bold">{store.name}<span className="mt-1 block font-mono text-[10px] font-normal text-muted">{store.slug}</span></td><td className="p-3">{store.businessName}</td><td className="p-3">{store.operatorName || "미배정"}</td><td className="p-3"><span className={`inline-flex border px-2 py-1 text-[10px] font-black ${status.className}`}>[{status.label}]</span></td></tr>;
+            })}
+          </tbody>
+        </table>
+        <div className="flex flex-col gap-3 p-3 md:hidden">
+          {directory.stores.map((store) => {
+            const status = storeApprovalStatus(store);
+            return <article className="min-w-0 border border-line bg-paper p-4" key={store.id}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-black">{store.name}</h3><p className="mt-1 truncate text-[11px] text-muted">{store.businessName} · {store.operatorName || "운영자 미배정"}</p></div><span className={`shrink-0 border px-2 py-1 text-[10px] font-black ${status.className}`}>[{status.label}]</span></div><p className="mt-3 break-all font-mono text-[10px] text-muted">{store.slug}</p></article>;
+          })}
+        </div>
+      </section>
 
       <section className="border border-ink p-5 md:p-7">
         <div className="mb-6 flex items-center gap-3">

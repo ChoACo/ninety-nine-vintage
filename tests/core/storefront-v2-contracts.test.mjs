@@ -6,11 +6,12 @@ const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 test("the storefront renders separate mobile and fluid desktop presentation trees", async () => {
-  const [home, mobileHome, layout, mobileLayout, header, productRail, centerMall, centerSkeletons, css] = await Promise.all([
+  const [home, mobileHome, layout, mobileLayout, mobileAutoHideHeader, header, productRail, centerMall, centerSkeletons, css] = await Promise.all([
     source("src/app/(shop)/home/page.tsx"),
     source("src/app/(mobile)/m/home/page.tsx"),
     source("src/components/layout/PcLayout.tsx"),
     source("src/components/mobile/MobileSiteLayout.tsx"),
+    source("src/components/mobile/MobileAutoHideHeader.tsx"),
     source("src/components/layout/PcHeader.tsx"),
     source("src/components/features/catalog/ProductRail.tsx"),
     source("src/components/features/catalog/CenterMallHub.tsx"),
@@ -21,7 +22,10 @@ test("the storefront renders separate mobile and fluid desktop presentation tree
   assert.match(home, /function DesktopHome\(/);
   assert.doesNotMatch(home, /MobileHome|md:hidden|data-home-presentation="mobile"/);
   assert.match(home, /<DesktopHome auctions=\{auctions\.slice\(0, 6\)\}/);
-  assert.match(home, /<HomeFeaturedAuction products=\{featuredAuctions\} \/>/);
+  assert.match(
+    home,
+    /<HomeFeaturedAuction banners=\{config\.banners\} products=\{featuredAuctions\} \/>/,
+  );
   assert.match(mobileHome, /data-mobile-home/);
   assert.match(mobileHome, /basePath="\/m"/);
   assert.match(layout, /data-global-sticky-header/);
@@ -29,14 +33,15 @@ test("the storefront renders separate mobile and fluid desktop presentation tree
   assert.match(layout, /data-ui-surface="desktop"/);
   assert.match(layout, /max-w-\[1600px\]/);
   assert.match(layout, /data-desktop-canvas="fluid"/);
-  assert.match(layout, /max-w-\[1440px\]/);
+  assert.match(layout, /max-w-\[1400px\]/);
   assert.match(layout, /data-desktop-content="fluid"/);
   assert.doesNotMatch(layout, /MobileHeader|MobileBottomNav|md:hidden/);
-  assert.match(header, /max-w-\[1440px\]/);
-  assert.match(header, /form className="flex h-10 w-40/);
+  assert.match(header, /max-w-\[1400px\]/);
+  assert.match(header, /form className="hidden h-10 w-32[^"]*min-\[900px\]:flex lg:w-36 xl:w-44/);
   assert.match(header, /(?:sm|md|lg|xl):/);
   assert.match(productRail, /surface === "desktop"\s*\? "grid grid-cols-3 gap-2"/);
-  assert.match(productRail, /grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3[\s\S]*lg:grid-cols-4[\s\S]*xl:grid-cols-5/);
+  assert.match(productRail, /grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5/);
+  assert.match(productRail, /grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4/);
   assert.match(centerMall, /grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4/);
   assert.match(centerMall, /aspect-\[16\/10\]/);
   assert.match(centerSkeletons, /grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4/);
@@ -45,7 +50,8 @@ test("the storefront renders separate mobile and fluid desktop presentation tree
   assert.match(home, /"only screen and \(max-width: 1279px\)": "\/m\/home"/);
   assert.match(css, /\[data-ui-surface="desktop"\][\s\S]*word-break: keep-all/);
   assert.match(mobileLayout, /data-ui-surface="mobile"/);
-  assert.match(mobileLayout, /data-global-sticky-header/);
+  assert.match(mobileLayout, /<MobileAutoHideHeader>/);
+  assert.match(mobileAutoHideHeader, /data-global-sticky-header/);
   assert.match(mobileLayout, /<MobileSiteHeader \/>/);
   assert.match(mobileLayout, /<MobileSiteBottomNav \/>/);
   assert.doesNotMatch(mobileLayout, /PcHeader|PcFooter|PcLayout/);
@@ -103,10 +109,10 @@ test("product, login, and bid navigation support intercepted modals and direct f
   );
 
   assert.match(interceptedProduct, /<ModalShell label="상품 상세" size="wide"><AuctionDetailView compact id=\{id\} \/><\/ModalShell>/);
-  assert.match(detailView, /grid grid-cols-1 items-start gap-6 md:grid-cols-12 lg:gap-12/);
-  assert.match(detailView, /min-w-0 md:col-span-7/);
-  assert.match(stickyBidPanel, /md:sticky md:col-span-5/);
-  assert.match(stickyBidPanel, /compact \? "md:top-6" : "md:top-\[100px\]"/);
+  assert.match(detailView, /grid w-full max-w-\[1400px\] grid-cols-1 items-start gap-6 p-0 sm:grid-cols-12/);
+  assert.match(detailView, /min-w-0 sm:col-span-6/);
+  assert.match(stickyBidPanel, /sm:sticky sm:col-span-6/);
+  assert.match(stickyBidPanel, /compact \? "sm:top-6" : "sm:top-20 md:top-24"/);
   assert.match(directProduct, /<AuctionDetailView id=\{id\} \/>/);
   assert.match(interceptedLogin, /<ModalShell label="로그인"><LoginPrompt dismissToPrevious returnTo=\{safeReturnTo\(query\.next\)\} \/><\/ModalShell>/);
   assert.match(directLogin, /<LoginPrompt returnTo=\{safeReturnTo\(query\.next\)\} \/>/);

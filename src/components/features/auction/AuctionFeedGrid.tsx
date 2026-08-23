@@ -51,7 +51,8 @@ export interface ProductPayload {
   brand: string;
   brandSlug: string;
   gender?: "" | "남성" | "여성" | "공용";
-  conditionGrade?: "" | "S" | "A+" | "A" | "B" | "C";
+  conditionGrade?: "" | "S" | "A" | "B" | "C";
+  measurements?: unknown;
   publishAt: string;
   closesAt: string;
   status: "pending" | "active" | "closed";
@@ -272,6 +273,9 @@ function EnabledAuctionFeedGrid({
   );
   const accountBidCapability = accountBids.capability;
   const refreshAccountBids = accountBids.refresh;
+  const catalogGridClass = surface === "desktop"
+    ? "grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+    : "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4";
 
   const lastRouteQuery = useRef(routeQuery);
   const productRefreshTimers = useRef(new Map<string, number>());
@@ -608,6 +612,7 @@ function EnabledAuctionFeedGrid({
           description: product.description,
           gender: product.gender,
           conditionGrade: product.conditionGrade,
+          measurements: product.measurements,
           imageUrl: getCatalogImageUrl(
             product.thumbnailUrls[0] ?? product.imageUrls[0] ?? "",
           ),
@@ -949,7 +954,7 @@ function EnabledAuctionFeedGrid({
         </div>
       )}
       {loading && (
-        <div className="grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-4 lg:grid-cols-4 lg:gap-x-5">
+        <div className={catalogGridClass}>
           {Array.from({ length: 12 }).map((_, index) => (
             <div
               aria-hidden="true"
@@ -995,7 +1000,7 @@ function EnabledAuctionFeedGrid({
         ))}
       {!loading && visibleCards.length > 0 && (
         <>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3 md:gap-x-4 lg:grid-cols-4 lg:gap-x-5">
+          <div className={catalogGridClass}>
             {pagination.items.map((item) => {
               const source = productById.get(item.id);
               return (

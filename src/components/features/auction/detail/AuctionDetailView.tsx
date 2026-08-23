@@ -4,7 +4,10 @@ import { ItemGallery } from "@/components/features/auction/detail/ItemGallery";
 import { StickyBidPanel } from "@/components/features/auction/detail/StickyBidPanel";
 import { fetchPublishedProduct } from "@/services/products";
 import type { BidHistoryEntry, ItemDetail } from "@/types/detail";
-import type { ConditionGrade } from "@/lib/catalog/conditions";
+import {
+  normalizeConditionGrade,
+  type ConditionGrade,
+} from "@/lib/catalog/conditions";
 import { normalizeMeasurements } from "@/lib/catalog/measurements";
 
 function mapPublishedProductToDetail(
@@ -45,7 +48,8 @@ function mapPublishedProductToDetail(
       },
     ];
   });
-  const conditionGrade: ConditionGrade = product.conditionGrade;
+  const conditionGrade: ConditionGrade =
+    normalizeConditionGrade(product.conditionGrade) ?? "";
   const condition =
     conditionGrade === "S"
       ? "NEW"
@@ -53,7 +57,9 @@ function mapPublishedProductToDetail(
         ? "EXCELLENT"
         : conditionGrade === "B"
           ? "GOOD"
-          : "FAIR";
+          : conditionGrade === "C"
+            ? "FAIR"
+            : undefined;
   const saleType = product.saleType === "fixed" ? "fixed" : "auction";
   return {
     id: product.id,
@@ -115,11 +121,11 @@ export async function AuctionDetailView({
   if (!item) notFound();
   return (
     <div
-      className="grid grid-cols-1 items-start gap-6 md:grid-cols-12 lg:gap-12"
+      className="mx-auto grid w-full max-w-[1400px] grid-cols-1 items-start gap-6 p-0 sm:grid-cols-12 sm:gap-8 sm:p-6 lg:grid-cols-[minmax(0,58fr)_minmax(340px,42fr)] lg:gap-10"
       data-detail-layout={compact ? "intercepted" : "page"}
       data-detail-surface={surface}
     >
-      <div className="min-w-0 md:col-span-7">
+      <div className="min-w-0 sm:col-span-6 md:col-span-7 lg:col-auto">
         <ItemGallery compact={compact} item={item} surface={surface} />
         <ConditionReport item={item} surface={surface} />
       </div>

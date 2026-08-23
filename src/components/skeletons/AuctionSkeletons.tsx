@@ -25,7 +25,7 @@ export function AuctionGridSkeleton() {
   return (
     <div
       aria-label="옥션 상품 불러오는 중"
-      className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4"
+      className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4"
     >
       {Array.from({ length: 8 }, (_, i) => (
         <div className="space-y-3" key={i}>

@@ -12,6 +12,8 @@ export function toFixedProductPayload(
     brand: product.brand,
     brandSlug: product.brandSlug,
     gender: product.gender,
+    conditionGrade: product.conditionGrade,
+    measurements: product.measurements,
     publishAt: product.publishAt,
     closesAt: product.closesAt,
     status: "active",

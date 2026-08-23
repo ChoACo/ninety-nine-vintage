@@ -35,7 +35,21 @@ export function OrderTable({
     onSelectionChange(next);
   };
   return (
-    <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-950 md:overflow-x-visible lg:overflow-x-auto">
+    <>
+    <div className="grid gap-3 md:hidden">
+      {orders.map((order) => {
+        const item = order.items[0];
+        const shipping = orderShippingMode(order);
+        const status = orderWorkflowStatus(order);
+        return <article className="w-full max-w-full overflow-hidden break-keep rounded-2xl border border-zinc-800 bg-zinc-950 p-4 text-zinc-200" key={order.id}>
+          <div className="flex min-w-0 gap-3"><CatalogImage alt="" className="size-16 shrink-0 rounded-xl object-cover" src={item?.products?.image_urls?.[0] ?? ""} /><div className="min-w-0 flex-1"><p className="line-clamp-2 text-sm font-bold text-zinc-100">{item?.products?.title ?? "상품 정보 없음"}</p><p className="mt-1 truncate font-mono text-[10px] text-zinc-500">{order.order_id}</p></div><input aria-label={`${order.order_id} 선택`} checked={selectedIds.has(order.id)} className="size-5 shrink-0" onChange={() => toggle(order.id)} type="checkbox" /></div>
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px]"><span className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 font-bold">{statusLabel[status]}</span><span className="rounded-md border border-zinc-700 px-2 py-1">{shipping === "vault" ? "📦 보관함" : "🚚 즉시 발송"}</span><span className="ml-auto font-mono text-sm font-bold text-zinc-100">{won(order.expected_amount)}</span></div>
+          <button className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-zinc-700 text-xs font-bold" onClick={() => onOpen(order)} type="button">{status === "ready_to_ship" ? "배송 화면에서 송장 입력" : "주문 상세"}<ExternalLink size={13} /></button>
+        </article>;
+      })}
+      {orders.length === 0 && <p className="py-16 text-center text-sm text-zinc-500">조건에 맞는 주문이 없습니다.</p>}
+    </div>
+    <div className="hidden overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-950 md:block md:overflow-x-visible lg:overflow-x-auto">
       <table className="w-full min-w-[680px] table-fixed border-collapse text-left lg:min-w-[1180px]">
         <thead className="border-b border-zinc-800 bg-zinc-900/80 text-[10px] font-bold uppercase tracking-[.08em] text-zinc-500">
           <tr className="h-10">
@@ -194,5 +208,6 @@ export function OrderTable({
         </p>
       )}
     </div>
+    </>
   );
 }

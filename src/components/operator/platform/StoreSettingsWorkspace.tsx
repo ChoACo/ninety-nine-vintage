@@ -11,6 +11,7 @@ import {
   isSupportedProductImageMimeType,
 } from "@/lib/supabase/productImagePolicy";
 import { useToastStore } from "@/store/useToastStore";
+import { compressProductImageForUpload } from "@/lib/images/productImageCompression";
 
 const BANKS = [
   "국민은행",
@@ -57,6 +58,8 @@ type StoreData = {
   remoteAreaShippingFee: number | null;
   updatedAt: string | null;
   payoutAccount: { bankName: string; accountHolder: string } | null;
+  announcementText: string;
+  announcementEnabled: boolean;
 };
 type Form = {
   name: string;
@@ -113,12 +116,13 @@ async function upload(storeId: string, kind: string, file: File) {
     !(await hasSupportedProductImageSignature(file))
   )
     throw new Error("10MB 이하 JPG·PNG·WEBP 이미지를 선택해 주세요.");
-  const ext = (file.name.split(".").pop() ?? "jpg").replace(/[^a-z0-9]/giu, "");
+  const compressed = await compressProductImageForUpload(file);
+  const ext = (compressed.name.split(".").pop() ?? "webp").replace(/[^a-z0-9]/giu, "");
   const client = getSupabaseBrowserClient();
   const path = `${storeId}/${kind}-${crypto.randomUUID()}.${ext}`;
   const { data, error } = await client.storage
     .from("store-mall-images")
-    .upload(path, file, { contentType: file.type, cacheControl: "31536000" });
+    .upload(path, compressed, { contentType: compressed.type, cacheControl: "31536000" });
   if (error || !data) throw new Error("이미지 업로드에 실패했습니다.");
   return client.storage.from("store-mall-images").getPublicUrl(data.path).data
     .publicUrl;
@@ -177,6 +181,8 @@ function Dropzone({
           setBusy(true);
           try {
             onChange(await upload(storeId, kind, file));
+          } catch (error) {
+            window.alert(error instanceof Error ? error.message : "이미지 업로드에 실패했습니다.");
           } finally {
             setBusy(false);
             e.target.value = "";
@@ -213,9 +219,9 @@ export function StoreBrandingCard({
         />
         <Dropzone
           kind="banner"
-          label="와이드 배너 (21:9)"
+          label="와이드 배너 (16:7)"
           onChange={(bannerUrl) => set({ bannerUrl })}
-          ratio="aspect-[21/9]"
+          ratio="aspect-[16/7]"
           storeId={storeId}
           value={form.bannerUrl}
         />
@@ -476,6 +482,9 @@ function Settings({
 }) {
   const [form, setForm] = useState(() => initial(store));
   const [busy, setBusy] = useState(false);
+  const [announcementText, setAnnouncementText] = useState(store.announcementText ?? "");
+  const [announcementEnabled, setAnnouncementEnabled] = useState(store.announcementEnabled ?? false);
+  const [noticeBusy, setNoticeBusy] = useState(false);
   const toast = useToastStore((s) => s.pushToast);
   const set = (p: Partial<Form>) => setForm((v) => ({ ...v, ...p }));
   const valid =
@@ -514,12 +523,37 @@ function Settings({
       setBusy(false);
     }
   }
+  async function saveNotice() {
+    if (noticeBusy) return;
+    setNoticeBusy(true);
+    try {
+      const response = await fetch("/api/admin/operator/platform", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "save_notice", storeId: store.id, announcementText, announcementEnabled }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "공지 저장 실패");
+      toast("success", "매장 공지가 저장되었습니다.");
+      await reload();
+    } catch (error) {
+      toast("error", error instanceof Error ? error.message : "공지 저장에 실패했습니다.");
+    } finally {
+      setNoticeBusy(false);
+    }
+  }
   return (
     <div className="space-y-5">
       <StoreBrandingCard form={form} set={set} storeId={store.id} />
+      <section className="w-full max-w-full overflow-hidden break-keep rounded-2xl border border-zinc-800 bg-zinc-900 p-5 md:p-6">
+        <div className="flex items-center justify-between gap-3"><div><h2 className="font-black">매장 공지</h2><p className="mt-1 text-xs text-zinc-500">한 줄 배너를 편집하고 모바일 노출을 미리 확인합니다.</p></div><label className="grid min-h-11 min-w-11 cursor-pointer place-items-center"><input checked={announcementEnabled} className="size-5 accent-emerald-500" onChange={(event) => setAnnouncementEnabled(event.target.checked)} type="checkbox" /><span className="sr-only">매장 공지 표시</span></label></div>
+        <input className={`${cls} text-base md:text-sm`} maxLength={80} onChange={(event) => setAnnouncementText(event.target.value)} placeholder="오늘의 입고 및 배송 공지를 입력하세요" value={announcementText} />
+        <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-950 p-3"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-zinc-500">Mobile preview</p><div className={`mt-2 rounded-xl px-4 py-3 text-center text-xs font-bold ${announcementEnabled && announcementText.trim() ? "bg-emerald-500 text-zinc-950" : "bg-zinc-800 text-zinc-500"}`}>{announcementEnabled && announcementText.trim() ? announcementText : "공지 배너 미노출"}</div></div>
+        <button className="mt-4 min-h-11 w-full rounded-xl border border-emerald-500/50 px-4 text-xs font-black text-emerald-400 disabled:opacity-40 sm:w-auto" disabled={noticeBusy || (announcementEnabled && !announcementText.trim())} onClick={() => void saveNotice()} type="button">{noticeBusy ? "공지 저장 중…" : "공지 저장"}</button>
+      </section>
       <StoreBusinessCard form={form} set={set} />
       <StoreShippingPolicyCard form={form} set={set} />
-      <footer className="sticky bottom-3 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-700 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur">
+      <footer className="sticky bottom-3 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-700 bg-zinc-950/95 p-3 pb-[calc(env(safe-area-inset-bottom,16px)+0.75rem)] shadow-2xl backdrop-blur md:pb-3">
         <p className="text-xs text-zinc-500">
           마지막 설정 변경 일시:{" "}
           {store.updatedAt
@@ -542,7 +576,7 @@ function Settings({
             type="button"
           >
             <Save size={15} />
-            {busy ? "저장 중…" : "매장 설정 저장"}
+            {busy ? "저장 중…" : "변경사항 저장"}
           </button>
         </div>
       </footer>
@@ -574,7 +608,7 @@ export function StoreSettingsWorkspace() {
     return () => window.clearTimeout(timer);
   }, [load]);
   return (
-    <div className="mx-auto max-w-6xl space-y-6 text-zinc-100">
+    <div className="mx-auto w-full max-w-6xl space-y-6 overflow-hidden break-keep pb-24 text-zinc-100">
       <header>
         <p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-400">
           Store settings

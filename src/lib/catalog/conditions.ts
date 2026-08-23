@@ -17,8 +17,24 @@ export const CONDITION_OPTIONS = PRODUCT_CONDITIONS.map((value) => ({
   label: CONDITION_LABELS[value],
 }));
 
+export type NormalizedConditionGrade = Exclude<ConditionGrade, "">;
+
 export function isConditionGrade(
   value: string,
-): value is Exclude<ConditionGrade, ""> {
+): value is NormalizedConditionGrade {
   return (PRODUCT_CONDITIONS as readonly string[]).includes(value);
+}
+
+export function normalizeConditionGrade(
+  value: unknown,
+): NormalizedConditionGrade | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toUpperCase();
+  if (normalized === "A+") return "A";
+  return isConditionGrade(normalized) ? normalized : null;
+}
+
+export function formatConditionGrade(value: unknown): string | null {
+  const grade = normalizeConditionGrade(value);
+  return grade ? `Grade ${grade} · ${CONDITION_LABELS[grade]}` : null;
 }

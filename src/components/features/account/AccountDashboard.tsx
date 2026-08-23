@@ -1434,9 +1434,22 @@ function AccountDashboardForSession({
                             >
                               {item.title}
                             </p>
-                            <p className="mt-2 text-[11px] text-muted">
-                              {item.originStoreName ?? "매장 상품"}
-                            </p>
+                            {item.originStoreId ? (
+                              <Link
+                                aria-label={`${item.originStoreName ?? "판매 매장"} 매장 페이지로 이동`}
+                                className="mt-1 inline-flex min-h-11 max-w-full items-center py-2 text-[11px] font-bold text-muted transition-opacity hover:text-ink hover:underline active:opacity-80"
+                                href={`${basePath}/centers/${encodeURIComponent(item.originStoreId)}`}
+                                prefetch={false}
+                              >
+                                <span className="truncate">
+                                  {item.originStoreName ?? "판매 매장"}
+                                </span>
+                              </Link>
+                            ) : (
+                              <p className="mt-2 text-[11px] text-muted">
+                                {item.originStoreName ?? "매장 상품"}
+                              </p>
+                            )}
                             <p
                               className={`mt-1 text-[11px] font-bold ${expires && expires.getTime() <= now ? "text-red-600" : "text-muted"}`}
                             >

@@ -96,7 +96,8 @@ test("premium detail actions use confirmation dialogs only for consequential mut
   assert.match(condition, /PremiumDialog/);
   assert.match(condition, /상품 상태 상세 보기/);
   assert.match(condition, /상품 상태 정보/);
-  assert.match(condition, /상태 등급 \{item\.conditionGrade \|\| "미입력"\}/);
+  assert.match(condition, /formatConditionGrade\(item\.conditionGrade\)/);
+  assert.doesNotMatch(condition, /미입력/);
   assert.doesNotMatch(condition, /전문가 검수 완료|정품·상태 확인|검수 보고서|상세 보고서|BadgeCheck/);
   assert.match(bid, /setConfirmOpen\(true\)/);
   assert.match(bid, /동의하고 최종 입찰/);
@@ -151,8 +152,12 @@ test("premium detail actions use confirmation dialogs only for consequential mut
   assert.match(quickCartAction, /장바구니 바로가기/);
   assert.doesNotMatch(sticky, /<QuickCartModal/);
   assert.doesNotMatch(quickCartAction, /router\.push\("\/cart"\)/);
-  assert.match(sticky, /md:sticky md:col-span-5/);
-  assert.match(sticky, /p-5 pb-32 md:pb-6/);
+  assert.match(sticky, /sm:sticky sm:col-span-6/);
+  assert.match(sticky, /p-5 pb-32 sm:pb-6/);
+  assert.match(sticky, /로그인 후 입찰에 참여하실 수 있습니다\./);
+  assert.match(sticky, /action: \{ href: bidLoginHref, label: "카카오 로그인" \}/);
+  assert.match(sticky, /disabled=\{!guestCanSignInToBid\}/);
+  assert.match(sticky, /break-keep rounded-2xl[\s\S]*p-3[\s\S]*sm:p-4/);
   assert.match(scrollLock, /activeBodyScrollLocks \+= 1/);
   assert.match(scrollLock, /activeBodyScrollLocks === 0/);
 });

@@ -136,6 +136,7 @@ export function CatalogImage({
   ...props
 }: CatalogImageProps) {
   const source = typeof src === "string" ? src : "";
+  const fillsContainer = props.fill === true;
   const requestedSource = getRequestedImageSource(source, maxDimension);
   const [loadedNativeSource, setLoadedNativeSource] = useState("");
   if (!requestedSource || !isSafeNativeImageSource(requestedSource)) {
@@ -215,12 +216,12 @@ export function CatalogImage({
       {...props}
       alt={alt}
       blurDataURL={blurDataURL}
-      height={height ?? maxDimension}
+      height={fillsContainer ? undefined : (height ?? maxDimension)}
       loading={props.priority ? undefined : loading}
       placeholder={placeholder}
       sizes={sizes}
       src={requestedSource}
-      width={width ?? maxDimension}
+      width={fillsContainer ? undefined : (width ?? maxDimension)}
     />
   );
 }

@@ -121,7 +121,7 @@ export function AuctionInactiveTeaser({
       </div>
 
       {products === null ? (
-        <div className="grid grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3 md:gap-x-4 lg:grid-cols-4 lg:gap-x-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4">
           {Array.from({ length: Math.min(8, TEASER_PRODUCT_LIMIT) }).map(
             (_, index) => (
               <div
@@ -133,7 +133,7 @@ export function AuctionInactiveTeaser({
           )}
         </div>
       ) : products.length > 0 ? (
-        <div className="grid grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3 md:gap-x-4 lg:grid-cols-4 lg:gap-x-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4">
           {products.map((product) => (
             <div key={product.id}>
               <SoldFeedCard

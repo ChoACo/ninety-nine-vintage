@@ -228,7 +228,7 @@ test("checkout quotes shipping by store or fulfillment group and snapshots each 
   assert.match(checkoutRoute, /p_include_shipping_fee:\s*includeShippingFee/);
   assert.match(cartView, /useState\(true\)/);
   assert.match(cartView, /배송비 함께 결제/);
-  assert.match(cartView, /배송비 \{shippingCharges\.length\}건/);
+  assert.match(cartView, /배송비 \{activeShippingCharges\.length\}건/);
   assert.match(
     cartView,
     /includeShippingFee:\s*currentRequest\.includeShippingFee/,

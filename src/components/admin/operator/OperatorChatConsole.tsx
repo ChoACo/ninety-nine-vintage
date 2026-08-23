@@ -523,6 +523,10 @@ export function OperatorChatConsole({
           className="grid gap-2 border-t border-line p-3 sm:grid-cols-[180px_minmax(0,1fr)_44px] sm:gap-3 sm:p-5"
           onSubmit={send}
         >
+          <div className="flex gap-2 overflow-x-auto sm:col-span-3" aria-label="빠른 답변">
+            <button className="min-h-11 shrink-0 rounded-full border border-line px-4 text-xs font-bold" disabled={!token || !selected || busy} onClick={() => setMessage("보관 배송 가능합니다. 보관함에서 상품을 선택한 뒤 묶음 배송을 요청해 주세요.")} type="button">보관 배송 가능합니다</button>
+            <button className="min-h-11 shrink-0 rounded-full border border-line px-4 text-xs font-bold" disabled={!token || !selected || busy} onClick={() => setMessage("실측 치수를 확인해 안내드리겠습니다. 궁금한 측정 부위를 함께 남겨 주세요.")} type="button">실측 치수 안내</button>
+          </div>
           <select aria-label="빠른 답변 템플릿" className="min-h-11 border border-line bg-paper px-3 text-xs" disabled={!token || !selected || busy} onChange={(event) => { if (event.target.value) setMessage(event.target.value); event.currentTarget.value = ""; }} defaultValue=""><option value="">빠른 답변</option>{CANNED_RESPONSES.map((template, index) => <option key={template} value={template}>템플릿 {index + 1}</option>)}</select>
           <input
             aria-label="회원 답변"

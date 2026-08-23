@@ -124,6 +124,19 @@ export async function GET(request: Request) {
           .order("created_at", { ascending: false });
   if (productError)
     return commerceJson({ error: "operator_products_unavailable" }, 503);
+  const productIds = (products ?? []).map((product) => product.id);
+  const { data: bidRows, error: bidError } = productIds.length
+    ? await user
+        .from("auction_bids")
+        .select("product_id")
+        .in("product_id", productIds)
+    : { data: [], error: null };
+  if (bidError)
+    return commerceJson({ error: "operator_products_unavailable" }, 503);
+  const bidCounts = new Map<string, number>();
+  for (const bid of bidRows ?? []) {
+    bidCounts.set(bid.product_id, (bidCounts.get(bid.product_id) ?? 0) + 1);
+  }
   const { data: lockData, error: lockError } =
     storeIds.length === 0
       ? { data: [], error: null }
@@ -145,13 +158,17 @@ export async function GET(request: Request) {
     stores: stores ?? [],
     products: (products ?? []).map((product) => {
       const lock = locksByProduct.get(product.id);
+      const withBidCount = {
+        ...product,
+        bid_count: bidCounts.get(product.id) ?? 0,
+      };
       return lock
         ? {
-            ...product,
+            ...withBidCount,
             pending_lock_kind: lock.lockKind,
             pending_lock_until: lock.lockUntil,
           }
-        : product;
+        : withBidCount;
     }),
     permissions: {
       canCloseAuctions: auth.roleCode === "owner",

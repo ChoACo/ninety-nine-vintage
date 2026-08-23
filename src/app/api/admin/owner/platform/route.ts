@@ -22,16 +22,19 @@ export async function GET(request: Request) {
   if (error) return commerceJson({ error: error.message ?? "platform_management_unavailable" }, 503);
   const management = data && typeof data === "object" ? data as { stores?: Array<Record<string, unknown>> } : {};
   const storeIds = (management.stores ?? []).map((store) => String(store.id));
-  const { data: fees, error: feeError } = storeIds.length
-    ? await auth.admin.from("stores").select("id,regular_shipping_fee,remote_area_shipping_fee").in("id", storeIds)
-    : { data: [], error: null };
-  if (feeError) return commerceJson({ error: "shipping_settings_unavailable" }, 503);
+  const [{ data: fees, error: feeError }, { data: config, error: configError }] = await Promise.all([
+    storeIds.length
+      ? auth.admin.from("stores").select("id,regular_shipping_fee,remote_area_shipping_fee").in("id", storeIds)
+      : Promise.resolve({ data: [], error: null }),
+    auth.admin.from("platform_config").select("global_delivery_fee,storage_duration_days,home_sections,banners,policy_markdown,version").eq("config_key", "default").single(),
+  ]);
+  if (feeError || configError) return commerceJson({ error: "platform_settings_unavailable" }, 503);
   const feeByStore = new Map((fees ?? []).map((fee) => [fee.id, fee]));
   return commerceJson({ management: { ...management, stores: (management.stores ?? []).map((store) => ({
     ...store,
     regularShippingFee: feeByStore.get(String(store.id))?.regular_shipping_fee ?? null,
     remoteAreaShippingFee: feeByStore.get(String(store.id))?.remote_area_shipping_fee ?? null,
-  })) } });
+  })) }, config });
 }
 
 export async function POST(request: Request) {
@@ -43,7 +46,17 @@ export async function POST(request: Request) {
     return commerceJson({ error: "invalid_platform_request" }, 422);
   }
   const rpc = auth.admin as unknown as RpcClient;
-  const result = body.action === "save_shipping_fees"
+  const result = body.action === "save_platform_config"
+    ? await (auth.user as unknown as RpcClient).rpc("update_owner_platform_config", {
+      p_global_delivery_fee: body.globalDeliveryFee,
+      p_storage_duration_days: body.storageDurationDays,
+      p_home_sections: body.homeSections,
+      p_banners: body.banners,
+      p_policy_markdown: body.policyMarkdown,
+      p_expected_version: body.expectedVersion,
+      p_reason: body.reason,
+    })
+    : body.action === "save_shipping_fees"
     ? await rpc.rpc("configure_store_shipping_fees", {
       p_store_id: body.storeId,
       p_regular_shipping_fee: body.regularShippingFee,

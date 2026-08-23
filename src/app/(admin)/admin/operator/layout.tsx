@@ -16,7 +16,7 @@ const navigation = [
   { group: "보관함 & 출고", href: "/admin/operator/storage", label: "보관함", description: "회원별 보관·D-Day", icon: "vault" },
   { group: "보관함 & 출고", href: "/admin/operator/shipping", label: "보관함·출고 관리", description: "패킹·송장 일괄 처리", icon: "shipping", badge: <OperatorPendingBadge kind="shipping" /> },
   { group: "고객 소통 & 설정", href: "/admin/operator/inquiries", label: "문의", description: "고객 문의 분할 화면", icon: "inquiries", badge: <OperatorInquiryBadge /> },
-  { group: "고객 소통 & 설정", href: "/admin/operator/community", label: "공지", description: "운영 안내와 질문·답변", icon: "inquiries" },
+  { group: "고객 소통 & 설정", href: "/admin/operator/community", label: "공지", description: "매장 한 줄 배너와 운영 안내", icon: "inquiries" },
   { group: "고객 소통 & 설정", href: "/admin/operator/platform", label: "매장 설정", description: "등급·계좌·운영 정보", icon: "settings" },
 ] as const;
 // Legacy labels are retained only in source history for migration checks: label: "오늘의 할 일" · label: "판매 중 상품" · label: "상품 등록" · label: "판매 내역" · 출고·보관부터 송장까지.

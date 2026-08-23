@@ -73,6 +73,9 @@ function maybeSynchronizeServerClock() {
 
 function handleClockVisibility() {
   if (typeof document === "undefined" || document.visibilityState === "visible") {
+    // Recalculate immediately on tab return; the server sample then corrects
+    // any accumulated local clock drift without leaving a stale countdown.
+    publishClockSnapshots();
     void synchronizeAuctionServerClock(true);
   }
 }

@@ -4,6 +4,7 @@ import { createRealtimeChannelName } from "./realtime";
 
 let browserClient: SupabaseClient<Database> | undefined;
 let publicBrowserClient: SupabaseClient<Database> | undefined;
+const LOCAL_TEST_AUTH_STORAGE_KEY = "ninety-nine-local-test-browser-auth";
 
 export class SupabaseConfigurationError extends Error {
   constructor() {
@@ -25,13 +26,30 @@ function getSupabaseConfiguration() {
   return { url, publishableKey };
 }
 
+function getBrowserAuthStorageKey(url: string) {
+  if (/^https?:\/\/(?:127\.0\.0\.1|localhost)(?::|\/)/.test(url)) {
+    return LOCAL_TEST_AUTH_STORAGE_KEY;
+  }
+
+  return `sb-${new URL(url).hostname.split(".")[0]}-auth-token`;
+}
+
+/** Last-resort cleanup when auth-js cannot complete local sign-out. */
+export function clearSupabaseBrowserSessionStorage() {
+  if (typeof window === "undefined") return;
+
+  const { url } = getSupabaseConfiguration();
+  const storageKey = getBrowserAuthStorageKey(url);
+  for (const suffix of ["", "-code-verifier", "-user"] as const) {
+    window.localStorage.removeItem(`${storageKey}${suffix}`);
+  }
+}
+
 export function getSupabaseBrowserClient(): SupabaseClient<Database> {
   if (browserClient) return browserClient;
 
   const { url, publishableKey } = getSupabaseConfiguration();
-  const localTestStorageKey = /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::|\/)/.test(url)
-    ? "ninety-nine-local-test-browser-auth"
-    : null;
+  const storageKey = getBrowserAuthStorageKey(url);
   browserClient = createClient<Database>(url, publishableKey, {
     auth: {
       persistSession: true,
@@ -39,7 +57,7 @@ export function getSupabaseBrowserClient(): SupabaseClient<Database> {
       // Authentication is completed only through the verified Kakao ID-token
       // callback. Never let URL fragments inject an unrelated Supabase session.
       detectSessionInUrl: false,
-      ...(localTestStorageKey ? { storageKey: localTestStorageKey } : {}),
+      storageKey,
     },
   });
 

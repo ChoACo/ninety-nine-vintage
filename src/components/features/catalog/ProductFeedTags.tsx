@@ -20,18 +20,20 @@ export function ProductFeedTags({
     <div aria-label="상품 요약 태그" className="mt-2 flex min-w-0 flex-wrap gap-1">
       {tags.map((tag) => (
         <span
-          className="max-w-full truncate rounded-full border border-line bg-surface px-2 py-1 text-[9px] font-bold leading-none text-muted"
+          className="max-w-full line-clamp-1 break-keep rounded-full border border-line bg-surface px-2 py-1 text-[9px] font-bold leading-none text-muted"
           data-tag-kind={tag.kind}
           key={`${tag.kind}:${tag.label}`}
+          title={tag.label}
         >
           {tag.label}
         </span>
       ))}
       {hashtags?.slice(0, 4).map((tag) => (
         <span
-          className="max-w-full truncate rounded-full border border-emerald-200 bg-emerald-50/50 px-2 py-1 text-[9px] font-bold leading-none text-emerald-800"
+          className="max-w-full line-clamp-1 break-keep rounded-full border border-emerald-200 bg-emerald-50/50 px-2 py-1 text-[9px] font-bold leading-none text-emerald-800"
           data-tag-kind="hashtag"
           key={`hashtag:${tag}`}
+          title={tag}
         >
           {tag}
         </span>

@@ -47,11 +47,11 @@ function dateLabel(value: string | null) {
     : date.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
-function timeUntilLabel(value: string | null): string {
+function timeUntilLabel(value: string | null, now = Date.now()): string {
   if (!value) return "";
   const target = new Date(value).getTime();
   if (Number.isNaN(target)) return "";
-  const diff = target - Date.now();
+  const diff = target - now;
   if (diff <= 0) return "기한 경과";
   const minutes = Math.ceil(diff / 60000);
   if (minutes < 60) return `${minutes}분 남음`;
@@ -69,6 +69,7 @@ export function OperatorUnpaidAuctionsConsole() {
     action: "relist" | "convert_fixed";
   } | null>(null);
   const [notice, setNotice] = useState("");
+  const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async (accessToken: string | null) => {
     if (!accessToken) return;
@@ -95,6 +96,22 @@ export function OperatorUnpaidAuctionsConsole() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    const interval = window.setInterval(tick, 30_000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        tick();
+        void load(token);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [load, token]);
 
   useEffect(() => {
     void (async () => {
@@ -246,7 +263,7 @@ export function OperatorUnpaidAuctionsConsole() {
                         {" "}
                         · 결제 기한 {dateLabel(product.paymentDueAt)}{" "}
                         <span className="font-bold text-amber-700">
-                          {timeUntilLabel(product.paymentDueAt)}
+                          {timeUntilLabel(product.paymentDueAt, now)}
                         </span>
                       </>
                     )}
@@ -267,17 +284,17 @@ export function OperatorUnpaidAuctionsConsole() {
               </div>
               <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                 <button
-                  className="flex shrink-0 items-center gap-1 border border-ink px-2 py-1 text-[10px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex min-h-11 shrink-0 items-center gap-1 border border-ink px-3 py-2 text-[10px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
                   disabled={!product.canResolve || !!busyAction || !token}
                   onClick={() => void resolve(product, "relist")}
                   title={product.canResolve ? "" : product.blockedReason}
                   type="button"
                 >
                   <TimerReset aria-hidden="true" size={11} />
-                  {busy && busyAction?.action === "relist" ? "처리 중" : "재경매 등록"}
+                  {busy && busyAction?.action === "relist" ? "처리 중" : "주문 취소 및 재공개"}
                 </button>
                 <button
-                  className="flex shrink-0 items-center gap-1 border border-ink px-2 py-1 text-[10px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex min-h-11 shrink-0 items-center gap-1 border border-ink px-3 py-2 text-[10px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
                   disabled={!product.canResolve || !!busyAction || !token}
                   onClick={() => void resolve(product, "convert_fixed")}
                   title={product.canResolve ? "" : product.blockedReason}

@@ -34,7 +34,7 @@ export function SoldFeedCard({
         className="block"
         href={`${basePath}/sold/${id}`}
       >
-        <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-lg shadow-black/5">
+        <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-line/30 bg-muted/20 shadow-sm">
           {imageUrl
             ? (
               <CatalogImage
@@ -59,7 +59,7 @@ export function SoldFeedCard({
         <span className="mt-3 block truncate text-[10px] text-muted">
           {brand}
         </span>
-        <span className="mt-1 block truncate text-sm font-medium">{title}</span>
+        <span className="mt-1 block min-h-[1.5rem] line-clamp-1 text-sm font-medium">{title}</span>
       </Link>
       <div className="mt-3 flex items-end justify-between gap-2">
         <div>

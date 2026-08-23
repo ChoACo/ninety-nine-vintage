@@ -19,6 +19,9 @@ export function StoreMallGrid({
   cards: StoreMallCard[];
 }) {
   if (cards.length === 0) return null;
+  const storeGridClass = basePath === "/m"
+    ? "grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4 lg:gap-5"
+    : "grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5";
   return (
     <section aria-label="판매 센터몰 바로가기">
       <SectionHeading
@@ -27,7 +30,7 @@ export function StoreMallGrid({
         title="센터몰 바로가기"
         titleClassName="mt-2 text-2xl font-black tracking-[-0.06em]"
       />
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4 lg:gap-5">
+      <div className={storeGridClass}>
         {cards.map((card, index) => {
           const mallInfo = card.mallInfo ?? "공식 판매 센터몰";
           const image = card.bannerUrl ?? card.mallImage;
@@ -88,7 +91,8 @@ export function StoreMallGrid({
                           )}
                         </div>
                         <h3
-                          className={`truncate text-base font-black tracking-[-.04em] ${hasImage ? "text-paper" : ""}`}
+                          className={`line-clamp-2 min-w-0 text-xs font-black leading-4 tracking-[-.04em] sm:text-base ${hasImage ? "text-paper" : ""}`}
+                          title={card.name}
                         >
                           {card.name}
                         </h3>
@@ -103,7 +107,8 @@ export function StoreMallGrid({
                     <div className="flex gap-1.5">
                       {card.conceptTags.slice(0, 2).map((tag) => (
                         <span
-                          className={`rounded-full px-2 py-1 text-[10px] font-bold ${hasImage ? "bg-black/35 text-zinc-100" : "bg-paper text-muted"}`}
+                          className={`max-w-full truncate rounded-full px-2 py-1 text-[9px] font-bold sm:text-[10px] ${hasImage ? "bg-black/35 text-zinc-100" : "bg-paper text-muted"}`}
+                          title={`#${tag.replace(/^#/u, "")}`}
                           key={tag}
                         >
                           #{tag.replace(/^#/u, "")}
@@ -111,7 +116,8 @@ export function StoreMallGrid({
                       ))}
                     </div>
                     <p
-                      className={`mt-2 truncate text-[11px] font-bold ${hasImage ? "text-zinc-100" : "text-muted"}`}
+                      className={`mt-2 line-clamp-2 min-h-8 break-words text-[10px] leading-4 font-bold sm:text-[11px] ${hasImage ? "text-zinc-100" : "text-muted"}`}
+                      title={mallInfo}
                     >
                       {mallInfo}
                     </p>

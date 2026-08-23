@@ -9,7 +9,10 @@ import {
 } from "@/lib/catalog/query";
 import { formatProductDisplayNumber } from "@/lib/productDisplayNumber";
 import { isSoldFeedVisible } from "@/lib/catalog/soldVisibility";
-import { isConditionGrade, type ConditionGrade } from "@/lib/catalog/conditions";
+import {
+  normalizeConditionGrade,
+  type ConditionGrade,
+} from "@/lib/catalog/conditions";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"] & {
   enhanced_title?: string | null;
@@ -123,7 +126,7 @@ export function mapPublishedProduct(row: ProductRow & { stores?: { name?: string
     storeSlug: row.stores?.slug?.trim() ?? "",
     storageClass: row.storage_class === "large" ? "large" : "small",
     sizeLabel: resolveSizeLabel(row.title, row.size_label),
-    conditionGrade: isConditionGrade(row.condition_grade) ? row.condition_grade : "",
+    conditionGrade: normalizeConditionGrade(row.condition_grade) ?? "",
     measurements: row.measurements,
     inspectionNotes: row.inspection_notes,
     defectTags: row.defect_tags ?? [],

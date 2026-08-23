@@ -9,7 +9,8 @@ export function StoreMallStoreInfo({ basePath = "", slug, store, surface }: { ba
   const isDesktop = surface === "desktop";
   const chatHref = `${basePath}/chat?storeId=${store.id}`;
   return <div className={isDesktop ? "pb-24" : "pb-8"}>
-    <StoreMallTabs active="about" basePath={basePath} chatHref={chatHref} slug={slug} surface={surface} />
+    <StoreMallTabs active="about" basePath={basePath} chatHref={chatHref} slug={slug} storeName={store.name} surface={surface} />
+    {store.announcementEnabled && store.announcementText ? <div className="w-full max-w-full overflow-hidden break-keep border-b border-emerald-600 bg-emerald-500 px-4 py-3 text-center text-xs font-black text-zinc-950" role="status">{store.announcementText}</div> : null}
     <section className={`mt-10 overflow-hidden border border-line ${isDesktop ? "grid grid-cols-2" : ""}`} id="store-story">
       <div className={`${isDesktop ? "p-10" : "p-6"} bg-[var(--store-card-1)]`}>
         <p className="eyebrow">ABOUT THE CENTER</p>

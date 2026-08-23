@@ -103,8 +103,10 @@ export function StoreMallCatalogPage({
         basePath={basePath}
         chatHref={chatHref}
         slug={slug}
+        storeName={store.name}
         surface={surface}
       />
+      {store.announcementEnabled && store.announcementText ? <div className="w-full max-w-full overflow-hidden break-keep border-b border-emerald-600 bg-emerald-500 px-4 py-3 text-center text-xs font-black text-zinc-950" role="status">{store.announcementText}</div> : null}
       <div className="mt-10">
         <p className="eyebrow text-muted">{store.name} 센터몰</p>
         <h1

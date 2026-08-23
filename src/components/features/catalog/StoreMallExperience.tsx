@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarDays, PackageCheck, ShieldCheck, Store } from "lucide-react";
+import { ArrowRight, CalendarDays, ShieldCheck, Store } from "lucide-react";
 import Link from "next/link";
 
 import { StoreMallSplitSales } from "@/components/features/catalog/StoreMallSplitSales";
@@ -32,16 +32,18 @@ export function StoreMallExperience({ auctions, basePath = "", dates, fixed, rou
   const secondary = products.slice(1, 3);
   const isDesktop = surface === "desktop";
   const chatHref = `${basePath}/chat?storeId=${store.id}`;
+  const heroImage = store.bannerUrl?.trim() || store.mallImage?.trim() || null;
   return <div className={isDesktop ? "pb-24" : "pb-8"}>
-    <CenterRealtimeRefresh storeId={store.id} /><StoreMallTabs active="main" basePath={basePath} chatHref={chatHref} routeSegment={routeSegment} slug={slug} surface={surface} />
+    <CenterRealtimeRefresh storeId={store.id} /><StoreMallTabs active="main" basePath={basePath} chatHref={chatHref} routeSegment={routeSegment} slug={slug} storeName={store.name} surface={surface} />
+    {store.announcementEnabled && store.announcementText ? <div className="w-full max-w-full overflow-hidden break-keep border-b border-emerald-600 bg-emerald-500 px-4 py-3 text-center text-xs font-black text-zinc-950" role="status">{store.announcementText}</div> : null}
 
     <section className={`relative overflow-hidden border-b border-line bg-surface text-ink ${isDesktop ? "grid min-h-[520px] grid-cols-[1.05fr_.95fr]" : "-mx-4"}`}>
       <div className={`relative z-10 flex flex-col justify-between ${isDesktop ? "p-12" : "min-h-[430px] p-6"}`}>
         <div><p className="text-[10px] font-bold tracking-[.24em] text-muted">NINETY-NINE SELLER STORE</p><div className="mt-6 inline-flex items-center gap-2 rounded-full border border-line px-3 py-2 text-[10px]"><Store size={13} /> 공식 판매 센터몰</div></div>
-        <div><h1 className={`${isDesktop ? "text-7xl" : "text-5xl"} flex items-center gap-3 font-black leading-[.9] tracking-[-.09em]`}>{store.name}<ShieldCheck className="shrink-0 text-sky-500" size={isDesktop ? 28 : 22} /></h1><p className="mt-6 max-w-lg text-sm leading-7 text-muted">{store.description || "매일 새롭게 선보이는 상품을 경매와 즉시구매로 만나보세요."}</p><a className="mt-7 inline-flex min-h-12 items-center gap-2 rounded-xl bg-amber-500 px-5 text-xs font-black text-zinc-950" href="#sales-catalog">오늘의 상품 <ArrowRight size={15} /></a><CenterStorefrontActions chatHref={chatHref} name={store.name} storeId={store.id} /></div>
+        <div><h1 className={`${isDesktop ? "text-7xl" : "break-words text-3xl sm:text-5xl"} flex min-w-0 items-center gap-3 font-black leading-[.9] tracking-[-.09em]`}>{store.name}<ShieldCheck className="shrink-0 text-sky-500" size={isDesktop ? 28 : 22} /></h1><p className="mt-6 max-w-lg text-sm leading-7 text-muted">{store.description || "매일 새롭게 선보이는 상품을 경매와 즉시구매로 만나보세요."}</p><a className="mt-7 inline-flex min-h-12 items-center gap-2 rounded-xl bg-amber-500 px-5 text-xs font-black text-zinc-950" href="#sales-catalog">오늘의 상품 <ArrowRight size={15} /></a><CenterStorefrontActions chatHref={chatHref} name={store.name} storeId={store.id} /></div>
       </div>
-      <div className={`relative border-l border-line bg-surface ${isDesktop ? "min-h-[520px]" : "h-[360px]"}`}>
-        {store.mallImage ? <><CatalogImage alt={`${store.name} 센터 배너`} className="size-full object-cover" maxDimension={1280} sizes={isDesktop ? "560px" : "100vw"} src={store.mallImage} /><div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" /></> : <div className="relative grid size-full place-items-center text-center" style={{ background: "var(--store-card-1)" }}><div className="absolute inset-0 bg-black/30" /><div className="relative px-6 text-sm text-white/90"><PackageCheck className="mx-auto mb-3" /><p>센터 배너 이미지를 등록하면 이곳에 표시됩니다.</p></div></div>}
+      <div className={`relative overflow-hidden bg-surface ${isDesktop ? "min-h-[520px] border-l border-line" : "h-32 w-full rounded-xl sm:h-48"}`}>
+        {heroImage ? <><CatalogImage alt={`${store.name} 센터 배너`} className="size-full object-cover" maxDimension={1280} sizes={isDesktop ? "560px" : "100vw"} src={heroImage} /><div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" /></> : <div aria-label={`${store.name} 기본 배너`} className="relative grid size-full overflow-hidden place-items-center bg-gradient-to-br from-amber-950 via-stone-800 to-zinc-950 text-center"><div className="absolute -left-16 top-8 size-56 rounded-full bg-amber-400/20 blur-3xl" /><div className="absolute -bottom-20 right-0 size-72 rounded-full bg-rose-900/30 blur-3xl" /><div className="absolute inset-0 bg-[linear-gradient(115deg,transparent_20%,rgba(255,255,255,.06)_20%,rgba(255,255,255,.06)_21%,transparent_21%,transparent_48%,rgba(255,255,255,.04)_48%,rgba(255,255,255,.04)_49%,transparent_49%)]" /><div className="relative max-w-xs border-y border-white/25 px-8 py-7 text-white"><p className="text-[10px] font-bold tracking-[.28em] text-amber-200">NINETY-NINE VINTAGE STORE</p><p className="mt-4 break-keep text-3xl font-black tracking-[-.06em]">{store.name}</p><p className="mt-3 text-[11px] tracking-[.14em] text-white/60">CURATED ARCHIVE · ONE OF ONE</p></div><div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-white/5" /></div>}
       </div>
     </section>
 

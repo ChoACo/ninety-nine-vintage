@@ -17,6 +17,8 @@ import { fetchStoreMallCards, type StoreMallCard } from "@/services/stores";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
 import { LoginReturnScrollRestorer } from "@/components/layout/LoginReturnScrollRestorer";
 import { HomeCategoryFilters } from "@/components/features/home/HomeCategoryFilters";
+import { DEFAULT_PLATFORM_CONFIG, type PlatformConfig } from "@/lib/platform/config";
+import { fetchPlatformConfig } from "@/services/platformConfig";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -26,18 +28,20 @@ export const metadata: Metadata = {
 };
 
 async function loadHomeData() {
-  const [auctionResult, fixedResult, storeMallsResult] = await Promise.allSettled([
+  const [auctionResult, fixedResult, storeMallsResult, configResult] = await Promise.allSettled([
     LIVE_AUCTION_ENABLED
       ? fetchPublishedProducts({ limit: 100, saleType: "auction" })
       : Promise.resolve([]),
     fetchPublishedProducts({ limit: 6, saleType: "fixed" }),
     fetchStoreMallCards(),
+    fetchPlatformConfig(),
   ]);
   return {
     auctions: auctionResult.status === "fulfilled" ? auctionResult.value : [],
     fixed: fixedResult.status === "fulfilled" ? fixedResult.value : [],
     storeMalls: storeMallsResult.status === "fulfilled" ? storeMallsResult.value : [],
     catalogUnavailable: fixedResult.status === "rejected",
+    config: configResult.status === "fulfilled" ? configResult.value : null,
   };
 }
 
@@ -48,24 +52,25 @@ interface HomePresentationProps {
   fixed: HomeProducts;
   featuredAuctions: HomeFeaturedAuctionItem[];
   storeMalls: StoreMallCard[];
+  config: PlatformConfig;
 }
 
-function DesktopHome({ auctions, featuredAuctions, fixed, storeMalls }: HomePresentationProps) {
+function DesktopHome({ auctions, config, featuredAuctions, fixed, storeMalls }: HomePresentationProps) {
   return (
     <div className="space-y-16" data-home-presentation="desktop">
-      <section className="theme-invariant-dark grid min-h-[560px] grid-cols-[1.05fr_.95fr] overflow-hidden bg-ink text-paper">
-        <div className="flex flex-col justify-between p-16">
+      <section className="flex min-h-0 flex-col items-center justify-between gap-6 overflow-hidden rounded-3xl border border-line/40 bg-gradient-to-br from-card to-muted/40 p-6 text-foreground sm:flex-row sm:p-10 lg:min-h-[560px] lg:gap-0 lg:p-12">
+        <div className="flex w-full flex-col justify-between sm:w-1/2 lg:w-[45%] lg:self-stretch lg:p-4">
           <div>
-            <p className="text-[10px] font-bold tracking-[0.16em] text-amber-400">CURATED ARCHIVE · ONE OF ONE</p>
-            <h1 className="mt-16 max-w-2xl text-balance text-[clamp(2rem,5vw,3.5rem)] font-black leading-[1.02] tracking-[-.07em]">시간을 다시 입는 <span className="text-zinc-400">선택.</span></h1>
-            <p className="mt-6 max-w-xl text-sm leading-6 text-zinc-400">엄선된 단 1점의 아카이브 빈티지. 매일 밤 실시간 경매와 14일 무료 보관으로 만나는 새로운 쇼핑 경험.</p>
+            <p className="inline-flex rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[10px] font-bold tracking-[0.16em] text-amber-700">CURATED ARCHIVE · ONE OF ONE</p>
+            <h1 className="mt-10 max-w-2xl text-balance text-[clamp(2rem,5vw,3.5rem)] font-black leading-[1.02] tracking-[-.07em]">시간을 다시 입는 <span className="text-muted">선택.</span></h1>
+            <p className="mt-6 max-w-xl text-sm leading-6 text-muted">엄선된 단 1점의 아카이브 빈티지. 매일 밤 실시간 경매와 14일 무료 보관으로 만나는 새로운 쇼핑 경험.</p>
           </div>
           <div className="mt-14 flex flex-wrap gap-3">
             <Link className="flex min-h-12 items-center gap-2 rounded-xl bg-amber-500 px-5 text-xs font-black text-zinc-950 transition-all duration-200 hover:-translate-y-0.5 hover:bg-amber-400 focus-visible:ring-2 focus-visible:ring-amber-300 active:scale-[.98]" href="/feed" prefetch={false}><Radio size={15} /> 오늘의 실시간 경매 참여하기</Link>
-            <Link className="flex min-h-12 items-center gap-2 rounded-xl border border-zinc-700 px-5 text-xs font-black transition-all duration-200 hover:border-white hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white active:scale-[.98]" href="/shop" prefetch={false}><Sparkles size={15} /> 즉시 구매 컬렉션</Link>
+            <Link className="flex min-h-12 items-center gap-2 rounded-xl border border-line px-5 text-xs font-black transition-all duration-200 hover:border-ink hover:bg-surface focus-visible:ring-2 focus-visible:ring-ink active:scale-[.98]" href="/shop" prefetch={false}><Sparkles size={15} /> 즉시 구매 컬렉션</Link>
           </div>
         </div>
-        <HomeFeaturedAuction products={featuredAuctions} />
+        {config.homeSections.featuredAuction ? <HomeFeaturedAuction banners={config.banners} products={featuredAuctions} /> : null}
       </section>
 
       <section aria-label="나인티 나인 이용 특징" className="grid grid-cols-3 gap-4">
@@ -76,9 +81,9 @@ function DesktopHome({ auctions, featuredAuctions, fixed, storeMalls }: HomePres
 
       {LIVE_AUCTION_ENABLED && <ProductRail eyebrow="실시간 경매" title="오늘 밤의 경매" products={auctions} />}
 
-      <section><HomeCategoryFilters /><ProductRail eyebrow="즉시 구매" title="바로 구매 가능한 단 1점" products={fixed} href="/shop" /></section>
+      {config.homeSections.archiveShop ? <section><HomeCategoryFilters /><ProductRail eyebrow="즉시 구매" title="바로 구매 가능한 단 1점" products={fixed} href="/shop" /></section> : null}
 
-      <StoreMallGrid cards={storeMalls} />
+      {config.homeSections.centerMall ? <StoreMallGrid cards={storeMalls} /> : null}
 
       <section className="grid grid-cols-2 items-start gap-10 border-t border-ink pt-12">
         <div><p className="text-[10px] font-bold tracking-[0.14em] text-muted">나인티 나인 안내</p><h2 className="mt-4 max-w-2xl text-4xl font-black leading-none tracking-[-.08em]">좋은 빈티지는<br />보관하는 시간까지 포함합니다.</h2></div>
@@ -90,7 +95,7 @@ function DesktopHome({ auctions, featuredAuctions, fixed, storeMalls }: HomePres
 }
 
 export default async function HomePage() {
-  const { auctions, fixed, catalogUnavailable, storeMalls } = await loadHomeData();
+  const { auctions, config, fixed, catalogUnavailable, storeMalls } = await loadHomeData();
   const featuredAuctions = shuffleFeaturedAuctionCandidates(
     selectFeaturedAuctionCandidates(auctions),
   ).map((product) => ({
@@ -104,7 +109,7 @@ export default async function HomePage() {
   return (
     <div>
       {catalogUnavailable && <StatusNotice className="mb-6 px-5 py-4 leading-5" variant="warning">상품 정보를 일시적으로 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</StatusNotice>}
-      <DesktopHome auctions={auctions.slice(0, 6)} featuredAuctions={featuredAuctions} fixed={fixed} storeMalls={storeMalls} />
+      <DesktopHome auctions={auctions.slice(0, 6)} config={config ?? DEFAULT_PLATFORM_CONFIG} featuredAuctions={featuredAuctions} fixed={fixed} storeMalls={storeMalls} />
       <LoginReturnScrollRestorer />
     </div>
   );

@@ -136,15 +136,16 @@ export function AdminWorkspaceShell({
 
   return (
     <div
-      className={`grid min-w-0 gap-6 transition-[grid-template-columns] duration-200 md:grid-cols-[64px_minmax(0,1fr)] lg:gap-8 ${darkMode ? (collapsed ? "lg:grid-cols-[64px_minmax(0,1fr)]" : "lg:grid-cols-[256px_minmax(0,1fr)]") : "lg:grid-cols-[248px_minmax(0,1fr)]"}`}
+      className={`grid min-w-0 gap-6 transition-[grid-template-columns] duration-200 sm:grid-cols-[160px_minmax(0,1fr)] sm:gap-5 md:grid-cols-[256px_minmax(0,1fr)] md:gap-0 lg:gap-0 ${darkMode ? (collapsed ? "lg:grid-cols-[64px_minmax(0,1fr)]" : "lg:grid-cols-[256px_minmax(0,1fr)]") : "lg:grid-cols-[256px_minmax(0,1fr)]"}`}
+      data-admin-workspace={operatorMode ? "operator" : workspaceMode}
     >
-      <aside className="h-fit min-w-0 md:sticky md:top-6 md:self-start">
+      <aside className="h-fit min-w-0 sm:sticky sm:top-6 sm:self-start md:w-64 md:shrink-0 md:border-r md:border-line/40 md:pr-4">
         <div
           className={`${darkMode ? "rounded-2xl border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl shadow-zinc-950/20" : "border-line bg-surface"} border p-4 sm:p-5 md:p-3 ${collapsed ? "lg:p-3" : "lg:p-5"}`}
         >
           <div className="flex items-start justify-between gap-3">
             <div
-              className={`${collapsed ? "lg:hidden" : "lg:block"} md:hidden`}
+              className={collapsed ? "lg:hidden" : "lg:block"}
             >
               <p
                 className={`eyebrow ${darkMode ? "text-zinc-500" : "text-muted"}`}
@@ -163,7 +164,7 @@ export function AdminWorkspaceShell({
             {darkMode && (
               <button
                 aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
-                className="hidden size-11 shrink-0 place-items-center rounded-xl border border-zinc-700 text-zinc-300 transition hover:border-zinc-400 focus-visible:ring-2 focus-visible:ring-amber-500 md:grid"
+                className="hidden size-11 shrink-0 place-items-center rounded-xl border border-zinc-700 text-zinc-300 transition hover:border-zinc-400 focus-visible:ring-2 focus-visible:ring-amber-500 lg:grid"
                 onClick={handleToggleSidebar}
                 title="Cmd+B"
                 type="button"
@@ -174,7 +175,7 @@ export function AdminWorkspaceShell({
           </div>
           {utility && (
             <div
-              className={`mt-4 border-t pt-4 ${darkMode ? "border-zinc-800" : "border-line"} md:hidden ${collapsed ? "lg:hidden" : "lg:block"}`}
+              className={`mt-4 border-t pt-4 ${darkMode ? "border-zinc-800" : "border-line"} sm:hidden ${collapsed ? "lg:hidden" : "lg:block"}`}
             >
               {utility}
             </div>
@@ -182,12 +183,12 @@ export function AdminWorkspaceShell({
         </div>
         <nav
           aria-label={`${title} 주요 메뉴`}
-          className={`${darkMode ? "rounded-2xl border border-zinc-800 bg-zinc-950 p-2" : ""} mt-3 flex max-w-full gap-2 overflow-x-auto pb-1 [scrollbar-width:none] md:grid md:gap-3 md:overflow-visible`}
+          className={`${darkMode ? "rounded-2xl border border-zinc-800 bg-zinc-950 p-2" : ""} mt-3 flex max-w-full gap-2 overflow-x-auto pb-1 [scrollbar-width:none] sm:grid sm:gap-2 sm:overflow-visible`}
         >
           {Object.entries(groups).map(([group, items]) => (
             <div key={group}>
               <p
-                className={`mb-1 px-3 pt-2 text-[10px] font-black tracking-[.14em] ${darkMode ? "text-zinc-500" : "text-muted"} md:hidden ${collapsed ? "lg:hidden" : "lg:block"}`}
+                className={`mb-1 px-3 pt-2 text-[10px] font-black tracking-[.14em] ${darkMode ? "text-zinc-500" : "text-muted"} ${collapsed ? "lg:hidden" : "lg:block"}`}
               >
                 {group}
               </p>
@@ -201,13 +202,13 @@ export function AdminWorkspaceShell({
                     <Link
                       aria-current={active ? "page" : undefined}
                       aria-label={item.label}
-                      className={`group block min-w-[145px] rounded-xl border px-3 py-3 transition-colors md:grid md:min-h-11 md:min-w-0 md:place-items-center md:px-0 md:py-0 ${collapsed ? "" : "lg:block lg:px-3 lg:py-3"} ${darkMode ? (active ? "border-amber-500/50 bg-zinc-800 text-zinc-50" : "border-transparent text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100") : active ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink"}`}
+                      className={`group block min-w-[145px] rounded-xl border px-3 py-3 transition-colors sm:min-h-11 sm:min-w-0 ${collapsed ? "lg:grid lg:place-items-center lg:px-0 lg:py-0" : "lg:block lg:px-3 lg:py-3"} ${darkMode ? (active ? "border-amber-500/50 bg-zinc-800 text-zinc-50" : "border-transparent text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100") : active ? "border-ink bg-ink text-paper" : "border-line bg-paper text-ink hover:border-ink"}`}
                       href={item.href}
                       key={item.href}
                       title={collapsed ? item.label : undefined}
                     >
                       <span
-                        className={`flex items-center gap-2 md:justify-center ${collapsed ? "" : "lg:justify-start"}`}
+                        className={`flex items-center gap-2 ${collapsed ? "lg:justify-center" : "lg:justify-start"}`}
                       >
                         {Icon && (
                           <Icon
@@ -219,12 +220,12 @@ export function AdminWorkspaceShell({
                           />
                         )}
                         <span
-                          className={`truncate text-sm font-black md:hidden ${collapsed ? "lg:hidden" : "lg:block"}`}
+                          className={`truncate text-xs font-black ${collapsed ? "lg:hidden" : "lg:block"}`}
                         >
                           {item.label}
                         </span>
                         <span
-                          className={`md:hidden ${collapsed ? "lg:hidden" : "lg:inline"}`}
+                          className={collapsed ? "lg:hidden" : "lg:inline"}
                         >
                           {item.badge}
                         </span>
@@ -245,7 +246,7 @@ export function AdminWorkspaceShell({
         </nav>
         <Link
           aria-label="구매자 MY로 이동"
-          className={`mt-3 hidden min-h-11 items-center justify-center rounded-xl border text-xs font-bold md:flex ${collapsed ? "px-0" : "lg:px-4"} ${darkMode ? "border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-100" : "border-line bg-paper"}`}
+          className={`mt-3 hidden min-h-11 items-center justify-center rounded-xl border text-xs font-bold sm:flex ${collapsed ? "px-0" : "lg:px-4"} ${darkMode ? "border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-100" : "border-line bg-paper"}`}
           href="/my"
           title={collapsed ? "구매자 MY로 이동" : undefined}
         >
@@ -255,7 +256,7 @@ export function AdminWorkspaceShell({
           )}
         </Link>
       </aside>
-      <section className="min-w-0 self-start" data-admin-workspace-content>
+      <section className="min-w-0 self-start pb-24 md:p-6 md:pb-8" data-admin-workspace-content>
         {contextBar}
         {contentHeader}
         {children}

@@ -23,6 +23,7 @@ function toItem(product: PublishedProduct) {
     description: product.description,
     gender: product.gender,
     conditionGrade: product.conditionGrade,
+    measurements: product.measurements,
     imageUrl: getCatalogImageUrl(
       product.thumbnailUrls[0] ?? product.imageUrls[0] ?? "",
     ),
@@ -66,7 +67,9 @@ export function ProductRail({
     ? surface === "desktop"
       ? "grid grid-cols-3 gap-2"
       : "grid grid-cols-1 gap-2"
-    : "grid grid-cols-2 gap-x-3 gap-y-9 md:grid-cols-3 md:gap-x-4 lg:grid-cols-4 lg:gap-x-5 xl:grid-cols-5";
+    : surface === "desktop"
+      ? "grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+      : "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4";
   return (
     <section className={surface === "desktop" ? "mt-20" : "mt-12"}>
       <SectionHeading

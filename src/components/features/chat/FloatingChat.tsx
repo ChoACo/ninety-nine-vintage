@@ -28,6 +28,17 @@ export function FloatingChat({ basePath = "" }: { basePath?: "" | "/m" }) {
   }, []);
   const available = useMemo(() => now ? isBusinessHours(now) : true, [now]);
   if (/^\/(?:m\/)?(?:chat|admin)(?:\/|$)/u.test(pathname)) return null;
+  const aboveMobileActionBar =
+    basePath === "/m" &&
+    /^\/m\/(?:cart|checkout|(?:shop|auction|live)\/[0-9a-f-]{36})(?:\/|$)/iu.test(
+      pathname,
+    );
+  const mobilePanelPosition = aboveMobileActionBar
+    ? "bottom-[calc(15.5rem+env(safe-area-inset-bottom,16px))]"
+    : "bottom-[calc(10.5rem+env(safe-area-inset-bottom,16px))]";
+  const mobileButtonPosition = aboveMobileActionBar
+    ? "bottom-[calc(11.5rem+env(safe-area-inset-bottom,16px))]"
+    : "bottom-[calc(6.5rem+env(safe-area-inset-bottom,16px))]";
   const chatParams = new URLSearchParams();
   const centerMatch = pathname.match(/^\/(?:m\/)?centers\/([^/?#]+)/u);
   const productMatch = pathname.match(/^\/(?:m\/)?(?:shop|auction|live)\/([0-9a-f-]{36})(?:\/|$)/iu);
@@ -37,7 +48,7 @@ export function FloatingChat({ basePath = "" }: { basePath?: "" | "/m" }) {
   const chatHref = `${basePath}/chat${chatParams.size > 0 ? `?${chatParams.toString()}` : ""}`;
   return <>
     <AnimatePresence>
-      {open && <motion.aside animate={{ opacity: 1, scale: 1, y: 0 }} aria-label="실시간 상담" className="fixed bottom-36 right-4 z-[120] w-[min(23rem,calc(100vw-2rem))] origin-bottom-right overflow-hidden rounded-3xl border border-line bg-paper text-ink shadow-2xl sm:bottom-24 sm:right-6" exit={{ opacity: 0, scale: 0.94, y: 12 }} initial={{ opacity: 0, scale: 0.94, y: 12 }} transition={{ duration: 0.22, ease: "easeOut" }}>
+      {open && <motion.aside animate={{ opacity: 1, scale: 1, y: 0 }} aria-label="실시간 상담" className={`fixed right-4 z-40 w-[min(23rem,calc(100vw-2rem))] origin-bottom-right overflow-hidden rounded-3xl border border-line bg-paper text-ink shadow-2xl sm:bottom-40 sm:right-6 lg:bottom-24 lg:right-8 ${mobilePanelPosition}`} exit={{ opacity: 0, scale: 0.94, y: 12 }} initial={{ opacity: 0, scale: 0.94, y: 12 }} transition={{ duration: 0.22, ease: "easeOut" }}>
         <header className="flex items-start justify-between bg-ink p-5 text-paper"><div><p className="text-[10px] font-bold tracking-[0.14em] opacity-60">NINETY-NINE SUPPORT</p><h2 className="mt-2 text-lg font-black">무엇을 도와드릴까요?</h2></div><button aria-label="상담창 닫기" className="grid size-9 place-items-center rounded-xl hover:bg-white/10" onClick={() => setOpen(false)} type="button"><X size={18} /></button></header>
         <div className="p-5">
           <p className={`flex items-center gap-2 rounded-2xl border px-3 py-3 text-xs font-bold ${available ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-500/10 text-amber-900"}`}><Clock3 size={14} />{available ? "상담 운영 중 · 평일 10:00–18:00" : "운영 시간 외 접수 중 (순차 답변)"}</p>
@@ -49,6 +60,6 @@ export function FloatingChat({ basePath = "" }: { basePath?: "" | "/m" }) {
         </div>
       </motion.aside>}
     </AnimatePresence>
-    <motion.button animate={{ rotate: open ? 90 : 0, scale: open ? 0.96 : 1 }} aria-expanded={open} aria-haspopup="dialog" aria-label={open ? "실시간 상담 닫기" : "실시간 상담 열기"} className="fixed bottom-20 right-4 z-[121] grid size-14 place-items-center rounded-full bg-ink text-paper shadow-xl shadow-black/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 sm:bottom-6 sm:right-6" onClick={() => setOpen((current) => !current)} transition={{ duration: 0.22, ease: "easeOut" }} type="button">{open ? <X size={21} /> : <MessageCircle size={22} />}</motion.button>
+    <motion.button animate={{ rotate: open ? 90 : 0, scale: open ? 0.96 : 1 }} aria-expanded={open} aria-haspopup="dialog" aria-label={open ? "실시간 상담 닫기" : "실시간 상담 열기"} className={`fixed right-4 z-40 flex size-12 items-center justify-center rounded-full bg-ink text-paper shadow-xl shadow-black/25 transition-transform hover:-translate-y-1 hover:shadow-2xl active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 sm:bottom-24 sm:right-6 lg:bottom-8 lg:right-8 ${mobileButtonPosition}`} onClick={() => setOpen((current) => !current)} transition={{ duration: 0.22, ease: "easeOut" }} type="button">{open ? <X size={20} /> : <MessageCircle size={21} />}</motion.button>
   </>;
 }

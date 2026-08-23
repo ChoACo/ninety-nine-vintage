@@ -41,6 +41,7 @@ import {
   rememberFixedPurchaseIntent,
   type FixedPurchaseIntent,
 } from "@/lib/commerce/purchaseIntent";
+import { formatConditionGrade } from "@/lib/catalog/conditions";
 
 interface StickyBidPanelProps {
   basePath?: "" | "/m";
@@ -563,6 +564,17 @@ export function StickyBidPanel({
                     : participationState === "outbid"
                       ? "재입찰하기"
                       : "라이브 옥션 입찰하기";
+  const conditionLabel = formatConditionGrade(item.conditionGrade);
+  const guestCanSignInToBid = canBid && bidCapability === "guest";
+  const bidLoginHref = `${basePath}/account/login?next=${encodeURIComponent(`${basePath}/auction/${item.id}/bid`)}`;
+
+  const explainUnavailableBid = () => {
+    if (!guestCanSignInToBid) return;
+    pushToast("error", "로그인 후 입찰에 참여하실 수 있습니다.", {
+      action: { href: bidLoginHref, label: "카카오 로그인" },
+      durationMs: 8_000,
+    });
+  };
 
   useEffect(() => {
     if (item.saleType !== "auction") return;
@@ -582,7 +594,7 @@ export function StickyBidPanel({
 
   return (
     <aside
-      className={`${surface === "desktop" ? "p-6 pb-6" : "p-5 pb-32 md:pb-6"} ${compact ? "md:top-6" : "md:top-[100px]"} z-10 h-fit self-start rounded-3xl border border-border bg-card text-card-foreground shadow-xl shadow-black/5 md:sticky md:col-span-5`}
+      className={`${surface === "desktop" ? "p-6 pb-6" : "p-5 pb-32 sm:pb-6"} ${compact ? "sm:top-6" : "sm:top-20 md:top-24"} z-10 h-fit self-start space-y-6 rounded-3xl border border-border bg-card text-card-foreground shadow-xl shadow-black/5 sm:sticky sm:col-span-6 md:col-span-5 lg:col-auto`}
       data-bid-panel="sticky"
     >
       <div className="border-b border-border py-6">
@@ -592,7 +604,7 @@ export function StickyBidPanel({
         <h1 className="text-3xl font-black leading-snug tracking-tight text-foreground [text-wrap:balance]">
           {item.name}
         </h1>
-        <dl className="mt-5 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 text-[11px] md:grid-cols-3">
+        <dl className={`mt-5 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 text-[11px] ${conditionLabel ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
           <div className="bg-card px-3 py-3">
             <dt className="text-zinc-500">카테고리</dt>
             <dd className="mt-1 truncate font-bold">
@@ -605,12 +617,12 @@ export function StickyBidPanel({
               {item.size || "표기 없음"}
             </dd>
           </div>
-          <div className="bg-card px-3 py-3">
+          {conditionLabel && <div className="bg-card px-3 py-3">
             <dt className="text-zinc-500">상태</dt>
-            <dd className="mt-1 truncate font-bold">
-              {item.conditionGrade || "미입력"}
+            <dd className="mt-1 truncate font-bold" title={conditionLabel}>
+              {conditionLabel}
             </dd>
-          </div>
+          </div>}
         </dl>
         <p className="mt-5 whitespace-pre-line text-xs leading-relaxed text-zinc-600">
           {item.description || "상세 사진과 컨디션 리포트를 확인해 주세요."}
@@ -737,8 +749,9 @@ export function StickyBidPanel({
             ) : (
               <button
                 aria-describedby="auction-settlement-summary"
-                className={`${surface === "mobile" ? "mobile-detail-cta" : ""} mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-300 text-sm font-bold text-white`}
-                disabled
+                className={`${surface === "mobile" ? "mobile-detail-cta" : ""} mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-sm font-bold text-white ${guestCanSignInToBid ? "bg-zinc-950 shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:bg-zinc-800 hover:shadow-xl active:scale-95" : "cursor-not-allowed bg-zinc-300"}`}
+                disabled={!guestCanSignInToBid}
+                onClick={explainUnavailableBid}
                 type="button"
               >
                 <LockKeyhole size={15} /> {bidButtonLabel}
@@ -774,23 +787,32 @@ export function StickyBidPanel({
         )
       ) : (
         <>
-          <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs leading-5 text-foreground">
+          <div className="mt-6 break-keep rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs leading-5 text-foreground sm:p-4">
             <strong className="block">14일 무료 보관함</strong>
-            <span className="mt-1 block text-muted-foreground">
+            <span className="mt-1 block break-keep text-muted-foreground">
               결제 후 같은 센터 상품과 묶음 배송을 신청할 수 있습니다. 단 1점
               고유 재고 상품입니다.
             </span>
           </div>
           <div
-            className={`${surface === "mobile" ? "mobile-detail-cta" : ""} mt-4 grid grid-cols-2 gap-2`}
+            className={`${surface === "mobile" ? "mobile-detail-cta" : ""} mt-4 grid grid-cols-[44px_minmax(0,1fr)_minmax(0,1fr)] gap-2`}
           >
+            <button
+              aria-label={liked ? "찜 해제" : "찜하기"}
+              aria-pressed={liked}
+              className="flex h-14 min-w-11 items-center justify-center rounded-2xl border border-zinc-950 text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95"
+              onClick={() => void updateWishlist()}
+              type="button"
+            >
+              <Heart fill={liked ? "currentColor" : "none"} size={18} />
+            </button>
             <button
               className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-zinc-950 text-sm font-bold text-zinc-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 disabled:opacity-50"
               disabled={buying}
               onClick={() => void addFixedToCart()}
               type="button"
             >
-              <ShoppingBag size={15} /> 장바구니 담기
+              <ShoppingBag size={15} /> <span className="truncate">장바구니 담기</span>
             </button>
             <button
               className="flex h-14 items-center justify-center rounded-2xl bg-zinc-950 text-sm font-bold text-white shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-95 disabled:opacity-50"

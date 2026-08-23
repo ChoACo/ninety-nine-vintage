@@ -121,6 +121,13 @@ function storageUrgencyClass(daysLeft: number | null): string {
   return "bg-surface text-muted";
 }
 
+function storageProgress(item: StorageItem): number {
+  const duration = storageDurationDays(item);
+  const left = storageDaysLeft(item);
+  if (left === null) return 0;
+  return Math.min(100, Math.max(0, ((duration - left) / duration) * 100));
+}
+
 function storageExpiryMatches(filter: StorageExpiryFilter, daysLeft: number | null): boolean {
   switch (filter) {
     case "all":
@@ -181,6 +188,10 @@ function OperationItemCard({
                   {storageDaysLabel(storageDaysLeft(storageItem))}
                 </span>
               )}
+            </div>
+            <div className="mt-2" aria-label={`보관 기간 ${storageDurationDays(storageItem)}일 중 ${Math.max(0, storageDaysLeft(storageItem) ?? storageDurationDays(storageItem))}일 남음`} role="progressbar" aria-valuemax={100} aria-valuemin={0} aria-valuenow={Math.round(storageProgress(storageItem))}>
+              <div className="h-1.5 overflow-hidden rounded-full bg-zinc-200"><div className={`h-full rounded-full ${Number(storageDaysLeft(storageItem)) <= 2 ? "bg-red-600" : Number(storageDaysLeft(storageItem)) <= 7 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${storageProgress(storageItem)}%` }} /></div>
+              <p className="mt-1 text-[9px] font-bold text-muted">남은 보관 기간 {storageDaysLabel(storageDaysLeft(storageItem)) || "확인 중"} / {storageDurationDays(storageItem)}일</p>
             </div>
             <p className="mt-1 text-[10px] text-muted">
               보관 {formatAt(storageItem.storageStartedAt)}<br />
@@ -403,7 +414,7 @@ export function OperatorMemberOperationsConsole({
   }, [selectedGroup, view]);
 
   return (
-    <div className="space-y-8">
+    <div className="w-full max-w-full space-y-8 overflow-hidden break-keep pb-24">
       <SectionHeading
         action={(
           <button

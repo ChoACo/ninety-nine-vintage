@@ -14,7 +14,7 @@ export function ShopCatalogSkeleton() {
           <Pulse className="h-11 w-24" key={i} />
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4">
         {Array.from({ length: 8 }, (_, i) => (
           <div className="space-y-3" key={i}>
             <Pulse className="aspect-[3/4]" />

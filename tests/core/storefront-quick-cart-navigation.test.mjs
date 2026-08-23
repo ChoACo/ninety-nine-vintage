@@ -35,7 +35,8 @@ test("storefront cart, route highlighting, and shipping totals update in client 
   assert.match(cart, /productTotal \+ selectedShippingFee/);
   assert.match(
     cart,
-    /includeShippingFee[\s\S]*shippingFee[\s\S]*vaultShippingFee/,
+    /deriveCartPricing\([\s\S]*includeShippingFee \? "ship" : "vault"/,
   );
+  assert.match(cart, /activeShippingCharges/);
   assert.match(cart, /transition-all duration-200/);
 });

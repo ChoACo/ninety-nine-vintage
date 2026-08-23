@@ -205,9 +205,9 @@ test("zoom and fallback images keep fixed desktop sizing, responsive mobile sizi
   assert.match(itemGallery, /\(max-width: 767px\) calc\(100vw - 2rem\)/);
   assert.match(itemGallery, /56\.5rem/);
   assert.match(itemGallery, /44rem/);
-  assert.match(itemGallery, /surface === "desktop"[\s\S]*?compact \? "650px" : "680px"/);
+  assert.match(itemGallery, /surface === "desktop"[\s\S]*?compact \? "650px" : "812px"/);
   assert.match(itemGallery, /surface === "desktop"[\s\S]*?compact \? "156px" : "164px"/);
-  assert.match(itemGallery, /maxDimension=\{1280\} sizes=\{imageSizes\}/);
+  assert.match(itemGallery, /maxDimension=\{surface === "desktop" \? 1600 : 1280\} sizes=\{imageSizes\}/);
   assert.match(itemGallery, /maxDimension=\{480\} sizes=\{thumbnailSizes\}/);
   assert.doesNotMatch(itemGallery, /sizes="58vw"/);
 });

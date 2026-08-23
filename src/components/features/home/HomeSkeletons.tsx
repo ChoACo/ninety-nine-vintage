@@ -6,7 +6,7 @@ function Pulse({ className }: { className: string }) {
 export function HeroSkeleton() {
   return (
     <div
-      className="grid min-h-[560px] gap-px overflow-hidden rounded-3xl bg-zinc-800 md:grid-cols-2"
+      className="grid min-h-[560px] gap-px overflow-hidden rounded-3xl bg-zinc-800 sm:grid-cols-2"
       role="status"
       aria-label="홈 배너 불러오는 중"
     >
@@ -31,7 +31,7 @@ export function AuctionCardSkeleton() {
 export function ProductGridSkeleton() {
   return (
     <div
-      className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4 lg:gap-5 xl:grid-cols-5"
+      className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 md:gap-6 lg:grid-cols-4"
       role="status"
       aria-label="상품 목록 불러오는 중"
     >

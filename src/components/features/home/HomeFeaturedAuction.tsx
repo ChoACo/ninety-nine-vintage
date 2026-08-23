@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 
 import { CatalogImage } from "@/components/ui/CatalogImage";
+import type { PlatformBanner } from "@/lib/platform/config";
 
 export interface HomeFeaturedAuctionItem {
   brand: string;
@@ -36,41 +37,57 @@ const fallbackBanners = {
 
 export function HomeFeaturedAuction({
   basePath = "",
+  banners = [],
   products,
   surface = "desktop",
 }: {
   basePath?: "" | "/m";
+  banners?: PlatformBanner[];
   products: HomeFeaturedAuctionItem[];
   surface?: "desktop" | "mobile";
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const mobile = surface === "mobile";
   const fallbackBanner = fallbackBanners[mobile ? "mobile" : "desktop"];
+  const activeBanners = banners.filter((banner) => banner.enabled && banner.imageUrl);
+  const rotationCount = activeBanners.length || products.length;
+  const showcaseClass = mobile
+    ? "aspect-[4/5] min-h-[480px] w-full sm:aspect-[4/3] sm:min-h-0 sm:w-1/2 lg:w-[55%]"
+    : "aspect-[4/3] w-full sm:w-1/2 lg:aspect-auto lg:min-h-[560px] lg:w-[55%]";
 
   useEffect(() => {
-    if (products.length < 2) return;
+    if (rotationCount < 2) return;
     const interval = window.setInterval(() => {
       setActiveIndex((current) => {
-        const nextOffset = Math.floor(Math.random() * (products.length - 1))
+        const nextOffset = Math.floor(Math.random() * (rotationCount - 1))
           + 1;
-        return (current + nextOffset) % products.length;
+        return (current + nextOffset) % rotationCount;
       });
     }, 5_000);
     return () => window.clearInterval(interval);
-  }, [products.length]);
+  }, [rotationCount]);
+
+  if (activeBanners.length > 0) {
+    return (
+      <div aria-label="운영 배너" className={`tablet-hero-showcase relative shrink-0 overflow-hidden rounded-2xl bg-black ${showcaseClass}`} role="region">
+        {activeBanners.map((banner, index) => {
+          const active = index === activeIndex;
+          return <Link aria-hidden={!active} className={`absolute inset-0 transition-opacity duration-700 ${active ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`} href={`${basePath}/feed`} key={banner.id} tabIndex={active ? 0 : -1}><CatalogImage alt={active ? banner.title : ""} className="tablet-hero-media size-full object-cover transition-transform duration-700 ease-out" fetchPriority={active ? "high" : "auto"} loading={active ? "eager" : "lazy"} priority={active} sizes={mobile ? "100vw" : "570px"} src={banner.imageUrl} /><span className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent" /><span className="absolute inset-x-0 bottom-0 p-6 text-sm font-black text-white sm:p-8">{banner.title}</span></Link>;
+        })}
+      </div>
+    );
+  }
 
   if (products.length === 0) {
     return (
       <Link
-        className={`group relative overflow-hidden bg-black ${
-          mobile ? "block aspect-[4/5] min-h-[480px]" : "min-h-[560px]"
-        }`}
+        className={`tablet-hero-showcase group relative block shrink-0 overflow-hidden rounded-2xl bg-black ${showcaseClass}`}
         href={`${basePath}/feed`}
         prefetch={false}
       >
         <Image
           alt="나인티 나인 빈티지 배너"
-          className="h-full w-full object-contain object-center"
+          className="tablet-hero-media h-full w-full object-contain object-center transition-transform duration-700 ease-out"
           blurDataURL="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI1MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjMDkwOTBiIi8+PC9zdmc+"
           fetchPriority="high"
           height={fallbackBanner.height}
@@ -110,9 +127,7 @@ export function HomeFeaturedAuction({
   return (
     <div
       aria-label="오늘의 대표 실시간 경매"
-      className={`relative overflow-hidden bg-black ${
-        mobile ? "aspect-[4/5] min-h-[480px]" : "min-h-[560px]"
-      }`}
+      className={`tablet-hero-showcase relative shrink-0 overflow-hidden rounded-2xl bg-black ${showcaseClass}`}
       role="region"
     >
       {products.map((product, index) => {
@@ -127,7 +142,7 @@ export function HomeFeaturedAuction({
           >
             <CatalogImage
               alt={active ? `${product.title} 대표 이미지` : ""}
-              className="h-full w-full object-cover object-center"
+              className="tablet-hero-media h-full w-full object-cover object-center transition-transform duration-700 ease-out"
               fetchPriority={active ? "high" : "auto"}
               loading={active ? "eager" : "lazy"}
               maxDimension={1600}

@@ -62,3 +62,9 @@ test("desktop global search supports slash without stealing editable input keys"
   assert.match(header, /aria-keyshortcuts="\/ Meta\+K Control\+K"/);
   assert.match(header, /<kbd[\s\S]*>\[\/\]<\/kbd>/);
 });
+
+test("desktop header keeps authenticated controls inside split-screen widths", async () => {
+  const header = await source("src/components/layout/PcHeader.tsx");
+  assert.match(header, /<span className="hidden min-\[1100px\]:inline">\{item\.label\}<\/span>/);
+  assert.match(header, /min-\[900px\]:flex/);
+});

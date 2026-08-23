@@ -45,7 +45,7 @@ test("desktop remains a compact PC surface at split-screen width", async () => {
   assert.doesNotMatch(rootLayout, /<body className="[^"]*overflow-x-hidden/);
   assert.match(globalCss, /html \{[\s\S]*?overflow-x: auto/);
   assert.match(globalCss, /body \{[\s\S]*?overflow-x: visible/);
-  assert.match(header, /min-\[900px\]:inline/);
+  assert.match(header, /min-\[1100px\]:inline/);
   assert.match(header, /min-\[900px\]:flex lg:w-36 xl:w-44/);
   assert.doesNotMatch(header, /MobileSiteHeader|hamburger/i);
 

@@ -4,6 +4,7 @@ import test from "node:test";
 
 const migration = await readFile(new URL("../../supabase/migrations/20260817164334_create_staff_notice_communication_board.sql", import.meta.url), "utf8");
 const guideMigration = await readFile(new URL("../../supabase/migrations/20260824112459_replace_operator_product_registration_guides.sql", import.meta.url), "utf8");
+const buyerGuideMigration = await readFile(new URL("../../supabase/migrations/20260824115918_add_buyer_purchase_guides.sql", import.meta.url), "utf8");
 const api = await readFile(new URL("../../src/app/api/admin/staff-board/route.ts", import.meta.url), "utf8");
 const board = await readFile(new URL("../../src/components/admin/StaffBoard.tsx", import.meta.url), "utf8");
 const operatorLayout = await readFile(new URL("../../src/app/(admin)/admin/operator/layout.tsx", import.meta.url), "utf8");
@@ -31,4 +32,13 @@ test("the old guide is replaced by separate mobile and PC product guides", () =>
   assert.match(guideMigration, /product-registration-pc/);
   assert.match(board, /guideCaptions/);
   assert.match(board, /caption = guideCaptions\[path\]/);
+});
+
+test("buyer auction and archive guides include ordered screenshots and red callouts", () => {
+  assert.match(buyerGuideMigration, /\[구매자 필독\] 라이브 옥션 입찰·결제·보관·배송 방법/);
+  assert.match(buyerGuideMigration, /\[구매자 필독\] 아카이브숍 장바구니·결제·배송 방법/);
+  assert.match(buyerGuideMigration, /guides\/buyer\/live-auction\/11-shipping-request-success\.png/);
+  assert.match(buyerGuideMigration, /guides\/buyer\/archive-cart\/06-order-paid-shipping\.png/);
+  assert.match(board, /path\.startsWith\("\/guides\/buyer\/"\)/);
+  assert.match(board, /border-4 border-red-500/);
 });

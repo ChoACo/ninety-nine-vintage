@@ -5,6 +5,7 @@ import test from "node:test";
 const migration = await readFile(new URL("../../supabase/migrations/20260817164334_create_staff_notice_communication_board.sql", import.meta.url), "utf8");
 const guideMigration = await readFile(new URL("../../supabase/migrations/20260824112459_replace_operator_product_registration_guides.sql", import.meta.url), "utf8");
 const buyerGuideMigration = await readFile(new URL("../../supabase/migrations/20260824115918_add_buyer_purchase_guides.sql", import.meta.url), "utf8");
+const buyerGuideDisclaimerMigration = await readFile(new URL("../../supabase/migrations/20260824121243_clarify_buyer_guide_test_data.sql", import.meta.url), "utf8");
 const api = await readFile(new URL("../../src/app/api/admin/staff-board/route.ts", import.meta.url), "utf8");
 const board = await readFile(new URL("../../src/components/admin/StaffBoard.tsx", import.meta.url), "utf8");
 const operatorLayout = await readFile(new URL("../../src/app/(admin)/admin/operator/layout.tsx", import.meta.url), "utf8");
@@ -41,4 +42,6 @@ test("buyer auction and archive guides include ordered screenshots and red callo
   assert.match(buyerGuideMigration, /guides\/buyer\/archive-cart\/06-order-paid-shipping\.png/);
   assert.match(board, /path\.startsWith\("\/guides\/buyer\/"\)/);
   assert.match(board, /border-4 border-red-500/);
+  assert.match(buyerGuideDisclaimerMigration, /개인정보와 실제 결제를 보호하기 위해 로컬 테스트 계정/);
+  assert.match(buyerGuideDisclaimerMigration, /본인 화면에 표시된 상품명, 계좌, 금액, 결제 마감과 배송지/);
 });

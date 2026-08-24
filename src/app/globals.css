@@ -510,7 +510,12 @@ html[data-theme="dark"] .theme-invariant-dark {
   [data-admin-workspace="operator"] [data-admin-workspace-content] {
     width: 100%;
     max-width: 100%;
-    overflow-x: hidden;
+    /* `hidden` turns the visible Y axis into an implicit `auto` scroll
+       container. Combined with overscroll containment, that trapped mobile
+       touch gestures in a full-height section that had nothing to scroll. */
+    overflow-x: clip;
+    overflow-y: visible;
+    overscroll-behavior-y: auto;
   }
 
   [data-admin-workspace="operator"] :is(button, a, [role="button"], [role="tab"]) {

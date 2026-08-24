@@ -26,7 +26,9 @@ test("root pages retain document scrolling while admin workspaces isolate both d
   assert.doesNotMatch(operatorChat, /overflow-y-auto/);
   assert.match(workspace, /md:sticky md:top-0/);
   assert.match(workspace, /independent-scroll no-scrollbar min-h-0 flex-1[\s\S]*overflow-y-auto overscroll-contain/);
-  assert.match(workspace, /independent-scroll no-scrollbar[\s\S]*md:h-full md:min-h-0 md:overflow-y-auto md:overscroll-contain[\s\S]*data-admin-workspace-content/);
+  assert.match(workspace, /className="no-scrollbar min-w-0 self-start pb-24 md:h-full md:min-h-0 md:overflow-y-auto md:overscroll-contain[\s\S]*data-admin-workspace-content/);
+  assert.doesNotMatch(workspace, /className="independent-scroll no-scrollbar min-w-0 self-start/);
+  assert.match(globals, /\[data-admin-workspace="operator"\] \[data-admin-workspace-content\][\s\S]*overflow-x:\s*clip;[\s\S]*overflow-y:\s*visible;[\s\S]*overscroll-behavior-y:\s*auto;/);
 });
 
 test("ticker and GNB share one sticky viewport header on desktop and mobile", () => {

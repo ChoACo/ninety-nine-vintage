@@ -331,7 +331,7 @@ export function AdminWorkspaceShell({
         </aside>
 
         <section
-          className="independent-scroll no-scrollbar min-w-0 self-start pb-24 md:h-full md:min-h-0 md:overflow-y-auto md:overscroll-contain md:p-6 md:pb-8"
+          className="no-scrollbar min-w-0 self-start pb-24 md:h-full md:min-h-0 md:overflow-y-auto md:overscroll-contain md:p-6 md:pb-8"
           data-admin-workspace-content
         >
           {contextBar}

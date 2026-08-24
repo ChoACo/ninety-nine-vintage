@@ -142,7 +142,7 @@ test("premium detail actions use confirmation dialogs only for consequential mut
   assert.match(gallery, /galleryActionsRef\.current/);
   assert.match(gallery, /event\.target\.closest\("button, a, input, select, textarea"\)/);
   assert.match(gallery, /modalLayers\.item\(modalLayers\.length - 1\) !== dialogRef\.current/);
-  assert.match(gallery, /\}, \[rendered\]\);/);
+  assert.match(gallery, /if \(!scrollLockActive\) return;[\s\S]*\}, \[scrollLockActive\]\);/);
   assert.match(gallery, /aria-current=\{visibleIndex === index/);
   assert.match(gallery, /className="grid size-11 shrink-0 place-items-center/);
   assert.match(gallery, /safe-area-inset-left/);
@@ -173,8 +173,9 @@ test("premium detail actions use confirmation dialogs only for consequential mut
 });
 
 test("fixed navigation and operator dialogs share the accessible portaled lifecycle", async () => {
-  const [dialog, mobileHeader, mobileFilters, operatorImport] = await Promise.all([
+  const [dialog, gallery, mobileHeader, mobileFilters, operatorImport] = await Promise.all([
     source("src/components/ui/PremiumDialog.tsx"),
+    source("src/components/features/auction/AuctionGalleryModal.tsx"),
     source("src/components/mobile/MobileSiteHeader.tsx"),
     source("src/components/features/auction/AuctionFilterSidebar.tsx"),
     source("src/components/admin/operator/OperatorXlsxImportModal.tsx"),
@@ -186,10 +187,14 @@ test("fixed navigation and operator dialogs share the accessible portaled lifecy
   assert.match(dialog, /event\.key !== "Tab"/);
   assert.match(dialog, /returnFocusRef\.current\?\.focus\(\)/);
   assert.match(dialog, /lockBodyScroll\(\)/);
+  assert.match(dialog, /const scrollLockActive = open \|\| rendered/);
+  assert.match(dialog, /data-scroll-lock-owner="premium-dialog"/);
   assert.match(dialog, /\(!open && !rendered\)/);
   assert.doesNotMatch(dialog, /if \(!rendered \|\| typeof document/);
   assert.match(dialog, /"drawer-left"/);
   assert.match(dialog, /"sheet-bottom"/);
+  assert.match(gallery, /const scrollLockActive = open \|\| rendered/);
+  assert.match(gallery, /data-scroll-lock-owner="auction-gallery"/);
 
   assert.match(mobileHeader, /<PremiumDialog/);
   assert.match(mobileHeader, /aria-expanded=\{menuOpen\} aria-label="전체 메뉴 열기"/);
@@ -223,8 +228,11 @@ test("route recovery and admin drawers share the reference-counted document lock
   assert.match(recovery, /pageshow/);
   assert.match(recovery, /visibilitychange/);
   assert.match(recovery, /!document\.querySelector\(ACTIVE_OVERLAY_SELECTOR\)/);
+  assert.match(recovery, /\[data-scroll-lock-owner\]/);
+  assert.doesNotMatch(recovery, /ACTIVE_OVERLAY_SELECTOR[\s\S]*aria-modal/);
   assert.match(workspace, /const releaseBodyScroll = lockBodyScroll\(\)/);
   assert.match(workspace, /data-mobile-drawer-open=/);
+  assert.match(workspace, /data-scroll-lock-owner=/);
   assert.doesNotMatch(workspace, /document\.body\.style\.overflow = "hidden"/);
   assert.match(styles, /-webkit-overflow-scrolling:\s*touch/);
 });

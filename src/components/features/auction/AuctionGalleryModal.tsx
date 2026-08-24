@@ -123,6 +123,7 @@ export function AuctionGalleryModal({
   const wheelEndTimerRef = useRef<number | null>(null);
 
   const visibleIndex = clampIndex(activeIndex, images.length);
+  const scrollLockActive = open || rendered;
 
   useEffect(() => {
     naturalSizesRef.current = naturalSizes;
@@ -279,7 +280,7 @@ export function AuctionGalleryModal({
   }, [applyTransform, getBounds, rendered]);
 
   useEffect(() => {
-    if (!rendered) return;
+    if (!scrollLockActive) return;
     returnFocusRef.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -367,7 +368,7 @@ export function AuctionGalleryModal({
       releaseBodyScroll();
       returnFocusRef.current?.focus();
     };
-  }, [rendered]);
+  }, [scrollLockActive]);
 
   useEffect(() => {
     if (!rendered || !viewportRef.current) return;
@@ -621,6 +622,7 @@ export function AuctionGalleryModal({
       aria-modal="true"
       className={`theme-invariant-dark premium-dialog-overlay fixed inset-0 z-[140] flex flex-col overflow-hidden bg-zinc-950 text-white ${surface === "desktop" ? "min-w-[1280px]" : ""}`}
       data-premium-modal-layer="nested"
+      data-scroll-lock-owner="auction-gallery"
       data-state={visible ? "open" : "closed"}
       ref={dialogRef}
       role="dialog"

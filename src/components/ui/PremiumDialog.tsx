@@ -88,8 +88,13 @@ export function PremiumDialog({
     if (!closeDisabledRef.current) onCloseRef.current();
   }, []);
 
+  // The portal mounts as soon as `open` becomes true, while `rendered` only
+  // preserves the exit animation. Waiting for the animation frame can leave a
+  // visible mobile sheet competing with page scroll when frames are throttled.
+  const scrollLockActive = open || rendered;
+
   useEffect(() => {
-    if (!rendered) return;
+    if (!scrollLockActive) return;
     returnFocusRef.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -148,7 +153,7 @@ export function PremiumDialog({
       releaseBodyScroll();
       returnFocusRef.current?.focus();
     };
-  }, [rendered, requestClose]);
+  }, [requestClose, scrollLockActive]);
 
   // Mount immediately when the caller opens the dialog. `rendered` is only
   // needed to keep the portal alive during the short closing animation.
@@ -179,6 +184,7 @@ export function PremiumDialog({
       className={`premium-dialog-overlay fixed inset-0 ${zIndexClassName} ${overlayPlacementClassName} bg-black/60 backdrop-blur-md ${overlayClassName}`.trim()}
       data-premium-modal-layer="nested"
       data-premium-modal-placement={placement}
+      data-scroll-lock-owner="premium-dialog"
       data-state={visible ? "open" : "closed"}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) requestClose();

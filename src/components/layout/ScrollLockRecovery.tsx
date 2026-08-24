@@ -4,11 +4,10 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { recoverBodyScroll } from "@/lib/browser/bodyScrollLock";
 
-const ACTIVE_OVERLAY_SELECTOR = [
-  '[aria-modal="true"]',
-  '[data-premium-modal-layer]',
-  '[data-mobile-drawer-open="true"]',
-].join(",");
+// Only overlays that acquire a lock may suppress recovery. Generic aria-modal
+// elements include legacy dialogs that never lock the page and could otherwise
+// keep an unrelated stale lock stranded after navigation.
+const ACTIVE_OVERLAY_SELECTOR = '[data-scroll-lock-owner]';
 
 export function ScrollLockRecovery() {
   const pathname = usePathname();

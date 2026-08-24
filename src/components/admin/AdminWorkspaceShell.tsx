@@ -194,6 +194,7 @@ export function AdminWorkspaceShell({
           id={`${sidebarMode}-workspace-sidebar`}
           role={mobileOpen ? "dialog" : undefined}
           data-mobile-drawer-open={mobileOpen ? "true" : undefined}
+          data-scroll-lock-owner={mobileOpen ? "admin-drawer" : undefined}
           style={{
             "--workspace-sidebar-offset": mobileOpen ? "0%" : "-100%",
           } as CSSProperties}

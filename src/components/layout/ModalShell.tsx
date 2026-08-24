@@ -87,7 +87,7 @@ export function ModalShell({
       : "max-w-3xl";
 
   return (
-    <div className="premium-dialog-overlay fixed inset-0 z-[110] overflow-x-auto overflow-y-hidden bg-black/60 backdrop-blur-md" data-state={closing ? "closed" : "open"} role="presentation">
+    <div className="premium-dialog-overlay fixed inset-0 z-[110] overflow-x-auto overflow-y-hidden bg-black/60 backdrop-blur-md" data-scroll-lock-owner="route-modal" data-state={closing ? "closed" : "open"} role="presentation">
       <div className="flex min-h-full min-w-[1280px] items-center justify-center p-6" onMouseDown={(event) => event.target === event.currentTarget && close()}>
         <div aria-label={label} aria-modal="true" className={`premium-dialog-surface flex max-h-[calc(100vh-3rem)] min-h-0 w-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-paper text-ink shadow-2xl shadow-black/20 outline-none ${widthClassName}`} data-modal-size={size} data-state={closing ? "closed" : "open"} ref={dialogRef} role="dialog" tabIndex={-1}>
           <header className="z-20 flex h-14 shrink-0 items-center justify-between border-b border-line bg-paper/95 px-6 backdrop-blur-md">

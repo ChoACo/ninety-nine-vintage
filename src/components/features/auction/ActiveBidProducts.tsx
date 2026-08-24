@@ -9,6 +9,10 @@ import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { announceAuctionBidSucceeded } from "@/lib/auction/bidEvents";
 import {
+  clientErrorFromPayload,
+  reportClientError,
+} from "@/lib/clientErrors";
+import {
   BID_RATE_LIMIT_MESSAGE,
   isRateLimitedResponse,
   retryAfterMs,
@@ -43,13 +47,17 @@ async function fetchActiveBidItems(
     signal,
   });
   const payload = await response.json().catch(() => null) as
-    | (BidPayload & { error?: string })
+    | (BidPayload & { code?: string; error?: string; message?: string; stage?: string })
     | null;
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
       throw new Error("로그인 상태가 만료되었습니다. 다시 로그인해 주세요.");
     }
-    throw new Error(payload?.error ?? "입찰 상품을 불러오지 못했습니다.");
+    throw clientErrorFromPayload(
+      payload,
+      "입찰 상품을 불러오지 못했습니다.",
+      response.status,
+    );
   }
   return (payload?.items ?? []).filter(
     (item) => item.productStatus === "active",
@@ -67,6 +75,7 @@ export function ActiveBidProducts({
   const [items, setItems] = useState<ActiveBidItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
+  const [backgroundRefreshError, setBackgroundRefreshError] = useState("");
   const [confirmItem, setConfirmItem] = useState<ActiveBidItem | null>(null);
   const [bidBusy, setBidBusy] = useState(false);
   const { isCoolingDown, beginCooldown, cooldownSeconds } = useBidRateLimitCooldown();
@@ -80,6 +89,7 @@ export function ActiveBidProducts({
     setLoading(true);
     try {
       setItems(await fetchActiveBidItems(accessToken));
+      setBackgroundRefreshError("");
     } catch (error) {
       setNotice(
         error instanceof Error
@@ -88,6 +98,21 @@ export function ActiveBidProducts({
       );
     } finally {
       setLoading(false);
+    }
+  }, [accessToken]);
+
+  const refreshInBackground = useCallback(async (source: "poll" | "realtime") => {
+    if (!accessToken) return;
+    try {
+      setItems(await fetchActiveBidItems(accessToken));
+      setBackgroundRefreshError("");
+    } catch (error) {
+      const fallback = "실시간 입찰 현황을 갱신하지 못했습니다.";
+      setBackgroundRefreshError(fallback);
+      reportClientError(error, {
+        dedupeKey: `active-bids-${source}`,
+        fallback,
+      });
     }
   }, [accessToken]);
 
@@ -127,19 +152,27 @@ export function ActiveBidProducts({
             payload.new as { id?: unknown } | null
           )?.id;
           if (typeof changedId === "string" && productIds.has(changedId)) {
-            void fetchActiveBidItems(accessToken).then(setItems).catch(() => undefined);
+            void refreshInBackground("realtime");
           }
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status !== "CHANNEL_ERROR" && status !== "TIMED_OUT") return;
+        const error = new Error(`active_bids_realtime_${status.toLowerCase()}`);
+        setBackgroundRefreshError("실시간 연결이 불안정합니다. 새로고침해 주세요.");
+        reportClientError(error, {
+          dedupeKey: "active-bids-channel",
+          fallback: "실시간 입찰 연결을 유지하지 못했습니다.",
+        });
+      });
     const fallback = window.setInterval(() => {
-      void fetchActiveBidItems(accessToken).then(setItems).catch(() => undefined);
+      void refreshInBackground("poll");
     }, 15_000);
     return () => {
       window.clearInterval(fallback);
       void client.removeChannel(channel);
     };
-  }, [accessToken, productIdKey, session?.user.id]);
+  }, [accessToken, productIdKey, refreshInBackground, session?.user.id]);
 
   const quickBid = async () => {
     if (!session?.access_token || !confirmItem || bidBusy || isCoolingDown) return;
@@ -243,6 +276,22 @@ export function ActiveBidProducts({
         <p aria-live="polite" className="mt-4 border border-line bg-surface px-4 py-3 text-xs">
           {notice}
         </p>
+      )}
+      {backgroundRefreshError && (
+        <div
+          className="mt-4 flex min-h-11 flex-wrap items-center justify-between gap-3 border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-900"
+          role="alert"
+        >
+          <span>{backgroundRefreshError}</span>
+          <button
+            className="min-h-11 border border-amber-400 px-4 font-bold active:scale-[.98]"
+            disabled={loading}
+            onClick={() => void load()}
+            type="button"
+          >
+            다시 불러오기
+          </button>
+        </div>
       )}
 
       {items.length === 0 ? (

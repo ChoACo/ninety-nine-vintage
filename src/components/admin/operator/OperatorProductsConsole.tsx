@@ -1805,21 +1805,20 @@ export function OperatorProductsConsole({
           ))}
         </nav>
       ) : (
-        <nav
+        <div
           aria-label="상품 등록 상태"
-          className="grid grid-cols-2 border border-ink"
+          className="border border-ink"
         >
-          <button
-            aria-pressed={registrationStage === "scheduled"}
-            className="min-h-12 bg-ink px-4 text-xs font-black text-paper"
-            type="button"
+          <span
+            className="flex min-h-12 items-center justify-center bg-ink px-4 text-xs font-black text-paper"
+            role="status"
           >
             업로드 예정{" "}
             <span className="ml-1 font-mono">
               {registrationCounts.scheduled}
             </span>
-          </button>
-        </nav>
+          </span>
+        </div>
       )}
       {view === "registration" &&
         products.some(

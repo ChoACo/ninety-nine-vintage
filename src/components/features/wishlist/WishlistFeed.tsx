@@ -12,6 +12,7 @@ import {
   useWishlistStore,
   type WishlistFilter,
 } from "@/store/useWishlistStore";
+import { WishlistGridSkeleton } from "@/components/skeletons/WishlistSkeletons";
 
 interface WishProduct {
   id: string;
@@ -36,12 +37,14 @@ export function WishlistFeed({ basePath = "" }: { basePath?: "" | "/m" }) {
   const likedIds = useCommerceStore((s) => s.likedIds);
   const toggleLike = useCommerceStore((s) => s.toggleLike);
   const addToCart = useCommerceStore((s) => s.addToCart);
+  const removeFromCart = useCommerceStore((s) => s.removeFromCart);
   const hydrate = useCommerceStore((s) => s.hydrate);
   const { filter, auctionAlerts, setFilter, setAuctionAlerts } =
     useWishlistStore();
   const pushToast = useToastStore((s) => s.pushToast);
   const [products, setProducts] = useState<WishProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
   useEffect(() => {
     hydrate();
   }, [hydrate]);
@@ -83,22 +86,47 @@ export function WishlistFeed({ basePath = "" }: { basePath?: "" | "/m" }) {
     [filter, products],
   );
   const remove = async (product: WishProduct) => {
+    if (pendingIds.includes(product.id)) return;
+    setPendingIds((current) => [...current, product.id]);
     toggleLike(product.id);
-    const session = (await getSupabaseBrowserClient().auth.getSession()).data
-      .session;
-    if (session) await persistWishlist(product.id, false, session.user.id);
-    pushToast("success", "찜 목록에서 삭제했습니다.");
+    try {
+      const session = (await getSupabaseBrowserClient().auth.getSession()).data
+        .session;
+      if (session && !(await persistWishlist(product.id, false, session.user.id))) {
+        toggleLike(product.id);
+        pushToast("error", "찜 삭제를 저장하지 못해 상품을 복원했습니다.");
+        return;
+      }
+      pushToast("success", "찜 목록에서 삭제했습니다.");
+    } catch {
+      toggleLike(product.id);
+      pushToast("error", "찜 삭제를 저장하지 못해 상품을 복원했습니다.");
+    } finally {
+      setPendingIds((current) => current.filter((id) => id !== product.id));
+    }
   };
   const move = async (product: WishProduct) => {
+    if (pendingIds.includes(product.id)) return;
     const session = (await getSupabaseBrowserClient().auth.getSession()).data
       .session;
     if (!session) {
       pushToast("error", "로그인 후 장바구니를 이용해 주세요.");
       return;
     }
-    await reserveCartProduct(product.id, session.user.id);
+    setPendingIds((current) => [...current, product.id]);
     addToCart(product.id);
-    pushToast("success", "장바구니에 담았습니다.");
+    try {
+      await reserveCartProduct(product.id, session.user.id);
+      pushToast("success", "장바구니에 담았습니다.");
+    } catch (error) {
+      removeFromCart(product.id);
+      pushToast(
+        "error",
+        `${error instanceof Error ? error.message : "장바구니에 담지 못했습니다."} 상태를 되돌렸습니다.`,
+      );
+    } finally {
+      setPendingIds((current) => current.filter((id) => id !== product.id));
+    }
   };
   return (
     <section className="space-y-6">
@@ -139,9 +167,7 @@ export function WishlistFeed({ basePath = "" }: { basePath?: "" | "/m" }) {
         ))}
       </nav>
       {loading ? (
-        <p className="py-20 text-center text-sm text-muted">
-          찜 목록을 불러오는 중입니다.
-        </p>
+        <WishlistGridSkeleton />
       ) : visible.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-line py-20 text-center">
           <Heart className="mx-auto text-muted" />
@@ -187,6 +213,7 @@ export function WishlistFeed({ basePath = "" }: { basePath?: "" | "/m" }) {
                     <button
                       aria-label="찜 삭제"
                       className="absolute right-2 top-2 grid size-10 place-items-center rounded-xl bg-white/90 text-rose-600"
+                      disabled={pendingIds.includes(product.id)}
                       onClick={() => void remove(product)}
                       type="button"
                     >
@@ -226,6 +253,7 @@ export function WishlistFeed({ basePath = "" }: { basePath?: "" | "/m" }) {
                     <div className="mt-3 grid gap-2">
                       <button
                         className="min-h-11 rounded-xl border border-line text-[10px] font-black"
+                        disabled={pendingIds.includes(product.id)}
                         onClick={() => void move(product)}
                         type="button"
                       >

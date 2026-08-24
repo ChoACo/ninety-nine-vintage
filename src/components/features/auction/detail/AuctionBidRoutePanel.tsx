@@ -7,7 +7,10 @@ import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { formatProductDisplayNumber } from "@/lib/productDisplayNumber";
 import { Button } from "@/components/ui/Button";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
-import { announceAuctionBidSucceeded } from "@/lib/auction/bidEvents";
+import {
+  announceAuctionBidOptimistic,
+  announceAuctionBidSucceeded,
+} from "@/lib/auction/bidEvents";
 import { useToastStore } from "@/store/useToastStore";
 import {
   BID_RATE_LIMIT_MESSAGE,
@@ -71,6 +74,7 @@ export function AuctionBidRoutePanel({ basePath = "", bidIncrement, currentPrice
     }
     setBusy(true);
     setMessage(null);
+    announceAuctionBidOptimistic(productId, numericAmount, "pending");
     try {
       const response = await fetch("/api/auction/bids", {
         method: "POST",
@@ -79,6 +83,7 @@ export function AuctionBidRoutePanel({ basePath = "", bidIncrement, currentPrice
       });
       const payload = await response.json().catch(() => null) as { bid?: { currentPrice?: number; isFinal?: boolean }; error?: string } | null;
       if (isRateLimitedResponse(response)) {
+        announceAuctionBidOptimistic(productId, numericAmount, "rollback");
         beginCooldown(retryAfterMs(response));
         setConfirmOpen(false);
         setMessage({ kind: "error", text: BID_RATE_LIMIT_MESSAGE });
@@ -89,10 +94,12 @@ export function AuctionBidRoutePanel({ basePath = "", bidIncrement, currentPrice
       setAgreed(false);
       setConfirmOpen(false);
       setMessage({ kind: "success", text: payload.bid.isFinal ? "첫 입찰이 즉시 낙찰로 확정되었습니다." : "입찰이 완료되었습니다. 현재가가 실시간으로 갱신됩니다." });
+      announceAuctionBidOptimistic(productId, numericAmount, "confirmed");
       pushToast("success", payload.bid.isFinal ? "첫 입찰로 낙찰이 확정되었습니다." : "입찰이 정상적으로 반영되었습니다.");
       announceAuctionBidSucceeded(productId);
       window.dispatchEvent(new Event("ninety-nine:close-route-modal"));
     } catch (error) {
+      announceAuctionBidOptimistic(productId, numericAmount, "rollback");
       setConfirmOpen(false);
       const errorMessage = error instanceof Error ? error.message : "입찰을 저장하지 못했습니다.";
       setMessage({ kind: "error", text: errorMessage });

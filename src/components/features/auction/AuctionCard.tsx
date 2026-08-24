@@ -15,6 +15,7 @@ import { ProductFeedTags } from "@/components/features/catalog/ProductFeedTags";
 import { isNewlyPublishedProduct } from "@/components/features/auction/auctionFeedLogic";
 import { ProductInquiryModal } from "@/components/features/auction/detail/ProductInquiryModal";
 import { ShareProductButton } from "@/components/ui/ShareProductButton";
+import { useToastStore } from "@/store/useToastStore";
 import { normalizeConditionGrade } from "@/lib/catalog/conditions";
 import { measurementEntries } from "@/lib/catalog/measurements";
 
@@ -35,8 +36,11 @@ function EnabledAuctionCard({ basePath = "", detailRoute, item }: AuctionCardPro
   const toggleLike = useCommerceStore((state) => state.toggleLike);
   const hydrate = useCommerceStore((state) => state.hydrate);
   const addToCart = useCommerceStore((state) => state.addToCart);
+  const removeFromCart = useCommerceStore((state) => state.removeFromCart);
+  const pushToast = useToastStore((state) => state.pushToast);
   const [actionMessage, setActionMessage] = useState("");
   const [cartBusy, setCartBusy] = useState(false);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
   const [inquiryOpen, setInquiryOpen] = useState(false);
   const isNew = isNewlyPublishedProduct(item.publishAt);
   const grade = normalizeConditionGrade(item.conditionGrade);
@@ -63,30 +67,37 @@ function EnabledAuctionCard({ basePath = "", detailRoute, item }: AuctionCardPro
         );
         return;
       }
-      await reserveCartProduct(item.id, session.user.id);
       addToCart(item.id);
+      await reserveCartProduct(item.id, session.user.id);
       setActionMessage("장바구니에 담았습니다. 구매 가능 여부는 결제 시 다시 확인됩니다.");
+      pushToast("success", "장바구니에 상품을 담았습니다.");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "장바구니에 담지 못했습니다.");
+      removeFromCart(item.id);
+      const message = error instanceof Error ? error.message : "장바구니에 담지 못했습니다.";
+      setActionMessage(message);
+      pushToast("error", `${message} 장바구니 상태를 되돌렸습니다.`);
     } finally {
       setCartBusy(false);
     }
   };
   const updateWishlist = async () => {
+    if (wishlistBusy) return;
+    const nextLiked = !liked;
+    toggleLike(item.id);
+    setWishlistBusy(true);
     try {
       const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
-      const nextLiked = !liked;
-      if (!session) {
+      if (session && !(await persistWishlist(item.id, nextLiked, session.user.id))) {
         toggleLike(item.id);
-        return;
-      }
-      if (await persistWishlist(item.id, nextLiked, session.user.id)) {
-        toggleLike(item.id);
-      } else {
         setActionMessage("로그인 계정이 변경되었거나 찜을 저장하지 못했습니다.");
+        pushToast("error", "찜을 저장하지 못해 이전 상태로 되돌렸습니다.");
       }
     } catch {
+      toggleLike(item.id);
       setActionMessage("로그인 상태를 확인하지 못했습니다.");
+      pushToast("error", "찜을 저장하지 못해 이전 상태로 되돌렸습니다.");
+    } finally {
+      setWishlistBusy(false);
     }
   };
   return (
@@ -100,7 +111,7 @@ function EnabledAuctionCard({ basePath = "", detailRoute, item }: AuctionCardPro
             {isNew && <span className="rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-black tracking-tight text-white shadow-sm">NEW</span>}
           </div>
           <div className="absolute right-2 top-2 flex flex-col items-end gap-2">
-            <button aria-label={liked ? `${item.name} 찜 해제` : `${item.name} 찜하기`} className={`grid size-9 place-items-center rounded-xl bg-paper/90 shadow-sm backdrop-blur-md transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ink active:scale-95 ${liked ? "text-red-700" : "text-ink"}`} onClick={(event) => { event.preventDefault(); void updateWishlist(); }} type="button"><Heart className={liked ? "scale-110" : "scale-100"} fill={liked ? "currentColor" : "none"} size={16} strokeWidth={1.75} /></button>
+            <button aria-label={liked ? `${item.name} 찜 해제` : `${item.name} 찜하기`} className={`grid size-9 place-items-center rounded-xl bg-paper/90 shadow-sm backdrop-blur-md transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ink active:scale-95 ${liked ? "text-red-700" : "text-ink"}`} disabled={wishlistBusy} onClick={(event) => { event.preventDefault(); void updateWishlist(); }} type="button"><Heart className={liked ? "scale-110" : "scale-100"} fill={liked ? "currentColor" : "none"} size={16} strokeWidth={1.75} /></button>
             <button aria-label={`${item.name} 상품 문의`} className="flex h-8 items-center gap-1 rounded-xl bg-paper/90 px-2.5 text-[10px] font-bold text-ink shadow-sm backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ink active:scale-95" onClick={(event) => { event.preventDefault(); setInquiryOpen(true); }} type="button"><MessageCircle size={13} strokeWidth={1.75} /> 문의</button>
             <ShareProductButton ariaLabel={`${item.name} 공유`} className="grid size-9 place-items-center rounded-xl bg-paper/90 text-ink shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" priceText={`${isFixed ? "판매 정가" : "현재 입찰가"} ${price.toLocaleString("ko-KR")}원`} title={`${item.enhancedTitle || item.name} | ${item.brand}`} url={`/auction/${item.id}`} />
           </div>

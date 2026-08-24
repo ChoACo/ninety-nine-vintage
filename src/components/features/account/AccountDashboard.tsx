@@ -19,6 +19,10 @@ import { CombinedAuctionPayment } from "@/components/features/account/CombinedAu
 import type { AuctionPaymentCenterGroup } from "@/components/features/account/CombinedAuctionPayment";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
+import {
+  MyProfileSkeleton,
+  VaultCardSkeleton,
+} from "@/components/skeletons/MySkeletons";
 import { PostcodeSearchButton } from "@/components/features/account/PostcodeSearchButton";
 import { logoutBrowserSession } from "@/lib/auth/logout";
 import {
@@ -27,6 +31,7 @@ import {
 } from "@/lib/cache/localCache";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { formatStorageDday, storageClassLabel } from "@/utils/shipping";
+import { useToastStore } from "@/store/useToastStore";
 
 interface ProductSummary {
   id: string;
@@ -306,6 +311,12 @@ function AccountDashboardForSession({
     address: "",
   });
   const [shippingMessage, setShippingMessage] = useState("");
+  const [shippingBusy, setShippingBusy] = useState(false);
+  const [shippingTransfer, setShippingTransfer] = useState<{
+    accountNumber: string;
+    amount: number;
+    bankName: string;
+  } | null>(null);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [memberAccessRequired, setMemberAccessRequired] = useState(false);
@@ -324,6 +335,7 @@ function AccountDashboardForSession({
   const [dataStatus, setDataStatus] = useState<
     "idle" | "loading" | "ready" | "error"
   >(token ? "loading" : "idle");
+  const pushToast = useToastStore((state) => state.pushToast);
 
   useEffect(() => {
     let cancelled = false;
@@ -582,6 +594,42 @@ function AccountDashboardForSession({
       v2Storage.filter((item) => selectedInventoryItemIds.includes(item.id)),
     [selectedInventoryItemIds, v2Storage],
   );
+  const shippingSelectionSummary = useMemo(() => {
+    const businessIds = [
+      ...new Set(
+        selectedInventoryItems
+          .map((item) => item.originStoreId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const tokenByBusiness = new Map(
+      centerShippingTokens.map((token) => [token.businessId, token.availableCount]),
+    );
+    const feeByBusiness = new Map(
+      paymentGroups.map((group) => [group.businessId, group.shippingFeeAmount]),
+    );
+    let tokenAppliedCount = 0;
+    let estimatedFee = 0;
+    let feeKnown = businessIds.length > 0;
+    for (const businessId of businessIds) {
+      if ((tokenByBusiness.get(businessId) ?? 0) > 0) {
+        tokenAppliedCount += 1;
+        continue;
+      }
+      const fee = feeByBusiness.get(businessId);
+      if (fee === undefined) feeKnown = false;
+      else estimatedFee += fee;
+    }
+    if (selectedInventoryItems.some((item) => !item.originStoreId)) {
+      feeKnown = false;
+    }
+    return {
+      businessCount: businessIds.length,
+      estimatedFee,
+      feeKnown,
+      tokenAppliedCount,
+    };
+  }, [centerShippingTokens, paymentGroups, selectedInventoryItems]);
   const selectedShippingMode =
     selectedInventoryItems.length > 0
       ? "v2"
@@ -736,15 +784,20 @@ function AccountDashboardForSession({
   if (loading || (token && dataStatus === "loading")) {
     return (
       <div
-        className="grid min-h-[50vh] place-items-center border border-dashed border-line bg-surface px-6 text-center"
+        className="min-h-[50vh] space-y-5 rounded-3xl border border-line bg-paper p-5 sm:p-7"
         role="status"
+        aria-label="계정 정보를 불러오는 중입니다"
       >
-        <div>
-          <p className="text-sm font-bold">계정 정보를 불러오는 중입니다.</p>
-          <p className="mt-2 text-xs text-muted">
-            로그인 세션과 장바구니·배송 정보를 확인하고 있습니다.
-          </p>
-        </div>
+        {view === "storage" ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }, (_, index) => (
+              <VaultCardSkeleton key={index} />
+            ))}
+          </div>
+        ) : (
+          <MyProfileSkeleton />
+        )}
+        <span className="sr-only">로그인 세션과 장바구니·배송 정보를 확인하고 있습니다.</span>
       </div>
     );
   }
@@ -768,6 +821,7 @@ function AccountDashboardForSession({
     );
   }
   const requestShipping = async () => {
+    if (shippingBusy) return;
     const shippingSettlement = "manual_transfer";
     const useV2 = selectedShippingMode === "v2";
     if (
@@ -785,6 +839,10 @@ function AccountDashboardForSession({
     const idempotencyKey =
       shippingRequestKeys.current.get(idempotencyScope) ?? crypto.randomUUID();
     shippingRequestKeys.current.set(idempotencyScope, idempotencyKey);
+    setShippingBusy(true);
+    setShippingMessage("");
+    setShippingTransfer(null);
+    try {
     const response = await fetch(
       useV2 ? "/api/shipping/requests" : "/api/shipping/requests/legacy-order",
       {
@@ -891,6 +949,14 @@ function AccountDashboardForSession({
     const bankName = payment?.bankNameSnapshot ?? payment?.bank_name_snapshot;
     const accountNumber =
       payment?.accountNumberSnapshot ?? payment?.account_number_snapshot;
+    if (
+      typeof expectedAmount === "number" &&
+      Number.isSafeInteger(expectedAmount) &&
+      bankName &&
+      accountNumber
+    ) {
+      setShippingTransfer({ accountNumber, amount: expectedAmount, bankName });
+    }
     setShippingMessage(
       payment &&
         typeof expectedAmount === "number" &&
@@ -902,6 +968,15 @@ function AccountDashboardForSession({
           ? "배송 신청을 접수했습니다. 보유한 무료 배송 권한이 자동 적용되었습니다."
           : "배송 신청을 접수했습니다. 배송비 입금 확인 후 출고됩니다.",
     );
+    pushToast("success", "배송 신청을 접수했습니다.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "배송 요청을 만들지 못했습니다.";
+      setShippingMessage(message);
+      pushToast("error", message);
+    } finally {
+      setShippingBusy(false);
+    }
   };
   const updateRefundDraft = (
     refundId: string,
@@ -1775,11 +1850,13 @@ function AccountDashboardForSession({
             </div>
             <button
               className="mt-4 h-11 w-full bg-ink text-xs font-bold text-paper disabled:opacity-40"
-              disabled={!token || !selectedShippingMode || !selectedAddressId}
+              disabled={shippingBusy || !token || !selectedShippingMode || !selectedAddressId}
               onClick={() => void requestShipping()}
               type="button"
             >
-              {selectedShippingMode === "legacy"
+              {shippingBusy
+                ? "배송 신청 처리 중..."
+                : selectedShippingMode === "legacy"
                 ? "선택 주문 전체 배송 신청"
                 : "선택 상품 배송 신청"}
             </button>
@@ -1787,6 +1864,24 @@ function AccountDashboardForSession({
               <p aria-live="polite" className="mt-3 text-xs text-emerald-700">
                 {shippingMessage}
               </p>
+            )}
+            {shippingTransfer && (
+              <button
+                className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 text-left text-xs font-bold text-emerald-800"
+                onClick={() => {
+                  void navigator.clipboard
+                    .writeText(shippingTransfer.accountNumber)
+                    .then(() => pushToast("success", "계좌번호를 복사했습니다."))
+                    .catch(() => pushToast("error", "계좌번호를 복사하지 못했습니다."));
+                }}
+                type="button"
+              >
+                <span>
+                  {shippingTransfer.amount.toLocaleString("ko-KR")}원 ·{" "}
+                  {shippingTransfer.bankName} {shippingTransfer.accountNumber}
+                </span>
+                <Copy className="shrink-0" size={15} />
+              </button>
             )}
           </div>
         </section>
@@ -1990,11 +2085,24 @@ function AccountDashboardForSession({
                       </p>
                       <button
                         className="mt-2 inline-flex items-center gap-1 text-xs font-bold underline"
-                        onClick={() =>
-                          void navigator.clipboard.writeText(
-                            shipment.trackingNumber ?? "",
-                          )
-                        }
+                        onClick={() => {
+                          void (async () => {
+                            try {
+                              await navigator.clipboard.writeText(
+                                shipment.trackingNumber ?? "",
+                              );
+                              pushToast(
+                                "success",
+                                "송장번호를 복사했습니다.",
+                              );
+                            } catch {
+                              pushToast(
+                                "error",
+                                "송장번호를 복사하지 못했습니다. 브라우저 권한을 확인해 주세요.",
+                              );
+                            }
+                          })();
+                        }}
                         type="button"
                       >
                         <Copy size={12} /> 송장번호 복사
@@ -2165,6 +2273,35 @@ function AccountDashboardForSession({
           </div>
         )}
       </section>
+      {showStorage && selectedInventoryItems.length > 0 && (
+        <aside
+          aria-live="polite"
+          className={`vault-floating-summary fixed inset-x-3 z-[70] mx-auto flex max-w-2xl items-center gap-3 rounded-2xl border border-line bg-paper/95 p-3 shadow-2xl shadow-black/20 backdrop-blur-xl ${surface === "mobile" ? "bottom-[calc(5rem+env(safe-area-inset-bottom))]" : "bottom-5"}`}
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-black">
+              선택 {selectedInventoryItems.length}개 ·{" "}
+              {shippingSelectionSummary.businessCount > 0 &&
+              shippingSelectionSummary.tokenAppliedCount ===
+                shippingSelectionSummary.businessCount
+                ? "배송비 면제 적용"
+                : `면제 ${shippingSelectionSummary.tokenAppliedCount}/${shippingSelectionSummary.businessCount}개 매장`}
+            </p>
+            <p className="mt-1 truncate font-mono text-sm font-black">
+              최종 배송비 {shippingSelectionSummary.feeKnown
+                ? `${shippingSelectionSummary.estimatedFee.toLocaleString("ko-KR")}원`
+                : "신청 시 서버 확정"}
+            </p>
+          </div>
+          <button
+            className="min-h-11 shrink-0 rounded-xl bg-ink px-4 text-xs font-black text-paper"
+            onClick={openShippingRequest}
+            type="button"
+          >
+            배송 신청
+          </button>
+        </aside>
+      )}
       <PremiumDialog
         labelledBy="address-manager-title"
         onClose={() => {

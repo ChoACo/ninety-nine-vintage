@@ -153,8 +153,9 @@ test("premium detail actions use confirmation dialogs only for consequential mut
   );
   assert.match(
     quickCartAction,
-    /reserveCartProduct\(item\.id, session\.user\.id\)[\s\S]*addToCart\(item\.id\)[\s\S]*장바구니에 상품을 담았습니다/,
+    /addToCart\(item\.id\)[\s\S]*reserveCartProduct\(item\.id, session\.user\.id\)[\s\S]*장바구니에 상품을 담았습니다/,
   );
+  assert.match(quickCartAction, /catch \(error\)[\s\S]*removeFromCart\(item\.id\)[\s\S]*상태를 되돌렸습니다/);
   assert.match(quickCartAction, /cartContainsItem[\s\S]*이미 장바구니에 담긴 상품입니다/);
   assert.match(quickCartAction, /장바구니 바로가기/);
   assert.doesNotMatch(sticky, /<QuickCartModal/);

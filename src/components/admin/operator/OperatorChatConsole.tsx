@@ -13,6 +13,11 @@ import {
 } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { ChatSkeleton } from "@/components/features/notifications/NotificationSkeletons";
+import {
+  clientErrorFromPayload,
+  getClientErrorDetails,
+  reportClientError,
+} from "@/lib/clientErrors";
 
 interface Conversation {
   id: string;
@@ -70,12 +75,6 @@ function conversationStatusLabel(status: string) {
   return status === "closed" ? "상담 완료" : "상담 중";
 }
 
-function problemMessage(payload: unknown, fallback: string) {
-  if (!payload || typeof payload !== "object") return fallback;
-  const problem = payload as { error?: string; message?: string };
-  return problem.message ?? problem.error ?? fallback;
-}
-
 export function OperatorChatConsole({
   basePath = "/admin/operator/chat",
   staffLabel = "운영자",
@@ -98,6 +97,7 @@ export function OperatorChatConsole({
   const [message, setMessage] = useState("");
   const [staffId, setStaffId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [refreshError, setRefreshError] = useState("");
   const [busy, setBusy] = useState(false);
   const [messageLoading, setMessageLoading] = useState(false);
   const [inquiryQuery, setInquiryQuery] = useState("");
@@ -110,7 +110,11 @@ export function OperatorChatConsole({
     });
     const payload = (await response.json().catch(() => null)) as StoreScopeResponse | null;
     if (!response.ok || !payload?.scope) {
-      throw new Error(problemMessage(payload, "센터 범위를 불러오지 못했습니다."));
+      throw clientErrorFromPayload(
+        payload,
+        "매장 범위를 불러오지 못했습니다.",
+        response.status,
+      );
     }
 
     const requestedStoreId = searchParams.get("storeId");
@@ -144,7 +148,11 @@ export function OperatorChatConsole({
     });
     const updatePayload = (await updateResponse.json().catch(() => null)) as StoreScopeResponse | null;
     if (!updateResponse.ok || updatePayload?.scope?.storeId !== targetStoreId) {
-      throw new Error(problemMessage(updatePayload, "센터 범위를 연결하지 못했습니다."));
+      throw clientErrorFromPayload(
+        updatePayload,
+        "매장 범위를 연결하지 못했습니다.",
+        updateResponse.status,
+      );
     }
   }, [requiresStoreScope, searchParams]);
 
@@ -177,10 +185,18 @@ export function OperatorChatConsole({
         },
       );
       const payload = (await response.json().catch(() => null)) as {
+        code?: string;
+        error?: string;
+        message?: string;
         messages?: ChatMessage[];
+        stage?: string;
       } | null;
       if (!response.ok || !payload) {
-        throw new Error(problemMessage(payload, "메시지를 불러오지 못했습니다."));
+        throw clientErrorFromPayload(
+          payload,
+          "메시지를 불러오지 못했습니다.",
+          response.status,
+        );
       }
       setMessages(payload.messages ?? []);
       await markRead(conversationId, accessToken);
@@ -200,12 +216,20 @@ export function OperatorChatConsole({
         cache: "no-store",
       });
       const payload = (await response.json().catch(() => null)) as {
+        code?: string;
         conversations?: Conversation[];
+        error?: string;
         members?: Member[];
+        message?: string;
+        stage?: string;
         stores?: SupportStore[];
       } | null;
       if (!response.ok || !payload) {
-        throw new Error(problemMessage(payload, "상담함을 불러오지 못했습니다."));
+        throw clientErrorFromPayload(
+          payload,
+          "상담함을 불러오지 못했습니다.",
+          response.status,
+        );
       }
       const nextConversations = payload.conversations ?? [];
       setConversations(nextConversations);
@@ -241,11 +265,17 @@ export function OperatorChatConsole({
           }),
         });
         const payload = (await response.json().catch(() => null)) as {
+          code?: string;
           conversation?: Conversation;
+          error?: string;
+          message?: string;
+          stage?: string;
         } | null;
         if (!response.ok || !payload?.conversation) {
-          throw new Error(
-            problemMessage(payload, "회원 채팅방을 만들지 못했습니다."),
+          throw clientErrorFromPayload(
+            payload,
+            "회원 채팅방을 만들지 못했습니다.",
+            response.status,
           );
         }
         await loadInbox(accessToken, payload.conversation.id);
@@ -276,27 +306,38 @@ export function OperatorChatConsole({
             await ensureRequestedConversation(session.access_token);
           }
         } catch (error) {
-          setNotice(
-            error instanceof Error
-              ? error.message
-              : "상담함을 불러오지 못했습니다.",
-          );
+          const fallback = "상담함을 불러오지 못했습니다.";
+          setNotice(getClientErrorDetails(error, fallback).message);
+          reportClientError(error, {
+            dedupeKey: "operator-chat-initial-load",
+            fallback,
+          });
         }
       })();
     }, 0);
     return () => window.clearTimeout(timer);
   }, [ensureRequestedConversation, ensureStoreScope]);
 
+  const handleRefreshFailure = useCallback((error: unknown) => {
+    const fallback = "새 상담 내용을 불러오지 못했습니다.";
+    setRefreshError(fallback);
+    reportClientError(error, {
+      dedupeKey: "operator-chat-realtime-refresh",
+      fallback,
+    });
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       if (token && selected) {
-        void loadMessages(selected, token).catch((error: unknown) =>
-          setNotice(
-            error instanceof Error
-              ? error.message
-              : "메시지를 불러오지 못했습니다.",
-          ),
-        );
+        void loadMessages(selected, token).catch((error: unknown) => {
+          const fallback = "메시지를 불러오지 못했습니다.";
+          setNotice(getClientErrorDetails(error, fallback).message);
+          reportClientError(error, {
+            dedupeKey: "operator-chat-message-load",
+            fallback,
+          });
+        });
       } else {
         setMessages([]);
       }
@@ -307,14 +348,27 @@ export function OperatorChatConsole({
   useEffect(() => {
     const reload = () => {
       if (!token) return;
-      void loadInbox(token, selected).catch(() => undefined);
+      void loadInbox(token, selected)
+        .then(() => setRefreshError(""))
+        .catch(handleRefreshFailure);
       if (selected) {
-        void loadMessages(selected, token).catch(() => undefined);
+        void loadMessages(selected, token)
+          .then(() => setRefreshError(""))
+          .catch(handleRefreshFailure);
       }
     };
     window.addEventListener("ninety-nine:chat-message", reload);
     return () => window.removeEventListener("ninety-nine:chat-message", reload);
-  }, [loadInbox, loadMessages, selected, token]);
+  }, [handleRefreshFailure, loadInbox, loadMessages, selected, token]);
+
+  const retryRefresh = () => {
+    if (!token) return;
+    const tasks: Promise<unknown>[] = [loadInbox(token, selected)];
+    if (selected) tasks.push(loadMessages(selected, token));
+    void Promise.all(tasks)
+      .then(() => setRefreshError(""))
+      .catch(handleRefreshFailure);
+  };
 
   const send = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -340,19 +394,31 @@ export function OperatorChatConsole({
         }),
       });
       const payload = (await response.json().catch(() => null)) as {
-        message?: ChatMessage;
+        code?: string;
+        error?: string;
+        message?: ChatMessage | string;
+        stage?: string;
       } | null;
-      if (!response.ok || !payload?.message) {
-        throw new Error(problemMessage(payload, "메시지를 보내지 못했습니다."));
+      if (!response.ok || typeof payload?.message !== "object") {
+        throw clientErrorFromPayload(
+          payload,
+          "메시지를 보내지 못했습니다.",
+          response.status,
+        );
       }
       setMessages((current) => current.map((item) => item.id === optimisticId ? payload.message as ChatMessage : item));
       await loadInbox(token, selected);
     } catch (error) {
       setMessages((current) => current.filter((item) => item.id !== optimisticId));
       setMessage(draft);
-      setNotice(
-        error instanceof Error ? error.message : "메시지를 보내지 못했습니다.",
-      );
+      const fallback = "메시지를 보내지 못했습니다.";
+      setNotice(getClientErrorDetails(error, fallback).message);
+      reportClientError(error, {
+        dedupeKey: "operator-chat-send",
+        fallback,
+        userMessage: "메시지를 보내지 못했습니다. 다시 시도해 주세요.",
+        visibility: "always",
+      });
     } finally {
       setBusy(false);
     }
@@ -517,6 +583,21 @@ export function OperatorChatConsole({
             <p className="text-xs font-bold text-red-700" role="alert">
               {notice}
             </p>
+          )}
+          {refreshError && (
+            <div
+              className="flex min-h-11 flex-wrap items-center justify-between gap-3 border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900"
+              role="alert"
+            >
+              <span>{refreshError}</span>
+              <button
+                className="min-h-11 border border-amber-400 px-4 active:scale-[.98]"
+                onClick={retryRefresh}
+                type="button"
+              >
+                다시 불러오기
+              </button>
+            </div>
           )}
         </div>
         <form

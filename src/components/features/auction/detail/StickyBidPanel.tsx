@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Heart,
   List,
@@ -43,6 +44,10 @@ import {
 } from "@/lib/commerce/purchaseIntent";
 import { formatConditionGrade } from "@/lib/catalog/conditions";
 import { MobileBidBar } from "@/components/mobile/MobileBidBar";
+import {
+  AUCTION_BID_OPTIMISTIC_EVENT,
+  type AuctionBidOptimisticDetail,
+} from "@/lib/auction/bidEvents";
 
 interface StickyBidPanelProps {
   basePath?: "" | "/m";
@@ -145,6 +150,11 @@ export function StickyBidPanel({
   const [inquiryOpen, setInquiryOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [buying, setBuying] = useState(false);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
+  const [optimisticBid, setOptimisticBid] = useState<{
+    amount: number;
+    state: "pending" | "confirmed";
+  } | null>(null);
   const [buyNotice, setBuyNotice] = useState("");
   const [buyNoticeKind, setBuyNoticeKind] = useState<"success" | "error">(
     "success",
@@ -174,6 +184,7 @@ export function StickyBidPanel({
     (state) => state.replaceAuthoritative,
   );
   const addToCart = useCommerceStore((state) => state.addToCart);
+  const removeFromCart = useCommerceStore((state) => state.removeFromCart);
   const cartContainsItem = useCommerceStore((state) =>
     state.cartIds.includes(item.id),
   );
@@ -239,6 +250,25 @@ export function StickyBidPanel({
       void refreshProductSnapshot();
     }, 800);
   }, [refreshProductSnapshot]);
+
+  useEffect(() => {
+    const receiveOptimisticBid = (event: Event) => {
+      const detail = (event as CustomEvent<AuctionBidOptimisticDetail>).detail;
+      if (!detail || detail.productId !== item.id) return;
+      if (detail.state === "rollback") {
+        setOptimisticBid(null);
+        return;
+      }
+      setOptimisticBid({ amount: detail.amount, state: detail.state });
+      if (detail.state === "confirmed") scheduleProductRefresh();
+    };
+    window.addEventListener(AUCTION_BID_OPTIMISTIC_EVENT, receiveOptimisticBid);
+    return () =>
+      window.removeEventListener(
+        AUCTION_BID_OPTIMISTIC_EVENT,
+        receiveOptimisticBid,
+      );
+  }, [item.id, scheduleProductRefresh]);
 
   useEffect(() => {
     hydrate(item.id, item.bidHistory, item.currentBid);
@@ -420,16 +450,18 @@ export function StickyBidPanel({
         );
         return;
       }
-      await reserveCartProduct(item.id, session.user.id);
       addToCart(item.id);
+      await reserveCartProduct(item.id, session.user.id);
       pushToast("success", "장바구니에 상품을 담았습니다.", {
         action: { label: "장바구니 바로가기", href: `${basePath}/cart` },
       });
     } catch (error) {
+      removeFromCart(item.id);
       setBuyNoticeKind("error");
-      setBuyNotice(
-        error instanceof Error ? error.message : "장바구니에 담지 못했습니다.",
-      );
+      const message =
+        error instanceof Error ? error.message : "장바구니에 담지 못했습니다.";
+      setBuyNotice(message);
+      pushToast("error", `${message} 장바구니 상태를 되돌렸습니다.`);
     } finally {
       setBuying(false);
     }
@@ -437,6 +469,7 @@ export function StickyBidPanel({
 
   const buyNow = async () => {
     if (buying) return;
+    const optimisticallyAdded = !cartContainsItem;
     setBuying(true);
     setBuyNotice("");
     setBuyNoticeKind("success");
@@ -450,13 +483,14 @@ export function StickyBidPanel({
         );
         return;
       }
+      if (optimisticallyAdded) addToCart(item.id);
       await reserveCartProduct(item.id, session.user.id);
-      addToCart(item.id);
       setBuying(false);
       navigateToFixedCheckout(basePath, item.id, (href) =>
         router.replace(href),
       );
     } catch (error) {
+      if (optimisticallyAdded) removeFromCart(item.id);
       setBuyNoticeKind("error");
       setBuyNotice(
         error instanceof Error ? error.message : "구매 준비에 실패했습니다.",
@@ -465,23 +499,26 @@ export function StickyBidPanel({
     }
   };
   const updateWishlist = async () => {
+    if (wishlistBusy) return;
+    const nextLiked = !liked;
+    toggleLike(item.id);
+    setWishlistBusy(true);
     try {
       const session = (await getSupabaseBrowserClient().auth.getSession()).data
         .session;
-      const nextLiked = !liked;
-      if (!session) {
+      if (session && !(await persistWishlist(item.id, nextLiked, session.user.id))) {
         toggleLike(item.id);
-        return;
-      }
-      if (await persistWishlist(item.id, nextLiked, session.user.id)) {
-        toggleLike(item.id);
-      } else {
         setBuyNoticeKind("error");
         setBuyNotice("로그인 계정이 변경되었거나 찜을 저장하지 못했습니다.");
+        pushToast("error", "찜을 저장하지 못해 이전 상태로 되돌렸습니다.");
       }
     } catch {
+      toggleLike(item.id);
       setBuyNoticeKind("error");
       setBuyNotice("로그인 상태를 확인하지 못했습니다.");
+      pushToast("error", "찜을 저장하지 못해 이전 상태로 되돌렸습니다.");
+    } finally {
+      setWishlistBusy(false);
     }
   };
 
@@ -497,10 +534,14 @@ export function StickyBidPanel({
     id: bid.id,
     outcome: bid.outcome ?? ("active" as const),
   }));
+  const activeOptimisticBid =
+    optimisticBid && auctionSnapshot.currentPrice < optimisticBid.amount
+      ? optimisticBid
+      : null;
   const displayPrice =
     item.saleType === "fixed"
       ? (item.fixedPrice ?? item.currentBid)
-      : auctionSnapshot.currentPrice;
+      : Math.max(auctionSnapshot.currentPrice, activeOptimisticBid?.amount ?? 0);
   const now = policyNow.getTime();
   const dailyAuctionPhase = now > 0 ? getDailyAuctionPhase(now) : "open";
   const phase = getAuctionFeedPhase(
@@ -635,8 +676,19 @@ export function StickyBidPanel({
             <p className="mb-2 text-xs text-muted-foreground">
               {item.saleType === "fixed" ? "판매 정가" : "현재 최고 입찰가"}
             </p>
-            <p className="font-mono text-3xl font-bold tracking-[-0.04em]">
-              {displayPrice.toLocaleString("ko-KR")}
+            <p className="flex min-h-9 items-baseline overflow-hidden font-mono text-3xl font-bold tracking-[-0.04em]">
+              <AnimatePresence initial={false} mode="popLayout">
+                <motion.span
+                  animate={{ backgroundColor: ["rgba(245,158,11,.28)", "rgba(245,158,11,0)"], opacity: 1, y: 0 }}
+                  className="rounded-lg tabular-nums"
+                  exit={{ opacity: 0, y: -14 }}
+                  initial={{ opacity: 0, y: 14 }}
+                  key={displayPrice}
+                  transition={{ duration: 0.34, ease: "easeOut" }}
+                >
+                  {displayPrice.toLocaleString("ko-KR")}
+                </motion.span>
+              </AnimatePresence>
               <span className="ml-1 text-base">원</span>
             </p>
           </div>
@@ -715,11 +767,33 @@ export function StickyBidPanel({
               <List size={11} /> 전체 원장 {visibleBids.length}건
             </button>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-3 overflow-hidden">
+            <AnimatePresence initial={false}>
+            {activeOptimisticBid && (
+              <motion.div
+                animate={{ opacity: 1, x: 0 }}
+                className="flex items-center justify-between rounded-xl bg-amber-500/10 px-2 py-2 text-xs"
+                exit={{ opacity: 0, x: 16 }}
+                initial={{ opacity: 0, x: -16 }}
+                key="my-optimistic-bid"
+                layout
+              >
+                <span className="font-bold text-amber-800">
+                  내 입찰 · {activeOptimisticBid.state === "pending" ? "전송 중" : "서버 반영 완료"}
+                </span>
+                <span className="font-mono font-bold tabular-nums">
+                  {activeOptimisticBid.amount.toLocaleString("ko-KR")}원
+                </span>
+              </motion.div>
+            )}
             {activeVisibleBids.slice(0, 5).map((bid) => (
-              <div
+              <motion.div
+                animate={{ opacity: 1, x: 0 }}
                 className="flex items-center justify-between text-xs"
+                initial={{ opacity: 0, x: -16 }}
                 key={bid.id}
+                layout
+                transition={{ duration: 0.24, ease: "easeOut" }}
               >
                 <span className="text-muted-foreground">
                   {bid.bidderMaskedId}{" "}
@@ -730,8 +804,9 @@ export function StickyBidPanel({
                 <span className="font-mono font-medium">
                   {bid.amount.toLocaleString("ko-KR")}원
                 </span>
-              </div>
+              </motion.div>
             ))}
+            </AnimatePresence>
           </div>
         </div>
       )}
@@ -814,6 +889,7 @@ export function StickyBidPanel({
               aria-label={liked ? "찜 해제" : "찜하기"}
               aria-pressed={liked}
               className="flex h-14 min-w-11 items-center justify-center rounded-2xl border border-border text-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-foreground hover:shadow-lg active:scale-95"
+              disabled={wishlistBusy}
               onClick={() => void updateWishlist()}
               type="button"
             >
@@ -852,6 +928,7 @@ export function StickyBidPanel({
       {item.saleType === "auction" && (
         <button
           className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-border/50 text-xs font-bold text-foreground shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-foreground hover:shadow-lg active:scale-95 disabled:opacity-50"
+          disabled={wishlistBusy}
           onClick={() => void updateWishlist()}
           type="button"
         >

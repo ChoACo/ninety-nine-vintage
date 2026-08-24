@@ -19,6 +19,7 @@ import { ProductFeedTags } from "@/components/features/catalog/ProductFeedTags";
 import { isNewlyPublishedProduct } from "@/components/features/auction/auctionFeedLogic";
 import { normalizeConditionGrade } from "@/lib/catalog/conditions";
 import { measurementEntries } from "@/lib/catalog/measurements";
+import { useToastStore } from "@/store/useToastStore";
 
 export type { AuctionFeedPhase } from "@/components/features/auction/auctionFeedLogic";
 
@@ -57,6 +58,8 @@ export function AuctionFeedCard(props: AuctionFeedCardProps) {
 function EnabledAuctionFeedCard({ basePath = "", bidCapability, item, participationState, surface = basePath === "/m" ? "mobile" : "desktop" }: AuctionFeedCardProps) {
   const liked = useCommerceStore((state) => state.likedIds.includes(item.id));
   const toggleLike = useCommerceStore((state) => state.toggleLike);
+  const pushToast = useToastStore((state) => state.pushToast);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [inquiryOpen, setInquiryOpen] = useState(false);
@@ -97,20 +100,23 @@ function EnabledAuctionFeedCard({ basePath = "", bidCapability, item, participat
   const isNew = isNewlyPublishedProduct(item.publishAt);
 
   const updateWishlist = async () => {
+    if (wishlistBusy) return;
+    const nextLiked = !liked;
+    toggleLike(item.id);
+    setWishlistBusy(true);
     try {
       const session = (await getSupabaseBrowserClient().auth.getSession()).data.session;
-      const nextLiked = !liked;
-      if (!session) {
+      if (session && !(await persistWishlist(item.id, nextLiked, session.user.id))) {
         toggleLike(item.id);
-        return;
-      }
-      if (await persistWishlist(item.id, nextLiked, session.user.id)) {
-        toggleLike(item.id);
-      } else {
         setActionMessage({ kind: "error", text: "로그인 계정이 변경되었거나 찜을 저장하지 못했습니다." });
+        pushToast("error", "찜을 저장하지 못해 이전 상태로 되돌렸습니다.");
       }
     } catch {
+      toggleLike(item.id);
       setActionMessage({ kind: "error", text: "로그인 상태를 확인하지 못했습니다." });
+      pushToast("error", "찜을 저장하지 못해 이전 상태로 되돌렸습니다.");
+    } finally {
+      setWishlistBusy(false);
     }
   };
 
@@ -130,7 +136,7 @@ function EnabledAuctionFeedCard({ basePath = "", bidCapability, item, participat
             <span className="font-semibold text-emerald-400">{bidCount}건 입찰</span>
           </div>
         </Link>
-        <div className="absolute right-2 top-2 flex flex-col items-end gap-2"><button aria-label={`${item.name} 상품 문의`} className="flex h-8 items-center gap-1 rounded-xl bg-paper/90 px-2.5 text-[10px] font-bold text-ink shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" onClick={() => setInquiryOpen(true)} type="button"><MessageCircle size={13} /> 문의</button><button aria-label={liked ? "찜 해제" : "찜하기"} className={`grid size-9 place-items-center rounded-xl bg-paper/90 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${liked ? "text-red-700" : "text-ink"}`} onClick={() => void updateWishlist()} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button><ShareProductButton ariaLabel={`${item.name} 공유`} className="grid size-9 place-items-center rounded-xl bg-paper/90 text-ink shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" priceText={`현재 최고 입찰가 ${currentPrice.toLocaleString("ko-KR")}원`} title={`${item.enhancedTitle || item.name} | ${item.brand}`} url={`/auction/${item.id}`} /></div>
+        <div className="absolute right-2 top-2 flex flex-col items-end gap-2"><button aria-label={`${item.name} 상품 문의`} className="flex h-8 items-center gap-1 rounded-xl bg-paper/90 px-2.5 text-[10px] font-bold text-ink shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" onClick={() => setInquiryOpen(true)} type="button"><MessageCircle size={13} /> 문의</button><button aria-label={liked ? "찜 해제" : "찜하기"} className={`grid size-9 place-items-center rounded-xl bg-paper/90 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${liked ? "text-red-700" : "text-ink"}`} disabled={wishlistBusy} onClick={() => void updateWishlist()} type="button"><Heart fill={liked ? "currentColor" : "none"} size={15} strokeWidth={1.6} /></button><ShareProductButton ariaLabel={`${item.name} 공유`} className="grid size-9 place-items-center rounded-xl bg-paper/90 text-ink shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" priceText={`현재 최고 입찰가 ${currentPrice.toLocaleString("ko-KR")}원`} title={`${item.enhancedTitle || item.name} | ${item.brand}`} url={`/auction/${item.id}`} /></div>
         {galleryImages.length > 0 && <button aria-label={`${item.name} 사진 ${galleryImages.length}장 확대 보기`} className="absolute bottom-12 right-2 flex h-8 items-center gap-1 rounded-lg bg-paper/90 px-2 text-[9px] font-bold text-ink shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" onClick={() => setGalleryOpen(true)} type="button"><Images size={13} /> {galleryImages.length}</button>}
       </div>
 

@@ -1,9 +1,13 @@
 "use client";
 import { Cog, Heart, LogOut, Package, Truck, Gavel, X } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { logoutBrowserSession } from "@/lib/auth/logout";
+import {
+  clientErrorFromResponse,
+  reportClientError,
+} from "@/lib/clientErrors";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { useCommerceStore } from "@/store/useCommerceStore";
 import { ProfileAvatarUploader } from "@/components/features/mypage/ProfileAvatarUploader";
@@ -20,6 +24,23 @@ interface MemberProfile {
   avatar_url: string | null;
   display_name: string;
 }
+type MetricSource = "auction" | "orders" | "vault";
+
+async function fetchMetricPayload(
+  url: string,
+  accessToken: string,
+  fallback: string,
+  signal: AbortSignal,
+) {
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal,
+  });
+  if (!response.ok) throw await clientErrorFromResponse(response, fallback);
+  return response.json() as Promise<Record<string, unknown>>;
+}
+
 export function ProfileHeader({
   activeTab,
   onTabChange,
@@ -29,7 +50,6 @@ export function ProfileHeader({
   onTabChange: (tab: MyTab) => void;
   basePath?: "" | "/m";
 }) {
-  const router = useRouter();
   const { session } = useSupabaseSession();
   const liked = useCommerceStore((s) => s.likedIds.length);
   const [metrics, setMetrics] = useState<Metrics>({
@@ -40,6 +60,9 @@ export function ProfileHeader({
     risk: false,
   });
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [metricFailures, setMetricFailures] = useState<MetricSource[]>([]);
+  const [metricsRetryKey, setMetricsRetryKey] = useState(0);
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const user = session?.user;
   const nickname =
@@ -53,37 +76,103 @@ export function ProfileHeader({
   const email =
     user?.email?.replace(/^(.{2}).*(@.*)$/u, "$1**$2") ?? "카카오 회원";
   useEffect(() => {
-    if (!session?.access_token) return;
-    const headers = { Authorization: `Bearer ${session.access_token}` };
-    void Promise.all([
-      fetch("/api/account/storage", { headers, cache: "no-store" }),
-      fetch("/api/account/bids", { headers, cache: "no-store" }),
-      fetch("/api/account/shipments", { headers, cache: "no-store" }),
-    ])
-      .then(async ([storage, bids, shipments]) => {
-        const s = storage.ok ? await storage.json() : {};
-        const b = bids.ok ? await bids.json() : {};
-        const h = shipments.ok ? await shipments.json() : {};
-        const items = Array.isArray(s.items) ? s.items : [];
-        setMetrics({
-          vault: items.length,
-          bids:
-            Number(b.summary?.leading ?? 0) + Number(b.summary?.outbid ?? 0),
-          wins: Number(b.summary?.final ?? 0),
-          shipping: Array.isArray(h.shipments)
-            ? h.shipments.filter(
-                (row: { status?: string }) => row.status !== "delivered",
-              ).length
-            : 0,
-          risk: items.some((row: { storageExpiresAt?: string | null }) => {
-            const days =
-              (Date.parse(row.storageExpiresAt ?? "") - Date.now()) / 86400000;
-            return days >= 0 && days <= 3;
-          }),
+    const accessToken = session?.access_token;
+    if (!accessToken) return;
+    let active = true;
+    const controller = new AbortController();
+    const requests = [
+      {
+        fallback: "보관함 요약을 불러오지 못했습니다.",
+        key: "vault" as const,
+        promise: fetchMetricPayload(
+          "/api/account/storage",
+          accessToken,
+          "보관함 요약을 불러오지 못했습니다.",
+          controller.signal,
+        ),
+      },
+      {
+        fallback: "입찰 요약을 불러오지 못했습니다.",
+        key: "auction" as const,
+        promise: fetchMetricPayload(
+          "/api/account/bids",
+          accessToken,
+          "입찰 요약을 불러오지 못했습니다.",
+          controller.signal,
+        ),
+      },
+      {
+        fallback: "배송 요약을 불러오지 못했습니다.",
+        key: "orders" as const,
+        promise: fetchMetricPayload(
+          "/api/account/shipments",
+          accessToken,
+          "배송 요약을 불러오지 못했습니다.",
+          controller.signal,
+        ),
+      },
+    ];
+
+    void Promise.allSettled(requests.map((request) => request.promise)).then(
+      (results) => {
+        if (!active) return;
+        const failed = requests.flatMap((request, index) =>
+          results[index]?.status === "rejected" ? [request.key] : [],
+        );
+        const [storage, bids, shipments] = results;
+        setMetrics((current) => {
+          const next = { ...current };
+          if (storage.status === "fulfilled") {
+            const items = Array.isArray(storage.value.items)
+              ? (storage.value.items as Array<{
+                  storageExpiresAt?: string | null;
+                }>)
+              : [];
+            next.vault = items.length;
+            next.risk = items.some((row) => {
+              const days =
+                (Date.parse(row.storageExpiresAt ?? "") - Date.now()) /
+                86400000;
+              return days >= 0 && days <= 3;
+            });
+          }
+          if (bids.status === "fulfilled") {
+            const summary =
+              bids.value.summary && typeof bids.value.summary === "object"
+                ? (bids.value.summary as Record<string, unknown>)
+                : {};
+            next.bids =
+              Number(summary.leading ?? 0) + Number(summary.outbid ?? 0);
+            next.wins = Number(summary.final ?? 0);
+          }
+          if (shipments.status === "fulfilled") {
+            next.shipping = Array.isArray(shipments.value.shipments)
+              ? shipments.value.shipments.filter(
+                  (row) =>
+                    !row ||
+                    typeof row !== "object" ||
+                    (row as { status?: string }).status !== "delivered",
+                ).length
+              : 0;
+          }
+          return next;
         });
-      })
-      .catch(() => undefined);
-  }, [session]);
+        setMetricFailures(failed);
+        results.forEach((result, index) => {
+          if (result.status !== "rejected" || controller.signal.aborted) return;
+          const request = requests[index];
+          reportClientError(result.reason, {
+            dedupeKey: `profile-metrics-${request.key}`,
+            fallback: request.fallback,
+          });
+        });
+      },
+    );
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [metricsRetryKey, session?.access_token]);
   useEffect(() => {
     if (!user?.id) return;
     const supabase = getSupabaseBrowserClient();
@@ -128,21 +217,23 @@ export function ProfileHeader({
     {
       tab: "vault" as const,
       label: "보관함",
-      value: metrics.vault,
+      value: metricFailures.includes("vault") ? null : metrics.vault,
       Icon: Package,
-      risk: metrics.risk,
+      risk: !metricFailures.includes("vault") && metrics.risk,
     },
     {
       tab: "auction" as const,
       label: "참여 옥션",
-      value: metrics.bids + metrics.wins,
+      value: metricFailures.includes("auction")
+        ? null
+        : metrics.bids + metrics.wins,
       Icon: Gavel,
-      risk: metrics.wins > 0,
+      risk: !metricFailures.includes("auction") && metrics.wins > 0,
     },
     {
       tab: "orders" as const,
       label: "주문/배송",
-      value: metrics.shipping,
+      value: metricFailures.includes("orders") ? null : metrics.shipping,
       Icon: Truck,
       risk: false,
     },
@@ -155,9 +246,19 @@ export function ProfileHeader({
     },
   ];
   const logout = async () => {
-    await getSupabaseBrowserClient().auth.signOut();
-    router.replace(`${basePath}/home`);
-    router.refresh();
+    if (!session?.access_token || logoutBusy) return;
+    setLogoutBusy(true);
+    try {
+      await logoutBrowserSession(session.access_token, basePath);
+    } catch (error) {
+      reportClientError(error, {
+        dedupeKey: "profile-logout",
+        fallback: "로그아웃을 완료하지 못했습니다.",
+        userMessage: "로그아웃을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        visibility: "always",
+      });
+      setLogoutBusy(false);
+    }
   };
   return (
     <>
@@ -236,12 +337,32 @@ export function ProfileHeader({
                 <span className="absolute right-3 top-3 size-2 animate-pulse rounded-full bg-rose-500" />
               ) : null}
               <p className="mt-5 text-[10px] text-zinc-400">{label}</p>
-              <p className="mt-2 font-mono text-2xl font-black">{value}</p>
+              <p className="mt-2 font-mono text-2xl font-black">
+                {value ?? "—"}
+              </p>
             </button>
           ))}
         </div>
+        {metricFailures.length > 0 && (
+          <div
+            className="mt-3 flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-xs"
+            role="alert"
+          >
+            <span>
+              일부 계정 요약을 불러오지 못해 해당 항목을 —로 표시했습니다.
+            </span>
+            <button
+              className="min-h-11 rounded-lg border border-amber-300/40 px-4 font-bold active:scale-[.98]"
+              onClick={() => setMetricsRetryKey((current) => current + 1)}
+              type="button"
+            >
+              다시 불러오기
+            </button>
+          </div>
+        )}
       </header>
       <PremiumDialog
+        closeDisabled={logoutBusy}
         labelledBy="my-logout-title"
         onClose={() => setLogoutOpen(false)}
         open={logoutOpen}
@@ -253,6 +374,7 @@ export function ProfileHeader({
           </h2>
           <button
             aria-label="닫기"
+            disabled={logoutBusy}
             onClick={() => setLogoutOpen(false)}
             type="button"
           >
@@ -266,17 +388,19 @@ export function ProfileHeader({
           <div className="mt-6 grid grid-cols-2 gap-2">
             <button
               className="min-h-11 border border-line font-bold"
+              disabled={logoutBusy}
               onClick={() => setLogoutOpen(false)}
               type="button"
             >
               취소
             </button>
             <button
-              className="min-h-11 bg-ink font-bold text-paper"
+              className="min-h-11 bg-ink font-bold text-paper disabled:opacity-50"
+              disabled={logoutBusy}
               onClick={() => void logout()}
               type="button"
             >
-              로그아웃
+              {logoutBusy ? "로그아웃 중…" : "로그아웃"}
             </button>
           </div>
         </div>

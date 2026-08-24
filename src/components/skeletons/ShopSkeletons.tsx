@@ -2,7 +2,7 @@ function Pulse({ className }: { className: string }) {
   return (
     <div
       aria-hidden="true"
-      className={`animate-pulse rounded-2xl bg-zinc-800 ${className}`}
+      className={`skeleton-shimmer rounded-2xl bg-zinc-800 ${className}`}
     />
   );
 }

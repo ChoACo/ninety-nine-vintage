@@ -1,8 +1,9 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Copy, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useToastStore } from "@/store/useToastStore";
 
 export interface CombinedAuctionWin {
   productId: string;
@@ -96,6 +97,7 @@ export function CombinedAuctionPayment({
   wins,
   groups,
 }: CombinedAuctionPaymentProps) {
+  const pushToast = useToastStore((state) => state.pushToast);
   const [dialog, setDialog] = useState<"payment" | "info" | null>(null);
   const [busy, setBusy] = useState(false);
   const [depositorName, setDepositorName] = useState(
@@ -452,7 +454,20 @@ export function CombinedAuctionPayment({
             </div>
             <div className="mt-6 border border-ink bg-surface p-4 text-sm leading-7">
               <p className="font-black">입금 정보가 준비되었습니다.</p>
-              <p className="mt-2">{transfer.bankName} {transfer.accountNumber}</p>
+              <button
+                aria-label={`${transfer.bankName} 계좌번호 복사`}
+                className="mt-2 flex min-h-11 w-full items-center justify-between rounded-xl border border-line bg-paper px-3 text-left font-mono font-bold"
+                onClick={() => {
+                  void navigator.clipboard
+                    .writeText(transfer.accountNumber)
+                    .then(() => pushToast("success", "계좌번호를 복사했습니다."))
+                    .catch(() => pushToast("error", "계좌번호를 복사하지 못했습니다."));
+                }}
+                type="button"
+              >
+                <span>{transfer.bankName} {transfer.accountNumber}</span>
+                <Copy aria-hidden="true" className="shrink-0" size={16} />
+              </button>
               <p>입금자명 {transfer.depositorName}</p>
               <div className="my-3 border-y border-line py-3 text-xs">
                 <p className="flex justify-between gap-4">

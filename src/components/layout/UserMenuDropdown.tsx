@@ -3,11 +3,11 @@
 import { ChevronDown, LogOut, Package, PackageOpen, User } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { logoutBrowserSession } from "@/lib/auth/logout";
+import { reportClientError } from "@/lib/clientErrors";
 
 const MENU_ITEM_CLASS = "flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-zinc-200 transition-all hover:bg-zinc-800/70 hover:text-white focus-visible:bg-zinc-800/70 focus-visible:text-white focus-visible:outline-none cursor-pointer select-none";
 
@@ -18,7 +18,6 @@ function maskIdentity(value: string) {
 }
 
 export function UserMenuDropdown({ basePath = "", session }: { basePath?: "" | "/m"; session: Session }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
@@ -39,9 +38,17 @@ export function UserMenuDropdown({ basePath = "", session }: { basePath?: "" | "
   const logout = async () => {
     if (logoutBusy) return;
     setLogoutBusy(true);
-    await getSupabaseBrowserClient().auth.signOut();
-    router.replace(`${basePath}/home`);
-    router.refresh();
+    try {
+      await logoutBrowserSession(session.access_token, basePath);
+    } catch (error) {
+      reportClientError(error, {
+        dedupeKey: "header-logout",
+        fallback: "로그아웃을 완료하지 못했습니다.",
+        userMessage: "로그아웃을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        visibility: "always",
+      });
+      setLogoutBusy(false);
+    }
   };
 
   return <>

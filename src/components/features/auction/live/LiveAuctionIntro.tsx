@@ -93,12 +93,12 @@ export function LiveAuctionIntro({
               내일의 옥션 미리보기
             </h2>
           </div>
-          <button
+          <Link
             className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-700 px-4 text-xs font-black transition hover:border-amber-500 focus-visible:ring-2 focus-visible:ring-amber-500"
-            type="button"
+            href={`${basePath}/my?tab=settings`}
           >
-            <Bell size={15} /> 카카오톡 경매 오픈 알림 신청
-          </button>
+            <Bell size={15} /> 경매 오픈 알림 설정
+          </Link>
         </div>
         {upcoming.length > 0 ? (
           <div className="mt-5 flex snap-x gap-3 overflow-x-auto pb-3">

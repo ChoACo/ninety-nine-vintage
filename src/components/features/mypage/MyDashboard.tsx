@@ -1,6 +1,8 @@
 "use client";
+import { AnimatePresence, motion } from "framer-motion";
 import { Bell, Cog, Gavel, Heart, Home, Package, Truck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTransition } from "react";
 import { AccountDashboard } from "@/components/features/account/AccountDashboard";
 import { BidHistory } from "@/components/features/account/BidHistory";
 import { OrderHistory } from "@/components/features/account/OrderHistory";
@@ -30,20 +32,24 @@ export function MyDashboard({
   surface?: "desktop" | "mobile";
 }) {
   const router = useRouter();
+  const [tabPending, startTabTransition] = useTransition();
   const search = useSearchParams();
   const requested = initialTab ?? search.get("tab");
   const active: MyTab = TABS.some((tab) => tab.id === requested)
     ? (requested as MyTab)
     : "home";
   const setTab = (tab: MyTab) => {
+    let href: string;
     if (
       basePath === "" &&
       (tab === "home" || tab === "orders" || tab === "vault")
     ) {
-      router.push(tab === "home" ? "/my" : `/my/${tab}`);
-      return;
+      href = tab === "home" ? "/my" : `/my/${tab}`;
+    } else {
+      href = `${basePath}/my?tab=${tab}`;
     }
-    router.push(`${basePath}/my?tab=${tab}`);
+    window.dispatchEvent(new Event("ninety-nine:navigation-start"));
+    startTabTransition(() => router.push(href, { scroll: false }));
   };
   return (
     <main className="space-y-6">
@@ -59,17 +65,38 @@ export function MyDashboard({
         {TABS.map(({ id, label, Icon }) => (
           <button
             aria-current={active === id ? "page" : undefined}
-            className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 text-xs font-black ${active === id ? "bg-ink text-paper" : "text-muted hover:bg-surface"}`}
+            className={`relative isolate flex min-h-11 shrink-0 items-center gap-2 overflow-hidden rounded-xl px-4 text-xs font-black ${active === id ? "text-paper" : "text-muted hover:bg-surface"}`}
+            disabled={tabPending && active === id}
             key={id}
             onClick={() => setTab(id)}
             type="button"
           >
-            <Icon size={15} />
-            {label}
+            {active === id && (
+              <motion.span
+                className="absolute inset-0 -z-10 rounded-xl bg-ink"
+                layoutId={`my-tab-indicator-${basePath || "desktop"}`}
+                transition={{ type: "spring", stiffness: 420, damping: 34 }}
+              />
+            )}
+            <Icon className="relative" size={15} />
+            <span className="relative">{label}</span>
           </button>
         ))}
       </nav>
-      <section className="rounded-3xl border border-line bg-paper p-5 sm:p-7">
+      <motion.section
+        animate={{ opacity: 1 }}
+        className="rounded-3xl border border-line bg-paper p-5 sm:p-7"
+        initial={false}
+        layout
+      >
+        <AnimatePresence initial={false} mode="popLayout">
+          <motion.div
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            initial={{ opacity: 0, x: 10 }}
+            key={active}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+          >
         {active === "home" ? (
           <div className="space-y-10">
             <AccountDashboard
@@ -167,7 +194,9 @@ export function MyDashboard({
             />
           </div>
         )}
-      </section>
+          </motion.div>
+        </AnimatePresence>
+      </motion.section>
     </main>
   );
 }

@@ -5,6 +5,8 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -58,6 +60,14 @@ export function PremiumDialog({
   const onCloseRef = useRef(onClose);
   const closeDisabledRef = useRef(closeDisabled);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const dragStartRef = useRef<{
+    pointerId: number;
+    position: number;
+    startedAt: number;
+  } | null>(null);
+  const draggedRef = useRef(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -87,6 +97,41 @@ export function PremiumDialog({
   const requestClose = useCallback(() => {
     if (!closeDisabledRef.current) onCloseRef.current();
   }, []);
+
+  const draggable = placement === "sheet-bottom" || placement === "drawer-left";
+  const pointerPosition = (event: ReactPointerEvent<HTMLElement>) =>
+    placement === "sheet-bottom" ? event.clientY : event.clientX;
+  const beginDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!draggable || closeDisabledRef.current) return;
+    dragStartRef.current = {
+      pointerId: event.pointerId,
+      position: pointerPosition(event),
+      startedAt: performance.now(),
+    };
+    draggedRef.current = false;
+    setDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const updateDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const start = dragStartRef.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+    const delta = pointerPosition(event) - start.position;
+    const directionalDelta = placement === "drawer-left" ? -delta : delta;
+    const nextOffset = Math.max(0, directionalDelta);
+    if (nextOffset > 4) draggedRef.current = true;
+    setDragOffset(nextOffset);
+  };
+  const endDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const start = dragStartRef.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+    const elapsed = Math.max(1, performance.now() - start.startedAt);
+    const velocity = dragOffset / elapsed;
+    const shouldClose = dragOffset >= 88 || (dragOffset >= 36 && velocity > 0.55);
+    dragStartRef.current = null;
+    setDragging(false);
+    setDragOffset(0);
+    if (shouldClose) requestClose();
+  };
 
   // The portal mounts as soon as `open` becomes true, while `rendered` only
   // preserves the exit animation. Waiting for the animation frame can leave a
@@ -178,6 +223,15 @@ export function PremiumDialog({
       : placement === "sheet-bottom"
         ? "max-h-[86dvh]"
         : "max-h-[min(88dvh,900px)]");
+  const dragStyle: CSSProperties | undefined =
+    dragging && dragOffset > 0
+      ? {
+          transform:
+            placement === "drawer-left"
+              ? `translate3d(${-dragOffset}px, 0, 0)`
+              : `translate3d(0, ${dragOffset}px, 0)`,
+        }
+      : undefined;
 
   return createPortal(
     <div
@@ -195,12 +249,40 @@ export function PremiumDialog({
         aria-label={ariaLabel}
         aria-labelledby={labelledBy}
         aria-modal="true"
-        className={`premium-dialog-surface ${resolvedPanelViewportClassName} ${panelPlacementClassName} overflow-x-hidden overflow-y-auto overscroll-contain border border-border/50 bg-card text-card-foreground shadow-2xl shadow-black/20 outline-none ${panelClassName}`.trim()}
+        className={`premium-dialog-surface relative ${resolvedPanelViewportClassName} ${panelPlacementClassName} overflow-x-hidden overflow-y-auto overscroll-contain border border-border/50 bg-card text-card-foreground shadow-2xl shadow-black/20 outline-none ${panelClassName}`.trim()}
+        data-dragging={dragging ? "true" : "false"}
         data-state={visible ? "open" : "closed"}
         ref={dialogRef}
         role="dialog"
+        style={dragStyle}
         tabIndex={-1}
       >
+        {draggable && (
+          <button
+            aria-label={
+              placement === "sheet-bottom"
+                ? "아래로 밀어 창 닫기"
+                : "왼쪽으로 밀어 메뉴 닫기"
+            }
+            className={
+              placement === "sheet-bottom"
+                ? "absolute left-1/2 top-1 z-20 flex h-7 w-16 -translate-x-1/2 touch-none items-start justify-center pt-2 after:h-1 after:w-10 after:rounded-full after:bg-muted-foreground/35"
+                : "absolute right-0 top-1/2 z-20 flex h-20 w-7 -translate-y-1/2 touch-none items-center justify-center after:h-10 after:w-1 after:rounded-full after:bg-muted-foreground/35"
+            }
+            onClick={() => {
+              if (draggedRef.current) {
+                draggedRef.current = false;
+                return;
+              }
+              requestClose();
+            }}
+            onPointerCancel={endDrag}
+            onPointerDown={beginDrag}
+            onPointerMove={updateDrag}
+            onPointerUp={endDrag}
+            type="button"
+          />
+        )}
         {children}
       </section>
     </div>,

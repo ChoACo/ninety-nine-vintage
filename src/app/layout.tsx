@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { Suspense } from "react";
 import { ChatNotificationProvider } from "@/components/features/chat/ChatNotificationProvider";
 import { GlobalToastHost } from "@/components/features/notifications/GlobalToastHost";
 import { NotificationExperienceProvider } from "@/components/features/notifications/NotificationExperienceProvider";
 import { SimpleModeProvider } from "@/components/features/accessibility/SimpleModeProvider";
 import { ReturnScrollCapture } from "@/components/layout/ReturnScrollCapture";
 import { ScrollLockRecovery } from "@/components/layout/ScrollLockRecovery";
+import { NavigationProgress } from "@/components/layout/NavigationProgress";
 import "./globals.css";
 
 const themeInitializationScript = `
@@ -71,6 +73,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <ChatNotificationProvider>{children}</ChatNotificationProvider>
           </NotificationExperienceProvider>
         </SimpleModeProvider>
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
         <GlobalToastHost />
         <ReturnScrollCapture />
         <ScrollLockRecovery />

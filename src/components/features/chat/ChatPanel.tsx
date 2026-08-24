@@ -12,6 +12,11 @@ import {
   type FormEvent,
 } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  clientErrorFromPayload,
+  getClientErrorDetails,
+  reportClientError,
+} from "@/lib/clientErrors";
 import { OnboardingChatPanel } from "@/components/features/chat/OnboardingChatPanel";
 import {
   ImageAttachmentPicker,
@@ -58,12 +63,6 @@ interface ChatPanelProps {
   surface?: "desktop" | "mobile";
 }
 
-function messageError(payload: unknown, fallback: string) {
-  if (!payload || typeof payload !== "object") return fallback;
-  const problem = payload as { error?: string; message?: string };
-  return problem.message ?? problem.error ?? fallback;
-}
-
 export function ChatPanel({
   basePath = "",
   surface = "desktop",
@@ -81,6 +80,7 @@ export function ChatPanel({
   const [userId, setUserId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [refreshError, setRefreshError] = useState("");
   const [retryMessage, setRetryMessage] = useState<{
     body: string;
     clientNonce: string;
@@ -122,11 +122,19 @@ export function ChatPanel({
         ),
       ]);
       const payload = (await response.json().catch(() => null)) as {
+        code?: string;
         conversation?: ChatConversation;
+        error?: string;
+        message?: string;
         messages?: ChatMessage[];
+        stage?: string;
       } | null;
       if (!response.ok || !payload?.conversation) {
-        throw new Error(messageError(payload, "상담을 불러오지 못했습니다."));
+        throw clientErrorFromPayload(
+          payload,
+          "상담을 불러오지 못했습니다.",
+          response.status,
+        );
       }
       setConversation(payload.conversation);
       setSelectedStoreId(payload.conversation.store_id);
@@ -155,13 +163,19 @@ export function ChatPanel({
       headers: { Authorization: `Bearer ${session.access_token}` },
       cache: "no-store",
     });
-    const payload = (await response.json().catch(() => null)) as {
+      const payload = (await response.json().catch(() => null)) as {
+      code?: string;
       stores?: ChatStore[];
       conversations?: ChatConversation[];
+      error?: string;
+      message?: string;
+      stage?: string;
     } | null;
     if (!response.ok || !payload) {
-      throw new Error(
-        messageError(payload, "매장 상담 목록을 불러오지 못했습니다."),
+      throw clientErrorFromPayload(
+        payload,
+        "매장 상담 목록을 불러오지 못했습니다.",
+        response.status,
       );
     }
 
@@ -213,6 +227,7 @@ export function ChatPanel({
       nextConversations[0]?.store_id ??
       null;
     setSelectedStoreId(nextStoreId);
+    setRefreshError("");
     const nextConversation =
       nextConversations.find((item) => item.store_id === nextStoreId) ?? null;
     setConversation(nextConversation);
@@ -225,28 +240,50 @@ export function ChatPanel({
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void loadIndex().catch((error: unknown) =>
-        setNotice(
-          error instanceof Error
-            ? error.message
-            : "상담을 불러오지 못했습니다.",
-        ),
-      );
+      void loadIndex().catch((error: unknown) => {
+        const fallback = "상담을 불러오지 못했습니다.";
+        setNotice(getClientErrorDetails(error, fallback).message);
+        reportClientError(error, {
+          dedupeKey: "member-chat-initial-load",
+          fallback,
+        });
+      });
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadIndex]);
 
+  const handleRefreshFailure = useCallback((error: unknown) => {
+    const fallback = "새 메시지를 불러오지 못했습니다.";
+    setRefreshError(fallback);
+    reportClientError(error, {
+      dedupeKey: "member-chat-realtime-refresh",
+      fallback,
+    });
+  }, []);
+
   useEffect(() => {
     const reload = () => {
       if (token && conversation?.id) {
-        void loadMessages(conversation.id, token).catch(() => undefined);
+        void loadMessages(conversation.id, token)
+          .then(() => setRefreshError(""))
+          .catch(handleRefreshFailure);
       } else {
-        void loadIndex().catch(() => undefined);
+        void loadIndex().catch(handleRefreshFailure);
       }
     };
     window.addEventListener("ninety-nine:chat-message", reload);
     return () => window.removeEventListener("ninety-nine:chat-message", reload);
-  }, [conversation?.id, loadIndex, loadMessages, token]);
+  }, [conversation?.id, handleRefreshFailure, loadIndex, loadMessages, token]);
+
+  const retryRefresh = () => {
+    if (token && conversation?.id) {
+      void loadMessages(conversation.id, token)
+        .then(() => setRefreshError(""))
+        .catch(handleRefreshFailure);
+      return;
+    }
+    void loadIndex().catch(handleRefreshFailure);
+  };
 
   const selectedStore = useMemo(
     () => stores.find((store) => store.id === selectedStoreId) ?? null,
@@ -308,12 +345,19 @@ export function ChatPanel({
         }),
       });
       const payload = (await response.json().catch(() => null)) as {
-        message?: ChatMessage;
+        code?: string;
+        error?: string;
+        message?: ChatMessage | string;
         conversation?: ChatConversation;
+        stage?: string;
       } | null;
       const conversationId = payload?.conversation?.id ?? conversation?.id;
-      if (!response.ok || !payload?.message || !conversationId) {
-        throw new Error(messageError(payload, "메시지를 보내지 못했습니다."));
+      if (!response.ok || typeof payload?.message !== "object" || !conversationId) {
+        throw clientErrorFromPayload(
+          payload,
+          "메시지를 보내지 못했습니다.",
+          response.status,
+        );
       }
       setMessages((current) => [...current, payload.message as ChatMessage]);
       if (pendingImages.length > 0) {
@@ -331,9 +375,14 @@ export function ChatPanel({
       await loadIndex();
     } catch (error) {
       setRetryMessage({ body: outgoing, clientNonce });
-      setNotice(
-        error instanceof Error ? error.message : "메시지를 보내지 못했습니다.",
-      );
+      const fallback = "메시지를 보내지 못했습니다.";
+      setNotice(getClientErrorDetails(error, fallback).message);
+      reportClientError(error, {
+        dedupeKey: "member-chat-send",
+        fallback,
+        userMessage: "메시지를 보내지 못했습니다. 다시 시도해 주세요.",
+        visibility: "always",
+      });
     } finally {
       setBusy(false);
     }
@@ -547,6 +596,21 @@ export function ChatPanel({
                   같은 내용 재전송
                 </button>
               )}
+            </div>
+          )}
+          {refreshError && (
+            <div
+              className="flex min-h-11 flex-wrap items-center justify-between gap-3 border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900"
+              role="alert"
+            >
+              <span>{refreshError}</span>
+              <button
+                className="min-h-11 border border-amber-400 px-4 active:scale-[.98]"
+                onClick={retryRefresh}
+                type="button"
+              >
+                다시 불러오기
+              </button>
             </div>
           )}
         </div>

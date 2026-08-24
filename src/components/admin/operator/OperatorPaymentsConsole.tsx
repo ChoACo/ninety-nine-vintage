@@ -1,7 +1,7 @@
 "use client";
 
-import { CheckCircle2, Clock3, Pencil, RefreshCw, RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, Clock3, Pencil, RefreshCw, RotateCcw, Search, X } from "lucide-react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import {
@@ -194,6 +194,30 @@ function canCancelPendingPayment(payment: PaymentRow, ownerSurface: boolean) {
     payment.remainingAmount > 0;
 }
 
+function matchesPaymentSearch(payment: PaymentRow, rawQuery: string) {
+  const query = rawQuery.normalize("NFKC").trim().toLocaleLowerCase("ko-KR");
+  if (!query) return true;
+  const amounts = [
+    payment.expectedAmount,
+    payment.receivedAmount,
+    payment.remainingAmount,
+  ];
+  const searchable = [
+    payment.lastDepositorName ?? "",
+    payment.buyerName,
+    payment.reference,
+    ...amounts.flatMap((amount) => [
+      String(amount),
+      amount.toLocaleString("ko-KR"),
+      formatWon(amount),
+    ]),
+  ]
+    .join(" ")
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR");
+  return query.split(/\s+/u).every((token) => searchable.includes(token));
+}
+
 export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface?: boolean }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [actorId, setActorId] = useState<string | null>(null);
@@ -210,6 +234,8 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
   const [cancellationReason, setCancellationReason] = useState("");
   const [approvalNote, setApprovalNote] = useState("");
   const [notice, setNotice] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const beginBusy = (key: string) => {
     if (busyKeyRef.current) return false;
@@ -599,11 +625,21 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
     ...payments.filter((payment) => payment.remainingAmount > 0),
     ...payments.filter((payment) => payment.remainingAmount === 0),
   ], [payments]);
+  const visiblePayments = useMemo(
+    () => orderedPayments.filter((payment) =>
+      matchesPaymentSearch(payment, deferredSearchQuery),
+    ),
+    [deferredSearchQuery, orderedPayments],
+  );
+  const visibleSummary = useMemo(() => ({
+    pending: visiblePayments.filter((payment) => payment.remainingAmount > 0).length,
+    confirmed: visiblePayments.filter((payment) => payment.remainingAmount === 0).length,
+  }), [visiblePayments]);
   const selectedPayment = useMemo(
     () => payments.find((payment) => sessionKey(payment) === expandedKey) ?? null,
     [expandedKey, payments],
   );
-  const pendingCount = summary.pending;
+  const pendingCount = visibleSummary.pending;
 
   return (
     <div className="space-y-8">
@@ -630,6 +666,49 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
         <p className="text-[11px] text-muted">서버 기준 {formatAt(serverTime)}</p>
       </div>
 
+      {ownerSurface && (
+        <section className="border border-line bg-surface p-3 sm:p-4">
+          <label className="block text-xs font-black" htmlFor="owner-payment-search">
+            입금 대사 빠른 검색
+          </label>
+          <div className="relative mt-2">
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+              size={16}
+            />
+            <input
+              autoComplete="off"
+              className="min-h-11 w-full border border-line bg-paper pl-10 pr-12 text-base outline-none focus:border-ink sm:text-sm"
+              id="owner-payment-search"
+              inputMode="search"
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="입금자명 / 주문자명 / 입금액"
+              type="search"
+              value={searchQuery}
+            />
+            {searchQuery && (
+              <button
+                aria-label="입금 검색어 지우기"
+                className="absolute right-0 top-0 grid size-11 place-items-center active:scale-[0.98]"
+                onClick={() => setSearchQuery("")}
+                type="button"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <div aria-live="polite" className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted">
+            <p>이름과 금액을 함께 입력하면 모든 조건이 일치하는 건만 표시됩니다.</p>
+            <p className="font-bold text-ink">
+              {deferredSearchQuery.trim()
+                ? `검색 결과 ${visiblePayments.length}건 / 현재 페이지 ${payments.length}건`
+                : `현재 페이지 ${payments.length}건`}
+            </p>
+          </div>
+        </section>
+      )}
+
       <div className="overflow-hidden border border-line">
         <div className="hidden grid-cols-[minmax(120px,1fr)_minmax(180px,2fr)_120px_110px_150px] gap-4 border-b border-ink bg-surface px-4 py-3 text-[11px] font-bold text-muted md:grid">
           <span>회원</span>
@@ -639,9 +718,9 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
           <span className="text-center">처리</span>
         </div>
         <div className="border-b border-ink bg-paper px-4 py-3 text-xs font-black">
-          입금 확인 하기 · {summary.pending}건
+          입금 확인 하기 · {visibleSummary.pending}건
         </div>
-        {orderedPayments.map((payment, index) => {
+        {visiblePayments.map((payment, index) => {
           const key = sessionKey(payment);
           const pending = payment.remainingAmount > 0;
           const confirmable = payment.receivedAmount >= 0 && (
@@ -661,7 +740,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
             <div key={`${payment.paymentKind}:${payment.paymentId}`}>
               {index === pendingCount && (
                 <div className="border-y border-ink bg-ink px-4 py-3 text-xs font-black text-paper">
-                  입금 확인 완료 · 최근 7일 · {summary.confirmed}건
+                  입금 확인 완료 · 최근 7일 · {visibleSummary.confirmed}건
                 </div>
               )}
             <article className="border-b border-line last:border-b-0">
@@ -669,6 +748,11 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
                 <div className="min-w-0">
                   <p className="truncate text-xs font-black">{payment.buyerName}</p>
                   <p className="mt-1 text-[10px] text-muted">{kindLabel(payment.paymentKind)}</p>
+                  {payment.lastDepositorName && (
+                    <p className="mt-1 truncate text-[10px] font-bold text-amber-700">
+                      입금자 {payment.lastDepositorName}
+                    </p>
+                  )}
                 </div>
                 <button
                   className="min-w-0 text-left"
@@ -736,7 +820,13 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
             </div>
           );
         })}
-        {payments.length === 0 && <p className="py-16 text-center text-sm text-muted">표시할 입금 요청이 없습니다.</p>}
+        {visiblePayments.length === 0 && (
+          <p className="py-16 text-center text-sm text-muted">
+            {payments.length === 0
+              ? "표시할 입금 요청이 없습니다."
+              : "검색 조건과 일치하는 입금 요청이 없습니다."}
+          </p>
+        )}
       </div>
 
       <PremiumDialog

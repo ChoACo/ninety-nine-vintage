@@ -16,6 +16,8 @@ import { useCommerceStore } from "@/store/useCommerceStore";
 import { useCartStore } from "@/store/useCartStore";
 import { useToastStore } from "@/store/useToastStore";
 import { CatalogImage } from "@/components/ui/CatalogImage";
+import { CopyAccountButton } from "@/components/ui/CopyAccountButton";
+import { PaymentDeadlineCountdown } from "@/components/ui/PaymentDeadlineCountdown";
 import { PostcodeSearchButton } from "@/components/features/account/PostcodeSearchButton";
 import { usePlatformConfig } from "@/hooks/usePlatformConfig";
 
@@ -34,7 +36,13 @@ interface PublishedFixedProduct {
   sizeLabel?: string;
   conditionGrade?: "S" | "A" | "B" | "C";
   reservationExpiresAt?: string | null;
+  pendingLock?: ProductPendingLock | null;
   storeName?: string;
+}
+
+interface ProductPendingLock {
+  kind: "buy_now_payment";
+  until: string | null;
 }
 
 interface ShippingCharge {
@@ -67,6 +75,7 @@ interface CartProduct {
   store: { name: string };
   imageUrls: string[];
   reservationExpiresAt?: string | null;
+  pendingLock?: ProductPendingLock | null;
 }
 
 type CartAccess = "loading" | "member" | "guest";
@@ -89,6 +98,7 @@ class CheckoutSessionChangedError extends Error {
 interface CheckoutOrder {
   id: string;
   total: number;
+  payment_due_at?: string | null;
 }
 
 interface CheckoutTransfer {
@@ -98,6 +108,18 @@ interface CheckoutTransfer {
   depositor_name: string;
   expected_amount: number;
   status: "awaiting_transfer" | "partially_paid" | "confirmed";
+  payment_due_at?: string | null;
+}
+
+interface CheckoutReceipt {
+  accountNumber: string;
+  amount: number;
+  bankName: string;
+  depositorName: string;
+  dueAt: string | null;
+  orderId: string;
+  serverTime: string | null;
+  status: CheckoutTransfer["status"];
 }
 
 interface StoredCheckoutRequest {
@@ -268,7 +290,11 @@ function isCheckoutOrder(value: unknown): value is CheckoutOrder {
     typeof order.id === "string" &&
     order.id.length > 0 &&
     Number.isSafeInteger(order.total) &&
-    (order.total as number) > 0
+    (order.total as number) > 0 &&
+    (order.payment_due_at === undefined ||
+      order.payment_due_at === null ||
+      (typeof order.payment_due_at === "string" &&
+        Number.isFinite(Date.parse(order.payment_due_at))))
   );
 }
 
@@ -287,6 +313,10 @@ function isCheckoutTransfer(
     transfer.account_number_snapshot.trim().length > 0 &&
     typeof transfer.depositor_name === "string" &&
     transfer.depositor_name.trim().length > 0 &&
+    (transfer.payment_due_at === undefined ||
+      transfer.payment_due_at === null ||
+      (typeof transfer.payment_due_at === "string" &&
+        Number.isFinite(Date.parse(transfer.payment_due_at)))) &&
     ["awaiting_transfer", "partially_paid", "confirmed"].includes(
       transfer.status as string,
     )
@@ -436,6 +466,7 @@ function toCartProduct(product: PublishedFixedProduct): CartProduct {
     closesAt: product.closesAt,
     store: { name: product.storeName || "NINETY-NINE VINTAGE" },
     imageUrls: product.imageUrls,
+    pendingLock: product.pendingLock ?? null,
     reservationExpiresAt: product.reservationExpiresAt ?? null,
   };
 }
@@ -500,6 +531,8 @@ export function CartView({
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [depositorName, setDepositorName] = useState("");
   const [mobileSummaryExpanded, setMobileSummaryExpanded] = useState(false);
+  const [checkoutReceipt, setCheckoutReceipt] =
+    useState<CheckoutReceipt | null>(null);
   const [addressForm, setAddressForm] = useState({
     label: "집",
     recipientName: "",
@@ -737,6 +770,7 @@ export function CartView({
       setShippingAddresses([]);
       setShippingAddressId("");
       setDepositorName("");
+      setCheckoutReceipt(null);
       setIncludeShippingFee(true);
       setMessage("");
       setMessageKind("success");
@@ -877,8 +911,11 @@ export function CartView({
           : [];
         const nextShippingFee = Number(payload.shippingFee);
         const nextShippingAvailable = payload.shippingAvailable !== false;
+        const unlockedProductCount = cartProducts.filter(
+          (product) => !product.pendingLock,
+        ).length;
         if (
-          cartProducts.length > 0 &&
+          unlockedProductCount > 0 &&
           nextShippingAvailable &&
           (!Number.isSafeInteger(nextShippingFee) || nextShippingFee < 1)
         ) {
@@ -1023,6 +1060,22 @@ export function CartView({
     };
   }, [access]);
 
+  useEffect(() => {
+    if (access !== "member") return;
+    const refresh = () => cartRefreshRef.current?.();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const intervalId = window.setInterval(refresh, 15_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [access]);
+
   const products = useMemo(() => {
     // A prepared order is immutable. While it is pending, show and retry only
     // that persisted item set; newly added cart items belong to a later order.
@@ -1049,6 +1102,11 @@ export function CartView({
     selectedProductId,
   ]);
   const hasPendingCheckout = heldCheckoutIds.length > 0;
+  const pendingLockedProducts = useMemo(
+    () => products.filter((product) => Boolean(product.pendingLock)),
+    [products],
+  );
+  const hasPendingProductLock = pendingLockedProducts.length > 0;
   const pricing = useMemo(
     () =>
       deriveCartPricing(
@@ -1081,6 +1139,31 @@ export function CartView({
       ),
     [activeShippingCharges],
   );
+  const waivedShippingCharges = useMemo(
+    () =>
+      activeShippingCharges.filter(
+        (charge) => charge.amount > 0 && charge.vaultAmount === 0,
+      ),
+    [activeShippingCharges],
+  );
+
+  useEffect(() => {
+    const now = Date.now();
+    const nextUnlockAt = pendingLockedProducts
+      .flatMap((product) =>
+        product.pendingLock?.until ? [Date.parse(product.pendingLock.until)] : [],
+      )
+      .filter((timestamp) => Number.isFinite(timestamp) && timestamp > now)
+      .sort((left, right) => left - right)[0];
+    if (!nextUnlockAt) return;
+    const delay = Math.min(Math.max(nextUnlockAt - now + 500, 500), 15_000);
+    const timeoutId = window.setTimeout(
+      () => cartRefreshRef.current?.(),
+      delay,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [pendingLockedProducts]);
+
   const checkout = async () => {
     if (
       busy ||
@@ -1088,6 +1171,13 @@ export function CartView({
       products.length === 0
     )
       return;
+    if (hasPendingProductLock) {
+      setMessageKind("warning");
+      setMessage(
+        "다른 회원이 결제 중인 상품이 포함되어 있습니다. 선점이 해제되면 자동으로 다시 확인합니다.",
+      );
+      return;
+    }
     if (paymentMode !== "manual_transfer") {
       setMessageKind("error");
       setMessage(
@@ -1248,6 +1338,22 @@ export function CartView({
         throw new Error("주문 서버의 입금 요청 정보를 확인하지 못했습니다.");
       }
       const transfer = checkout.transfer;
+      const responseServerTime =
+        typeof checkout.serverTime === "string" &&
+        Number.isFinite(Date.parse(checkout.serverTime))
+          ? checkout.serverTime
+          : null;
+      setCheckoutReceipt({
+        accountNumber: transfer.account_number_snapshot,
+        amount: transfer.expected_amount,
+        bankName: transfer.bank_name_snapshot,
+        depositorName: transfer.depositor_name,
+        dueAt:
+          transfer.payment_due_at ?? checkout.order.payment_due_at ?? null,
+        orderId: checkout.order.id,
+        serverTime: responseServerTime,
+        status: transfer.status,
+      });
       removePurchasedFromCart(productIds);
       productIds.forEach(
         (productId) => void persistCart(productId, false, buyerId),
@@ -1331,12 +1437,15 @@ export function CartView({
   const checkoutDisabled =
     busy ||
     products.length === 0 ||
+    hasPendingProductLock ||
     paymentMode !== "manual_transfer" ||
     !shippingAddressId ||
     !depositorName.trim() ||
     !termsAccepted;
   const checkoutButtonLabel = busy
     ? "결제 준비 중..."
+    : hasPendingProductLock
+      ? "선점 상품 결제 대기 중"
     : paymentMode === "manual_transfer"
       ? "주문하고 입금계좌 확인"
       : "결제 설정 확인 중";
@@ -1427,6 +1536,46 @@ export function CartView({
           )}
         </div>
       )}
+      {checkoutReceipt && checkoutReceipt.status !== "confirmed" && (
+        <section
+          aria-labelledby="checkout-transfer-title"
+          className="rounded-2xl border border-emerald-300 bg-emerald-50/70 p-4 shadow-sm sm:p-5"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-[11px] font-black text-emerald-800">
+                주문 완료 · 입금 대기
+              </p>
+              <h2
+                className="mt-1 text-lg font-black tracking-tight"
+                id="checkout-transfer-title"
+              >
+                계좌이체 정보를 확인해 주세요
+              </h2>
+              <p className="mt-1 break-all font-mono text-[10px] text-muted">
+                주문 {checkoutReceipt.orderId}
+              </p>
+            </div>
+            <strong className="shrink-0 font-mono text-xl">
+              {checkoutReceipt.amount.toLocaleString("ko-KR")}원
+            </strong>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <CopyAccountButton
+              accountNumber={checkoutReceipt.accountNumber}
+              bankName={checkoutReceipt.bankName}
+            />
+            <PaymentDeadlineCountdown
+              dueAt={checkoutReceipt.dueAt}
+              serverTime={checkoutReceipt.serverTime}
+            />
+          </div>
+          <p className="mt-3 text-[11px] font-bold leading-5 text-emerald-900">
+            입금자명 {checkoutReceipt.depositorName}으로 정확한 금액을 입금해
+            주세요. 계좌번호 영역을 누르면 바로 복사됩니다.
+          </p>
+        </section>
+      )}
       {access === "loading" || productsLoading || cartLoading ? (
         <div className="border border-dashed border-line py-24 text-center">
           <p className="text-sm font-bold">장바구니를 불러오는 중입니다.</p>
@@ -1507,6 +1656,20 @@ export function CartView({
                       <p className="mt-2 text-xs text-muted">
                         {product.size} · {conditionLabels[product.condition]}
                       </p>
+                      {product.pendingLock ? (
+                        <div
+                          aria-label="다른 회원이 결제 진행 중인 선점 상품"
+                          className="mt-3 inline-flex rounded-full border border-amber-400 bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-900"
+                        >
+                          다른 회원이 결제 진행 중 (선점)
+                        </div>
+                      ) : null}
+                      {product.pendingLock?.until ? (
+                        <p className="mt-1 text-[10px] font-bold text-amber-800">
+                          결제 기한 또는 취소 처리 후 자동으로 구매 가능 여부를
+                          다시 확인합니다.
+                        </p>
+                      ) : null}
                     </div>
                     <button
                       aria-label="장바구니에서 삭제"
@@ -1537,6 +1700,18 @@ export function CartView({
                 {productTotal.toLocaleString("ko-KR")}원
               </strong>
             </div>
+            {waivedShippingCharges.length > 0 ? (
+              <div className="mt-5 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-emerald-900">
+                <p className="text-xs font-black">
+                  🎉 묶음배송 혜택: 배송비 0원 적용
+                </p>
+                <p className="mt-1 text-[11px] leading-5">
+                  이미 배송비를 결제한 센터의 배송권을 적용했습니다. 보관함에
+                  담아 두었다가 해당 센터 상품과 추가 결제 없이 묶음 배송할 수
+                  있습니다.
+                </p>
+              </div>
+            ) : null}
             <fieldset className="mt-5 grid gap-2">
               <legend className="mb-2 text-xs font-bold">상품 수령 방법</legend>
               <label
@@ -1996,7 +2171,7 @@ export function CartView({
             ) : null}
             <div className="mx-auto grid max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
               <button aria-controls="mobile-payment-breakdown" aria-expanded={mobileSummaryExpanded} className="min-h-[44px] min-w-0 rounded-xl px-2 text-left" onClick={() => setMobileSummaryExpanded((expanded) => !expanded)} type="button"><span className="block text-[10px] text-muted">총 {products.length}개 · 결제 예정 금액</span><strong className="block truncate font-mono text-lg">{expectedTotal.toLocaleString("ko-KR")}원</strong></button>
-              <button className="min-h-[44px] rounded-xl bg-ink px-5 text-sm font-black text-paper disabled:opacity-50" disabled={checkoutDisabled} onClick={() => void checkout()} type="button">결제하기</button>
+              <button className="min-h-[44px] rounded-xl bg-ink px-5 text-sm font-black text-paper disabled:opacity-50" disabled={checkoutDisabled} onClick={() => void checkout()} type="button">{hasPendingProductLock ? "선점 대기" : busy ? "준비 중..." : "결제하기"}</button>
             </div>
           </section>
         ) : null}

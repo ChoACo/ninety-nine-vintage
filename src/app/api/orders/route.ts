@@ -52,7 +52,7 @@ export async function GET(request: Request) {
       confirmationRequest,
     ]),
   );
-  return commerceJson({ orders: (orders ?? []).map((order) => ({
+  return commerceJson({ serverTime: new Date().toISOString(), orders: (orders ?? []).map((order) => ({
     ...order,
     transfer: transferByOrder.get(order.id) ?? null,
     paymentConfirmation: (() => {

@@ -12,14 +12,35 @@ const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
 test("category presets open the measurement fields per garment group", () => {
-  const topFields = measurementPresetForCategory("여성 · 상의 · 니트")?.fields;
+  const topFields = measurementPresetForCategory("여성 상의")?.fields;
   assert.deepEqual([...topFields], ["shoulder", "chest", "sleeve", "length"]);
-  const outerFields = measurementPresetForCategory("남성 · 아우터 · 코트")?.fields;
+  const outerFields = measurementPresetForCategory("남성 아우터")?.fields;
   assert.deepEqual([...outerFields], ["shoulder", "chest", "sleeve", "length"]);
-  const bottomFields = measurementPresetForCategory("여성 · 바지 · 데님/청바지")?.fields;
+  const bottomFields = measurementPresetForCategory("남성 하의")?.fields;
   assert.deepEqual([...bottomFields], ["waist", "rise", "thigh", "hem", "length"]);
-  const skirtFields = measurementPresetForCategory("여성 · 치마 · 미디스커트")?.fields;
-  assert.deepEqual([...skirtFields], ["waist", "rise", "thigh", "hem", "length"]);
+  const skirtFields = measurementPresetForCategory("원피스/스커트")?.fields;
+  assert.deepEqual([...skirtFields], ["chest", "waist", "hip", "length"]);
+  const batchSkirtFields = measurementPresetForCategory("여성 · 치마 · 미디스커트")?.fields;
+  assert.deepEqual([...batchSkirtFields], ["waist", "rise", "thigh", "hem", "length"]);
+});
+
+test("accessory categories use purpose-built specification fields", () => {
+  assert.deepEqual(
+    [...measurementPresetForCategory("신발").fields],
+    ["footLength", "footWidth", "heelHeight"],
+  );
+  assert.deepEqual(
+    [...measurementPresetForCategory("모자").fields],
+    ["circumference", "brimLength"],
+  );
+  assert.deepEqual(
+    [...measurementPresetForCategory("가방").fields],
+    ["width", "height", "depth"],
+  );
+  assert.deepEqual(
+    [...measurementPresetForCategory("벨트/지갑").fields],
+    ["width", "height", "totalLength"],
+  );
 });
 
 test("unknown, blank, and misc categories keep the form free of preset fields", () => {
@@ -52,8 +73,15 @@ test("measurement payloads are normalized to known positive centimeter keys", ()
 
 test("form strings are collected into numeric measurements for saving", () => {
   assert.deepEqual(
-    collectMeasurements({ shoulder: "45", chest: "", length: "70.5", waist: "abc" }),
-    { shoulder: 45, length: 70.5 },
+    collectMeasurements({
+      shoulder: "45",
+      chest: "",
+      length: "70.5",
+      waist: "abc",
+      footLength: "26.5",
+      heelHeight: "3",
+    }),
+    { shoulder: 45, length: 70.5, footLength: 26.5, heelHeight: 3 },
   );
 });
 

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
+  ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   ClipboardCheck,
   ChevronDown,
@@ -233,16 +233,17 @@ function MeasurementFields({
   onChange: (key: string, value: string) => void;
   values: Record<string, string>;
 }) {
-  const fields = measurementFieldsFor(category);
-  if (fields.length === 0) return null;
+  const preset = measurementPresetForCategory(category);
+  const fields = preset?.fields ?? [];
+  if (!preset || fields.length === 0) return null;
   return (
-    <fieldset className="sm:col-span-2">
-      <legend className="text-[10px] font-bold text-muted">
-        실측 치수 (cm){" "}
-        <span className="font-normal">
-          (카테고리 기준 자동 표시 · 측정한 항목만 입력)
-        </span>
+    <fieldset className="border border-line bg-surface p-3 sm:col-span-2 sm:p-4">
+      <legend className="px-1 text-xs font-black">
+        {preset.label} <span className="font-mono text-[10px] text-muted">CM</span>
       </legend>
+      <p className="mt-1 text-[10px] leading-4 text-muted">
+        선택한 카테고리에 맞춘 항목입니다. 측정한 값만 입력해 주세요.
+      </p>
       <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {fields.map((field) => (
           <label className="text-[10px] font-bold text-muted" key={field}>
@@ -965,6 +966,17 @@ export function OperatorProductsConsole({
     setSingleImages((current) => {
       const next = [...current];
       [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const setSingleImageAsCover = (id: string) => {
+    setSingleImages((current) => {
+      const index = current.findIndex((image) => image.id === id);
+      if (index <= 0) return current;
+      const next = [...current];
+      const [cover] = next.splice(index, 1);
+      next.unshift(cover);
       return next;
     });
   };
@@ -1941,7 +1953,7 @@ export function OperatorProductsConsole({
                 <div>
                   <p className="text-xs font-black">1. 상품 사진 선택</p>
                   <p className="mt-1 text-[11px] text-muted">
-                    최대 15장 · 표시된 순서대로 저장
+                    최대 15장 · 표시된 순서대로 저장 · 첫 사진이 대표
                     {quickAiBusy ? " · AI 분석 중…" : ""}
                   </p>
                   {selectedEntitlements && (
@@ -1996,9 +2008,14 @@ export function OperatorProductsConsole({
                 <ol className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                   {singleImages.map((image, index) => (
                     <li
-                      className="border border-line bg-surface p-2"
+                      className={`relative border bg-surface p-2 ${index === 0 ? "border-ink ring-1 ring-ink" : "border-line"}`}
                       key={image.id}
                     >
+                      {index === 0 && (
+                        <span className="absolute left-3 top-3 z-10 bg-ink px-2 py-1 text-[9px] font-black text-paper shadow-sm">
+                          대표 사진
+                        </span>
+                      )}
                       <CatalogImage
                         alt={`선택 사진 ${index + 1}`}
                         className="aspect-square w-full object-cover"
@@ -2007,28 +2024,37 @@ export function OperatorProductsConsole({
                       <p className="mt-2 truncate text-[10px] font-bold">
                         {index + 1}. {image.file.name}
                       </p>
+                      {index > 0 && (
+                        <button
+                          className="mt-2 min-h-11 w-full border border-ink px-2 text-[10px] font-black active:scale-[0.98]"
+                          onClick={() => setSingleImageAsCover(image.id)}
+                          type="button"
+                        >
+                          대표 지정
+                        </button>
+                      )}
                       <div className="mt-2 grid grid-cols-3 gap-1">
                         <button
                           aria-label={`${index + 1}번 사진 앞으로 이동`}
-                          className="grid place-items-center border border-line p-2 disabled:opacity-30"
+                          className="grid min-h-11 place-items-center border border-line active:scale-[0.98] disabled:opacity-30"
                           disabled={index === 0}
                           onClick={() => moveSingleImage(index, -1)}
                           type="button"
                         >
-                          <ArrowUp size={12} />
+                          <ArrowLeft size={14} />
                         </button>
                         <button
                           aria-label={`${index + 1}번 사진 뒤로 이동`}
-                          className="grid place-items-center border border-line p-2 disabled:opacity-30"
+                          className="grid min-h-11 place-items-center border border-line active:scale-[0.98] disabled:opacity-30"
                           disabled={index === singleImages.length - 1}
                           onClick={() => moveSingleImage(index, 1)}
                           type="button"
                         >
-                          <ArrowDown size={12} />
+                          <ArrowRight size={14} />
                         </button>
                         <button
                           aria-label={`${index + 1}번 사진 삭제`}
-                          className="grid place-items-center border border-red-200 p-2 text-red-700"
+                          className="grid min-h-11 place-items-center border border-red-200 text-red-700 active:scale-[0.98]"
                           onClick={() => removeSingleImage(image.id)}
                           type="button"
                         >

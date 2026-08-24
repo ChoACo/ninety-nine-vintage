@@ -146,6 +146,7 @@ async function checkoutWithManualTransfer(
     mode: "manual_transfer",
     order: checkout.order,
     transfer: { ...checkout.transfer, depositor_name: depositorName },
+    serverTime: new Date().toISOString(),
   }, 201);
 }
 

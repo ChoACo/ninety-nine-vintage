@@ -43,6 +43,7 @@ interface ProductSummary {
 }
 interface InventoryItem {
   id: string;
+  businessId: string | null;
   productId: string;
   title: string;
   imageUrl: string;
@@ -594,11 +595,20 @@ function AccountDashboardForSession({
       v2Storage.filter((item) => selectedInventoryItemIds.includes(item.id)),
     [selectedInventoryItemIds, v2Storage],
   );
+  const availableWaiverBusinessIds = useMemo(
+    () =>
+      new Set(
+        centerShippingTokens
+          .filter((token) => token.availableCount > 0)
+          .map((token) => token.businessId),
+      ),
+    [centerShippingTokens],
+  );
   const shippingSelectionSummary = useMemo(() => {
     const businessIds = [
       ...new Set(
         selectedInventoryItems
-          .map((item) => item.originStoreId)
+          .map((item) => item.businessId)
           .filter((id): id is string => Boolean(id)),
       ),
     ];
@@ -620,7 +630,7 @@ function AccountDashboardForSession({
       if (fee === undefined) feeKnown = false;
       else estimatedFee += fee;
     }
-    if (selectedInventoryItems.some((item) => !item.originStoreId)) {
+    if (selectedInventoryItems.some((item) => !item.businessId)) {
       feeKnown = false;
     }
     return {
@@ -1399,12 +1409,13 @@ function AccountDashboardForSession({
               </div>
             </div>
             {centerShippingTokens.length > 0 && (
-              <div className="mb-4 border border-line bg-surface p-3">
-                <p className="text-xs font-bold">센터별 배송비 결제 현황</p>
-                <p className="mt-1 text-[11px] leading-5 text-muted">
-                  배송비를 결제한 센터에는 보이지 않는 배송 토큰이 부여됩니다.
-                  토큰이 남아 있는 센터는 추가 결제 없이 배송 신청할 수 있으며,
-                  토큰을 모두 사용하면 해당 센터에 배송비만 따로 결제해 주세요.
+              <div className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-emerald-900">
+                <p className="text-xs font-black">
+                  🎉 묶음배송 혜택: 배송비 0원 적용
+                </p>
+                <p className="mt-1 text-[11px] leading-5">
+                  이미 배송비를 결제한 센터의 보관 상품은 배송권 1회를 사용해
+                  추가 결제 없이 묶음 배송할 수 있습니다.
                 </p>
                 <ul className="mt-2 space-y-1">
                   {centerShippingTokens.map((token) => (
@@ -1502,6 +1513,10 @@ function AccountDashboardForSession({
                       const isSelected = selectedInventoryItemIds.includes(
                         item.id,
                       );
+                      const hasShippingWaiver = Boolean(
+                        item.businessId &&
+                          availableWaiverBusinessIds.has(item.businessId),
+                      );
                       return (
                         <article
                           className={`relative border border-line bg-paper ${disabled ? "opacity-60" : ""}`}
@@ -1537,6 +1552,11 @@ function AccountDashboardForSession({
                             >
                               {item.title}
                             </p>
+                            {hasShippingWaiver ? (
+                              <p className="mt-2 inline-flex rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-800">
+                                묶음배송 배송비 0원
+                              </p>
+                            ) : null}
                             {item.originStoreId ? (
                               <Link
                                 aria-label={`${item.originStoreName ?? "판매 매장"} 매장 페이지로 이동`}
@@ -2280,17 +2300,19 @@ function AccountDashboardForSession({
         >
           <div className="min-w-0 flex-1">
             <p className="text-xs font-black">
-              선택 {selectedInventoryItems.length}개 ·{" "}
-              {shippingSelectionSummary.businessCount > 0 &&
-              shippingSelectionSummary.tokenAppliedCount ===
-                shippingSelectionSummary.businessCount
-                ? "배송비 면제 적용"
-                : `면제 ${shippingSelectionSummary.tokenAppliedCount}/${shippingSelectionSummary.businessCount}개 매장`}
+              {shippingSelectionSummary.feeKnown &&
+              shippingSelectionSummary.businessCount > 0 &&
+              shippingSelectionSummary.estimatedFee === 0
+                ? `선택 ${selectedInventoryItems.length}개 / 배송비 0원 / 추가 결제 없음`
+                : `선택 ${selectedInventoryItems.length}개 / 면제 ${shippingSelectionSummary.tokenAppliedCount}/${shippingSelectionSummary.businessCount}개 센터`}
             </p>
             <p className="mt-1 truncate font-mono text-sm font-black">
-              최종 배송비 {shippingSelectionSummary.feeKnown
+              {shippingSelectionSummary.feeKnown &&
+              shippingSelectionSummary.estimatedFee === 0
+                ? "보유 배송권 자동 적용"
+                : `최종 배송비 ${shippingSelectionSummary.feeKnown
                 ? `${shippingSelectionSummary.estimatedFee.toLocaleString("ko-KR")}원`
-                : "신청 시 서버 확정"}
+                : "신청 시 서버 확정"}`}
             </p>
           </div>
           <button

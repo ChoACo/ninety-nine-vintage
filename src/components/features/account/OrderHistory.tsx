@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CatalogImage } from "@/components/ui/CatalogImage";
+import { CopyAccountButton } from "@/components/ui/CopyAccountButton";
+import { PaymentDeadlineCountdown } from "@/components/ui/PaymentDeadlineCountdown";
 
 interface OrderItem {
   id: string;
@@ -120,6 +122,7 @@ function OrderProductCard({ basePath, item, surface }: { basePath: "" | "/m"; it
 
 export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?: "" | "/m"; surface?: "desktop" | "mobile" }) {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [serverTime, setServerTime] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [confirmationBusyOrderId, setConfirmationBusyOrderId] = useState<string | null>(null);
   const [confirmationNotice, setConfirmationNotice] = useState("");
@@ -242,13 +245,21 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
             fetch("/api/account/cancellations", { headers: { Authorization: `Bearer ${nextAccessToken}` }, cache: "no-store" }),
           ]);
           if (response.ok) {
-            const payload = (await response.json()) as { orders?: Order[] };
+            const payload = (await response.json()) as {
+              orders?: Order[];
+              serverTime?: string;
+            };
             if (
               active &&
               generation === requestGeneration &&
               currentUserId === nextUserId
             ) {
               setOrders(payload.orders ?? []);
+              setServerTime(
+                typeof payload.serverTime === "string"
+                  ? payload.serverTime
+                  : null,
+              );
               if (cancellationResponse.ok) {
                 const cancellationPayload = await cancellationResponse.json() as { cancellations?: Array<{ product_id: string; status: string }> };
                 setCancellationByProduct(Object.fromEntries((cancellationPayload.cancellations ?? []).map((item) => [item.product_id, item.status])));
@@ -364,12 +375,33 @@ export function OrderHistory({ basePath = "", surface = "mobile" }: { basePath?:
                 ))}
               </div>
               {order.status === "awaiting_payment" && order.transfer && (
-                <p className="mt-4 border border-amber-200 bg-amber-500/10 px-3 py-3 text-[11px] leading-5 text-amber-900">
-                  {order.transfer.expected_amount.toLocaleString("ko-KR")}원 ·{" "}
-                  {order.transfer.bank_name_snapshot}{" "}
-                  {order.transfer.account_number_snapshot}로 입금해 주세요. 입금
-                  확인 후 상품이 보관함으로 이동하며, 보관 기간은 결제 완료 시점부터 계산됩니다.
-                </p>
+                <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-950">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-black">무통장 입금 안내</p>
+                    <strong className="shrink-0 font-mono text-sm">
+                      {order.transfer.expected_amount.toLocaleString("ko-KR")}원
+                    </strong>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <CopyAccountButton
+                      accountNumber={order.transfer.account_number_snapshot}
+                      bankName={order.transfer.bank_name_snapshot}
+                    />
+                    <PaymentDeadlineCountdown
+                      dueAt={
+                        order.transfer.payment_due_at ??
+                        order.payment_due_at ??
+                        null
+                      }
+                      serverTime={serverTime}
+                    />
+                  </div>
+                  <p className="mt-2 text-[11px] font-bold leading-5">
+                    계좌번호를 누르면 즉시 복사됩니다. 입금 확인 후 상품이
+                    보관함으로 이동하며 보관 기간은 결제 완료 시점부터
+                    계산됩니다.
+                  </p>
+                </div>
               )}
               {order.legacyPaymentHistory && (
                 <p className="mt-4 border border-line bg-surface px-3 py-3 text-[11px] leading-5 text-muted">

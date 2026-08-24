@@ -3,9 +3,28 @@ import { authenticateOwnerAccessRequest, ownerAccessErrorResponse, ownerAccessJs
 export async function GET(request: Request) {
   try {
     const access = await authenticateOwnerAccessRequest(request);
-    const { data, error } = await access.admin.from("auction_emergency_control").select("paused,paused_at,reason,updated_at,updated_by").eq("singleton", true).single();
-    if (error) return ownerAccessJsonResponse({ error: "auction_emergency_state_unavailable" }, 503);
-    return ownerAccessJsonResponse(data);
+    const [stateResult, activeAuctionResult] = await Promise.all([
+      access.admin
+        .from("auction_emergency_control")
+        .select("paused,paused_at,reason,updated_at,updated_by")
+        .eq("singleton", true)
+        .single(),
+      access.admin
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .eq("sale_type", "auction")
+        .eq("status", "active"),
+    ]);
+    if (stateResult.error || activeAuctionResult.error) {
+      return ownerAccessJsonResponse(
+        { error: "auction_emergency_state_unavailable" },
+        503,
+      );
+    }
+    return ownerAccessJsonResponse({
+      ...stateResult.data,
+      activeAuctionCount: activeAuctionResult.count ?? 0,
+    });
   } catch (error) { return ownerAccessErrorResponse(error); }
 }
 

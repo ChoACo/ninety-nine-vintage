@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  Check,
   CheckCircle2,
   ChevronDown,
+  ClipboardList,
   PackageCheck,
   RefreshCw,
   Truck,
@@ -12,6 +14,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CatalogImage } from "@/components/ui/CatalogImage";
+import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { useOperatorOptimisticStore } from "@/store/useOperatorOptimisticStore";
 import {
   formatStorageDday,
@@ -25,6 +28,7 @@ type ShipmentAction = "complete" | "pack" | "ship" | "tracking_update" | "tracki
 type ShippingForm = { courier: string; customCourier: string; trackingNumber: string; note: string };
 type AddressReveal = { address: AddressSnapshot; expiresAt: string };
 type ShippingConsoleView = "requests" | "completed" | "history";
+type ShippingConsolePresentation = "full" | "picking-summary";
 type StorageExpiryFilter = "all" | "today" | "within_2" | "past";
 type ShipmentSortOrder = "recent" | "expiry";
 
@@ -216,6 +220,153 @@ function activeItems(shipment: InventoryShipment) {
   return shipment.items.filter((item) => item.lineStatus !== "excluded" && item.lineStatus !== "cancelled");
 }
 
+function PickingListDialog({
+  onClose,
+  shipment,
+}: Readonly<{
+  onClose: () => void;
+  shipment: InventoryShipment;
+}>) {
+  const items = activeItems(shipment);
+  const [pickedItemIds, setPickedItemIds] = useState<Set<string>>(new Set());
+  const pickedCount = pickedItemIds.size;
+  const allPicked = items.length > 0 && pickedCount === items.length;
+
+  const toggleItem = (inventoryItemId: string) => {
+    setPickedItemIds((current) => {
+      const next = new Set(current);
+      if (next.has(inventoryItemId)) next.delete(inventoryItemId);
+      else next.add(inventoryItemId);
+      return next;
+    });
+  };
+
+  return (
+    <PremiumDialog
+      ariaLabel={`${shipment.memberName} 묶음 출고 피킹 리스트`}
+      onClose={onClose}
+      open
+      panelClassName="max-w-3xl rounded-none"
+    >
+      <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-line bg-paper p-4 sm:p-5">
+        <div>
+          <p className="eyebrow text-muted">묶음 출고 / 피킹</p>
+          <h2 className="mt-1 text-lg font-black">
+            묶음 출고 {items.length}건 피킹 리스트
+          </h2>
+          <p className="mt-1 text-xs text-muted">
+            {shipment.memberName} · 배송 {shipment.id.slice(0, 8).toUpperCase()}
+          </p>
+        </div>
+        <button
+          aria-label="피킹 리스트 닫기"
+          className="grid size-11 shrink-0 place-items-center border border-line active:scale-[0.98]"
+          onClick={onClose}
+          type="button"
+        >
+          <X size={17} />
+        </button>
+      </div>
+
+      <div className="p-4 sm:p-5">
+        <div className="border border-line bg-surface p-3 sm:p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-black">피킹 진행 {pickedCount}/{items.length}</p>
+            <button
+              className="min-h-11 border border-ink px-3 text-[11px] font-black active:scale-[0.98]"
+              onClick={() =>
+                setPickedItemIds(
+                  allPicked
+                    ? new Set()
+                    : new Set(items.map((item) => item.inventoryItemId)),
+                )
+              }
+              type="button"
+            >
+              {allPicked ? "전체 해제" : "전체 피킹 확인"}
+            </button>
+          </div>
+          <div
+            aria-label={`피킹 진행률 ${pickedCount}/${items.length}`}
+            aria-valuemax={items.length}
+            aria-valuemin={0}
+            aria-valuenow={pickedCount}
+            className="mt-3 h-2 overflow-hidden bg-line"
+            role="progressbar"
+          >
+            <div
+              className="h-full origin-left bg-emerald-600 transition-transform duration-200"
+              style={{ transform: `scaleX(${items.length > 0 ? pickedCount / items.length : 0})` }}
+            />
+          </div>
+        </div>
+
+        <ol className="mt-4 space-y-2">
+          {items.map((item, index) => {
+            const picked = pickedItemIds.has(item.inventoryItemId);
+            return (
+              <li key={item.inventoryItemId}>
+                <label
+                  className={`flex min-h-20 cursor-pointer items-center gap-3 border p-3 transition-colors active:scale-[0.995] ${picked ? "border-emerald-600 bg-emerald-50" : "border-line bg-paper"}`}
+                >
+                  <input
+                    checked={picked}
+                    className="sr-only"
+                    onChange={() => toggleItem(item.inventoryItemId)}
+                    type="checkbox"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className={`grid size-11 shrink-0 place-items-center border font-mono text-sm font-black ${picked ? "border-emerald-600 bg-emerald-600 text-white" : "border-line"}`}
+                  >
+                    {picked ? <Check size={18} /> : index + 1}
+                  </span>
+                  <span className="size-16 shrink-0 overflow-hidden bg-surface">
+                    {item.imageUrl ? (
+                      <CatalogImage
+                        alt=""
+                        className="h-full w-full object-cover"
+                        sizes="64px"
+                        src={item.imageUrl}
+                      />
+                    ) : (
+                      <span className="grid h-full place-items-center text-[9px] text-muted">
+                        사진 없음
+                      </span>
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="line-clamp-2 text-xs font-black">{item.title}</span>
+                    <span className="mt-1 block text-[10px] text-muted">
+                      {item.originStoreName} · 보관품 {item.inventoryItemId.slice(-8).toUpperCase()}
+                    </span>
+                    {item.isBlocked && (
+                      <span className="mt-1 block text-[10px] font-black text-amber-700">
+                        출고 전 확인 필요
+                      </span>
+                    )}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+        </ol>
+
+        <p className="mt-4 break-keep text-[10px] leading-4 text-muted">
+          체크 상태는 현장 피킹 확인용이며 출고 상태나 송장 정보는 변경하지 않습니다.
+        </p>
+        <button
+          className={`mt-4 min-h-11 w-full px-4 text-xs font-black active:scale-[0.98] ${allPicked ? "bg-emerald-600 text-white" : "border border-line"}`}
+          onClick={onClose}
+          type="button"
+        >
+          {allPicked ? "피킹 확인 완료 · 닫기" : "리스트 닫기"}
+        </button>
+      </div>
+    </PremiumDialog>
+  );
+}
+
 function shipmentDaysLeft(shipment: InventoryShipment): number | null {
   if (!shipment.storageExpiresAt) return null;
   const parsed = Date.parse(shipment.storageExpiresAt);
@@ -299,9 +450,11 @@ function sessionKey(shipment: InventoryShipment, action: ShipmentAction, form?: 
 }
 
 export function OperatorShippingConsole({
+  presentation = "full",
   staffLabel = "운영자",
   view = "requests",
 }: Readonly<{
+  presentation?: ShippingConsolePresentation;
   staffLabel?: string;
   view?: ShippingConsoleView;
 }>) {
@@ -316,6 +469,7 @@ export function OperatorShippingConsole({
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [trackingModalShipment, setTrackingModalShipment] = useState<InventoryShipment | null>(null);
+  const [pickingModalShipment, setPickingModalShipment] = useState<InventoryShipment | null>(null);
   const [expiryFilter, setExpiryFilter] = useState<StorageExpiryFilter>("all");
   const [sortOrder, setSortOrder] = useState<ShipmentSortOrder>("recent");
   const setOptimisticShipmentStatus = useOperatorOptimisticStore((state) => state.setShipmentStatus);
@@ -553,6 +707,10 @@ export function OperatorShippingConsole({
     () => shipments.filter((shipment) => shipment.status === "shipped"),
     [shipments],
   );
+  const bundledShipments = useMemo(
+    () => activeShipments.filter((shipment) => activeItems(shipment).length > 1),
+    [activeShipments],
+  );
   const activeMemberGroups = useMemo(() => {
     const groups = groupShipmentsByMember(visibleActiveShipments);
     if (sortOrder !== "expiry") return groups;
@@ -596,8 +754,84 @@ export function OperatorShippingConsole({
     },
   }[view];
 
+  if (presentation === "picking-summary") {
+    return (
+      <section className="border border-line bg-paper" id="bundled-picking-queue">
+        <div className="flex flex-col justify-between gap-3 border-b border-line p-4 sm:flex-row sm:items-center sm:p-5">
+          <div>
+            <p className="eyebrow text-muted">준비·배송 바로가기</p>
+            <h2 className="mt-2 flex items-center gap-2 text-lg font-black">
+              <ClipboardList size={18} /> 묶음 출고 피킹
+            </h2>
+            <p className="mt-1 break-keep text-xs text-muted">
+              보관함에서 함께 배송 신청된 상품만 모아 현장에서 바로 확인합니다.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="min-h-11 border border-line px-3 text-xs font-bold active:scale-[0.98]"
+              onClick={refresh}
+              type="button"
+            >
+              <span className="inline-flex items-center gap-2"><RefreshCw size={13} /> 새로고침</span>
+            </button>
+            <Link
+              className="inline-flex min-h-11 items-center justify-center bg-ink px-4 text-xs font-black text-paper active:scale-[0.98]"
+              href="/admin/operator/shipping#bundled-picking-queue"
+            >
+              전체 출고 큐
+            </Link>
+          </div>
+        </div>
+        {notice && (
+          <p aria-live="polite" className="border-b border-line bg-surface px-4 py-3 text-xs">
+            {notice}
+          </p>
+        )}
+        <div className="p-4 sm:p-5">
+          <p className="text-xs font-bold">
+            묶음 배송 {bundledShipments.length}건 · 피킹 상품 {bundledShipments.reduce((sum, shipment) => sum + activeItems(shipment).length, 0)}개
+          </p>
+          {bundledShipments.length > 0 ? (
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {bundledShipments.map((shipment) => (
+                <button
+                  className="flex min-h-16 items-center justify-between gap-3 border border-line p-3 text-left active:scale-[0.995] hover:border-ink"
+                  key={shipment.id}
+                  onClick={() => setPickingModalShipment(shipment)}
+                  type="button"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-black">{shipment.memberName}</span>
+                    <span className="mt-1 block font-mono text-[10px] text-muted">
+                      배송 {shipment.id.slice(0, 8).toUpperCase()}
+                    </span>
+                  </span>
+                  <span className="shrink-0 bg-ink px-3 py-2 text-[10px] font-black text-paper">
+                    묶음 출고 {activeItems(shipment).length}건 피킹 리스트
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 border border-dashed border-line px-4 py-8 text-center text-xs text-muted">
+              현재 피킹할 묶음 출고 요청이 없습니다.
+            </p>
+          )}
+        </div>
+        {pickingModalShipment && (
+          <PickingListDialog
+            key={pickingModalShipment.id}
+            onClose={() => setPickingModalShipment(null)}
+            shipment={pickingModalShipment}
+          />
+        )}
+      </section>
+    );
+  }
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" id="bundled-picking-queue">
       <div className="flex flex-col items-stretch justify-between gap-5 border-b border-ink pb-6 sm:flex-row sm:items-end">
         <div>
           <p className="eyebrow text-muted">{staffLabel} / 택배</p>
@@ -750,7 +984,18 @@ export function OperatorShippingConsole({
               </div>
 
               <div className="mt-5 border-t border-line pt-4">
-                <p className="text-xs font-bold">신청 상품</p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-bold">신청 상품</p>
+                  {activeItems(shipment).length > 1 && (
+                    <button
+                      className="min-h-11 border border-ink px-3 text-[10px] font-black active:scale-[0.98]"
+                      onClick={() => setPickingModalShipment(shipment)}
+                      type="button"
+                    >
+                      묶음 출고 {activeItems(shipment).length}건 피킹 리스트
+                    </button>
+                  )}
+                </div>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3 lg:grid-cols-5">
                   {shipment.items.map((item) => (
                     <div className="border border-line p-2" key={item.inventoryItemId}>
@@ -909,6 +1154,13 @@ export function OperatorShippingConsole({
             </div>
           </div>
         </div>
+      )}
+      {pickingModalShipment && (
+        <PickingListDialog
+          key={pickingModalShipment.id}
+          onClose={() => setPickingModalShipment(null)}
+          shipment={pickingModalShipment}
+        />
       )}
     </div>
   );

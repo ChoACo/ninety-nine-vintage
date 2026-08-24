@@ -333,7 +333,9 @@ export async function GET(request: Request) {
       ? Promise.resolve({ data: [], error: null })
       : auth.admin
           .from("customer_inventory_items")
-          .select("id, storage_class_snapshot, storage_duration_days")
+          .select(
+            "id, business_id, storage_class_snapshot, storage_duration_days",
+          )
           .in(
             "id",
             data.items.map((item) => item.id),
@@ -406,6 +408,7 @@ export async function GET(request: Request) {
       const details = inventoryDetails.get(item.id);
       return {
         ...item,
+        businessId: details?.business_id ?? null,
         storageClass: details?.storage_class_snapshot ?? "small",
         storageDurationDays: details?.storage_duration_days ?? 14,
       };

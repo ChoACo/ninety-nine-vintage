@@ -32,9 +32,14 @@ test("checkout snapshots one immutable charge per store or fulfillment group", a
   assert.match(cartRoute, /chargesAreValid/);
   assert.match(cartRoute, /auth\.user\.rpc\([\s\S]{0,100}"can_purchase_product"/);
   assert.match(cartRoute, /p_product_ids:\s*purchasableIds/);
-  assert.match(cartRoute, /staleProductIds:\s*ids\.filter\(\(id\) => !purchasableIdSet\.has\(id\)\)/);
+  assert.match(cartRoute, /pendingLockByProductId/);
+  assert.match(cartRoute, /\.neq\("member_id", auth\.userId\)/);
+  assert.match(cartRoute, /visibleProductIds = \[[\s\S]*?\.\.\.purchasableIds,[\s\S]*?\.\.\.lockedProducts/);
+  assert.match(cartRoute, /staleProductIds:\s*ids\.filter\(\(id\) => !visibleProductIdSet\.has\(id\)\)/);
   assert.match(cartRoute, /charge\.unitKind === "store"/);
   assert.match(cartView, /현재 계정으로 구매할 수 없는 상품/);
+  assert.match(cartView, /다른 회원이 결제 진행 중 \(선점\)/);
+  assert.match(cartView, /hasPendingProductLock/);
   assert.match(cartView, /처리\{" "\}[\s\S]*?\{charge\.billingStoreName\}/);
   assert.match(cartView, /charge\.products[\s\S]*?\.map/);
 });

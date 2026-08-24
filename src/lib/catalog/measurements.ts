@@ -10,7 +10,13 @@ export type MeasurementKey =
   | "length"
   | "width"
   | "height"
-  | "depth";
+  | "depth"
+  | "circumference"
+  | "brimLength"
+  | "footLength"
+  | "footWidth"
+  | "heelHeight"
+  | "totalLength";
 
 export const MEASUREMENT_LABELS: Readonly<Record<MeasurementKey, string>> = {
   shoulder: "어깨",
@@ -25,6 +31,12 @@ export const MEASUREMENT_LABELS: Readonly<Record<MeasurementKey, string>> = {
   width: "가로",
   height: "세로",
   depth: "폭",
+  circumference: "둘레",
+  brimLength: "챙 길이",
+  footLength: "발길이",
+  footWidth: "발볼",
+  heelHeight: "굽 높이",
+  totalLength: "전체 길이",
 };
 
 const MEASUREMENT_KEY_ORDER: readonly MeasurementKey[] = [
@@ -40,38 +52,90 @@ const MEASUREMENT_KEY_ORDER: readonly MeasurementKey[] = [
   "width",
   "height",
   "depth",
+  "circumference",
+  "brimLength",
+  "footLength",
+  "footWidth",
+  "heelHeight",
+  "totalLength",
 ];
 
 export interface MeasurementPreset {
   fields: readonly MeasurementKey[];
+  label: string;
 }
 
 export const MEASUREMENT_PRESETS: Readonly<
-  Record<"top" | "outer" | "bottom" | "onepiece" | "jumpsuit" | "setup" | "goods", MeasurementPreset>
+  Record<
+    | "top"
+    | "outer"
+    | "bottom"
+    | "onepiece"
+    | "jumpsuit"
+    | "setup"
+    | "bag"
+    | "hat"
+    | "shoes"
+    | "beltWallet"
+    | "goods",
+    MeasurementPreset
+  >
 > = {
-  top: { fields: ["shoulder", "chest", "sleeve", "length"] },
-  outer: { fields: ["shoulder", "chest", "sleeve", "length"] },
-  bottom: { fields: ["waist", "rise", "thigh", "hem", "length"] },
-  onepiece: { fields: ["chest", "waist", "hip", "length"] },
-  jumpsuit: { fields: ["chest", "waist", "thigh", "hem", "length"] },
+  top: {
+    fields: ["shoulder", "chest", "sleeve", "length"],
+    label: "상의 실측",
+  },
+  outer: {
+    fields: ["shoulder", "chest", "sleeve", "length"],
+    label: "아우터 실측",
+  },
+  bottom: {
+    fields: ["waist", "rise", "thigh", "hem", "length"],
+    label: "하의 실측",
+  },
+  onepiece: {
+    fields: ["chest", "waist", "hip", "length"],
+    label: "원피스 실측",
+  },
+  jumpsuit: {
+    fields: ["chest", "waist", "thigh", "hem", "length"],
+    label: "점프수트 실측",
+  },
   setup: {
     fields: ["shoulder", "chest", "sleeve", "length", "waist", "hem"],
+    label: "셋업 실측",
   },
-  goods: { fields: ["width", "height", "depth"] },
+  bag: { fields: ["width", "height", "depth"], label: "가방 규격" },
+  hat: { fields: ["circumference", "brimLength"], label: "모자 규격" },
+  shoes: {
+    fields: ["footLength", "footWidth", "heelHeight"],
+    label: "신발 규격",
+  },
+  beltWallet: {
+    fields: ["width", "height", "totalLength"],
+    label: "벨트·지갑 규격",
+  },
+  goods: { fields: ["width", "height", "depth"], label: "잡화 규격" },
 };
 
 const GROUP_PRESETS: Readonly<Record<string, MeasurementPreset | null>> = {
   상의: MEASUREMENT_PRESETS.top,
   아우터: MEASUREMENT_PRESETS.outer,
+  하의: MEASUREMENT_PRESETS.bottom,
   바지: MEASUREMENT_PRESETS.bottom,
   치마: MEASUREMENT_PRESETS.bottom,
   원피스: MEASUREMENT_PRESETS.onepiece,
+  스커트: MEASUREMENT_PRESETS.bottom,
   점프수트: MEASUREMENT_PRESETS.jumpsuit,
+  셋업: MEASUREMENT_PRESETS.setup,
   "셋업/세트": MEASUREMENT_PRESETS.setup,
   액세서리: MEASUREMENT_PRESETS.goods,
   잡화: MEASUREMENT_PRESETS.goods,
-  가방: MEASUREMENT_PRESETS.goods,
-  신발: MEASUREMENT_PRESETS.goods,
+  가방: MEASUREMENT_PRESETS.bag,
+  모자: MEASUREMENT_PRESETS.hat,
+  신발: MEASUREMENT_PRESETS.shoes,
+  "벨트/지갑": MEASUREMENT_PRESETS.beltWallet,
+  "기타 잡화": MEASUREMENT_PRESETS.goods,
 };
 
 export function measurementPresetForCategory(

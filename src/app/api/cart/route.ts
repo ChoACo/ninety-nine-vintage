@@ -102,12 +102,11 @@ export async function GET(request: Request) {
       shippingAvailable: true,
     });
   }
-  const { data: products, error: productError } = await auth.user
+  const { data: products, error: productError } = await admin
     .from("products")
     .select("*,stores(name,slug)")
     .in("id", ids)
     .eq("sale_type", "fixed")
-    .eq("status", "active")
     .lte("publish_at", new Date().toISOString());
   if (productError) {
     console.error("[cart:get] product relation query failed", {
@@ -116,7 +115,10 @@ export async function GET(request: Request) {
     });
     return commerceJson({ error: "cart_unavailable" }, 503);
   }
-  const liveIds = (products ?? []).map((product) => product.id);
+  const activeProducts = (products ?? []).filter(
+    (product) => product.status === "active",
+  );
+  const liveIds = activeProducts.map((product) => product.id);
   const eligibility = await Promise.all(
     liveIds.map(async (productId) => {
       const { data: canPurchase, error: eligibilityError } =
@@ -140,21 +142,112 @@ export async function GET(request: Request) {
     .filter((result) => result.canPurchase)
     .map((result) => result.productId);
   const purchasableIdSet = new Set(purchasableIds);
-  const purchasableProducts = (products ?? []).filter((product) =>
+  const purchasableProducts = activeProducts.filter((product) =>
     purchasableIdSet.has(product.id),
   );
+
+  const { data: orderItemRows, error: orderItemError } = await admin
+    .from("commerce_order_items")
+    .select("order_id, product_id")
+    .in("product_id", ids);
+  if (orderItemError) {
+    console.error("[cart:get] pending lock item query failed", {
+      code: orderItemError.code,
+      message: orderItemError.message,
+    });
+    return commerceJson({ error: "cart_unavailable" }, 503);
+  }
+  const candidateOrderIds = [
+    ...new Set((orderItemRows ?? []).map((item) => item.order_id)),
+  ];
+  const [orderRowsResult, transferRowsResult] =
+    candidateOrderIds.length === 0
+      ? [
+          { data: [], error: null },
+          { data: [], error: null },
+        ]
+      : await Promise.all([
+          admin
+            .from("commerce_orders")
+            .select("id, member_id, status, payment_due_at")
+            .in("id", candidateOrderIds)
+            .in("status", ["awaiting_payment", "partially_paid"])
+            .neq("member_id", auth.userId),
+          admin
+            .from("commerce_order_transfers")
+            .select("order_id, status, payment_due_at")
+            .in("order_id", candidateOrderIds)
+            .in("status", ["awaiting_transfer", "partially_paid"]),
+        ]);
+  if (orderRowsResult.error || transferRowsResult.error) {
+    console.error("[cart:get] pending lock ledger query failed", {
+      orderCode: orderRowsResult.error?.code,
+      transferCode: transferRowsResult.error?.code,
+    });
+    return commerceJson({ error: "cart_unavailable" }, 503);
+  }
+  const orderById = new Map(
+    (orderRowsResult.data ?? []).map((order) => [order.id, order]),
+  );
+  const transferByOrderId = new Map(
+    (transferRowsResult.data ?? []).map((transfer) => [
+      transfer.order_id,
+      transfer,
+    ]),
+  );
+  const pendingLockByProductId = new Map<
+    string,
+    { kind: "buy_now_payment"; until: string | null }
+  >();
+  for (const item of orderItemRows ?? []) {
+    const order = orderById.get(item.order_id);
+    const transfer = transferByOrderId.get(item.order_id);
+    if (!order || !transfer) continue;
+    const dueTimestamps = [order.payment_due_at, transfer.payment_due_at]
+      .flatMap((value) =>
+        value && Number.isFinite(Date.parse(value)) ? [value] : [],
+      )
+      .sort((left, right) => Date.parse(right) - Date.parse(left));
+    pendingLockByProductId.set(item.product_id, {
+      kind: "buy_now_payment",
+      until: dueTimestamps[0] ?? null,
+    });
+  }
+  const lockedProducts = (products ?? []).filter(
+    (product) =>
+      product.status === "closed" && pendingLockByProductId.has(product.id),
+  );
+  const visibleProductIds = [
+    ...purchasableIds,
+    ...lockedProducts.map((product) => product.id),
+  ];
+  const visibleProductIdSet = new Set(visibleProductIds);
   if (purchasableIds.length === 0) {
+    const items = lockedProducts.map(mapPublishedProduct).map((product) => ({
+      ...product,
+      imageUrls: product.imageUrls.map((image) => getCatalogImageUrl(image)),
+      thumbnailUrls: product.thumbnailUrls.map((image) =>
+        getCatalogImageUrl(image, 320),
+      ),
+      pendingLock: pendingLockByProductId.get(product.id) ?? null,
+      reservationExpiresAt:
+        reservations.find((reservation) => reservation.product_id === product.id)
+          ?.reserved_until ?? null,
+    }));
     return commerceJson({
-      items: [],
+      items,
       paymentMode,
-      productIds: [],
-      reservations: [],
+      productIds: visibleProductIds,
+      reservations: reservations.map((reservation) => ({
+        productId: reservation.product_id,
+        reservedUntil: reservation.reserved_until,
+      })),
       serverTime: reservations[0]?.server_time ?? null,
       shippingFee: 0,
       shippingCharges: [],
       shippingAvailable: true,
       quoteTotal: 0,
-      staleProductIds: ids,
+      staleProductIds: ids.filter((id) => !visibleProductIdSet.has(id)),
     });
   }
   const shippingRegion =
@@ -252,18 +345,21 @@ export async function GET(request: Request) {
       reservation.reserved_until,
     ]),
   );
-  const items = purchasableProducts.map(mapPublishedProduct).map((product) => ({
+  const items = [...purchasableProducts, ...lockedProducts]
+    .map(mapPublishedProduct)
+    .map((product) => ({
     ...product,
     imageUrls: product.imageUrls.map((image) => getCatalogImageUrl(image)),
     thumbnailUrls: product.thumbnailUrls.map((image) =>
       getCatalogImageUrl(image, 320),
     ),
+    pendingLock: pendingLockByProductId.get(product.id) ?? null,
     reservationExpiresAt: reservationByProduct.get(product.id) ?? null,
-  }));
+    }));
   return commerceJson({
     items,
     paymentMode,
-    productIds: purchasableIds,
+    productIds: visibleProductIds,
     reservations: reservations.map((reservation) => ({
       productId: reservation.product_id,
       reservedUntil: reservation.reserved_until,
@@ -279,7 +375,7 @@ export async function GET(request: Request) {
     quoteTotal: shippingAvailable
       ? Number(quote?.total)
       : Number(quote?.productSubtotal ?? 0),
-    staleProductIds: ids.filter((id) => !purchasableIdSet.has(id)),
+    staleProductIds: ids.filter((id) => !visibleProductIdSet.has(id)),
   });
 }
 

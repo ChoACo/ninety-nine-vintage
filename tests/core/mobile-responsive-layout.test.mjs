@@ -59,7 +59,8 @@ test("mobile cart exposes an expandable payment bar and full-card shipping choic
   assert.match(cart, /aria-label="모바일 결제 요약"/);
   assert.match(cart, /mobileSummaryExpanded/);
   assert.match(cart, /총 \{products\.length\}개 · 결제 예정 금액/);
-  assert.match(cart, />결제하기<\/button>/);
+  assert.match(cart, /hasPendingProductLock \? "선점 대기"/);
+  assert.match(cart, /: busy \? "준비 중\.\.\." : "결제하기"/);
   assert.match(cart, /cursor-pointer rounded-xl border p-3 text-xs/);
   assert.match(cart, /charge\.unitName\} 배송비/);
 });

@@ -820,6 +820,7 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
   assert.match(shipmentRoute, /"sourceId"/);
   assert.match(shipmentRoute, /"trackingUrl"/);
   assert.match(shipmentRoute, /trackingNumber/);
+  assert.match(shipmentRoute, /"www\.hanjin\.com",\s*"trace\.cjlogistics\.com"/);
   assert.match(shippingRoute, /inventoryItemIds\.length\s*>\s*100/);
   assert.match(shippingRoute, /new Set\(inventoryItemIds\)\.size\s*!==\s*inventoryItemIds\.length/);
   assert.match(shippingRoute, /p_inventory_item_ids:\s*\[\.\.\.inventoryItemIds\]\.sort\(\)/);

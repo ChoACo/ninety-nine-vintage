@@ -1,6 +1,7 @@
 import { authenticateMemberCommerceRequest, commerceJson } from "@/lib/commerce/server";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const TRACKING_URL_HOSTS = new Set(["www.hanjin.com", "trace.cjlogistics.com"]);
 
 type RpcClient = {
   rpc: (name: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>;
@@ -71,7 +72,7 @@ function isTrackingUrl(value: unknown): value is string | null {
   if (typeof value !== "string") return false;
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.hostname === "www.hanjin.com";
+    return url.protocol === "https:" && TRACKING_URL_HOSTS.has(url.hostname);
   } catch {
     return false;
   }

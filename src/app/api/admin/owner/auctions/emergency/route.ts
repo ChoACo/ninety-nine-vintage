@@ -4,7 +4,7 @@ export async function GET(request: Request) {
   try {
     const access = await authenticateOwnerAccessRequest(request);
     const [stateResult, activeAuctionResult] = await Promise.all([
-      access.admin
+      access.userClient
         .from("auction_emergency_control")
         .select("paused,paused_at,reason,updated_at,updated_by")
         .eq("singleton", true)

@@ -56,6 +56,10 @@ test("emergency auction badges refresh current pause state and active impact cou
   ]);
 
   assert.match(route, /Promise\.all\(\[/);
+  assert.match(
+    route,
+    /access\.userClient[\s\S]{0,120}\.from\("auction_emergency_control"\)/,
+  );
   assert.match(route, /\.eq\("sale_type", "auction"\)/);
   assert.match(route, /\.eq\("status", "active"\)/);
   assert.match(route, /activeAuctionCount: activeAuctionResult\.count \?\? 0/);

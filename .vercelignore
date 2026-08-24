@@ -2,6 +2,7 @@
 .env*
 !.env.example
 *.pem
+.tmp.driveupload/
 .vscode/
 AGENTS.md
 scripts/codex-router.ps1

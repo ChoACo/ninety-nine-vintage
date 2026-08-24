@@ -22,7 +22,7 @@ export default function MobileAccountPage() {
       <details className="mt-5 border-y border-line py-1" id="account-settings">
         <summary className="cursor-pointer py-4 text-sm font-black">통합 작업공간 · 설정</summary>
         <div className="space-y-6 pb-5">
-          <section><h2 className="text-sm font-black">닉네임</h2><div className="mt-3"><NicknameSettings /></div></section>
+          <section><h2 className="text-sm font-black">닉네임</h2><div className="mt-3"><NicknameSettings presentation="modal" /></div></section>
           <section><h2 className="text-sm font-black">알림</h2><div className="mt-3"><MobilePwaControls detailed /></div></section>
           <section><h2 className="text-sm font-black">사이트 설정</h2><div className="mt-3"><SiteSettingsPage surface="mobile" /></div></section>
         </div>

@@ -56,6 +56,9 @@ export function PcFooter() {
               서비스 안내
             </p>
             <div className="mt-4 grid gap-3 break-keep break-words text-xs leading-relaxed text-muted">
+              <Link className="font-bold text-ink hover:underline" href="/notices">
+                공지사항 · 이용 가이드
+              </Link>
               <Link className="hover:text-ink" href="/terms">
                 이용약관
               </Link>

@@ -12,6 +12,7 @@ interface CommerceCheckoutBody {
   includeShippingFee?: unknown;
   shippingRegion?: unknown;
   shippingAddressId?: unknown;
+  depositorName?: unknown;
 }
 
 interface ManualTransferCheckoutResult {
@@ -87,6 +88,7 @@ async function checkoutWithManualTransfer(
   includeShippingFee: boolean,
   shippingRegion: "regular" | "remote_area",
   shippingAddressId: string,
+  depositorName: string,
 ) {
   try {
     await getManualTransferAccount(auth.admin);
@@ -106,6 +108,15 @@ async function checkoutWithManualTransfer(
   }
   if (!paymentStatus.configured) {
     return commerceJson({ error: "manual_transfer_configuration_missing" }, 503);
+  }
+
+  const { error: depositorError } = await auth.admin
+    .from("member_accounts")
+    .update({ last_depositor_name: depositorName })
+    .eq("member_id", auth.userId)
+    .eq("account_status", "active");
+  if (depositorError) {
+    return commerceJson({ error: "depositor_name_unavailable" }, 503);
   }
 
   const { data, error } = await auth.user.rpc(
@@ -134,7 +145,7 @@ async function checkoutWithManualTransfer(
   return commerceJson({
     mode: "manual_transfer",
     order: checkout.order,
-    transfer: checkout.transfer,
+    transfer: { ...checkout.transfer, depositor_name: depositorName },
   }, 201);
 }
 
@@ -149,9 +160,13 @@ export async function POST(request: Request) {
   const includeShippingFee = body?.includeShippingFee === true;
   const shippingRegion = body?.shippingRegion === "remote_area" ? "remote_area" : "regular";
   const shippingAddressId = typeof body?.shippingAddressId === "string" ? body.shippingAddressId.trim() : "";
+  const depositorName = typeof body?.depositorName === "string" ? body.depositorName.trim() : "";
 
   if (productIds.length === 0 || !idempotencyKey || idempotencyKey.length > 128 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(shippingAddressId)) {
     return commerceJson({ error: "상품과 주문 요청 키가 필요합니다." }, 400);
+  }
+  if (!depositorName || depositorName.length > 80) {
+    return commerceJson({ error: "invalid_depositor_name" }, 422);
   }
   if (body?.expectedPaymentMode !== "manual_transfer") {
     return commerceJson({ error: "manual_transfer_required" }, 409);
@@ -163,5 +178,6 @@ export async function POST(request: Request) {
     includeShippingFee,
     shippingRegion,
     shippingAddressId,
+    depositorName,
   );
 }

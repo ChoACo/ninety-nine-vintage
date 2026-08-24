@@ -43,13 +43,18 @@ test("fulfillment groups share only shipment permissions and snapshot per-store 
 });
 
 test("settlements apply ceil five-percent commission, subscription deductions and reversal entries",async()=>{
-  const migration=await source(migrationPath);
+  const [migration,payoutRoute]=await Promise.all([
+    source(migrationPath),
+    source("src/app/api/admin/owner/settlements/route.ts"),
+  ]);
   assert.match(migration,/ceil\(inventory\.paid_amount\*0\.05\)/i);
   assert.match(migration,/extract\(isodow from p_settlement_date\) not in \(1,4\)/i);
   assert.match(migration,/entries\.eligible_at<=v_cutoff/);
   assert.match(migration,/subscription_deduction/);
   assert.match(migration,/project_store_refund_settlement/);
   assert.match(migration,/complete_owner_settlement_batch/);
+  assert.match(payoutRoute,/auth\.user as unknown as RpcClient/);
+  assert.doesNotMatch(payoutRoute,/auth\.admin as unknown as RpcClient/);
 });
 
 test("payout accounts are encrypted before RPC submission and monthly fees accrue by a protected daily cron",async()=>{

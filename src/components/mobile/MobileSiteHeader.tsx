@@ -21,6 +21,7 @@ const MEMBER_ONLY_MOBILE_HREFS = new Set([
   "/m/account",
   "/m/account/payments",
   "/m/account/shipping",
+  "/m/notices",
 ]);
 
 export function MobileSiteHeader() {
@@ -44,6 +45,7 @@ export function MobileSiteHeader() {
     ["상담·채팅", "/m/chat"],
     ["장바구니", "/m/cart"],
     ["MY", "/m/my"],
+    ["공지사항 · 이용 가이드", "/m/notices"],
     ...(roleNavigation.isStaff
       ? [["업무", roleNavigation.centerHref] as const]
       : []),

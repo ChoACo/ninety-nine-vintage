@@ -29,6 +29,10 @@ test("first-login nickname setup is limited to Kakao account hubs and every late
   assert.doesNotMatch(gate, /onClose|dismiss|닫기/);
   assert.match(settings, /requestMyNicknameChange\(nickname\)/);
   assert.match(settings, /운영자 승인이 필요/);
+  assert.match(settings, /<PremiumDialog/);
+  assert.match(settings, /placement="sheet-bottom"/);
+  assert.match(settings, /닉네임 설정을 표시하지 못했습니다/);
+  assert.match(mobileAccount, /<NicknameSettings presentation="modal"\s*\/>/);
   assert.match(review, /getPendingNicknameChangeRequests/);
   assert.match(review, /reviewNicknameChangeRequest\(request\.id,\s*approve\)/);
   assert.match(migration, /drop function if exists public\.change_my_nickname_once\(text\)/i);

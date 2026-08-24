@@ -212,6 +212,7 @@ export async function GET(request: Request) {
     commerceLedgerResult,
     auctionLedgerResult,
     shippingLedgerResult,
+    memberAccountResult,
   ] =
     await Promise.all([
       memberIds.length === 0
@@ -257,6 +258,12 @@ export async function GET(request: Request) {
             .from("manual_transfer_payment_ledger")
             .select("id, transfer_kind, manual_transfer_order_id, commerce_order_transfer_id, shipping_fee_payment_id, entry_type, reversal_of, created_at")
             .in("shipping_fee_payment_id", shippingIds),
+      memberIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : auth.admin
+            .from("member_accounts")
+            .select("member_id, last_depositor_name")
+            .in("member_id", memberIds),
     ]);
   if (
     profileResult.error ||
@@ -265,7 +272,8 @@ export async function GET(request: Request) {
     commerceTransferResult.error ||
     commerceLedgerResult.error ||
     auctionLedgerResult.error ||
-    shippingLedgerResult.error
+    shippingLedgerResult.error ||
+    memberAccountResult.error
   ) {
     return commerceJson(
       { error: "payment_queue_unavailable", message: "구매자와 상품 정보를 불러오지 못했습니다." },
@@ -314,6 +322,12 @@ export async function GET(request: Request) {
     (profileResult.data ?? []).map((profile) => [
       profile.id,
       profile.display_name,
+    ]),
+  );
+  const declaredDepositorNames = new Map(
+    (memberAccountResult.data ?? []).map((account) => [
+      account.member_id,
+      account.last_depositor_name,
     ]),
   );
   const productById = new Map(
@@ -407,6 +421,10 @@ export async function GET(request: Request) {
             : [];
       return {
         ...payment,
+        lastDepositorName:
+          payment.lastDepositorName ??
+          declaredDepositorNames.get(payment.memberId) ??
+          null,
         buyerName: buyerNames.get(payment.memberId) ?? "이름 미확인 구매자",
         reversibleLedgerId: reversibleByPayment.get(payment.paymentId) ?? null,
         products: linkedProductIds.flatMap((id) => {

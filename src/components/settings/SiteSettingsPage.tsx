@@ -44,6 +44,7 @@ export function SiteSettingsPage({ surface }: { surface: "desktop" | "mobile" })
             <section>
               <h2 className="text-sm font-black">서비스 안내</h2>
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold">
+                <Link href={`${basePath}/notices`}>공지사항 · 이용 가이드</Link>
                 <Link href={`${basePath}/privacy`}>개인정보처리방침</Link>
                 <Link href={`${basePath}/terms`}>이용약관</Link>
                 <Link href={`${basePath}/refund`}>환불·취소 정책</Link>

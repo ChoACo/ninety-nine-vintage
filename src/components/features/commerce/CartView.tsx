@@ -95,6 +95,7 @@ interface CheckoutTransfer {
   order_id: string;
   bank_name_snapshot: string;
   account_number_snapshot: string;
+  depositor_name: string;
   expected_amount: number;
   status: "awaiting_transfer" | "partially_paid" | "confirmed";
 }
@@ -110,6 +111,7 @@ interface StoredCheckoutRequest {
   shippingFeeQuote: number;
   shippingRegion: "regular" | "remote_area";
   shippingAddressId: string;
+  depositorName: string;
 }
 
 interface ShippingAddress {
@@ -136,6 +138,8 @@ const DEFINITELY_PRE_LEDGER_ERRORS = new Set([
   "payment_status_unavailable",
   "invalid_expected_payment_mode",
   "payment_mode_changed",
+  "invalid_depositor_name",
+  "depositor_name_unavailable",
   "checkout_request_releasable",
 ]);
 const conditionLabels: Record<CartProduct["condition"], string> = {
@@ -252,6 +256,9 @@ const checkoutErrorMessages: Record<string, string> = {
     "결제 방식이 변경되었습니다. 변경된 내용을 확인한 뒤 결제 버튼을 다시 눌러 주세요.",
   checkout_request_releasable:
     "주문 원장이 생성되지 않았습니다. 결제 요청을 해제한 뒤 장바구니를 수정하거나 다시 시도할 수 있습니다.",
+  invalid_depositor_name: "입금자명을 1~80자로 입력해 주세요.",
+  depositor_name_unavailable:
+    "입금자명을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
 };
 
 function isCheckoutOrder(value: unknown): value is CheckoutOrder {
@@ -278,6 +285,8 @@ function isCheckoutTransfer(
     transfer.bank_name_snapshot.trim().length > 0 &&
     typeof transfer.account_number_snapshot === "string" &&
     transfer.account_number_snapshot.trim().length > 0 &&
+    typeof transfer.depositor_name === "string" &&
+    transfer.depositor_name.trim().length > 0 &&
     ["awaiting_transfer", "partially_paid", "confirmed"].includes(
       transfer.status as string,
     )
@@ -374,6 +383,11 @@ function readStoredCheckoutRequest(options?: {
         shippingAddressId:
           typeof parsed.shippingAddressId === "string"
             ? parsed.shippingAddressId
+            : "",
+        depositorName:
+          typeof parsed.depositorName === "string" &&
+          parsed.depositorName.trim().length <= 80
+            ? parsed.depositorName.trim()
             : "",
       };
     }
@@ -484,6 +498,7 @@ export function CartView({
     string | null
   >(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [depositorName, setDepositorName] = useState("");
   const [mobileSummaryExpanded, setMobileSummaryExpanded] = useState(false);
   const [addressForm, setAddressForm] = useState({
     label: "집",
@@ -721,6 +736,7 @@ export function CartView({
       setShippingAvailable(true);
       setShippingAddresses([]);
       setShippingAddressId("");
+      setDepositorName("");
       setIncludeShippingFee(true);
       setMessage("");
       setMessageKind("success");
@@ -782,6 +798,7 @@ export function CartView({
           setRestoredCheckoutProducts(activeRequest.productSnapshots);
           setReleaseCheckoutAllowed(!activeRequest.ledgerMayExist);
           setIncludeShippingFee(activeRequest.includeShippingFee);
+          setDepositorName(activeRequest.depositorName);
         } else {
           checkoutRequest.current = null;
           setHeldCheckoutIds([]);
@@ -1083,6 +1100,12 @@ export function CartView({
       setMessage("즉시구매는 결제와 함께 배송지를 선택해야 합니다.");
       return;
     }
+    const canonicalDepositorName = depositorName.trim();
+    if (!canonicalDepositorName || canonicalDepositorName.length > 80) {
+      setMessageKind("error");
+      setMessage("입금자명을 1~80자로 입력해 주세요.");
+      return;
+    }
     const expectedPaymentMode = paymentMode;
     setBusy(true);
     setMessage("");
@@ -1133,9 +1156,12 @@ export function CartView({
           shippingFeeQuote: requestShippingFee,
           shippingRegion,
           shippingAddressId,
+          depositorName: canonicalDepositorName,
         }),
         productIds,
         productSnapshots,
+        depositorName:
+          pendingRequest?.depositorName || canonicalDepositorName,
       };
       const wasLedgerUncertain = currentRequest.ledgerMayExist;
       const dispatchedRequest = { ...currentRequest, ledgerMayExist: true };
@@ -1155,6 +1181,7 @@ export function CartView({
           includeShippingFee: currentRequest.includeShippingFee,
           shippingRegion: currentRequest.shippingRegion,
           shippingAddressId: currentRequest.shippingAddressId,
+          depositorName: currentRequest.depositorName,
         }),
       });
       const payload = (await response.json().catch(() => null)) as unknown;
@@ -1306,6 +1333,7 @@ export function CartView({
     products.length === 0 ||
     paymentMode !== "manual_transfer" ||
     !shippingAddressId ||
+    !depositorName.trim() ||
     !termsAccepted;
   const checkoutButtonLabel = busy
     ? "결제 준비 중..."
@@ -1576,7 +1604,7 @@ export function CartView({
               배송 지역
               <select
                 className="mt-1 h-11 w-full border border-line bg-paper px-3"
-                disabled={busy || hasPendingCheckout}
+                disabled={busy}
                 onChange={(event) => {
                   invalidateCheckoutRequest();
                   setShippingRegion(
@@ -1886,6 +1914,23 @@ export function CartView({
                 결제 운영 모드를 확인하고 있습니다.
               </div>
             )}
+            <label className="mt-4 block text-xs font-bold" htmlFor="commerce-checkout-depositor">
+              입금자명 <span className="text-red-700">필수</span>
+              <input
+                autoComplete="name"
+                className="mt-2 h-12 w-full rounded-xl border border-line bg-paper px-4 text-base outline-none focus:border-ink md:text-sm"
+                disabled={busy || hasPendingCheckout}
+                id="commerce-checkout-depositor"
+                maxLength={80}
+                onChange={(event) => setDepositorName(event.target.value)}
+                placeholder="실제 입금할 이름"
+                required
+                value={depositorName}
+              />
+              <span className="mt-2 block text-[11px] font-normal leading-5 text-muted">
+                주문 후 안내되는 계좌에 이 이름으로 입금해 주세요.
+              </span>
+            </label>
             <div
               className="mt-3 grid grid-cols-2 gap-2 text-[11px]"
               aria-label="결제 수단"

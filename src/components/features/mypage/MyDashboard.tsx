@@ -147,7 +147,7 @@ export function MyDashboard({
             <section>
               <h2 className="text-xl font-black">프로필·닉네임</h2>
               <div className="mt-4">
-                <NicknameSettings />
+                <NicknameSettings presentation={surface === "mobile" ? "modal" : "inline"} />
               </div>
             </section>
             <section>

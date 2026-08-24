@@ -98,7 +98,10 @@ test("auction blackout permits only the exact fixed inventory close used by chec
 });
 
 test("checkout API uses only the atomic manual-transfer RPC", async () => {
-  const route = await source("src/app/api/orders/checkout/route.ts");
+  const [route,paymentQueue] = await Promise.all([
+    source("src/app/api/orders/checkout/route.ts"),
+    source("src/app/api/admin/operator/payments/route.ts"),
+  ]);
   const start = route.indexOf("async function checkoutWithManualTransfer");
   assert.notEqual(start, -1);
   const manualCheckout = route.slice(start);
@@ -119,6 +122,11 @@ test("checkout API uses only the atomic manual-transfer RPC", async () => {
     manualCheckout,
     /const\s+checkout\s*=\s*readManualTransferCheckout\(data\)[\s\S]*?if\s*\(!checkout\)/,
   );
+  assert.match(route, /invalid_depositor_name/);
+  assert.match(route, /last_depositor_name:\s*depositorName/);
+  assert.match(route, /depositor_name:\s*depositorName/);
+  assert.match(paymentQueue, /member_id, last_depositor_name/);
+  assert.match(paymentQueue, /payment\.lastDepositorName \?\?/);
 });
 
 test("cart keeps its request and items until a complete transfer response is verified", async () => {
@@ -140,6 +148,9 @@ test("cart keeps its request and items until a complete transfer response is ver
     cart,
     /내 정보에서 입금 상태를 확인해 주세요/,
   );
+  assert.match(cart, /입금자명 <span className="text-red-700">필수<\/span>/);
+  assert.match(cart, /!depositorName\.trim\(\)/);
+  assert.match(cart, /depositorName:\s*currentRequest\.depositorName/);
 });
 
 test("database types expose the atomic checkout RPC", async () => {

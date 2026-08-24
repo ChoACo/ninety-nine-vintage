@@ -8,8 +8,14 @@ export async function GET(request: Request) {
   const auth = await authenticateStaffRequest(request);
   if (!auth.ok) return auth.response;
   if (auth.roleCode !== "owner") return commerceJson({ error: "forbidden" }, 403);
-  const { data, error } = await (auth.admin as unknown as RpcClient).rpc("get_owner_payout_desk");
-  return error ? commerceJson({ error: error.message }, 503) : commerceJson({ desk: data });
+  const { data, error } = await (auth.user as unknown as RpcClient).rpc("get_owner_payout_desk");
+  if (error) {
+    return commerceJson(
+      { error: error.message },
+      error.code === "42501" ? 403 : 503,
+    );
+  }
+  return commerceJson({ desk: data });
 }
 
 export async function POST(request: Request) {
@@ -18,7 +24,10 @@ export async function POST(request: Request) {
   if (auth.roleCode !== "owner") return commerceJson({ error: "forbidden" }, 403);
   const body = await request.json().catch(() => null);
   if (!record(body) || typeof body.action !== "string") return commerceJson({ error: "invalid_request" }, 422);
-  const rpc = auth.admin as unknown as RpcClient;
+  // Owner settlement RPCs intentionally grant EXECUTE only to `authenticated`
+  // and authorize with auth.uid(). Preserve the caller JWT instead of using the
+  // service-role client, whose auth.uid() is null and whose EXECUTE is revoked.
+  const rpc = auth.user as unknown as RpcClient;
   const result = body.action === "complete"
     ? await rpc.rpc("complete_owner_settlement_batch", { p_batch_id: body.batchId, p_transfer_reference: body.transferReference, p_expected_version: body.expectedVersion, p_reason: body.reason })
     : body.action === "reveal"

@@ -8,6 +8,7 @@ const buyerGuideMigration = await readFile(new URL("../../supabase/migrations/20
 const buyerGuideDisclaimerMigration = await readFile(new URL("../../supabase/migrations/20260824121243_clarify_buyer_guide_test_data.sql", import.meta.url), "utf8");
 const api = await readFile(new URL("../../src/app/api/admin/staff-board/route.ts", import.meta.url), "utf8");
 const board = await readFile(new URL("../../src/components/admin/StaffBoard.tsx", import.meta.url), "utf8");
+const guideNotices = await readFile(new URL("../../src/lib/notices/memberGuideNotices.ts", import.meta.url), "utf8");
 const operatorLayout = await readFile(new URL("../../src/app/(admin)/admin/operator/layout.tsx", import.meta.url), "utf8");
 const employeeLayout = await readFile(new URL("../../src/app/(admin)/admin/employee/layout.tsx", import.meta.url), "utf8");
 const ownerLayout = await readFile(new URL("../../src/app/(admin)/admin/owner/layout.tsx", import.meta.url), "utf8");
@@ -31,8 +32,10 @@ test("the old guide is replaced by separate mobile and PC product guides", () =>
   assert.match(guideMigration, /\[PC 필독\] 판매센터 상품 등록 방법/);
   assert.match(guideMigration, /product-registration-mobile/);
   assert.match(guideMigration, /product-registration-pc/);
-  assert.match(board, /guideCaptions/);
-  assert.match(board, /caption = guideCaptions\[path\]/);
+  assert.match(board, /GUIDE_IMAGE_CAPTIONS/);
+  assert.match(board, /caption = GUIDE_IMAGE_CAPTIONS\[path\]/);
+  assert.match(guideNotices, /product-registration-mobile/);
+  assert.match(guideNotices, /product-registration-pc/);
 });
 
 test("buyer auction and archive guides include ordered screenshots and red callouts", () => {

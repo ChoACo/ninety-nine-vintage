@@ -567,6 +567,21 @@ html[data-theme="dark"] .theme-invariant-dark {
 /* Legacy console rows are intentionally compact on desktop, but become stacked
    work cards on narrow screens. Data tables keep their own horizontal scroller. */
 @media (max-width: 767px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  [data-ui-surface="mobile"],
+  [data-admin-surface],
+  [data-admin-workspace-content] {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
   [data-admin-workspace="operator"] [data-admin-workspace-content] {
     width: 100%;
     max-width: 100%;
@@ -589,6 +604,62 @@ html[data-theme="dark"] .theme-invariant-dark {
   textarea,
   select {
     font-size: 1rem !important;
+  }
+
+  :is(button, a)[aria-label*="닫기"],
+  :is(button, a)[aria-label*="이전"],
+  :is(button, a)[aria-label*="다음"],
+  :is(button, a)[role="tab"],
+  [data-mobile-touch-target] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  [data-premium-modal-placement="center"].premium-dialog-overlay {
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+  }
+
+  [data-premium-modal-placement="center"] .premium-dialog-surface {
+    width: 100%;
+    max-width: 100%;
+    max-height: 88dvh;
+    border-radius: 1.5rem 1.5rem 0 0;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    animation-name: premium-sheet-in;
+    animation-duration: 260ms;
+    animation-timing-function: cubic-bezier(.22, 1, .36, 1);
+    will-change: transform, opacity;
+  }
+
+  [data-premium-modal-placement="center"] .premium-dialog-surface::before {
+    display: block;
+    width: 2.5rem;
+    height: 0.25rem;
+    flex: none;
+    margin: 0.5rem auto 0;
+    border-radius: 999px;
+    background: rgb(var(--theme-muted) / 0.35);
+    content: "";
+  }
+
+  [data-premium-modal-placement="sheet-bottom"] .premium-dialog-surface {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  [data-premium-modal-placement="center"] .premium-dialog-surface[data-state="closed"] {
+    animation-name: premium-sheet-out;
+    animation-duration: 190ms;
+    animation-timing-function: ease-in;
+  }
+
+  .route-modal-surface[data-state="open"] {
+    animation: premium-sheet-in 260ms cubic-bezier(.22, 1, .36, 1);
+  }
+
+  .route-modal-surface[data-state="closed"] {
+    animation: premium-sheet-out 190ms ease-in both;
   }
 
   [data-admin-surface] form.grid-cols-2 { grid-template-columns: minmax(0, 1fr) !important; }

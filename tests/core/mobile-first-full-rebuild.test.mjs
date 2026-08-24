@@ -52,14 +52,14 @@ test("catalog cards use a compact portrait hierarchy with floating grade and liv
   }
 });
 
-test("mobile cart and PDP actions float above the capsule navigation", async () => {
+test("mobile cart and PDP actions float above the safe-area navigation", async () => {
   const [nav, cart, panel, css] = await Promise.all([
     source("src/components/mobile/MobileSiteBottomNav.tsx"),
     source("src/components/features/commerce/CartView.tsx"),
     source("src/components/features/auction/detail/StickyBidPanel.tsx"),
     source("src/app/globals.css"),
   ]);
-  assert.match(nav, /bottom-4[\s\S]*rounded-full[\s\S]*backdrop-blur-xl/);
+  assert.match(nav, /bottom-0[\s\S]*safe-area-inset-bottom[\s\S]*backdrop-blur-xl/);
   assert.match(cart, /bottom-\[calc\(6\.5rem\+env\(safe-area-inset-bottom,16px\)\)\]/);
   assert.match(cart, /aria-expanded=\{mobileSummaryExpanded\}/);
   assert.match(panel, /grid-cols-\[44px_minmax\(0,1fr\)_minmax\(0,1fr\)\]/);

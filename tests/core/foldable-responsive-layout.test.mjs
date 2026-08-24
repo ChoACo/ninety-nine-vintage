@@ -46,8 +46,8 @@ test("foldable navigation, cart and PDP use centered and split layouts", async (
     source("src/app/globals.css"),
   ]);
   assert.match(layout, /sm:max-w-3xl/);
-  assert.match(layout, /pb-32/);
-  assert.match(nav, /bottom-4[\s\S]*w-\[calc\(100%-3rem\)\][\s\S]*max-w-lg[\s\S]*rounded-full/);
+  assert.match(layout, /pb-\[calc\(7rem\+env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(nav, /bottom-0[\s\S]*safe-area-inset-bottom[\s\S]*max-w-lg/);
   assert.match(chat, /sm:bottom-24 sm:right-6/);
   assert.match(cart, /max-w-\[1400px\][\s\S]*sm:grid-cols-12 sm:gap-8/);
   assert.match(cart, /sm:col-span-7/);

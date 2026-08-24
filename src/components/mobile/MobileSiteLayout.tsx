@@ -29,7 +29,7 @@ export function MobileSiteLayout({ children }: { children: ReactNode }) {
             <MobileSiteHeader />
           </MobileAutoHideHeader>
           <SideNavRail />
-          <main className="mx-auto min-h-[calc(100svh-7rem)] w-full max-w-lg px-4 py-4 pb-32 sm:max-w-3xl lg:max-w-6xl lg:pl-24 lg:pr-6">{children}</main>
+          <main className="mx-auto min-h-[calc(100svh-7rem)] w-full min-w-0 max-w-lg overflow-x-clip px-4 py-4 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:max-w-3xl lg:max-w-6xl lg:pl-24 lg:pr-6">{children}</main>
           <MobileSiteBottomNav />
           <CacheConsentBanner surface="mobile" />
           <FloatingChat basePath="/m" />

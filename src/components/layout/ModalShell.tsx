@@ -87,15 +87,16 @@ export function ModalShell({
       : "max-w-3xl";
 
   return (
-    <div className="premium-dialog-overlay fixed inset-0 z-[110] overflow-x-auto overflow-y-hidden bg-black/60 backdrop-blur-md" data-scroll-lock-owner="route-modal" data-state={closing ? "closed" : "open"} role="presentation">
-      <div className="flex min-h-full min-w-[1280px] items-center justify-center p-6" onMouseDown={(event) => event.target === event.currentTarget && close()}>
-        <div aria-label={label} aria-modal="true" className={`premium-dialog-surface flex max-h-[calc(100vh-3rem)] min-h-0 w-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-paper text-ink shadow-2xl shadow-black/20 outline-none ${widthClassName}`} data-modal-size={size} data-state={closing ? "closed" : "open"} ref={dialogRef} role="dialog" tabIndex={-1}>
-          <header className="z-20 flex h-14 shrink-0 items-center justify-between border-b border-line bg-paper/95 px-6 backdrop-blur-md">
-            <button className="inline-flex items-center gap-2 rounded-xl px-2 py-2 text-xs font-bold transition-all duration-300 hover:-translate-y-0.5 hover:bg-surface active:scale-95" onClick={close} type="button"><ArrowLeft size={16} /> 뒤로 가기</button>
+    <div className="route-modal-overlay premium-dialog-overlay fixed inset-0 z-[110] overflow-hidden bg-black/60 backdrop-blur-md" data-scroll-lock-owner="route-modal" data-state={closing ? "closed" : "open"} role="presentation">
+      <div className="flex min-h-full w-full min-w-0 items-end justify-center md:items-center md:p-6" onMouseDown={(event) => event.target === event.currentTarget && close()}>
+        <div aria-label={label} aria-modal="true" className={`route-modal-surface premium-dialog-surface flex max-h-[92dvh] min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-paper text-ink shadow-2xl shadow-black/20 outline-none md:max-h-[calc(100vh-3rem)] md:rounded-3xl ${widthClassName}`} data-modal-size={size} data-state={closing ? "closed" : "open"} ref={dialogRef} role="dialog" tabIndex={-1}>
+          <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted/40 md:hidden" />
+          <header className="z-20 flex min-h-14 shrink-0 items-center justify-between border-b border-line bg-paper/95 px-3 backdrop-blur-md sm:px-4 md:px-6">
+            <button className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 py-2 text-xs font-bold transition-all duration-300 hover:-translate-y-0.5 hover:bg-surface active:scale-95" onClick={close} type="button"><ArrowLeft size={16} /> 뒤로 가기</button>
             <p className="truncate px-4 text-xs font-bold">{label}</p>
-            <button aria-label={`${label} 닫기`} className="grid size-10 place-items-center rounded-xl transition-all duration-300 hover:-translate-y-0.5 hover:bg-surface active:scale-95" onClick={close} type="button"><X size={18} /></button>
+            <button aria-label={`${label} 닫기`} className="grid size-11 place-items-center rounded-xl transition-all duration-300 hover:-translate-y-0.5 hover:bg-surface active:scale-95" onClick={close} type="button"><X size={18} /></button>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto p-6" data-route-modal-scroll>{children}</div>
+          <div className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5 md:p-6" data-route-modal-scroll>{children}</div>
         </div>
       </div>
     </div>

@@ -992,9 +992,9 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
       </PremiumDialog>
 
       <div className="flex items-center justify-between gap-4">
-        <button className="border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={offset === 0} onClick={() => changePage(Math.max(0, offset - PAGE_SIZE))} type="button">이전</button>
+        <button className="min-h-11 border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={offset === 0} onClick={() => changePage(Math.max(0, offset - PAGE_SIZE))} type="button">이전</button>
         <p className="font-mono text-[11px] text-muted">{offset + 1}–{offset + payments.length}</p>
-        <button className="border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={payments.length < PAGE_SIZE} onClick={() => changePage(offset + PAGE_SIZE)} type="button">다음</button>
+        <button className="min-h-11 border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={payments.length < PAGE_SIZE} onClick={() => changePage(offset + PAGE_SIZE)} type="button">다음</button>
       </div>
     </div>
   );

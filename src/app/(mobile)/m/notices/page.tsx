@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { MemberAccountBoundary } from "@/components/features/account/MemberAccountBoundary";
 import { MemberNoticeBoard } from "@/components/notices/MemberNoticeBoard";
 
 export const metadata: Metadata = {
@@ -9,9 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function MobileNoticesPage() {
-  return (
-    <MemberAccountBoundary basePath="/m" returnTo="/m/notices">
-      <MemberNoticeBoard />
-    </MemberAccountBoundary>
-  );
+  return <MemberNoticeBoard />;
 }

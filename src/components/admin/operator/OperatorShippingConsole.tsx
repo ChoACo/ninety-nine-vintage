@@ -1106,18 +1106,17 @@ export function OperatorShippingConsole({
       </section>}
 
       {view !== "history" && <div className="flex items-center justify-between gap-4">
-        <button className="border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={offset === 0} onClick={() => changePage(Math.max(0, offset - PAGE_SIZE))} type="button">이전</button>
+        <button className="min-h-11 border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={offset === 0} onClick={() => changePage(Math.max(0, offset - PAGE_SIZE))} type="button">이전</button>
         <p className="font-mono text-[11px] text-muted">{offset + 1}–{offset + shipments.length}</p>
-        <button className="border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={shipments.length < PAGE_SIZE} onClick={() => changePage(offset + PAGE_SIZE)} type="button">다음</button>
+        <button className="min-h-11 border border-line px-4 py-2 text-xs font-bold disabled:opacity-40" disabled={shipments.length < PAGE_SIZE} onClick={() => changePage(offset + PAGE_SIZE)} type="button">다음</button>
       </div>}
 
       {trackingModalShipment && (
-        <div aria-modal="true" className="fixed inset-0 z-[120] grid place-items-center bg-black/55 p-4" role="dialog">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border border-line bg-paper p-5 shadow-2xl">
+        <PremiumDialog labelledBy="tracking-modal-title" onClose={() => setTrackingModalShipment(null)} open panelClassName="max-w-2xl p-5" zIndexClassName="z-[120]">
             <div className="flex items-center justify-between border-b border-line pb-4">
               <div>
                 <p className="eyebrow text-muted">배송 관리</p>
-                <h2 className="mt-1 text-lg font-black">{trackingModalShipment.status === "shipped" ? "송장 수정" : "원스톱 패킹 & 송장 입력"}</h2>
+                <h2 className="mt-1 text-lg font-black" id="tracking-modal-title">{trackingModalShipment.status === "shipped" ? "송장 수정" : "원스톱 패킹 & 송장 입력"}</h2>
               </div>
               <button aria-label="송장 모달 닫기" className="grid size-11 place-items-center" onClick={() => setTrackingModalShipment(null)} type="button"><X size={17} /></button>
             </div>
@@ -1152,8 +1151,7 @@ export function OperatorShippingConsole({
                 {trackingModalShipment.status === "shipped" && <button className="min-h-11 w-full border border-red-500 text-xs font-bold text-red-700 disabled:opacity-40" disabled={busyKey !== null} onClick={async () => { await mutateShipment(trackingModalShipment, "tracking_delete"); setTrackingModalShipment(null); }} type="button">송장 삭제</button>}
               </div>
             </div>
-          </div>
-        </div>
+        </PremiumDialog>
       )}
       {pickingModalShipment && (
         <PickingListDialog

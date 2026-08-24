@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Command, Search, Store, Zap } from "lucide-react";
+import { Command, Search, Store, X, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useOperatorStoreScope } from "@/store/useOperatorStoreScope";
+import { PremiumDialog } from "@/components/ui/PremiumDialog";
 
 const commands = [
   ["대시보드", "/admin/operator"],
@@ -73,11 +74,9 @@ export function OperatorContextBar() {
         <p className="mt-1 text-lg font-black text-zinc-100">{pageHeading.title}</p>
       </div>
     </div>
-    {open && <div aria-label="운영자 빠른 이동" aria-modal="true" className="fixed inset-0 z-[120] grid place-items-start bg-zinc-950/70 p-4 pt-[12vh] backdrop-blur-sm" role="dialog" onClick={() => setOpen(false)}>
-      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 text-zinc-100 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center gap-3 border-b border-zinc-800 px-4"><Search className="text-zinc-500" size={17} /><input autoFocus className="h-14 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-600" onChange={(event) => setQuery(event.target.value)} placeholder="메뉴를 검색하세요…" value={query} /><kbd className="text-[10px] text-zinc-500">ESC</kbd></div>
+    <PremiumDialog ariaLabel="운영자 빠른 이동" onClose={() => setOpen(false)} open={open} panelClassName="max-w-xl bg-zinc-900 text-zinc-100">
+        <div className="flex items-center gap-3 border-b border-zinc-800 px-4"><Search className="shrink-0 text-zinc-500" size={17} /><input autoFocus className="h-14 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-zinc-600" onChange={(event) => setQuery(event.target.value)} placeholder="메뉴를 검색하세요…" value={query} /><button aria-label="빠른 이동 닫기" className="grid size-11 shrink-0 place-items-center rounded-xl text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100" onClick={() => setOpen(false)} type="button"><X size={18} /></button></div>
         <div className="grid gap-1 p-2">{filtered.map(([label, href]) => <Link className="flex min-h-11 items-center rounded-xl px-3 text-sm font-bold transition hover:bg-zinc-800 hover:text-amber-400" href={href} key={href} onClick={() => setOpen(false)}>{label}<span className="ml-auto text-[10px] text-zinc-600">{href}</span></Link>)}{filtered.length === 0 && <p className="px-3 py-8 text-center text-xs text-zinc-500">일치하는 메뉴가 없습니다.</p>}</div>
-      </div>
-    </div>}
+    </PremiumDialog>
   </>;
 }

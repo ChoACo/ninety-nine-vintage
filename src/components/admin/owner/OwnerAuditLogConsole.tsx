@@ -419,7 +419,7 @@ export function OwnerAuditLogConsole() {
       {rows.length > 0 && !resultsStale && (
         <div className="mt-4 flex items-center justify-between gap-4">
           <button
-            className="border border-line px-4 py-2 text-xs font-bold disabled:opacity-40"
+            className="min-h-11 border border-line px-4 py-2 text-xs font-bold disabled:opacity-40"
             disabled={loading || offset === 0}
             onClick={() => void load(Math.max(0, offset - LIST_LIMIT))}
             type="button"
@@ -428,7 +428,7 @@ export function OwnerAuditLogConsole() {
           </button>
           <p className="font-mono text-[11px] text-muted">{offset + 1}–{offset + rows.length}건 표시 중</p>
           <button
-            className="border border-line px-4 py-2 text-xs font-bold disabled:opacity-40"
+            className="min-h-11 border border-line px-4 py-2 text-xs font-bold disabled:opacity-40"
             disabled={loading || !hasMore}
             onClick={() => void load(offset + LIST_LIMIT)}
             type="button"

@@ -1,6 +1,7 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, Cog, Gavel, Heart, Home, Package, Truck } from "lucide-react";
+import { ArrowUpRight, Bell, Cog, Gavel, Heart, Home, Package, Store, Truck } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { AccountDashboard } from "@/components/features/account/AccountDashboard";
@@ -10,6 +11,8 @@ import { MobilePwaControls } from "@/components/features/pwa/MobilePwaControls";
 import { MyNotificationPreferences } from "@/components/features/mypage/MyNotificationPreferences";
 import { NicknameSettings } from "@/components/account/NicknameSettings";
 import { WishlistFeed } from "@/components/features/wishlist/WishlistFeed";
+import { useAdminNavigationAccess } from "@/hooks/useAdminNavigationAccess";
+import { getMobileRoleNavigation } from "@/lib/admin/mobileNavigation";
 import {
   ProfileHeader,
   type MyTab,
@@ -34,6 +37,11 @@ export function MyDashboard({
   const router = useRouter();
   const [tabPending, startTabTransition] = useTransition();
   const search = useSearchParams();
+  const adminAccess = useAdminNavigationAccess();
+  const roleNavigation = getMobileRoleNavigation(adminAccess.roleCode);
+  const showOperatorShortcut =
+    surface === "mobile" &&
+    (adminAccess.roleCode === "operator" || adminAccess.roleCode === "owner");
   const requested = initialTab ?? search.get("tab");
   const active: MyTab = TABS.some((tab) => tab.id === requested)
     ? (requested as MyTab)
@@ -58,6 +66,26 @@ export function MyDashboard({
         basePath={basePath}
         onTabChange={setTab}
       />
+      {showOperatorShortcut ? (
+        <Link
+          className="flex min-h-14 w-full items-center gap-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 active:scale-[.98]"
+          href={roleNavigation.centerHref}
+          prefetch={false}
+        >
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-ink text-paper">
+            <Store aria-hidden="true" size={19} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <strong className="block text-sm font-black">판매센터 바로가기</strong>
+            <span className="mt-0.5 block truncate text-xs text-muted">
+              {adminAccess.roleCode === "owner"
+                ? "소유자 운영 화면으로 이동"
+                : "상품·주문·출고 업무 화면으로 이동"}
+            </span>
+          </span>
+          <ArrowUpRight aria-hidden="true" className="shrink-0" size={18} />
+        </Link>
+      ) : null}
       <nav
         aria-label="MY 대시보드 메뉴"
         className="flex snap-x gap-2 overflow-x-auto rounded-2xl border border-line bg-paper p-2"

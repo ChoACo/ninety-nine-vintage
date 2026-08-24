@@ -13,11 +13,11 @@ test("mobile shell reserves bottom navigation space and honors safe areas", asyn
   ]);
   assert.doesNotMatch(rootLayout, /<body className="[^"]*overflow-x-hidden/);
   assert.match(mobileLayout, /min-h-screen overflow-x-hidden/);
-  assert.match(mobileLayout, /pb-32/);
+  assert.match(mobileLayout, /pb-\[calc\(7rem\+env\(safe-area-inset-bottom\)\)\]/);
   assert.match(bottomNav, /safe-area-inset-bottom/);
   assert.match(bottomNav, /max-w-lg/);
-  assert.match(bottomNav, /rounded-full/);
-  assert.match(bottomNav, /min-h-\[44px\] min-w-\[44px\]/);
+  assert.match(bottomNav, /fixed inset-x-0 bottom-0/);
+  assert.match(bottomNav, /min-h-\[52px\] min-w-\[44px\]/);
 });
 
 test("footer stacks without clipping business information", async () => {

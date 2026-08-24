@@ -159,7 +159,38 @@ export function OperatorRevenueConsole() {
               <div className="bg-paper p-4"><p className="text-[10px] text-muted">취소·환불</p><p className="mt-2 font-mono font-bold">-{formatKRW(store.refunds)}</p></div>
               <div className="bg-paper p-4"><p className="text-[10px] text-muted">순매출</p><p className="mt-2 font-mono font-bold">{formatKRW(store.netSales)}</p></div>
             </div>
-            <div className="overflow-x-auto">
+            <div className="divide-y divide-line md:hidden">
+              {store.entries.map((entry) => (
+                <article className="min-w-0 p-4" key={entry.id}>
+                  <div className="flex min-w-0 items-start gap-3">
+                    {entry.productId ? (
+                      <CatalogImage alt="" className="size-12 shrink-0 rounded-xl object-cover" sizes="48px" src={entry.productImageUrl ?? ""} />
+                    ) : null}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        {entry.productId ? (
+                          <Link className="min-w-0 truncate text-sm font-black hover:underline" href={`/auction/${entry.productId}`}>
+                            {entry.productTitle ?? "상품 정보 확인"}
+                          </Link>
+                        ) : (
+                          <p className="text-sm font-black text-muted">상품 정보 없음</p>
+                        )}
+                        <strong className={`shrink-0 break-all text-right font-mono text-sm ${entry.amount < 0 ? "text-rose-700" : ""}`}>
+                          {formatKRW(entry.amount)}
+                        </strong>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted">
+                        <span className="rounded-full border border-line px-2 py-1 font-bold text-ink">{entryKindLabel(entry.entryKind)}</span>
+                        <span>{entry.buyerName ?? "구매자 확인 불가"}</span>
+                      </div>
+                      <time className="mt-2 block text-[10px] text-muted">{new Date(entry.occurredAt).toLocaleString("ko-KR")}</time>
+                    </div>
+                  </div>
+                </article>
+              ))}
+              {store.entries.length === 0 && <p className="px-4 py-10 text-center text-xs text-muted">선택 기간의 원장 항목이 없습니다.</p>}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[820px] text-left text-xs">
                 <thead className="border-b border-line text-[10px] text-muted"><tr><th className="px-4 py-3">시각</th><th className="px-4 py-3">구분</th><th className="px-4 py-3">상품</th><th className="px-4 py-3">구매자</th><th className="px-4 py-3">금액</th></tr></thead>
                 <tbody className="divide-y divide-line">

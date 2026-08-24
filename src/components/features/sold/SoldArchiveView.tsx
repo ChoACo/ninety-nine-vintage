@@ -129,7 +129,7 @@ export async function SoldArchiveView({
       {archive.hasNext && nextHref && (
         <div className="border-t border-line pt-6 text-center">
           <Link
-            className="inline-flex border border-ink px-6 py-3 text-xs font-bold"
+            className="inline-flex min-h-11 items-center border border-ink px-6 py-3 text-xs font-bold"
             href={nextHref}
           >
             다음 24개 기록

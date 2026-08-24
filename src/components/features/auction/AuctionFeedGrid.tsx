@@ -1076,7 +1076,7 @@ function EnabledAuctionFeedGrid({
             className="mt-8 flex items-center justify-center gap-2"
           >
             <button
-              className="h-10 border border-line px-4 text-xs font-bold disabled:opacity-35"
+              className="min-h-11 border border-line px-4 text-xs font-bold disabled:opacity-35"
               disabled={pagination.page <= 1}
               onClick={() => setPage(pagination.page - 1)}
               type="button"
@@ -1092,7 +1092,7 @@ function EnabledAuctionFeedGrid({
                   pageNumber === pagination.page ? "page" : undefined
                 }
                 aria-label={`${pageNumber}페이지`}
-                className={`size-10 border font-mono text-xs font-bold ${pageNumber === pagination.page ? "border-ink bg-ink text-paper" : "border-line"}`}
+                className={`size-11 border font-mono text-xs font-bold ${pageNumber === pagination.page ? "border-ink bg-ink text-paper" : "border-line"}`}
                 key={pageNumber}
                 onClick={() => setPage(pageNumber)}
                 type="button"
@@ -1101,7 +1101,7 @@ function EnabledAuctionFeedGrid({
               </button>
             ))}
             <button
-              className="h-10 border border-line px-4 text-xs font-bold disabled:opacity-35"
+              className="min-h-11 border border-line px-4 text-xs font-bold disabled:opacity-35"
               disabled={pagination.page >= pagination.pageCount}
               onClick={() => setPage(pagination.page + 1)}
               type="button"

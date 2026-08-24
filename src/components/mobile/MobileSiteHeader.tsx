@@ -21,7 +21,6 @@ const MEMBER_ONLY_MOBILE_HREFS = new Set([
   "/m/account",
   "/m/account/payments",
   "/m/account/shipping",
-  "/m/notices",
 ]);
 
 export function MobileSiteHeader() {

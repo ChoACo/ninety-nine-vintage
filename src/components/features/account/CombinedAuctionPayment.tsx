@@ -2,6 +2,7 @@
 
 import { Copy, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useToastStore } from "@/store/useToastStore";
 
@@ -254,16 +255,14 @@ export function CombinedAuctionPayment({
       </div>
 
       {dialog === "payment" && (
-        <div
-          aria-labelledby="combined-auction-payment-title"
-          aria-modal="true"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !busy) setDialog(null);
-          }}
-          role="dialog"
+        <PremiumDialog
+          closeDisabled={busy}
+          labelledBy="combined-auction-payment-title"
+          onClose={() => setDialog(null)}
+          open
+          panelClassName="max-w-lg p-5 sm:p-7"
+          zIndexClassName="z-[100]"
         >
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto bg-paper p-5 shadow-2xl sm:p-7">
             <div className="flex items-start justify-between gap-4 border-b border-ink pb-4">
               <div>
                 <p className="eyebrow text-muted">낙찰품 선택 결제</p>
@@ -280,7 +279,7 @@ export function CombinedAuctionPayment({
               </div>
               <button
                 aria-label="결제 창 닫기"
-                className="p-2"
+                className="grid size-11 shrink-0 place-items-center"
                 disabled={busy}
                 onClick={() => setDialog(null)}
                 type="button"
@@ -426,21 +425,17 @@ export function CombinedAuctionPayment({
                 {message}
               </p>
             )}
-          </div>
-        </div>
+        </PremiumDialog>
       )}
 
       {dialog === "info" && transfer && (
-        <div
-          aria-labelledby="combined-auction-transfer-title"
-          aria-modal="true"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setDialog(null);
-          }}
-          role="dialog"
+        <PremiumDialog
+          labelledBy="combined-auction-transfer-title"
+          onClose={() => setDialog(null)}
+          open
+          panelClassName="max-w-lg p-5 sm:p-7"
+          zIndexClassName="z-[100]"
         >
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto bg-paper p-5 shadow-2xl sm:p-7">
             <div className="flex items-start justify-between gap-4 border-b border-ink pb-4">
               <div>
                 <p className="eyebrow text-muted">낙찰품 선택 결제</p>
@@ -448,7 +443,7 @@ export function CombinedAuctionPayment({
                   입금 정보
                 </h3>
               </div>
-              <button aria-label="입금 정보 창 닫기" className="p-2" onClick={() => setDialog(null)} type="button">
+              <button aria-label="입금 정보 창 닫기" className="grid size-11 shrink-0 place-items-center" onClick={() => setDialog(null)} type="button">
                 <X size={18} />
               </button>
             </div>
@@ -522,8 +517,7 @@ export function CombinedAuctionPayment({
             >
               입금자명 수정하기
             </button>
-          </div>
-        </div>
+        </PremiumDialog>
       )}
     </>
   );

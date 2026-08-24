@@ -273,7 +273,28 @@ export function OwnerPayoutDesk() {
 
       <section>
         <h2 className="mb-3 text-lg font-black">정산 이력</h2>
-        <div className="overflow-x-auto rounded-2xl border border-zinc-800">
+        <div className="divide-y divide-zinc-800 overflow-hidden rounded-2xl border border-zinc-800 md:hidden">
+          {history.map((batch) => (
+            <article className="min-w-0 space-y-4 bg-zinc-950 p-4" key={batch.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black">{batch.storeName}</p>
+                  <time className="mt-1 block font-mono text-[10px] text-zinc-500">{batch.settlementDate}</time>
+                </div>
+                <span className="shrink-0 rounded-full border border-zinc-700 px-2.5 py-1 text-[10px] font-bold text-zinc-300">
+                  {batch.status === "paid" ? "정산 완료" : "공제 처리"}
+                </span>
+              </div>
+              <dl className="grid grid-cols-3 gap-2 rounded-xl bg-zinc-900 p-3 text-right">
+                <div><dt className="text-[10px] text-zinc-500">판매액</dt><dd className="mt-1 break-all font-mono text-xs">{won(batch.grossSales)}</dd></div>
+                <div><dt className="text-[10px] text-zinc-500">공제</dt><dd className="mt-1 break-all font-mono text-xs">{won(batch.platformFee + batch.deductedFee)}</dd></div>
+                <div><dt className="text-[10px] text-zinc-500">지급액</dt><dd className="mt-1 break-all font-mono text-xs font-bold text-emerald-400">{won(batch.payoutAmount)}</dd></div>
+              </dl>
+            </article>
+          ))}
+          {history.length === 0 && <p className="px-4 py-10 text-center text-xs text-zinc-500">아직 완료된 정산 이력이 없습니다.</p>}
+        </div>
+        <div className="hidden overflow-x-auto rounded-2xl border border-zinc-800 md:block">
           <table className="w-full min-w-[720px] text-left text-xs">
             <thead className="bg-zinc-900 text-zinc-500">
               <tr>

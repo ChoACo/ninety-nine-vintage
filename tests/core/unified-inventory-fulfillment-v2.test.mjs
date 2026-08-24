@@ -796,6 +796,7 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
     accountRoute,
     dashboard,
     encryption,
+    deliveryReadGrant,
   ] = await Promise.all([
     source("src/app/api/account/storage/route.ts"),
     source("src/app/api/account/shipments/route.ts"),
@@ -804,6 +805,7 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
     source("src/app/api/account/refunds/[id]/account/route.ts"),
     source("src/components/features/account/AccountDashboard.tsx"),
     source("src/lib/refunds/encryption.ts"),
+    source("supabase/migrations/20260824204238_grant_account_shipment_delivery_server_read.sql"),
   ]);
 
   assert.match(storageRoute, /"get_my_inventory_overview"/);
@@ -821,6 +823,7 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
   assert.match(shipmentRoute, /"trackingUrl"/);
   assert.match(shipmentRoute, /trackingNumber/);
   assert.match(shipmentRoute, /"www\.hanjin\.com",\s*"trace\.cjlogistics\.com"/);
+  assert.match(deliveryReadGrant, /grant\s+select\s*\(\s*id,\s*member_id,\s*delivery_status,\s*delivery_status_text,\s*delivered_at,\s*auto_settle_at\s*\)\s+on\s+table\s+public\.inventory_shipments\s+to\s+service_role/i);
   assert.match(shippingRoute, /inventoryItemIds\.length\s*>\s*100/);
   assert.match(shippingRoute, /new Set\(inventoryItemIds\)\.size\s*!==\s*inventoryItemIds\.length/);
   assert.match(shippingRoute, /p_inventory_item_ids:\s*\[\.\.\.inventoryItemIds\]\.sort\(\)/);

@@ -67,6 +67,24 @@ test("recover endpoint forwards operator mode through the user-scoped rpc", asyn
   assert.doesNotMatch(route, /auth\.admin[\s\S]*\.rpc\(/);
 });
 
+test("unpaid console reuses authenticated store scope and keeps failures user-facing", async () => {
+  const [route, consoleSource, layout] = await Promise.all([
+    source("src/app/api/admin/operator/auctions/unpaid/route.ts"),
+    source("src/components/admin/operator/OperatorUnpaidAuctionsConsole.tsx"),
+    source("src/app/(admin)/admin/operator/layout.tsx"),
+  ]);
+
+  assert.match(route, /\.eq\("id", auth\.selectedStoreId\)/);
+  assert.doesNotMatch(route, /admin[\s\S]*\.from\("store_memberships"\)/);
+  assert.match(route, /message:\s*"미결제 낙찰 정보를 불러오지 못했습니다/);
+  assert.match(consoleSource, /payload\.message \?\? "미결제 낙찰을 불러오지 못했습니다/);
+  assert.match(consoleSource, /미결제 낙찰 정보를 불러오는 중입니다/);
+  assert.match(consoleSource, /미결제 낙찰 정보를 표시할 수 없습니다/);
+  assert.match(consoleSource, />\s*다시 시도\s*</);
+  assert.match(layout, /eyebrow="운영자 업무 공간"/);
+  assert.doesNotMatch(layout, /Seller workspace/);
+});
+
 test("past console exposes one-click winner state actions", async () => {
   const [pastRoute, pastConsole, recoveryButtons] = await Promise.all([
     source("src/app/api/admin/operator/products/past/route.ts"),

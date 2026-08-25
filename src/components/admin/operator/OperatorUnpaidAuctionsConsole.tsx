@@ -60,20 +60,30 @@ function timeUntilLabel(value: string | null, now = Date.now()): string {
   return `${Math.ceil(hours / 24)}일 남음`;
 }
 
+function loadErrorMessage(error: unknown): string {
+  if (error instanceof Error && /[가-힣]/.test(error.message)) {
+    return error.message;
+  }
+  return "미결제 낙찰 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
 export function OperatorUnpaidAuctionsConsole() {
   const [token, setToken] = useState<string | null>(null);
   const [products, setProducts] = useState<UnpaidProduct[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<{
     productId: string;
     action: "relist" | "convert_fixed";
   } | null>(null);
   const [notice, setNotice] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async (accessToken: string | null) => {
     if (!accessToken) return;
     setLoading(true);
+    setLoadFailed(false);
+    setNotice("");
     try {
       const response = await fetch("/api/admin/operator/auctions/unpaid", {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -81,17 +91,15 @@ export function OperatorUnpaidAuctionsConsole() {
       });
       const payload = (await response.json()) as {
         error?: string;
+        message?: string;
         products?: UnpaidProduct[];
       };
       if (!response.ok)
-        throw new Error(payload.error ?? "미결제 낙찰을 불러오지 못했습니다.");
+        throw new Error(payload.message ?? "미결제 낙찰을 불러오지 못했습니다.");
       setProducts(payload.products ?? []);
     } catch (error) {
-      setNotice(
-        error instanceof Error
-          ? error.message
-          : "미결제 낙찰을 불러오지 못했습니다.",
-      );
+      setLoadFailed(true);
+      setNotice(loadErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -115,17 +123,23 @@ export function OperatorUnpaidAuctionsConsole() {
 
   useEffect(() => {
     void (async () => {
-      const session = (await getSupabaseBrowserClient().auth.getSession()).data
-        .session;
-      setToken(session?.access_token ?? null);
-      await load(session?.access_token ?? null);
-    })().catch((error) =>
-      setNotice(
-        error instanceof Error
-          ? error.message
-          : "운영자 세션을 확인하지 못했습니다.",
-      ),
-    );
+      try {
+        const session = (await getSupabaseBrowserClient().auth.getSession()).data
+          .session;
+        setToken(session?.access_token ?? null);
+        if (!session?.access_token) {
+          setLoadFailed(true);
+          setLoading(false);
+          setNotice("로그인 상태를 확인한 뒤 다시 시도해 주세요.");
+          return;
+        }
+        await load(session.access_token);
+      } catch (error) {
+        setLoadFailed(true);
+        setLoading(false);
+        setNotice(loadErrorMessage(error));
+      }
+    })();
   }, [load]);
 
   const counts = useMemo(
@@ -173,12 +187,12 @@ export function OperatorUnpaidAuctionsConsole() {
       };
       if (!response.ok)
         throw new Error(payload?.error ?? "처리하지 못했습니다.");
+      await load(token);
       setNotice(
         action === "relist"
           ? `'${product.title}' 경매가 ${dateLabel(payload.result?.publish_at ?? null)} 시작 드롭으로 재등록되었습니다.`
           : `'${product.title}'이(가) ${Number(payload.result?.fixed_price ?? product.currentPrice).toLocaleString("ko-KR")}원 즉시구매 상품으로 전환되었습니다.`,
       );
-      await load(token);
     } catch (error) {
       setNotice(
         error instanceof Error
@@ -228,6 +242,11 @@ export function OperatorUnpaidAuctionsConsole() {
       </div>
 
       <div className="divide-y divide-line border-y border-line">
+        {loading && products.length === 0 && (
+          <div className="py-20 text-center text-sm text-muted" role="status">
+            미결제 낙찰 정보를 불러오는 중입니다.
+          </div>
+        )}
         {products.map((product) => {
           const busy = actionBusy(product.id);
           const latest = product.offers[product.offers.length - 1];
@@ -324,7 +343,15 @@ export function OperatorUnpaidAuctionsConsole() {
             </article>
           );
         })}
-        {!loading && products.length === 0 && (
+        {!loading && loadFailed && products.length === 0 && (
+          <div className="space-y-3 py-20 text-center text-sm text-muted">
+            <p>미결제 낙찰 정보를 표시할 수 없습니다.</p>
+            <Button onClick={() => void load(token)} type="button">
+              다시 시도
+            </Button>
+          </div>
+        )}
+        {!loading && !loadFailed && products.length === 0 && (
           <div className="py-20 text-center text-sm text-muted">
             현재 미결제 낙찰이 없습니다.
           </div>

@@ -26,7 +26,7 @@ export default function OperatorLayout({ children }: Readonly<{ children: React.
     <AdminWorkspaceShell
       contentHeader={<StandaloneBackModal />}
       description="상품 등록부터 배송과 정산까지 한 매장의 판매 업무를 처리합니다."
-      eyebrow="Seller workspace"
+      eyebrow="운영자 업무 공간"
       navigation={navigation}
       contextBar={<OperatorContextBar />}
       operatorMode

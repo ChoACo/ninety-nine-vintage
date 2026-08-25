@@ -48,34 +48,17 @@ export async function GET(request: Request) {
   }
   const admin = auth.admin as unknown as SupabaseClient;
 
-  let allowedStoreIds: string[] | null = null;
-  if (auth.roleCode === "operator") {
-    const membershipResult = await admin
-      .from("store_memberships")
-      .select("store_id")
-      .eq("user_id", auth.userId)
-      .eq("status", "active")
-      .eq("manage_products", true);
-    if (membershipResult.error) {
-      return commerceJson({ error: "unpaid_auctions_unavailable" }, 503);
-    }
-    allowedStoreIds = [...new Set(
-      (membershipResult.data ?? []).map((membership) => membership.store_id),
-    )];
-    if (allowedStoreIds.length === 0) {
-      return commerceJson({ error: "unpaid_auctions_forbidden" }, 403);
-    }
-  }
-
-  let storeQuery = admin
+  const storeQuery = admin
     .from("stores")
     .select("id, name")
     .eq("is_active", true)
     .eq("id", auth.selectedStoreId);
-  if (allowedStoreIds) storeQuery = storeQuery.in("id", allowedStoreIds);
   const { data: stores, error: storeError } = await storeQuery.order("name");
   if (storeError)
-    return commerceJson({ error: "unpaid_auctions_unavailable" }, 503);
+    return commerceJson({
+      error: "unpaid_auctions_unavailable",
+      message: "미결제 낙찰 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    }, 503);
   const storeIds = (stores ?? []).map((store) => store.id);
   if (storeIds.length === 0) {
     return commerceJson({ error: "unpaid_auctions_forbidden" }, 403);
@@ -91,7 +74,10 @@ export async function GET(request: Request) {
     .order("closes_at", { ascending: false });
   const { data: products, error: productError } = await productQuery;
   if (productError)
-    return commerceJson({ error: "unpaid_auctions_unavailable" }, 503);
+    return commerceJson({
+      error: "unpaid_auctions_unavailable",
+      message: "미결제 낙찰 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    }, 503);
   const productRows = (products ?? []) as unknown as ProductRow[];
   if (productRows.length === 0) {
     return commerceJson({ products: [], stores: stores ?? [] });
@@ -100,7 +86,10 @@ export async function GET(request: Request) {
   const { data: offerRows, error: offerError } = await auth.user
     .rpc("get_operator_unpaid_auction_offers", { p_store_ids: storeIds });
   if (offerError)
-    return commerceJson({ error: "unpaid_auctions_unavailable" }, 503);
+    return commerceJson({
+      error: "unpaid_auctions_unavailable",
+      message: "미결제 낙찰 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    }, 503);
   const offersByProduct = new Map<string, OfferRow[]>();
   for (const offer of (offerRows ?? []) as OfferRow[]) {
     const list = offersByProduct.get(offer.product_id) ?? [];

@@ -6,7 +6,6 @@ export type MemberAccountStatus = "active" | "suspended";
 export type ManagedAccessRole =
   | "operator"
   | "employee"
-  | "band_member"
   | "member";
 
 interface MemberDirectoryRow {

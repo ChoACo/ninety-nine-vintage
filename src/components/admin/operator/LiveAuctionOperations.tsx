@@ -2,7 +2,6 @@
 
 import { Clock3, Gavel, RefreshCw, Radio } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AuctionController } from "@/components/admin/operator/AuctionController";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { StatusNotice } from "@/components/ui/StatusNotice";
@@ -111,14 +110,14 @@ export function LiveAuctionOperations() {
       {active.map((product) => <article className="w-full max-w-full overflow-hidden break-keep rounded-2xl border border-line bg-paper p-4" key={product.id}>
         <div className="flex min-w-0 gap-3"><CatalogImage alt="" className="size-16 shrink-0 rounded-xl object-cover" src={product.image_urls?.[0] ?? ""} /><div className="min-w-0 flex-1"><strong className="line-clamp-2 text-sm">{product.title}</strong><p className="mt-1 text-[11px] text-muted">{product.stores?.name ?? "소속 센터"}</p></div></div>
         <div className="mt-4 grid grid-cols-3 gap-2 text-center"><div className={`rounded-xl p-2 transition-colors ${flashedProductId === product.id ? "bg-amber-200" : "bg-surface"}`}><span className="block text-[10px] text-muted">현재 최고가</span><strong className="mt-1 block font-mono text-xs">{product.current_price.toLocaleString("ko-KR")}원</strong></div><div className="rounded-xl bg-surface p-2"><span className="block text-[10px] text-muted">입찰</span><strong className="mt-1 block font-mono text-xs">{product.bid_count ?? 0}회</strong></div><div className="rounded-xl bg-surface p-2"><span className="block text-[10px] text-muted">남은 시간</span><strong className="mt-1 block font-mono text-xs">{remaining(product.closes_at)}</strong></div></div>
-        <div className="mt-3 flex min-h-11 items-center justify-end"><AuctionController onChanged={() => void load()} productId={product.id} title={product.title} /></div>
+        <div className="mt-3 flex min-h-11 items-center justify-end text-[10px] font-bold text-muted">모니터링 전용</div>
       </article>)}
       {!loading && active.length === 0 && <p className="py-16 text-center text-sm text-muted">현재 진행 중인 경매가 없습니다.</p>}
     </div>
     <div className="hidden overflow-x-auto border border-line md:block">
       <table className="w-full min-w-[760px] text-left text-xs">
         <thead className="border-b border-line bg-surface text-[10px] text-muted"><tr><th className="px-4 py-4">경매 상품</th><th>센터</th><th className="text-right">현재가</th><th className="text-right">마감 시각</th><th className="px-4 text-right">관제</th></tr></thead>
-        <tbody className="divide-y divide-line">{active.map((product) => <tr key={product.id}><td className="px-4 py-3"><div className="flex items-center gap-3"><CatalogImage alt="" className="size-12 object-cover" src={product.image_urls?.[0] ?? ""} /><strong className="max-w-[280px] truncate">{product.title}</strong></div></td><td>{product.stores?.name ?? "소속 센터"}</td><td className={`text-right font-mono font-bold transition-colors ${flashedProductId === product.id ? "bg-amber-200 text-ink" : ""}`}>{product.current_price.toLocaleString("ko-KR")}원<br /><span className="text-[10px] font-normal text-muted">{product.bid_count ?? 0}회</span></td><td className="text-right font-mono text-muted">{remaining(product.closes_at)}</td><td className="px-4 text-right"><AuctionController onChanged={() => void load()} productId={product.id} title={product.title} /></td></tr>)}</tbody>
+        <tbody className="divide-y divide-line">{active.map((product) => <tr key={product.id}><td className="px-4 py-3"><div className="flex items-center gap-3"><CatalogImage alt="" className="size-12 object-cover" src={product.image_urls?.[0] ?? ""} /><strong className="max-w-[280px] truncate">{product.title}</strong></div></td><td>{product.stores?.name ?? "소속 센터"}</td><td className={`text-right font-mono font-bold transition-colors ${flashedProductId === product.id ? "bg-amber-200 text-ink" : ""}`}>{product.current_price.toLocaleString("ko-KR")}원<br /><span className="text-[10px] font-normal text-muted">{product.bid_count ?? 0}회</span></td><td className="text-right font-mono text-muted">{remaining(product.closes_at)}</td><td className="px-4 text-right text-[10px] font-bold text-muted">모니터링 전용</td></tr>)}</tbody>
       </table>
       {!loading && active.length === 0 && <p className="py-16 text-center text-sm text-muted">현재 진행 중인 경매가 없습니다.</p>}
     </div>

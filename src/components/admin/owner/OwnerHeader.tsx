@@ -42,9 +42,9 @@ export function OwnerHeader() {
       if (cancelled) return;
       const overviewData = overview.status === "fulfilled" ? overview.value as { stores?: Array<{ id: string; name: string; slug: string }>; activeSessions?: number; dbConnected?: boolean } : {};
       const tokenData = tokenUsage.status === "fulfilled" ? tokenUsage.value as { totalTokens?: number } : {};
-      const storageData = storageUsage.status === "fulfilled" ? storageUsage.value as { ratio?: number } : {};
+      const storageData = storageUsage.status === "fulfilled" ? storageUsage.value as { totalUsedBytes?: number } : {};
       setStores(overviewData.stores ?? []);
-      setHealth({ db: overviewData.dbConnected === true, sessions: overviewData.activeSessions ?? 0, tokens: Math.min(100, Math.round(((tokenData.totalTokens ?? 0) / 1_000_000) * 100)), storage: Math.min(100, Math.round((storageData.ratio ?? 0) * 100)) });
+      setHealth({ db: overviewData.dbConnected === true, sessions: overviewData.activeSessions ?? 0, tokens: Math.min(100, Math.round(((tokenData.totalTokens ?? 0) / 1_000_000) * 100)), storage: storageData.totalUsedBytes ?? 0 });
     })();
     return () => { cancelled = true; };
   }, [setStores]);
@@ -55,10 +55,16 @@ export function OwnerHeader() {
         <label className="flex w-full min-w-0 flex-1 items-center gap-2 text-xs font-black sm:min-w-[240px]"><ShieldCheck className="shrink-0 text-amber-400" size={16} /><select aria-label="소유자 전역 센터 범위" className="h-11 min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-3 text-xs text-zinc-100 outline-none focus:border-amber-500" onChange={(event) => setSelectedStoreId(event.target.value || null)} value={selectedStoreId ?? ""}><option value="">🌐 전체 플랫폼 통합 뷰</option>{stores.map((store) => <option key={store.id} value={store.id}>🏬 {store.name}</option>)}</select></label>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto"><span className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 text-[10px] font-black ${health.db ? "border-emerald-500/30 text-emerald-400" : "border-rose-500/30 text-rose-400"}`}><span className={`size-2 rounded-full ${health.db ? "animate-pulse bg-emerald-400" : "bg-rose-500"}`} /><Database size={13} /> DB·Realtime</span><span className="hidden min-h-11 items-center rounded-xl border border-zinc-800 px-3 font-mono text-[10px] text-zinc-400 md:inline-flex">CCU {health.sessions}</span><Link className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-rose-500/30 px-3 text-xs font-black text-rose-400 hover:bg-rose-500/10" href="/admin/owner/rules/auction"><AlertTriangle size={14}/>비상 제어</Link><button aria-expanded={open} aria-haspopup="dialog" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-700 px-3 text-xs font-bold" onClick={() => setOpen(true)} type="button"><Search size={14} /><Command size={11} />K</button></div>
       </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2"><Quota label="AI token" value={health.tokens} /><Quota label="Storage" value={health.storage} /></div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2"><Quota label="AI token" value={health.tokens} /><StorageMetric bytes={health.storage} /></div>
     </div>
     <PremiumDialog ariaLabel="소유자 빠른 이동" onClose={() => setOpen(false)} open={open} panelClassName="max-w-xl bg-zinc-900 text-zinc-100"><div className="flex items-center gap-3 border-b border-zinc-800 px-4"><Search className="shrink-0" size={16} /><input autoFocus className="h-14 min-w-0 flex-1 bg-transparent text-base outline-none" onChange={(event) => setQuery(event.target.value)} placeholder="회원·매장·주문·감사 메뉴 검색" value={query} /><button aria-label="빠른 이동 닫기" className="grid size-11 shrink-0 place-items-center rounded-xl text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100" onClick={() => setOpen(false)} type="button"><X size={18} /></button></div><div className="grid gap-1 p-2">{filtered.map(([label, href]) => <Link className="flex min-h-11 items-center rounded-xl px-3 text-sm font-bold hover:bg-zinc-800 hover:text-amber-400" href={href} key={href} onClick={() => setOpen(false)}>{label}</Link>)}</div></PremiumDialog>
   </>;
 }
 
 function Quota({ label, value }: Readonly<{ label: string; value: number }>) { return <div className="flex items-center gap-3"><span className="w-16 text-[9px] font-bold uppercase tracking-wider text-zinc-500">{label}</span><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-800"><div className="h-full rounded-full bg-emerald-500 transition-[width]" style={{ width: `${value}%` }} /></div><span className="w-8 text-right font-mono text-[9px] text-zinc-500">{value}%</span></div>; }
+
+function StorageMetric({ bytes }: Readonly<{ bytes: number }>) {
+  const gibibytes = bytes / 1024 ** 3;
+  const value = gibibytes >= 1 ? `${gibibytes.toFixed(2)} GB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return <div className="flex items-center gap-3"><span className="w-16 text-[9px] font-bold uppercase tracking-wider text-zinc-500">R2 Storage</span><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-800"><div className="h-full w-full rounded-full bg-sky-500" /></div><span className="w-16 text-right font-mono text-[9px] text-zinc-400">{value}</span></div>;
+}

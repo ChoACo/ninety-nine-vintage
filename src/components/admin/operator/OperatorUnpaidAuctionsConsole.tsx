@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, PackagePlus, RefreshCw, TimerReset } from "lucide-react";
+import { Archive, PackagePlus, RefreshCw, TimerReset, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { OperatorSecondChanceButton } from "@/components/admin/operator/OperatorSecondChanceButton";
@@ -73,7 +73,7 @@ export function OperatorUnpaidAuctionsConsole() {
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<{
     productId: string;
-    action: "relist" | "convert_fixed";
+    action: "relist" | "archive" | "delete";
   } | null>(null);
   const [notice, setNotice] = useState("");
   const [loadFailed, setLoadFailed] = useState(false);
@@ -155,13 +155,15 @@ export function OperatorUnpaidAuctionsConsole() {
 
   const resolve = async (
     product: UnpaidProduct,
-    action: "relist" | "convert_fixed",
+    action: "relist" | "archive" | "delete",
   ) => {
     if (!token || busyAction) return;
     const confirmMessage =
       action === "relist"
         ? `'${product.title}' 경매를 다음 10시 드롭으로 재등록할까요?\n기존 낙찰·차순위 이력은 보존되고 새 상품으로 재편성됩니다.`
-        : `'${product.title}'을(를) ${product.currentPrice.toLocaleString("ko-KR")}원 즉시구매 상품으로 전환할까요?`;
+        : action === "archive"
+          ? `'${product.title}'을(를) 예약 아카이브숍 상품으로 이동할까요?`
+          : `'${product.title}'의 활성 판매를 완전히 종료할까요? 거래 원장은 감사 이력으로 보존됩니다.`;
     if (!window.confirm(confirmMessage)) return;
     setBusyAction({ productId: product.id, action });
     setNotice("");
@@ -191,7 +193,9 @@ export function OperatorUnpaidAuctionsConsole() {
       setNotice(
         action === "relist"
           ? `'${product.title}' 경매가 ${dateLabel(payload.result?.publish_at ?? null)} 시작 드롭으로 재등록되었습니다.`
-          : `'${product.title}'이(가) ${Number(payload.result?.fixed_price ?? product.currentPrice).toLocaleString("ko-KR")}원 즉시구매 상품으로 전환되었습니다.`,
+          : action === "archive"
+            ? `'${product.title}'이(가) ${dateLabel(payload.result?.publish_at ?? null)} 아카이브숍 예약 상품으로 이동했습니다.`
+            : `'${product.title}' 상품을 삭제 상태로 전환했습니다.`,
       );
     } catch (error) {
       setNotice(
@@ -315,14 +319,24 @@ export function OperatorUnpaidAuctionsConsole() {
                 <button
                   className="flex min-h-11 shrink-0 items-center gap-1 border border-ink px-3 py-2 text-[10px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
                   disabled={!product.canResolve || !!busyAction || !token}
-                  onClick={() => void resolve(product, "convert_fixed")}
+                  onClick={() => void resolve(product, "archive")}
                   title={product.canResolve ? "" : product.blockedReason}
                   type="button"
                 >
-                  <Banknote aria-hidden="true" size={11} />
-                  {busy && busyAction?.action === "convert_fixed"
+                  <Archive aria-hidden="true" size={11} />
+                  {busy && busyAction?.action === "archive"
                     ? "처리 중"
-                    : "즉시구매 전환"}
+                    : "아카이브숍 예약"}
+                </button>
+                <button
+                  className="flex min-h-11 shrink-0 items-center gap-1 border border-red-300 px-3 py-2 text-[10px] font-bold text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={!product.canResolve || !!busyAction || !token}
+                  onClick={() => void resolve(product, "delete")}
+                  title={product.canResolve ? "" : product.blockedReason}
+                  type="button"
+                >
+                  <Trash2 aria-hidden="true" size={11} />
+                  {busy && busyAction?.action === "delete" ? "처리 중" : "상품 삭제"}
                 </button>
                 {product.canSecondChance ? (
                   <OperatorSecondChanceButton

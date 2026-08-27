@@ -166,7 +166,7 @@ test("storage cleanup deletes objects before locators and preserves failures for
   }]);
 });
 
-test("storage usage gauge exposes provider capacity and an active rollover target", async () => {
+test("storage usage gauge reports live R2 bytes without a capacity ceiling", async () => {
   const [service, route, gauge, dashboard, aiMigration, productMigration, envExample] = await Promise.all([
     source("src/lib/multicloud/storageUsage.ts"),
     source("src/app/api/admin/owner/storage-usage/route.ts"),
@@ -176,19 +176,19 @@ test("storage usage gauge exposes provider capacity and an active rollover targe
     source("supabase/migrations/20260804020000_add_product_ai_metadata.sql"),
     source(".env.example"),
   ]);
-  assert.match(service, /get_multicloud_storage_usage/);
-  assert.match(service, /storage_provider_id/);
+  assert.match(service, /ListObjectsV2Command/);
+  assert.match(service, /ContinuationToken/);
   assert.match(service, /totalUsedBytes/);
-  assert.match(service, /rolloverThreshold/);
-  assert.match(service, /activeProviderId/);
+  assert.match(service, /totalObjectCount/);
+  assert.doesNotMatch(service, /capacityBytes|rolloverThreshold|get_multicloud_storage_usage/);
   assert.match(route, /authenticateStaffRequest/);
   assert.match(route, /roleCode !== "owner"/);
   assert.match(route, /getStorageUsageSummary/);
   assert.match(gauge, /StorageUsageGauge/);
-  assert.match(gauge, /Active:/);
-  assert.match(gauge, /bg-red-600/);
-  assert.match(gauge, /bg-amber-500/);
-  assert.match(gauge, /bg-emerald-600/);
+  assert.match(gauge, /R2 스토리지 사용 현황/);
+  assert.match(gauge, /현재 사용 중/);
+  assert.match(gauge, /totalObjectCount/);
+  assert.doesNotMatch(gauge, /Supabase Storage|Google Cloud Storage|rolloverPercent/);
   assert.match(dashboard, /StorageUsageGauge/);
   assert.match(dashboard, /TokenUsageGauge/);
   assert.match(aiMigration, /public\.ai_token_usage_logs/);
@@ -199,4 +199,13 @@ test("storage usage gauge exposes provider capacity and an active rollover targe
   assert.match(envExample, /OPENROUTER_API_KEY/);
   assert.match(envExample, /CRON_SECRET/);
   assert.match(envExample, /MULTICLOUD_SUPABASE_CAPACITY_BYTES/);
+});
+
+test("root metadata fixes the shared preview to the site brand image", async () => {
+  const layout = await source("src/app/layout.tsx");
+  assert.match(layout, /openGraph:\s*\{/);
+  assert.match(layout, /url:\s*"\/ninety-nine-vintage-banner\.png"/);
+  assert.match(layout, /twitter:\s*\{/);
+  assert.match(layout, /card:\s*"summary_large_image"/);
+  assert.doesNotMatch(layout, /banner_url|mall_image/);
 });

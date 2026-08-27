@@ -1300,7 +1300,7 @@ function AccountDashboardForSession({
           </h2>
           <p className="mt-2 text-[11px] leading-5 text-muted">
             낙찰품은 보관 상품이 되기 전에 결제를 진행해야 합니다. 결제 마감은
-            서버가 확정한 경매 규칙을 따릅니다.
+            낙찰일 기준 3일째 오후 11시 59분 59초(KST)입니다.
           </p>
         </div>
         {pendingAuctionWins.length === 0 ? (

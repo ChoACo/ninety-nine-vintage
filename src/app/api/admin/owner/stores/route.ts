@@ -28,7 +28,9 @@ function rpcError(
       ? 403
       : error?.code === "P0002"
         ? 404
-        : ["PT409", "23503", "23505", "55000"].includes(error?.code ?? "")
+        : ["PT409", "23503", "23505", "40001", "55000"].includes(
+              error?.code ?? "",
+            )
           ? 409
           : ["22023", "23514"].includes(error?.code ?? "")
             ? 422
@@ -52,20 +54,44 @@ export async function GET(request: Request) {
         : {};
     const stores = management.stores ?? [];
     const storeIds = stores.map((store) => String(store.id));
-    const { data: branding, error: brandingError } = storeIds.length
-      ? await access.admin
-          .from("stores")
-          .select("id,banner_url,mall_image")
-          .in("id", storeIds)
-      : { data: [], error: null };
+    const [brandingResult, subscriptionResult] = storeIds.length
+      ? await Promise.all([
+          access.admin
+            .from("stores")
+            .select("id,banner_url,mall_image")
+            .in("id", storeIds),
+          access.admin
+            .from("store_service_subscriptions")
+            .select(
+              "store_id,plan_code,requested_plan_code,status,monthly_fee,version",
+            )
+            .in("store_id", storeIds),
+        ])
+      : [
+          { data: [], error: null },
+          { data: [], error: null },
+        ];
+    const { data: branding, error: brandingError } = brandingResult;
+    const { data: subscriptions, error: subscriptionError } =
+      subscriptionResult;
     if (brandingError) {
       console.error("owner_store_branding_query_failed", {
         code: brandingError.code,
         message: brandingError.message,
       });
     }
+    if (subscriptionError) {
+      console.error("owner_store_subscription_query_failed", {
+        code: subscriptionError.code,
+        message: subscriptionError.message,
+      });
+      return rpcError(subscriptionError, "store_subscription_unavailable");
+    }
     const brandingByStore = new Map(
       (branding ?? []).map((item) => [String(item.id), item]),
+    );
+    const subscriptionByStore = new Map(
+      (subscriptions ?? []).map((item) => [String(item.store_id), item]),
     );
     return ownerAccessJsonResponse({
       management: {
@@ -75,6 +101,17 @@ export async function GET(request: Request) {
           bannerUrl:
             brandingByStore.get(String(store.id))?.banner_url ?? null,
           mallImage: brandingByStore.get(String(store.id))?.mall_image ?? null,
+          planCode:
+            subscriptionByStore.get(String(store.id))?.plan_code ?? "standard",
+          requestedPlanCode:
+            subscriptionByStore.get(String(store.id))?.requested_plan_code ??
+            null,
+          subscriptionStatus:
+            subscriptionByStore.get(String(store.id))?.status ?? "active",
+          monthlyFee:
+            subscriptionByStore.get(String(store.id))?.monthly_fee ?? 30000,
+          subscriptionVersion:
+            subscriptionByStore.get(String(store.id))?.version ?? 0,
         })),
       },
     });
@@ -134,6 +171,39 @@ export async function PATCH(request: Request) {
         },
       );
       if (error) return rpcError(error, "store_banner_update_failed");
+      return ownerAccessJsonResponse({ result: data });
+    }
+
+    if (action === "plan_change") {
+      const storeId = readUuid(body.storeId);
+      const expectedVersion = readVersion(body.expectedVersion);
+      const planCode =
+        body.planCode === "pro" || body.planCode === "standard"
+          ? body.planCode
+          : null;
+      if (!storeId || expectedVersion === null || !planCode) {
+        return ownerAccessJsonResponse(
+          {
+            error: "invalid_store_plan",
+            message: "센터 등급 변경 정보를 확인해 주세요.",
+          },
+          422,
+        );
+      }
+      const { data, error } = await access.userClient.rpc(
+        "set_owner_store_service_plan",
+        {
+          p_store_id: storeId,
+          p_plan_code: planCode,
+          p_expected_version: expectedVersion,
+          p_idempotency_key: idempotencyKey,
+          p_reason:
+            planCode === "pro"
+              ? "관리자 센터에서 Pro 등급으로 변경"
+              : "관리자 센터에서 일반 등급으로 변경",
+        },
+      );
+      if (error) return rpcError(error, "store_plan_update_failed");
       return ownerAccessJsonResponse({ result: data });
     }
 
@@ -259,13 +329,12 @@ export async function PATCH(request: Request) {
       const registrationNumber = typeof body.businessRegistrationNumber === "string" ? body.businessRegistrationNumber.replace(/\D/g, "") : "";
       const bankName = typeof body.bankName === "string" ? body.bankName.trim() : "";
       const accountHolder = typeof body.accountHolder === "string" ? body.accountHolder.trim() : "";
-      const commissionRate = Number(body.commissionRate);
       const smallStorageDays = Number(body.smallStorageDays);
       const largeStorageDays = Number(body.largeStorageDays);
       let accountNumber: string;
       try { accountNumber = normalizeAccountNumber(String(body.accountNumber ?? "")); }
       catch { return ownerAccessJsonResponse({ error: "invalid_payout_account", message: "정산 계좌번호를 확인해 주세요." }, 422); }
-      if (!businessId || !operatorId || !SLUG_PATTERN.test(slug) || !name || !representativeName || !/^\d{10}$/.test(registrationNumber) || !bankName || !accountHolder || !Number.isFinite(commissionRate) || commissionRate < 0 || commissionRate > 50 || !Number.isInteger(smallStorageDays) || !Number.isInteger(largeStorageDays)) {
+      if (!businessId || !operatorId || !SLUG_PATTERN.test(slug) || !name || !representativeName || !/^\d{10}$/.test(registrationNumber) || !bankName || !accountHolder || !Number.isInteger(smallStorageDays) || !Number.isInteger(largeStorageDays)) {
         return ownerAccessJsonResponse({ error: "invalid_onboarding_request", message: "신규 센터 등록 정보를 확인해 주세요." }, 422);
       }
       const { data, error } = await access.userClient.rpc("owner_onboard_store", {
@@ -273,7 +342,7 @@ export async function PATCH(request: Request) {
         p_operator_id: operatorId, p_representative_name: representativeName,
         p_business_registration_number: registrationNumber, p_bank_name: bankName,
         p_account_holder: accountHolder, p_account_number_ciphertext: encryptAccountNumber(accountNumber),
-        p_account_number_masked: maskAccountNumber(accountNumber), p_commission_rate: commissionRate / 100,
+        p_account_number_masked: maskAccountNumber(accountNumber), p_commission_rate: 0.05,
         p_small_storage_days: smallStorageDays, p_large_storage_days: largeStorageDays,
         p_idempotency_key: idempotencyKey, p_reason: "소유자센터 신규 판매센터 온보딩",
       });

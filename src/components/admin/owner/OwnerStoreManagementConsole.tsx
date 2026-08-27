@@ -7,6 +7,7 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
+  Sparkles,
   UserMinus,
   UserPlus,
 } from "lucide-react";
@@ -64,6 +65,11 @@ interface ManagedStore {
   operatorName: string;
   isActive: boolean;
   version: number;
+  planCode: "standard" | "pro";
+  requestedPlanCode: "pro" | null;
+  subscriptionStatus: "active" | "pending_approval" | "delinquent" | "cancelled";
+  monthlyFee: number;
+  subscriptionVersion: number;
   operators: StoreOperator[];
   employees: StoreEmployee[];
 }
@@ -376,6 +382,28 @@ export function OwnerStoreManagementConsole() {
     );
   };
 
+  const changeStorePlan = async (store: ManagedStore) => {
+    const planCode = store.planCode === "pro" ? "standard" : "pro";
+    const label = planCode === "pro" ? "Pro" : "일반";
+    if (
+      !window.confirm(
+        `“${store.name}” 센터를 ${label} 등급으로 변경할까요?\n판매 수수료는 어느 등급이든 5%로 동일합니다.`,
+      )
+    ) {
+      return;
+    }
+    await mutate(
+      `plan_change:${store.id}:${store.subscriptionVersion}:${planCode}`,
+      {
+        action: "plan_change",
+        storeId: store.id,
+        planCode,
+        expectedVersion: store.subscriptionVersion,
+      },
+      `${store.name} 센터를 ${label} 등급으로 변경했습니다.`,
+    );
+  };
+
   const assignEmployee = async (store: ManagedStore) => {
     const employeeId = employeeDrafts[store.id];
     if (!employeeId) {
@@ -458,19 +486,19 @@ export function OwnerStoreManagementConsole() {
         </div>
         <table className="hidden w-full text-left text-xs md:table">
           <thead className="border-b border-line bg-paper text-[10px] text-muted">
-            <tr><th className="p-3">센터</th><th className="p-3">사업체</th><th className="p-3">담당 운영자</th><th className="p-3">상태</th></tr>
+            <tr><th className="p-3">센터</th><th className="p-3">사업체</th><th className="p-3">담당 운영자</th><th className="p-3">상태</th><th className="p-3">센터 등급</th></tr>
           </thead>
           <tbody className="divide-y divide-line">
             {directory.stores.map((store) => {
               const status = storeApprovalStatus(store);
-              return <tr key={store.id}><td className="p-3 font-bold">{store.name}<span className="mt-1 block font-mono text-[10px] font-normal text-muted">{store.slug}</span></td><td className="p-3">{store.businessName}</td><td className="p-3">{store.operatorName || "미배정"}</td><td className="p-3"><span className={`inline-flex border px-2 py-1 text-[10px] font-black ${status.className}`}>[{status.label}]</span></td></tr>;
+              return <tr key={store.id}><td className="p-3 font-bold">{store.name}<span className="mt-1 block font-mono text-[10px] font-normal text-muted">{store.slug}</span></td><td className="p-3">{store.businessName}</td><td className="p-3">{store.operatorName || "미배정"}</td><td className="p-3"><span className={`inline-flex border px-2 py-1 text-[10px] font-black ${status.className}`}>[{status.label}]</span></td><td className="p-3"><button aria-label={`${store.name} 센터 등급 변경`} className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-[10px] font-black disabled:opacity-40 ${store.planCode === "pro" ? "border-amber-500 bg-amber-500/10 text-amber-700" : "border-line bg-paper text-muted"}`} disabled={busyKey !== null || !store.isActive} onClick={() => void changeStorePlan(store)} type="button"><Sparkles size={12}/>{store.planCode === "pro" ? "Pro 센터" : "일반 센터"}</button>{store.subscriptionStatus === "pending_approval" && <span className="mt-1 block text-[10px] text-amber-700">Pro 신청 대기 중</span>}</td></tr>;
             })}
           </tbody>
         </table>
         <div className="flex flex-col gap-3 p-3 md:hidden">
           {directory.stores.map((store) => {
             const status = storeApprovalStatus(store);
-            return <article className="min-w-0 border border-line bg-paper p-4" key={store.id}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-black">{store.name}</h3><p className="mt-1 truncate text-[11px] text-muted">{store.businessName} · {store.operatorName || "운영자 미배정"}</p></div><span className={`shrink-0 border px-2 py-1 text-[10px] font-black ${status.className}`}>[{status.label}]</span></div><p className="mt-3 break-all font-mono text-[10px] text-muted">{store.slug}</p></article>;
+            return <article className="min-w-0 border border-line bg-paper p-4" key={store.id}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-black">{store.name}</h3><p className="mt-1 truncate text-[11px] text-muted">{store.businessName} · {store.operatorName || "운영자 미배정"}</p></div><span className={`shrink-0 border px-2 py-1 text-[10px] font-black ${status.className}`}>[{status.label}]</span></div><div className="mt-3 flex items-center justify-between gap-3"><p className="break-all font-mono text-[10px] text-muted">{store.slug}</p><button aria-label={`${store.name} 센터 등급 변경`} className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-[10px] font-black disabled:opacity-40 ${store.planCode === "pro" ? "border-amber-500 bg-amber-500/10 text-amber-700" : "border-line text-muted"}`} disabled={busyKey !== null || !store.isActive} onClick={() => void changeStorePlan(store)} type="button"><Sparkles size={12}/>{store.planCode === "pro" ? "Pro 센터" : "일반 센터"}</button></div>{store.subscriptionStatus === "pending_approval" && <p className="mt-2 text-[10px] text-amber-700">판매센터에서 Pro 등급 승인을 신청했습니다.</p>}</article>;
           })}
         </div>
       </section>
@@ -632,9 +660,7 @@ export function OwnerStoreManagementConsole() {
                       </p>
                     </div>
                   </div>
-                  <span className="w-fit bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800">
-                    운영 중
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2"><span className="w-fit bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800">운영 중</span><button className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-[10px] font-black disabled:opacity-40 ${store.planCode === "pro" ? "border-amber-500 bg-amber-500/10 text-amber-700" : "border-line bg-paper text-muted"}`} disabled={busyKey !== null} onClick={() => void changeStorePlan(store)} type="button"><Sparkles size={12}/>{store.planCode === "pro" ? "Pro 센터" : "일반 센터"}</button></div>
                 </div>
 
                 <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(300px,.9fr)]">

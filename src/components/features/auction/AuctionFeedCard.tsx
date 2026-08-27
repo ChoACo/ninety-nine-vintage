@@ -78,9 +78,9 @@ function EnabledAuctionFeedCard({ basePath = "", bidCapability, item, participat
   const bidCount = Math.max(item.bidCount, activeHistory.length);
   const participantCount = item.participantCount ?? 0;
   const phase = item.bidLockedAt ? "CLOSED" : item.auctionPhase ?? "OPEN";
-  const { canBid, firstBidFinal, hasParticipated } = getAuctionFeedBidAccess({ bidCount, bidIncrement: item.bidIncrement, currentPrice, participationState, phase });
+  const { canBid, firstBidExtended, hasParticipated } = getAuctionFeedBidAccess({ bidCount, bidIncrement: item.bidIncrement, currentPrice, participationState, phase });
   const policyBidLabel = phase === "CLOSING_SOON"
-    ? firstBidFinal ? "첫 입찰 즉시 확정" : hasParticipated ? "기존 참여자 입찰" : "기존 참여자 전용"
+    ? firstBidExtended ? "첫 입찰 · 15분 연장" : hasParticipated ? "기존 참여자 입찰" : "기존 참여자 전용"
     : phase === "CLOSED" ? "경매 마감"
       : phase === "UPCOMING" ? "오픈 예정"
         : participationState === "outbid" ? "재입찰하기" : "경매 참여";
@@ -148,7 +148,7 @@ function EnabledAuctionFeedCard({ basePath = "", bidCapability, item, participat
           <div className="flex items-end justify-between gap-2"><div><p className="text-[10px] text-muted">{phase === "CLOSED" ? "최종 낙찰가" : "현재 최고 입찰가"}</p><p className="mt-0.5 font-mono text-sm font-bold text-foreground tabular-nums">{currentPrice.toLocaleString("ko-KR")}원</p></div><button aria-label={`입찰 내역 ${bidCount}건 보기`} className="flex items-center gap-1 text-right text-[10px] text-muted underline" onClick={() => setHistoryOpen(true)} type="button"><List size={12} /> 참여 {participantCount}명</button></div>
         </div>
         <div className="mt-3 grid grid-cols-[1fr_auto_auto] gap-2">{canStartBid ? <Link className="flex h-11 items-center justify-center gap-1 rounded-lg bg-ink text-xs font-semibold text-paper shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 sm:h-8" href={`${basePath}/auction/${item.id}/bid`}><Gavel size={13} /> {bidLabel}</Link> : <button className="flex h-11 items-center justify-center gap-1 rounded-lg bg-zinc-300 text-xs font-semibold text-paper sm:h-8" disabled type="button"><Gavel size={13} /> {bidLabel}</button>}<button aria-label={`${item.name} 상품 문의`} className="grid size-11 place-items-center rounded-lg border border-line shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 sm:size-8" onClick={() => setInquiryOpen(true)} type="button"><MessageCircle size={13} /></button><Link className="flex h-11 items-center justify-center rounded-lg border border-line px-2.5 text-[10px] font-bold shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 sm:h-8" href={`${basePath}/auction/${item.id}`}>상세</Link></div>
-        {phase === "CLOSING_SOON" && <p className="mt-2 text-[10px] text-amber-700">{firstBidFinal ? "무입찰 상품의 첫 입찰은 즉시 확정됩니다." : hasParticipated ? "마감 직전에는 기존 참여자만 추가 입찰할 수 있습니다." : "신규 참여가 마감되었습니다. 기존 참여자만 입찰할 수 있습니다."}</p>}
+        {phase === "CLOSING_SOON" && <p className="mt-2 text-[10px] text-amber-700">{firstBidExtended ? "무입찰 상품의 첫 입찰은 마감이 15분 연장되며 경매가 계속됩니다." : hasParticipated ? "마감 직전에는 기존 참여자만 추가 입찰할 수 있습니다." : "신규 참여가 마감되었습니다. 기존 참여자만 입찰할 수 있습니다."}</p>}
         {bidCapability === "non_member" && <p className="mt-2 text-[10px] text-amber-700">현재 로그인한 계정은 경매 입찰용 회원 계정이 아닙니다.</p>}
         {actionMessage && <StatusNotice className="mt-3" variant={actionMessage.kind}>{actionMessage.text}</StatusNotice>}
       </div>

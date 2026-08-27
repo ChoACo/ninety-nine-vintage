@@ -35,8 +35,10 @@ export async function POST(
   const action =
     body?.action === "relist"
       ? "relist"
-      : body?.action === "convert_fixed"
-        ? "convert_fixed"
+      : body?.action === "archive"
+        ? "archive"
+        : body?.action === "delete"
+          ? "delete"
         : "";
   if (!action) {
     return commerceJson({ error: "invalid_action" }, 400);

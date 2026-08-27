@@ -158,19 +158,6 @@ function mapProductRowToManagedProduct(row: ProductRow): ManagedProduct {
   };
 }
 
-function getImageExtension(file: File): string {
-  const fileExtension = file.name
-    .split(".")
-    .pop()
-    ?.toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
-
-  if (fileExtension && fileExtension.length <= 8) return fileExtension;
-
-  const mimeExtension = file.type.split("/")[1]?.replace("jpeg", "jpg");
-  return mimeExtension?.replace(/[^a-z0-9]/g, "") || "img";
-}
-
 function assertUploadableImage(file: File) {
   if (!isSupportedProductImageMimeType(file.type)) {
     throw new ProductRepositoryError(
@@ -186,9 +173,18 @@ async function removeUploadedImages(paths: readonly string[]) {
   if (paths.length === 0) return;
 
   try {
-    await getSupabaseBrowserClient()
-      .storage.from(PRODUCT_IMAGES_BUCKET)
-      .remove([...paths]);
+    const { data } = await getSupabaseBrowserClient().auth.getSession();
+    if (!data.session?.access_token) return;
+    for (let offset = 0; offset < paths.length; offset += 100) {
+      await fetch("/api/storage/r2-presigned-url", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${data.session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ keys: paths.slice(offset, offset + 100) }),
+      });
+    }
   } catch {
     // Preserve the original upload/database error. Orphan cleanup can be
     // retried from Storage without risking a second database write.
@@ -197,8 +193,8 @@ async function removeUploadedImages(paths: readonly string[]) {
 
 /**
  * Remove a browser-uploaded batch when the guarded product API rejects the
- * database write. Storage RLS only allows this while no product row owns the
- * generated UUID path, so a successful save cannot be erased from the client.
+ * database write. The authenticated cleanup API refuses keys whose product ID
+ * already exists, so a successful save cannot be erased from the client.
  */
 export async function discardUnpersistedProductImages(
   paths: readonly string[],
@@ -213,95 +209,189 @@ export interface UploadedProductImages {
   paths: string[];
 }
 
+interface R2UploadTarget {
+  headers: Record<string, string>;
+  key: string;
+  publicUrl: string;
+  uploadUrl: string;
+}
+
+async function getR2UploadTarget(
+  accessToken: string,
+  file: File,
+  productId: string,
+  variant: "image" | "thumbnail",
+): Promise<R2UploadTarget> {
+  const response = await fetch("/api/storage/r2-presigned-url", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      contentType: file.type,
+      productId,
+      sizeBytes: file.size,
+      variant,
+    }),
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | (Partial<R2UploadTarget> & { error?: string })
+    | null;
+  if (
+    !response.ok ||
+    !payload?.uploadUrl ||
+    !payload.publicUrl ||
+    !payload.key ||
+    !payload.headers
+  ) {
+    throw new ProductRepositoryError(
+      payload?.error?.startsWith("r2_configuration_")
+        ? "R2 저장소 설정을 확인해 주세요."
+        : "R2 업로드 주소를 발급하지 못했어요.",
+    );
+  }
+  return payload as R2UploadTarget;
+}
+
+async function putR2Object(target: R2UploadTarget, file: File) {
+  const response = await fetch(target.uploadUrl, {
+    method: "PUT",
+    headers: target.headers,
+    body: file,
+  });
+  if (!response.ok) {
+    throw new ProductRepositoryError(
+      "R2 사진 업로드에 실패했어요. 버킷 CORS와 공개 도메인을 확인해 주세요.",
+    );
+  }
+}
+
+async function verifyR2PublicObject(target: R2UploadTarget, file: File) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const response = await fetch(target.publicUrl, {
+      method: "HEAD",
+      cache: "no-store",
+    }).catch(() => null);
+    if (
+      response?.ok &&
+      Number(response.headers.get("content-length")) === file.size &&
+      response.headers.get("content-type")?.split(";", 1)[0] === file.type
+    ) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+  }
+  throw new ProductRepositoryError(
+    "R2 공개 이미지 검증에 실패했어요. 공개 도메인과 CORS를 확인해 주세요.",
+  );
+}
+
+async function mapWithConcurrency<T>(
+  length: number,
+  concurrency: number,
+  worker: (index: number) => Promise<T>,
+): Promise<T[]> {
+  const results = new Array<T>(length);
+  let nextIndex = 0;
+  let firstError: unknown = null;
+  const runners = Array.from(
+    { length: Math.min(length, Math.max(1, concurrency)) },
+    async () => {
+      while (nextIndex < length && !firstError) {
+        const index = nextIndex++;
+        try {
+          results[index] = await worker(index);
+        } catch (error) {
+          firstError ??= error;
+        }
+      }
+    },
+  );
+  await Promise.all(runners);
+  if (firstError) throw firstError;
+  return results;
+}
+
 export async function uploadProductImages(
   files: readonly File[],
   productId: string,
   onUploaded?: (completed: number, total: number) => void,
   onCompressionMeasured?: ProductImageCompressionReporter,
+  options: Readonly<{ concurrency?: number }> = {},
 ): Promise<UploadedProductImages> {
   if (files.length === 0) {
     throw new ProductRepositoryError("상품 사진을 하나 이상 선택해 주세요.");
   }
 
-  const client = getSupabaseBrowserClient();
-  const imageUrls: string[] = [];
-  const thumbnailUrls: string[] = [];
+  const { data, error: sessionError } =
+    await getSupabaseBrowserClient().auth.getSession();
+  if (sessionError || !data.session?.access_token) {
+    throw new ProductRepositoryError("사진 업로드 로그인이 만료되었습니다.");
+  }
+  const accessToken = data.session.access_token;
   const paths: string[] = [];
-  const compressionMeasurements: ProductImageCompressionMeasurement[] = [];
+  let completed = 0;
 
   try {
-    for (const file of files) {
-      assertUploadableImage(file);
-      if (!(await hasSupportedProductImageSignature(file))) {
-        throw new ProductRepositoryError(
-          "사진 파일의 실제 형식과 확장자 또는 MIME 정보가 일치하지 않아요.",
+    const uploaded = await mapWithConcurrency(
+      files.length,
+      options.concurrency ?? 2,
+      async (index) => {
+        const file = files[index];
+        assertUploadableImage(file);
+        if (!(await hasSupportedProductImageSignature(file))) {
+          throw new ProductRepositoryError(
+            "사진 파일의 실제 형식과 확장자 또는 MIME 정보가 일치하지 않아요.",
+          );
+        }
+        const { imageFile, measurement, thumbnailFile } =
+          await compressProductImageVariantsForUpload(file);
+        onCompressionMeasured?.(measurement, index + 1, files.length);
+        const [imageTarget, thumbnailTarget] = await Promise.all([
+          getR2UploadTarget(accessToken, imageFile, productId, "image"),
+          getR2UploadTarget(
+            accessToken,
+            thumbnailFile,
+            productId,
+            "thumbnail",
+          ),
+        ]);
+        paths.push(imageTarget.key, thumbnailTarget.key);
+        const putResults = await Promise.allSettled([
+          putR2Object(imageTarget, imageFile),
+          putR2Object(thumbnailTarget, thumbnailFile),
+        ]);
+        const putFailure = putResults.find(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
         );
-      }
-      const { imageFile, measurement, thumbnailFile } =
-        await compressProductImageVariantsForUpload(file);
-      compressionMeasurements.push(measurement);
-      onCompressionMeasured?.(
-        measurement,
-        compressionMeasurements.length,
-        files.length,
-      );
-      const uniqueName = `${Date.now()}-${crypto.randomUUID()}`;
-      const imagePath = `products/${productId}/images/${uniqueName}.${getImageExtension(imageFile)}`;
-      const thumbnailPath = `products/${productId}/thumbnails/${uniqueName}.${getImageExtension(thumbnailFile)}`;
-
-      // Track both deterministic targets before starting the requests. If one
-      // upload succeeds while its sibling rejects, cleanup can still remove the
-      // successful orphan. Per-file concurrency bounds browser memory while
-      // eliminating the avoidable main-then-thumbnail network waterfall.
-      paths.push(imagePath, thumbnailPath);
-      const [imageUpload, thumbnailUpload] = await Promise.all([
-        client.storage
-          .from(PRODUCT_IMAGES_BUCKET)
-          .upload(imagePath, imageFile, {
-            cacheControl: "31536000",
-            contentType: imageFile.type,
-            upsert: false,
-          }),
-        client.storage
-          .from(PRODUCT_IMAGES_BUCKET)
-          .upload(thumbnailPath, thumbnailFile, {
-            cacheControl: "31536000",
-            contentType: thumbnailFile.type,
-            upsert: false,
-          }),
-      ]);
-      const { data: imageData, error: imageError } = imageUpload;
-
-      if (imageError || !imageData) {
-        throw new ProductRepositoryError(
-          "사진 업로드에 실패했어요. Storage 버킷과 운영자 권한을 확인해 주세요.",
-          { cause: imageError },
+        if (putFailure) throw putFailure.reason;
+        const verifyResults = await Promise.allSettled([
+          verifyR2PublicObject(imageTarget, imageFile),
+          verifyR2PublicObject(thumbnailTarget, thumbnailFile),
+        ]);
+        const verifyFailure = verifyResults.find(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
         );
-      }
-
-      const { data: thumbnailData, error: thumbnailError } = thumbnailUpload;
-      if (thumbnailError || !thumbnailData) {
-        throw new ProductRepositoryError(
-          "미리보기 사진 업로드에 실패했어요. Storage 버킷과 운영자 권한을 확인해 주세요.",
-          { cause: thumbnailError },
-        );
-      }
-
-      const { data: imagePublicUrlData } = client.storage
-        .from(PRODUCT_IMAGES_BUCKET)
-        .getPublicUrl(imageData.path);
-      const { data: thumbnailPublicUrlData } = client.storage
-        .from(PRODUCT_IMAGES_BUCKET)
-        .getPublicUrl(thumbnailData.path);
-      imageUrls.push(imagePublicUrlData.publicUrl);
-      thumbnailUrls.push(thumbnailPublicUrlData.publicUrl);
-      onUploaded?.(imageUrls.length, files.length);
-    }
+        if (verifyFailure) throw verifyFailure.reason;
+        completed += 1;
+        onUploaded?.(completed, files.length);
+        return {
+          compressionMeasurement: measurement,
+          imageUrl: imageTarget.publicUrl,
+          thumbnailUrl: thumbnailTarget.publicUrl,
+        };
+      },
+    );
 
     return {
-      compressionMeasurements,
-      imageUrls,
-      thumbnailUrls,
+      compressionMeasurements: uploaded.map(
+        (result) => result.compressionMeasurement,
+      ),
+      imageUrls: uploaded.map((result) => result.imageUrl),
+      thumbnailUrls: uploaded.map((result) => result.thumbnailUrl),
       paths,
     };
   } catch (error) {
@@ -534,6 +624,8 @@ export async function createProductsBatch(
             "uploading",
           );
         },
+        undefined,
+        { concurrency: 6 },
       );
       completedImages += prepared.draft.imageFiles.length;
       uploadedPaths.push(...uploaded.paths);
@@ -673,16 +765,39 @@ export async function updateManagedProduct(
   return mapProductRowToManagedProduct(data as unknown as ProductRow);
 }
 
-function getStoragePathFromPublicUrl(publicUrl: string): string | null {
+interface ProductStorageLocation {
+  key: string;
+  provider: "r2" | "supabase";
+}
+
+function getStorageLocationFromPublicUrl(
+  publicUrl: string,
+): ProductStorageLocation | null {
   try {
-    const pathname = new URL(publicUrl).pathname;
+    const url = new URL(publicUrl);
+    const pathname = url.pathname;
     const marker = `/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/`;
     const markerIndex = pathname.indexOf(marker);
-    if (markerIndex < 0) return null;
-    const path = decodeURIComponent(
-      pathname.slice(markerIndex + marker.length),
-    );
-    return path.startsWith("products/") ? path : null;
+    if (markerIndex >= 0) {
+      const path = decodeURIComponent(
+        pathname.slice(markerIndex + marker.length),
+      );
+      return path.startsWith("products/")
+        ? { key: path, provider: "supabase" }
+        : null;
+    }
+
+    const configuredR2PublicUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.trim();
+    if (!configuredR2PublicUrl) return null;
+    const r2Base = new URL(configuredR2PublicUrl);
+    if (url.origin !== r2Base.origin) return null;
+    const basePath = r2Base.pathname.replace(/\/$/u, "");
+    const objectPrefix = `${basePath}/`;
+    if (!pathname.startsWith(objectPrefix)) return null;
+    const path = decodeURIComponent(pathname.slice(objectPrefix.length));
+    return path.startsWith("products/")
+      ? { key: path, provider: "r2" }
+      : null;
   } catch {
     return null;
   }
@@ -702,14 +817,25 @@ export async function deleteManagedProduct(
     throw new ProductRepositoryError(error.message, { cause: error });
   }
 
-  const paths = (data ?? []).flatMap((url) => {
-    const path = getStoragePathFromPublicUrl(url);
-    return path ? [path] : [];
+  const locations = (data ?? []).flatMap((url) => {
+    const location = getStorageLocationFromPublicUrl(url);
+    return location ? [location] : [];
   });
   // The database deletion is authoritative. Storage cleanup is best-effort so
   // a transient object API failure cannot make the UI retry an already-deleted
   // product and report a misleading failure.
-  await removeUploadedImages(paths);
+  const r2Keys = locations
+    .filter((location) => location.provider === "r2")
+    .map((location) => location.key);
+  const supabasePaths = locations
+    .filter((location) => location.provider === "supabase")
+    .map((location) => location.key);
+  await Promise.allSettled([
+    removeUploadedImages(r2Keys),
+    supabasePaths.length > 0
+      ? client.storage.from(PRODUCT_IMAGES_BUCKET).remove(supabasePaths)
+      : Promise.resolve(),
+  ]);
 }
 
 export interface PublishedProductsPage {

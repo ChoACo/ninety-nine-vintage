@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -24,6 +25,7 @@ import type { FormEvent } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useOperatorStoreScope } from "@/store/useOperatorStoreScope";
 import { useOperatorOptimisticStore } from "@/store/useOperatorOptimisticStore";
+import { useToastStore } from "@/store/useToastStore";
 import {
   discardUnpersistedProductImages,
   uploadProductImages,
@@ -34,6 +36,7 @@ import type {
   BatchAuctionProgressReporter,
 } from "@/lib/import/batchAuction";
 import { inferBrandFromTitle } from "@/lib/catalog/brand";
+import { isConditionGrade } from "@/lib/catalog/conditions";
 import { BATCH_CLOTHING_CATEGORIES } from "@/lib/import/categoryIds";
 import { DEFECT_TAGS } from "@/lib/catalog/defects";
 import {
@@ -51,8 +54,8 @@ import {
   OperatorXlsxImportModal,
   type XlsxRegistrationOptions,
 } from "@/components/admin/operator/OperatorXlsxImportModal";
-import { AuctionController } from "@/components/admin/operator/AuctionController";
 import { getNextAuctionDeadline } from "@/utils/formatters";
+import { getKoreanAuctionTime } from "@/utils/auctionBidPolicy";
 import {
   isAiEnhancementApplied,
   processQuickRegistrationAI,
@@ -83,6 +86,8 @@ interface Store {
     immediatePublished?: number;
     scheduledDailyLimit?: number;
     scheduledPublished?: number;
+    monthlyPublicationLimit?: number;
+    monthlyPublished?: number;
     pendingInventoryLimit?: number;
     pendingInventoryUsed?: number;
     automationRollingLimit?: number;
@@ -111,6 +116,7 @@ interface Product {
   gender: string;
   storage_class: string;
   publish_at: string;
+  paused_at?: string | null;
   closes_at: string;
   inspection_notes: string[];
   defect_tags: string[];
@@ -296,10 +302,33 @@ function toIsoDateTime(value: string) {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 function importedConditionGrade(condition: string | null) {
-  if (condition === "새상품") return "S";
-  if (condition === "상태 좋음") return "A";
-  if (condition === "사용감 있음") return "B";
-  return "A";
+  return condition && isConditionGrade(condition) ? condition : "A";
+}
+
+async function mapWithConcurrency<T, R>(
+  values: readonly T[],
+  concurrency: number,
+  worker: (value: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let nextIndex = 0;
+  let firstError: unknown = null;
+  const runners = Array.from(
+    { length: Math.min(values.length, Math.max(1, concurrency)) },
+    async () => {
+      while (nextIndex < values.length && !firstError) {
+        const index = nextIndex++;
+        try {
+          results[index] = await worker(values[index], index);
+        } catch (error) {
+          firstError ??= error;
+        }
+      }
+    },
+  );
+  await Promise.all(runners);
+  if (firstError) throw firstError;
+  return results;
 }
 function productStatusLabel(status: string) {
   if (status === "pending") return "공개 처리 중";
@@ -321,13 +350,29 @@ function productStatusText(product: Product) {
 function isManageableProductStatus(status: string) {
   return status === "pending" || status === "active";
 }
-function isScheduledProduct(product: Product, now: number) {
+function isScheduledProduct(product: Product) {
   const publishAt = new Date(product.publish_at).getTime();
   return (
     product.status === "pending" &&
+    !product.paused_at &&
     Number.isFinite(publishAt) &&
-    publishAt > now
+    publishAt > 0
   );
+}
+function isOverdueScheduledProduct(product: Product, now: number) {
+  return (
+    isScheduledProduct(product) &&
+    new Date(product.publish_at).getTime() <= now
+  );
+}
+function formatScheduledPublishAt(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "시각 확인 필요";
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Seoul",
+  }).format(date);
 }
 function requestedSingleSaleType() {
   if (typeof window === "undefined") return null;
@@ -376,6 +421,8 @@ export function OperatorProductsConsole({
   view = "active",
 }: Readonly<{ view?: ProductConsoleView }>) {
   const requestedSaleType = requestedSingleSaleType();
+  const router = useRouter();
+  const pushToast = useToastStore((state) => state.pushToast);
   const storeScope = useOperatorStoreScope((state) => state.scope);
   const setOptimisticProductStatus = useOperatorOptimisticStore(
     (state) => state.setProductStatus,
@@ -488,6 +535,7 @@ export function OperatorProductsConsole({
       const payload = (await response.json()) as {
         stores?: Store[];
         products?: Product[];
+        serverNow?: string;
         permissions?: {
           canCloseAuctions: boolean;
           canCreate: boolean;
@@ -507,7 +555,8 @@ export function OperatorProductsConsole({
       const nextStores = payload.stores ?? [];
       setStores(nextStores);
       setProducts(payload.products ?? []);
-      setProductReferenceNow(Date.now());
+      const serverNow = Date.parse(payload.serverNow ?? "");
+      setProductReferenceNow(Number.isFinite(serverNow) ? serverNow : Date.now());
       setPermissions(nextPermissions);
       const publishableStoreIds = new Set(
         nextStores.filter((store) => store.canPublish).map((store) => store.id),
@@ -584,6 +633,21 @@ export function OperatorProductsConsole({
     })();
   }, [load]);
 
+  useEffect(() => {
+    if (!token || !storeScope.active || !storeScope.storeId) return;
+    void (async () => {
+      try {
+        await load(token);
+      } catch (error) {
+        setNotice(
+          error instanceof Error
+            ? error.message
+            : "선택한 센터의 상품을 불러오지 못했습니다.",
+        );
+      }
+    })();
+  }, [load, storeScope.active, storeScope.storeId, token]);
+
   const workspaceProducts = useMemo(() => {
     const scopedStoreId = storeScope.active ? storeScope.storeId : null;
     return products.filter((product) => {
@@ -599,12 +663,11 @@ export function OperatorProductsConsole({
         );
       }
       if (product.status !== "pending") return false;
-      const scheduled = isScheduledProduct(product, productReferenceNow);
+      const scheduled = isScheduledProduct(product);
       return registrationStage === "scheduled" ? scheduled : !scheduled;
     });
   }, [
     filter.saleType,
-    productReferenceNow,
     products,
     registrationStage,
     storeScope,
@@ -640,14 +703,21 @@ export function OperatorProductsConsole({
     return products.reduce(
       (counts, product) => {
         if (product.status !== "pending") return counts;
-        if (isScheduledProduct(product, productReferenceNow)) {
+        if (isScheduledProduct(product)) {
           counts.scheduled += 1;
         } else counts.draft += 1;
         return counts;
       },
       { draft: 0, scheduled: 0 },
     );
-  }, [productReferenceNow, products]);
+  }, [products]);
+  const overdueScheduledCount = useMemo(
+    () =>
+      products.filter((product) =>
+        isOverdueScheduledProduct(product, productReferenceNow),
+      ).length,
+    [productReferenceNow, products],
+  );
   const visiblePendingIds = useMemo(
     () =>
       permissions.canPublish
@@ -1065,7 +1135,7 @@ export function OperatorProductsConsole({
       });
       let message =
         snapshot.publicationMode === "scheduled"
-          ? `“${snapshot.form.title}” 단품 등록과 ${String(snapshot.scheduledHourKst).padStart(2, "0")}:00 공개 예약을 완료했습니다.`
+          ? `“${snapshot.form.title}” 단품 등록과 ${formatScheduledPublishAt(snapshot.publishAt)} 공개 예약을 완료했습니다.`
           : `“${snapshot.form.title}” 단품 등록을 완료했습니다.`;
       if (snapshot.canPublishImmediately) {
         if (!payload.product?.id) {
@@ -1548,7 +1618,6 @@ export function OperatorProductsConsole({
       0,
     );
     const uploadedPaths: string[] = [];
-    const productsToInsert: Array<Record<string, unknown>> = [];
     let completedImages = 0;
     let persisted = false;
 
@@ -1556,33 +1625,42 @@ export function OperatorProductsConsole({
     setNotice("");
     try {
       onProgress(0, totalImages, "uploading");
-      for (const [productIndex, row] of preview.rows.entries()) {
+      const productsToInsert = await mapWithConcurrency(
+        preview.rows,
+        5,
+        async (row, productIndex): Promise<Record<string, unknown>> => {
         if (!row.draft)
           throw new Error(
             `${productIndex + 1}번째 상품의 검증 결과가 유효하지 않습니다.`,
           );
         const draft = row.draft;
         const productId = crypto.randomUUID();
+        let reportedForProduct = 0;
         const uploaded = await uploadProductImages(
           draft.imageFiles,
           productId,
           (completedForProduct) => {
+            completedImages += completedForProduct - reportedForProduct;
+            reportedForProduct = completedForProduct;
             onProgress(
-              completedImages + completedForProduct,
+              completedImages,
               totalImages,
               "uploading",
             );
           },
+          undefined,
+          { concurrency: 1 },
         );
-        completedImages += draft.imageFiles.length;
         uploadedPaths.push(...uploaded.paths);
-        productsToInsert.push({
+        return {
           id: productId,
           title: draft.title,
           brand: inferBrandFromTitle(draft.title).brand,
           gender: row.category?.gender ?? "",
           description: draft.description,
           category: row.category?.label ?? "기타",
+          categoryId: row.category?.id ?? null,
+          quantity: row.quantity,
           storeId: scopedStoreId,
           saleType: draft.saleType,
           startingPrice: draft.startingPrice,
@@ -1597,11 +1675,12 @@ export function OperatorProductsConsole({
               : getNextAuctionDeadline(draft.publish_at).toISOString(),
           sizeLabel: row.size,
           conditionGrade: importedConditionGrade(row.condition),
-          storageClass: "small",
+          storageClass: row.storageClass,
           inspectionNotes: [],
-          defectTags: [],
-        });
-      }
+          defectTags: row.defectTags,
+          searchTags: row.searchTags,
+        };
+      });
 
       onProgress(totalImages, totalImages, "saving");
       const response = await fetch("/api/admin/operator/products/bulk", {
@@ -1651,6 +1730,9 @@ export function OperatorProductsConsole({
           `${count}개 엑셀 상품을 저장했습니다. 목록 새로고침이 필요합니다.`,
         );
       }
+      pushToast("success", `${count}개 상품을 일괄 등록했습니다.`);
+      router.replace("/admin/operator/products");
+      router.refresh();
       return count;
     } catch (error) {
       if (!persisted) await discardUnpersistedProductImages(uploadedPaths);
@@ -1659,11 +1741,15 @@ export function OperatorProductsConsole({
       setBusy(false);
     }
   };
-  const effectivePublicationMode: PublicationMode = publicationMode;
+  const registrationClock = getKoreanAuctionTime(productReferenceNow);
+  const immediatePublishingBlocked = registrationClock.secondsSinceMidnight >= 21 * 60 * 60
+    && registrationClock.secondsSinceMidnight < 22 * 60 * 60;
+  const effectivePublicationMode: PublicationMode =
+    publicationMode === "now" && !immediatePublishingBlocked ? "now" : "scheduled";
   const singleRegistrationSubmitLabel =
     effectivePublicationMode === "now"
       ? `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 즉시 공개`
-      : `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 오전 10:00 예약`;
+      : `${form.saleType === "fixed" ? "즉시구매" : "경매"} 등록하고 ${formatScheduledPublishAt(scheduledPublishAt)} 예약`;
   const singleRegistrationDisabled =
     busy || !token || !productFieldsEditable || singleImages.length === 0;
 
@@ -1825,12 +1911,24 @@ export function OperatorProductsConsole({
             className="flex min-h-12 items-center justify-center bg-ink px-4 text-xs font-black text-paper"
             role="status"
           >
-            업로드 예정{" "}
+            예약 공개{" "}
             <span className="ml-1 font-mono">
               {registrationCounts.scheduled}
             </span>
+            {registrationCounts.draft > 0 && (
+              <span className="ml-2 font-mono text-paper/70">
+                · 일시중지 {registrationCounts.draft}
+              </span>
+            )}
           </span>
         </div>
+      )}
+      {view === "registration" && overdueScheduledCount > 0 && (
+        <StatusNotice>
+          공개 예정 시각이 지난 상품 {overdueScheduledCount}건을 확인했습니다. 자동
+          공개 작업이 매분 다시 시도하며, 필요하면 상품의 공개 버튼으로 즉시
+          처리할 수 있습니다.
+        </StatusNotice>
       )}
       {view === "registration" &&
         products.some(
@@ -1956,23 +2054,6 @@ export function OperatorProductsConsole({
                     최대 15장 · 표시된 순서대로 저장 · 첫 사진이 대표
                     {quickAiBusy ? " · AI 분석 중…" : ""}
                   </p>
-                  {selectedEntitlements && (
-                    <p className="mt-1 text-[10px] font-bold text-muted">
-                      AI {selectedEntitlements.aiUsed}/
-                      {selectedEntitlements.aiDailyLimit ?? "전체 한도"} · 즉시
-                      공개 {selectedEntitlements.immediatePublished ?? 0}/
-                      {selectedEntitlements.immediateDailyLimit ?? 30} · 예약
-                      공개 {selectedEntitlements.scheduledPublished ?? 0}/
-                      {selectedEntitlements.scheduledDailyLimit ?? 40} · 등록
-                      대기·예약 대기{" "}
-                      {selectedEntitlements.pendingInventoryUsed ??
-                        selectedEntitlements.productsCreated}
-                      /
-                      {selectedEntitlements.pendingInventoryLimit ??
-                        selectedEntitlements.productDailyLimit ??
-                        100}
-                    </p>
-                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -2004,6 +2085,14 @@ export function OperatorProductsConsole({
                   </label>
                 </div>
               </div>
+              {selectedEntitlements && (
+                <div className="mt-4 grid gap-2 border border-line bg-surface p-3 text-[10px] font-bold sm:grid-cols-2 lg:grid-cols-4" aria-label="센터 상품 공개 한도">
+                  <p>센터 등급 <strong className="block pt-1 text-sm text-ink">{selectedEntitlements.planCode === "pro" ? "Pro" : "일반"}</strong></p>
+                  <p>이번 달 공개 <strong className="block pt-1 text-sm text-ink">{selectedEntitlements.monthlyPublished ?? 0} / {selectedEntitlements.monthlyPublicationLimit ?? (selectedEntitlements.planCode === "pro" ? 1600 : 800)}</strong></p>
+                  <p>오늘 즉시 / 예약 <strong className="block pt-1 text-sm text-ink">{selectedEntitlements.immediatePublished ?? 0}/{selectedEntitlements.immediateDailyLimit ?? 30} · {selectedEntitlements.scheduledPublished ?? 0}/{selectedEntitlements.scheduledDailyLimit ?? 40}</strong></p>
+                  <p>초안·예약 대기 <strong className="block pt-1 text-sm text-ink">{selectedEntitlements.pendingInventoryUsed ?? selectedEntitlements.productsCreated} / {selectedEntitlements.pendingInventoryLimit ?? selectedEntitlements.productDailyLimit ?? (selectedEntitlements.planCode === "pro" ? 320 : 120)}</strong></p>
+                </div>
+              )}
               {singleImages.length > 0 ? (
                 <ol className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                   {singleImages.map((image, index) => (
@@ -2570,8 +2659,11 @@ export function OperatorProductsConsole({
               <div className="border-b border-ink pb-3 pt-2 sm:col-span-2">
                 <p className="text-xs font-black">4. 공개 설정</p>
                 <p className="mt-1 text-[11px] text-muted">
-                  즉시 공개하거나 원하는 시간에 예약할 수 있습니다.
+                  즉시 공개하거나 원하는 시간에 예약할 수 있습니다. 예약 시점의 하루 한도가 가득 차면 다음날 오전 10시로 자동 이월됩니다.
                 </p>
+                {immediatePublishingBlocked && (
+                  <p className="mt-2 text-[11px] font-bold text-amber-700">21:00~22:00는 경매 마감 및 동기화 점검 중이므로 즉시 공개가 차단됩니다.</p>
+                )}
               </div>
               <div className="grid items-end gap-3 sm:col-span-2 sm:grid-cols-[1fr_auto]">
                 <label className="text-xs font-bold">
@@ -2597,6 +2689,7 @@ export function OperatorProductsConsole({
                   <input
                     checked={effectivePublicationMode === "now"}
                     className="size-4 accent-ink"
+                    disabled={immediatePublishingBlocked}
                     onChange={(event) =>
                       setPublicationMode(
                         event.target.checked ? "now" : "scheduled",
@@ -2743,8 +2836,10 @@ export function OperatorProductsConsole({
           const manageable = isManageableProductStatus(product.status);
           const canPublishStore = stores.some((store) => store.id === product.store_id && store.canPublish);
           const isActive = product.status === "active";
+          const scheduled = isScheduledProduct(product);
+          const overdue = isOverdueScheduledProduct(product, productReferenceNow);
           return <article className="w-full max-w-full overflow-hidden break-keep rounded-2xl border border-line bg-paper p-4" key={product.id}>
-            <div className="flex min-w-0 gap-3"><CatalogImage alt="" className="size-16 shrink-0 rounded-xl object-cover" src={product.image_urls?.[0] ?? ""} /><div className="min-w-0 flex-1"><p className="line-clamp-2 text-sm font-bold">{product.title}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="rounded-md border border-line px-2 py-1 text-[10px] font-bold">Grade {product.condition_grade || "A"}</span><span className="rounded-md border border-line px-2 py-1 text-[10px]">{product.sale_type === "fixed" ? "판매중" : "경매중"}</span></div><p className="mt-2 font-mono text-sm font-bold">{(product.fixed_price ?? product.current_price).toLocaleString("ko-KR")}원</p></div>
+            <div className="flex min-w-0 gap-3"><CatalogImage alt="" className="size-16 shrink-0 rounded-xl object-cover" src={product.image_urls?.[0] ?? ""} /><div className="min-w-0 flex-1"><p className="line-clamp-2 text-sm font-bold">{product.title}</p><div className="mt-2 flex flex-wrap gap-1.5"><span className="rounded-md border border-line px-2 py-1 text-[10px] font-bold">Grade {product.condition_grade || "A"}</span><span className="rounded-md border border-line px-2 py-1 text-[10px]">{product.sale_type === "fixed" ? "즉시구매" : "경매"}</span></div><p className="mt-2 font-mono text-sm font-bold">{(product.fixed_price ?? product.current_price).toLocaleString("ko-KR")}원</p>{scheduled && <p className={`mt-1 text-[11px] font-bold ${overdue ? "text-red-700" : "text-muted"}`}>{overdue ? "공개 지연" : "공개 예정"} · {formatScheduledPublishAt(product.publish_at)}</p>}{product.paused_at && <p className="mt-1 text-[11px] font-bold text-amber-700">운영자 일시중지</p>}</div>
               <button aria-label={`${product.title} ${isActive ? "판매 일시중지" : "판매 공개"}`} aria-pressed={isActive} className="grid min-h-11 min-w-11 shrink-0 place-items-center" disabled={busy || !permissions.canMutate || (isActive ? !manageable : !canPublishStore || product.status !== "pending")} onClick={() => void (isActive ? pause(product) : publish(product))} type="button"><span className={`relative h-6 w-11 rounded-full transition ${isActive ? "bg-emerald-500" : "bg-zinc-300"}`}><span className={`absolute top-1 size-4 rounded-full bg-white transition-transform ${isActive ? "translate-x-5" : "translate-x-1"}`} /></span></button>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:flex">
@@ -2767,12 +2862,20 @@ export function OperatorProductsConsole({
               <th className="px-4 py-4">가격</th>
               <th className="px-4 py-4">보관</th>
               <th className="px-4 py-4">상태</th>
+              {view === "registration" && (
+                <th className="px-4 py-4">공개 예정 시각</th>
+              )}
               <th className="px-4 py-4" />
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {visibleProducts.map((product) => {
               const manageable = isManageableProductStatus(product.status);
+              const scheduled = isScheduledProduct(product);
+              const overdue = isOverdueScheduledProduct(
+                product,
+                productReferenceNow,
+              );
               const canPublishStore = stores.some(
                 (store) => store.id === product.store_id && store.canPublish,
               );
@@ -2825,22 +2928,26 @@ export function OperatorProductsConsole({
                       className={`border px-2 py-1 text-[10px] font-bold ${product.status === "closed" && product.pending_lock_kind ? "border-amber-300 bg-amber-500/10 text-amber-800" : "border-line"}`}
                     >
                       {view === "registration" &&
-                      isScheduledProduct(product, productReferenceNow)
-                        ? "업로드 예정"
+                      scheduled
+                        ? overdue
+                          ? "공개 지연"
+                          : "예약 공개"
                         : productStatusText(product)}
                     </span>
                   </td>
+                  {view === "registration" && (
+                    <td
+                      className={`px-4 py-4 font-mono text-[11px] ${overdue ? "font-bold text-red-700" : "text-muted"}`}
+                    >
+                      {scheduled
+                        ? formatScheduledPublishAt(product.publish_at)
+                        : product.paused_at
+                          ? "운영자 일시중지"
+                          : "시각 확인 필요"}
+                    </td>
+                  )}
                   <td className="px-4 py-4 text-right">
                     <div className="flex justify-end gap-3">
-                      {permissions.canMutate &&
-                        product.sale_type === "auction" &&
-                        product.status === "active" && (
-                          <AuctionController
-                            onChanged={() => void load(token)}
-                            productId={product.id}
-                            title={product.title}
-                          />
-                        )}
                       {product.status === "active" && (
                         <button
                           aria-label={`${product.title} 일시중지`}
@@ -2907,7 +3014,7 @@ export function OperatorProductsConsole({
               <tr>
                 <td
                   className="px-4 py-16 text-center text-muted"
-                  colSpan={view === "registration" ? 8 : 7}
+                  colSpan={view === "registration" ? 9 : 7}
                 >
                   조건에 맞는 상품이 없습니다.
                 </td>
@@ -3019,6 +3126,9 @@ export function OperatorProductsConsole({
       </PremiumDialog>
       <OperatorXlsxImportModal
         accessToken={token ?? ""}
+        activeStoreId={
+          storeScope.storeId ?? (stores.length === 1 ? stores[0].id : null)
+        }
         onClose={() => setXlsxImportOpen(false)}
         onSubmit={importXlsx}
         open={

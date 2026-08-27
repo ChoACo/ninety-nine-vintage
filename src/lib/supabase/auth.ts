@@ -4,7 +4,6 @@ import { isProductionTestMember } from "@/lib/productionTestMember";
 
 export type AppRole =
   | "member"
-  | "band_member"
   | "employee"
   | "operator"
   | "admin"
@@ -15,7 +14,6 @@ export type AccessRole =
   | "owner"
   | "operator"
   | "employee"
-  | "band_member"
   | "member";
 
 /**
@@ -30,10 +28,10 @@ export type ProductOperationsRole = Extract<
   AppRole,
   "employee" | "operator" | "admin"
 >;
-export type MemberRole = Extract<AppRole, "member" | "band_member">;
-export type PresenceRole = Extract<AppRole, "member" | "band_member" | "operator">;
+export type MemberRole = Extract<AppRole, "member">;
+export type PresenceRole = Extract<AppRole, "member" | "operator">;
 
-export type PublicRoleGrade = 1 | 2 | 2.5 | 3;
+export type PublicRoleGrade = 1 | 2 | 3;
 
 export interface PublicRoleDescriptor {
   label: string;
@@ -45,7 +43,6 @@ const PUBLIC_ROLE: Record<AppRole, PublicRoleDescriptor> = {
   admin: { label: "운영자", grade: null },
   operator: { label: "운영자", grade: 1 },
   employee: { label: "직원", grade: 2 },
-  band_member: { label: "회원", grade: 2.5 },
   member: { label: "회원", grade: 3 },
   unauthorized: { label: "방문자", grade: null },
 };
@@ -62,7 +59,6 @@ export function parseAppRole(value: unknown): AppRole {
   return value === "admin" ||
     value === "operator" ||
     value === "employee" ||
-    value === "band_member" ||
     value === "member"
     ? value
     : "unauthorized";
@@ -105,11 +101,10 @@ export function getUserRole(user: User | null | undefined): AppRole {
   }
   const hasMemberCompatibleRole =
     rawRole == null ||
-    explicitRole === "member" ||
-    explicitRole === "band_member";
+    explicitRole === "member";
 
   if (!hasMemberCompatibleRole) return "unauthorized";
-  return explicitRole === "band_member" ? "band_member" : "member";
+  return "member";
 }
 
 export function isStaffRole(role: AppRole): role is StaffRole {
@@ -121,7 +116,7 @@ export function isOwnerRole(role: AppRole): role is OwnerRole {
 }
 
 export function isMemberRole(role: AppRole): role is MemberRole {
-  return role === "member" || role === "band_member";
+  return role === "member";
 }
 
 export function canAccessOperationsCenter(
@@ -147,7 +142,7 @@ export function canAccessOperationsWorkspace(role: AppRole): boolean {
 }
 
 export function shouldTrackPresence(role: AppRole): boolean {
-  return role === "member" || role === "band_member" || role === "operator";
+  return role === "member" || role === "operator";
 }
 
 export function getPublicRoleDescriptor(

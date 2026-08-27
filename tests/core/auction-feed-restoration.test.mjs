@@ -38,6 +38,7 @@ test("feed bid access follows first-bid and configured increment rules", () => {
     getAuctionFeedBidAccess({ bidCount: 0, currentPrice: 20_000, phase: "CLOSING_SOON" }),
     {
       canBid: true,
+      firstBidExtended: true,
       firstBidFinal: true,
       hasAnyBid: false,
       hasParticipated: false,
@@ -85,7 +86,7 @@ test("cancelled-only bid history remains auditable but never counts as active", 
     bidCount: history.filter(isActiveAuctionBid).length,
     currentPrice: 20_000,
     phase: "CLOSING_SOON",
-  }).firstBidFinal, true);
+  }).firstBidExtended, true);
 
   const decision = getAuctionBidDecision({
     currentUserName: "new-user",
@@ -97,7 +98,7 @@ test("cancelled-only bid history remains auditable but never counts as active", 
     },
   });
   assert.equal(decision.hasAnyBidHistory, false);
-  assert.equal(decision.finalOnAccept, true);
+  assert.equal(decision.finalOnAccept, false);
   assert.equal(decision.reason, "empty-item-first-bid");
 });
 
@@ -149,9 +150,18 @@ test("product realtime snapshots expose only auction policy fields", () => {
 });
 
 test("feed refreshes only the changed product and never polls the whole catalog", async () => {
-  const grid = await source("src/components/features/auction/AuctionFeedGrid.tsx");
+  const [grid, tracker, layout] = await Promise.all([
+    source("src/components/features/auction/AuctionFeedGrid.tsx"),
+    source("src/components/layout/SiteSessionActivityTracker.tsx"),
+    source("src/app/layout.tsx"),
+  ]);
+  assert.match(tracker, /window\.setInterval/);
+  assert.match(tracker, /document\.visibilityState === "visible"/);
+  assert.match(tracker, /10 \* 60_000/);
+  assert.match(layout, /<SiteSessionActivityTracker/);
   assert.doesNotMatch(grid, /window\.setInterval/);
   assert.doesNotMatch(grid, /setRefreshNonce/);
+  assert.doesNotMatch(grid, /setInterval\([\s\S]{0,160}setProducts/);
   assert.match(grid, /AUCTION_BID_SUCCEEDED_EVENT/);
   assert.match(grid, /event: "\*"/);
   assert.match(grid, /\/api\/products\/\$\{encodeURIComponent\(productId\)\}/);
@@ -257,7 +267,7 @@ test("restored feed UI uses separated desktop and mobile routes with authoritati
   assert.match(sidebar, /<option value="today">오늘 등록 상품<\/option>/);
   assert.match(sidebar, /<option value="all">전체 등록일<\/option>/);
   assert.match(sidebar, /readInitialParam\("date", "all"\)/);
-  assert.match(grid, /routeSearchParams\.get\("date"\) \?\? "all"/);
+  assert.match(grid, /routeSearchParams\.get\("date"\) \?\? "latest"/);
   assert.match(grid, /catalog-filter-options/);
   assert.match(grid, /판매 완료 상품만 보기/);
   assert.match(grid, /showSoldOnly\s*\?[\s\S]*?<SoldFeedCard/);
@@ -386,7 +396,7 @@ test("inactive auction feed falls back to a schedule panel and sold-product teas
   assert.match(teaser, /경매 비활성 시간대/);
   assert.match(teaser, /view=sold/);
   assert.match(teaser, /dailyPhase === "closed"/);
-  assert.match(teaser, /오후 9시 정산 시간입니다\. 미판매 상품은 오후 10시부터 다시 입찰할 수 있습니다\./);
+  assert.match(teaser, /오후 9시부터 10시까지 경매 마감 및 동기화 점검 중입니다\. 미판매 상품은 오후 10시부터 다시 입찰할 수 있습니다\./);
   assert.match(teaser, /다음 경매는 매일 오전 10시에 시작됩니다\./);
   assert.match(teaser, /<SoldFeedCard/);
   assert.doesNotMatch(teaser, /판매 중 상품 보기로 돌아갈 수 있습니다\./);

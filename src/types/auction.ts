@@ -8,7 +8,7 @@ export type PublicRoleGrade = 1 | 2 | 2.5 | 3;
  * 권한 정책에서 사용하는 공개 역할 이름입니다. 기존 `admin` 값은 서버 내부의
  * 소유자 식별자로만 유지하고 공개 역할에 포함하지 않습니다.
  */
-export type PublicRoleName = "operator" | "employee" | "band_member" | "member";
+export type PublicRoleName = "operator" | "employee" | "member";
 
 export type AuctionStatus = "pending" | "active" | "closed";
 
@@ -114,7 +114,7 @@ export interface WonAuction {
   stage: WonAuctionStage;
   /** 결제하기를 처음 눌러 계좌 안내를 확인한 시각 */
   paymentStartedAt?: ISODateString;
-  /** 낙찰 다음 날 오전 11:59:59로 서버가 확정한 입금 마감 */
+  /** 낙찰일 기준 3일째 오후 11:59:59(KST)로 서버가 확정한 입금 마감 */
   paymentDeadlineAt?: ISODateString;
   paidAt?: ISODateString;
   keepExpiresAt?: ISODateString;

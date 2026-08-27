@@ -66,7 +66,7 @@ test("payout accounts are encrypted before RPC submission and monthly fees accru
 });
 
 test("same-day feeds and public store filters use a hydration-stable seed",async()=>{
-  const [feed,filters,service]=await Promise.all([source("src/components/features/auction/AuctionFeedGrid.tsx"),source("src/components/features/auction/AuctionFilterSidebar.tsx"),source("src/services/products.ts")]);
-  assert.doesNotMatch(feed,/crypto\.randomUUID\(\)/); assert.match(feed,/const feedSeed = useMemo/); assert.match(feed,/Math\.imul\(hash/);
+  const [feed,tracker,filters,service]=await Promise.all([source("src/components/features/auction/AuctionFeedGrid.tsx"),source("src/components/layout/SiteSessionActivityTracker.tsx"),source("src/components/features/auction/AuctionFilterSidebar.tsx"),source("src/services/products.ts")]);
+  assert.match(tracker,/crypto\.randomUUID\(\)/); assert.match(tracker,/ninety-nine:catalog-session-seed/); assert.match(tracker,/10 \* 60_000/); assert.match(feed,/Math\.imul\(hash/);
   assert.match(filters,/storeOptions/); assert.match(service,/storeName/); assert.match(service,/storeSlug/);
 });

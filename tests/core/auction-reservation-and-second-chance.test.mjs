@@ -287,12 +287,16 @@ test("operator retry is an exact product-scoped mirror of the scheduled offer pr
   );
 });
 
-test("operator second chance is role, store, deadline, audit, and payment-mode constrained", async () => {
-  const [migration, route, consoleSource, pastConsole, pastRoute, button] =
+test("operator second chance is manual, sequential, store-scoped, and repeats until candidates are exhausted", async () => {
+  const [migration, manualMigration, policyMigration, route, consoleSource, pastConsole, pastRoute, button] =
     await Promise.all([
       source(
         "supabase/migrations/20260721080000_scope_operator_second_chance_processing.sql",
       ),
+      source(
+        "supabase/migrations/20260826221618_manual_second_chance_and_owner_forced_payment.sql",
+      ),
+      source("supabase/migrations/20260826231224_harden_live_auction_policy_v2.sql"),
       source("src/app/api/admin/operator/auctions/[id]/second-chance/route.ts"),
       source("src/components/admin/operator/OperatorConsole.tsx"),
       source("src/components/admin/operator/OperatorPastProductsConsole.tsx"),
@@ -330,12 +334,24 @@ test("operator second chance is role, store, deadline, audit, and payment-mode c
   );
   assert.match(
     route,
-    /auth\.user[\s\S]*\.rpc\("operator_process_second_chance"/,
+    /operator_process_second_chance_manual/,
   );
   assert.doesNotMatch(
     route,
     /auth\.admin\s*\.?\s*rpc\("operator_process_second_chance"/,
   );
+  assert.match(manualMigration, /guard_manual_second_chance_insert/i);
+  assert.match(manualMigration, /return null;/i);
+  assert.match(manualMigration, /set_config\('app\.manual_second_chance', 'on', true\)/i);
+  assert.match(manualMigration, /operator_process_second_chance_manual/i);
+  assert.match(manualMigration, /revoke all on function public\.operator_process_second_chance\(uuid\)\s+from authenticated/i);
+  assert.match(policyMigration, /offer_kind = 'second_chance' and offer_round >= 2/i);
+  assert.match(policyMigration, /set second_chance_hours = 12/i);
+  assert.match(policyMigration, /v_hours constant integer := 12/i);
+  assert.match(policyMigration, /coalesce\(max\(offers\.offer_round\), 1\) \+ 1/i);
+  assert.match(policyMigration, /interval '12 hours'/i);
+  assert.match(policyMigration, /not exists[\s\S]*used\.bidder_id = bids\.bidder_id/i);
+  assert.match(policyMigration, /아직 차순위 기회를 받지 않은 입찰자가 있습니다/i);
   assert.doesNotMatch(route, /get_payment_runtime_mode_for_service|portone/i);
   assert.match(
     consoleSource,
@@ -350,7 +366,8 @@ test("operator second chance is role, store, deadline, audit, and payment-mode c
   assert.match(pastRoute, /\.in\("store_id", storeIds\)/);
   assert.match(pastRoute, /closedAuctions:/);
   assert.match(pastConsole, /closedAuctions\.map/);
-  assert.match(pastConsole, /최근 8개 제한 없이/);
+  assert.match(pastConsole, /12시간/);
+  assert.match(pastConsole, /후보가 모두 소진/);
   assert.doesNotMatch(pastConsole, /paymentMode|portone/i);
   assert.match(pastConsole, /<OperatorSecondChanceButton/);
   assert.doesNotMatch(pastConsole, /closedAuctions\.slice\(/);

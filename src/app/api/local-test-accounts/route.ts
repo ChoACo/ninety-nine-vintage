@@ -8,9 +8,8 @@ import {
   createSupabaseServerClients,
 } from "@/lib/supabase/server";
 
-type LocalTestRole = "band_member" | "employee" | "member" | "operator" | "owner";
+type LocalTestRole = "employee" | "member" | "operator" | "owner";
 type LocalTestAccountSlot =
-  | "band-member"
   | "employee-primary"
   | "member-primary"
   | "operator-primary"
@@ -21,11 +20,6 @@ const TEST_ACCOUNTS: Record<
   LocalTestAccountSlot,
   { displayName: string; email: string; role: LocalTestRole }
 > = {
-  "band-member": {
-    displayName: "로컬 테스트 밴드회원",
-    email: "local.band-member@ninety-nine.test",
-    role: "band_member",
-  },
   "employee-primary": {
     displayName: "로컬 테스트 직원",
     email: "local.employee@ninety-nine.test",
@@ -54,6 +48,7 @@ const TEST_ACCOUNTS: Record<
 };
 
 const RETIRED_TEST_ACCOUNT_EMAILS = new Set([
+  "local.band-member@ninety-nine.test",
   "local.member.admin-2@ninety-nine.test",
 ]);
 
@@ -97,7 +92,6 @@ function isManagedLocalTestAccount(
 
 function readAccountSlot(value: unknown): LocalTestAccountSlot | null {
   if (
-    value === "band-member" ||
     value === "employee-primary" ||
     value === "member-primary" ||
     value === "operator-primary" ||

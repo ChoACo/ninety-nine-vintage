@@ -815,7 +815,8 @@ test("buyer inventory, shipment, and refund interfaces expose only scoped public
   assert.match(storageRoute, /legacyAuctionWins/);
   assert.match(storageRoute, /display_due_at,\s*due_at/);
   assert.match(storageRoute, /win\.payment_due_at/);
-  assert.match(storageRoute, /deadlineEnforcementExempt:\s*role\?\.role_code === "band_member"/);
+  assert.match(storageRoute, /deadlineEnforcementExempt:\s*false/);
+  assert.doesNotMatch(storageRoute, /band_member/);
   assert.doesNotMatch(storageRoute, /internalNote|evidencePaths|account_ciphertext/);
   assert.match(shipmentRoute, /"get_my_inventory_shipments"/);
   assert.match(shipmentRoute, /"sourceKind"/);

@@ -2,6 +2,8 @@ import {
   fetchPublishedProducts,
   fetchPublicPremiumStoreIds,
   fetchSoldFeedProducts,
+  fetchUpcomingAuctionProducts,
+  fetchWonAuctionProducts,
 } from "@/services/products";
 import { getCatalogImageUrl } from "@/lib/images";
 import { normalizeProductLimit, normalizeProductOffset } from "@/lib/catalog/query";
@@ -12,8 +14,14 @@ export async function GET(request: Request) {
   const offset = normalizeProductOffset(searchParams.get("offset") ?? "0");
   const saleType = searchParams.get("saleType") === "fixed" ? "fixed" : "auction";
   const soldOnly = searchParams.get("view") === "sold";
+  const upcomingOnly = saleType === "auction" && searchParams.get("view") === "upcoming";
+  const wonOnly = saleType === "auction" && searchParams.get("view") === "won";
   try {
-    const [products, premiumStoreIds] = await Promise.all([soldOnly
+    const [products, premiumStoreIds] = await Promise.all([wonOnly
+      ? fetchWonAuctionProducts({ limit, offset })
+      : upcomingOnly
+      ? fetchUpcomingAuctionProducts({ limit, offset })
+      : soldOnly
       ? fetchSoldFeedProducts({ limit, offset, saleType })
       : fetchPublishedProducts({
         limit,

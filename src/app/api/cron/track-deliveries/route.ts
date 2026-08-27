@@ -25,14 +25,22 @@ function isCandidate(value: unknown): value is TrackingCandidate {
 
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+  const authorization = request.headers.get("authorization")?.trim() ?? "";
+  const provided = authorization.startsWith("Bearer ")
+    ? authorization.slice(7).trim()
+    : "";
+  const { admin } = createSupabaseServerClients();
+  const envAuthorized = Boolean(cronSecret) && provided === cronSecret;
+  const vaultVerification = !envAuthorized && provided
+    ? await admin.rpc("verify_web_push_dispatch_secret", { p_secret: provided })
+    : { data: false, error: null };
+  if (!envAuthorized && (vaultVerification.error || vaultVerification.data !== true)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   if (!process.env.TRACKER_DELIVERY_CLIENT_ID?.trim() || !process.env.TRACKER_DELIVERY_CLIENT_SECRET?.trim()) {
     return NextResponse.json({ error: "courier_tracker_configuration_missing" }, { status: 503 });
   }
 
-  const { admin } = createSupabaseServerClients();
   const { data, error } = await admin.rpc("get_pending_inventory_delivery_tracking", { p_limit: 20 });
   const rawShipments: unknown = isRecord(data) ? data.shipments : null;
   if (error || !Array.isArray(rawShipments) || !rawShipments.every(isCandidate)) {

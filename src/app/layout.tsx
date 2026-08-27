@@ -8,6 +8,7 @@ import { SimpleModeProvider } from "@/components/features/accessibility/SimpleMo
 import { ReturnScrollCapture } from "@/components/layout/ReturnScrollCapture";
 import { ScrollLockRecovery } from "@/components/layout/ScrollLockRecovery";
 import { NavigationProgress } from "@/components/layout/NavigationProgress";
+import { SiteSessionActivityTracker } from "@/components/layout/SiteSessionActivityTracker";
 import "./globals.css";
 
 const themeInitializationScript = `
@@ -40,6 +41,27 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.ninety-nine-vintage.store"),
   title: "NINETY-NINE VINTAGE",
   description: "시간을 다시 입는 선택, 빈티지 라이브 옥션 & 14일 무료 보관 플랫폼",
+  openGraph: {
+    title: "NINETY-NINE VINTAGE",
+    description: "시간을 다시 입는 선택, 빈티지 라이브 옥션 & 14일 무료 보관 플랫폼",
+    url: "/",
+    siteName: "NINETY-NINE VINTAGE",
+    locale: "ko_KR",
+    type: "website",
+    images: [{
+      url: "/ninety-nine-vintage-banner.png",
+      width: 3024,
+      height: 2269,
+      alt: "NINETY-NINE VINTAGE",
+      type: "image/png",
+    }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "NINETY-NINE VINTAGE",
+    description: "시간을 다시 입는 선택, 빈티지 라이브 옥션 & 14일 무료 보관 플랫폼",
+    images: ["/ninety-nine-vintage-banner.png"],
+  },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -77,6 +99,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <NavigationProgress />
         </Suspense>
         <GlobalToastHost />
+        <SiteSessionActivityTracker />
         <ReturnScrollCapture />
         <ScrollLockRecovery />
       </body>

@@ -2,7 +2,6 @@ export type ManagedMemberRole =
   | "owner"
   | "operator"
   | "employee"
-  | "band_member"
   | "member";
 
 export type ManagedMemberStatus =

@@ -69,7 +69,7 @@ export async function PATCH(request: Request) {
 
     if (action === "role") {
       const roleCode = typeof body.roleCode === "string" ? body.roleCode : "";
-      if (!["operator", "employee", "band_member", "member"].includes(roleCode)) return ownerAccessJsonResponse({ error: "invalid_role" }, 400);
+      if (!["operator", "employee", "member"].includes(roleCode)) return ownerAccessJsonResponse({ error: "invalid_role" }, 400);
       const reportsToOperatorId =
         typeof body.reportsToOperatorId === "string"
           ? body.reportsToOperatorId

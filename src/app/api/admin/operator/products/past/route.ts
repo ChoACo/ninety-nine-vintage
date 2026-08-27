@@ -125,14 +125,12 @@ export async function GET(request: Request) {
       stores: [],
     });
   }
-const now = new Date().toISOString();
   const [pastResult, closedResult] = await Promise.all([
     auth.admin
       .from("products")
       .select("*, stores(id, name, slug)")
       .eq("sale_type", "auction")
       .eq("past_action", "pending")
-      .gt("past_expires_at", now)
       .in("store_id", storeIds)
       .order("past_at", { ascending: false }),
     auth.admin
@@ -238,6 +236,8 @@ export async function POST(request: Request) {
   const action =
     body?.action === "delete"
       ? "delete"
+      : body?.action === "archive"
+        ? "archive"
       : body?.action === "relist"
         ? "relist"
         : "";
@@ -253,16 +253,26 @@ export async function POST(request: Request) {
   if ((scopedProducts ?? []).length !== productIds.length) {
     return commerceJson({ error: "operator_store_scope_mismatch" }, 403);
   }
-  const { data, error } = await auth.user
-    .rpc("manage_past_auction_products", {
-      p_product_ids: productIds,
+  let processedCount = 0;
+  let skippedCount = 0;
+  const failures: Array<{ id: string; message: string }> = [];
+  for (const productId of productIds) {
+    const { error } = await auth.user.rpc("operator_resolve_expired_auction", {
+      p_product_id: productId,
       p_action: action,
-    })
-    .single();
-  if (error)
-    return commerceJson(
-      { error: error.message || "지난 상품을 처리하지 못했습니다." },
-      409,
-    );
-  return commerceJson({ result: data });
+    });
+    if (error) {
+      skippedCount += 1;
+      failures.push({ id: productId, message: error.message });
+    } else {
+      processedCount += 1;
+    }
+  }
+  return commerceJson({
+    result: {
+      processed_count: processedCount,
+      skipped_count: skippedCount,
+      failures,
+    },
+  }, failures.length > 0 && processedCount === 0 ? 409 : 200);
 }

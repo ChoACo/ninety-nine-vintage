@@ -3,31 +3,20 @@
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
-interface StorageProviderUsage {
-  providerId: string;
+interface R2StorageUsage {
+  providerId: "r2";
+  bucketName: string;
   usedBytes: number;
-  capacityBytes: number;
-  recordCount: number;
-  ratio: number;
-  state: "active" | "degraded" | "offline" | "unused";
+  objectCount: number;
+  usageVerified: true;
 }
 
 interface StorageUsageData {
-  providers: StorageProviderUsage[];
+  provider: R2StorageUsage;
   totalUsedBytes: number;
-  totalCapacityBytes: number;
-  ratio: number;
-  rolloverThreshold: number;
-  activeProviderId: string;
+  totalObjectCount: number;
   measuredAt: string;
 }
-
-const PROVIDER_LABELS: Record<string, string> = {
-  supabase: "Supabase Storage",
-  gcs: "Google Cloud Storage",
-  r2: "Cloudflare R2",
-  s3: "AWS S3",
-};
 
 function formatBytes(bytes: number): string {
   if (bytes <= 0) return "0 B";
@@ -35,32 +24,6 @@ function formatBytes(bytes: number): string {
   const power = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   const value = bytes / Math.pow(1024, power);
   return `${value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2)} ${units[power]}`;
-}
-
-function getBarColor(ratio: number): string {
-  if (ratio >= 0.95) return "bg-red-600";
-  if (ratio >= 0.8) return "bg-amber-500";
-  return "bg-emerald-600";
-}
-
-function getTextColor(ratio: number): string {
-  if (ratio >= 0.95) return "text-red-700";
-  if (ratio >= 0.8) return "text-amber-700";
-  return "text-emerald-700";
-}
-
-function getStateBadgeClasses(state: StorageProviderUsage["state"]): string {
-  if (state === "active") return "border-emerald-300 bg-emerald-50 text-emerald-800";
-  if (state === "degraded") return "border-amber-300 bg-amber-500/10 text-amber-800";
-  if (state === "offline") return "border-red-300 bg-red-50 text-red-800";
-  return "border-line bg-surface text-muted";
-}
-
-function getStateLabel(state: StorageProviderUsage["state"]): string {
-  if (state === "active") return "Active";
-  if (state === "degraded") return "Degraded";
-  if (state === "offline") return "Offline";
-  return "Idle";
 }
 
 export function StorageUsageGauge() {
@@ -91,26 +54,16 @@ export function StorageUsageGauge() {
   }, []);
 
   const isLoading = !data && !notice;
-  const totalRatio = data ? data.ratio : 0;
-  const rolloverPercent = data ? Math.round(data.rolloverThreshold * 100) : 90;
-
   return (
     <section className="border border-line bg-paper p-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-black text-ink">멀티 클라우드 스토리지 용량 현황</p>
-          <p className="mt-1 text-[10px] text-muted">임계치 {rolloverPercent}% 도달 시 다음 프로바이더로 자동 롤오버</p>
+          <p className="text-xs font-black text-ink">R2 스토리지 사용 현황</p>
+          <p className="mt-1 text-[10px] text-muted">Cloudflare R2 버킷을 직접 조회한 현재 사용량입니다.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded-full border border-line bg-surface px-3 py-1 text-[10px] font-bold text-muted">
-            {data ? `${data.providers.length}개 프로바이더` : "—"}
-          </span>
-          {data && (
-            <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-800">
-              Active: {PROVIDER_LABELS[data.activeProviderId] ?? data.activeProviderId}
-            </span>
-          )}
-        </div>
+        <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-800">
+          Cloudflare R2
+        </span>
       </div>
 
       {notice && <p className="mt-4 text-xs text-red-700">{notice}</p>}
@@ -126,71 +79,27 @@ export function StorageUsageGauge() {
       )}
 
       {data && (
-        <>
-          <div className="mt-5 space-y-2">
-            <div className="flex items-center justify-between text-[10px]">
-              <span className="font-mono font-bold text-muted">전체 합산</span>
-              <span className={`font-mono font-bold ${getTextColor(totalRatio)}`}>
-                {formatBytes(data.totalUsedBytes)} / {formatBytes(data.totalCapacityBytes)} · {(totalRatio * 100).toFixed(1)}%
-              </span>
+        <div className="mt-5 rounded-2xl border border-emerald-300 bg-emerald-50/40 p-5">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-bold text-muted">현재 사용 중</p>
+              <p className="mt-2 font-mono text-3xl font-black tracking-[-.05em] text-ink">
+                {formatBytes(data.totalUsedBytes)}
+              </p>
             </div>
-            <div className="relative h-3 w-full overflow-hidden rounded-full bg-surface">
-              <div
-                className={`h-full rounded-full transition-all duration-700 ${getBarColor(totalRatio)}`}
-                style={{ width: `${Math.min(totalRatio * 100, 100)}%` }}
-              />
+            <div className="text-right">
+              <p className="text-[10px] font-bold text-muted">저장 객체</p>
+              <p className="mt-2 font-mono text-lg font-black text-ink">
+                {data.totalObjectCount.toLocaleString("ko-KR")}개
+              </p>
             </div>
           </div>
-
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {data.providers.map((provider) => {
-              const isActive = provider.providerId === data.activeProviderId;
-              const label = PROVIDER_LABELS[provider.providerId] ?? provider.providerId;
-              const percent = provider.capacityBytes > 0 ? (provider.ratio * 100).toFixed(1) : "—";
-              return (
-                <div
-                  className={`border p-4 ${isActive ? "border-emerald-300 bg-emerald-50/40" : "border-line bg-paper"}`}
-                  data-active={isActive ? "true" : "false"}
-                  data-provider={provider.providerId}
-                  key={provider.providerId}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-ink">{label}</span>
-                    <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold ${getStateBadgeClasses(provider.state)}`}>
-                      {getStateLabel(provider.state)}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-[10px]">
-                    <span className="font-mono text-muted">
-                      {formatBytes(provider.usedBytes)} / {provider.capacityBytes > 0 ? formatBytes(provider.capacityBytes) : "무제한"}
-                    </span>
-                    <span className={`font-mono font-bold ${getTextColor(provider.ratio)}`}>{percent}{percent !== "—" ? "%" : ""}</span>
-                  </div>
-                  <div className="mt-2 relative h-2 w-full overflow-hidden rounded-full bg-surface">
-                    <div
-                      className={`h-full rounded-full transition-all duration-700 ${getBarColor(provider.ratio)}`}
-                      style={{ width: provider.capacityBytes > 0 ? `${Math.min(provider.ratio * 100, 100)}%` : "0%" }}
-                    />
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-[9px] text-muted">
-                    <span>레코드 {provider.recordCount.toLocaleString("ko-KR")}건</span>
-                    {provider.capacityBytes > 0 && (
-                      <span>남음 {formatBytes(Math.max(0, provider.capacityBytes - provider.usedBytes))}</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="mt-4 flex flex-wrap justify-between gap-2 border-t border-emerald-200 pt-3 text-[9px] text-muted">
+            <span>버킷 {data.provider.bucketName}</span>
+            <time dateTime={data.measuredAt}>조회 {new Date(data.measuredAt).toLocaleString("ko-KR")}</time>
           </div>
-
-          {totalRatio >= 0.8 && (
-            <div className={`mt-4 border p-3 text-[10px] font-bold ${totalRatio >= 0.95 ? "border-red-200 bg-red-50 text-red-700" : "border-amber-200 bg-amber-500/10 text-amber-800"}`}>
-              {totalRatio >= 0.95
-                ? "전체 스토리지 용량이 95%를 초과했습니다. 신규 업로드는 다른 프로바이더로 자동 라우팅됩니다."
-                : "전체 스토리지 용량이 80%를 초과했습니다. 임계치 도달 시 자동으로 다음 프로바이더로 롤오버됩니다."}
-            </div>
-          )}
-        </>
+          <p className="mt-3 text-[9px] leading-4 text-muted">R2는 종량제이므로 한계 용량과 사용률 대신 실제 저장 바이트를 표시합니다.</p>
+        </div>
       )}
     </section>
   );

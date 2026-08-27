@@ -4,7 +4,6 @@ import { useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type LocalTestAccountSlot =
-  | "band-member"
   | "employee-primary"
   | "member-primary"
   | "operator-primary"
@@ -69,9 +68,6 @@ export function LocalTestAccountActions({ returnTo }: { returnTo: string }) {
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <button className="border border-ink px-3 py-2 text-xs font-bold disabled:opacity-50" disabled={busy !== null} onClick={() => signIn("member-primary")} type="button">
           {busy === "member-primary" ? "회원 준비 중..." : "테스트 회원으로 접속"}
-        </button>
-        <button className="border border-ink px-3 py-2 text-xs font-bold disabled:opacity-50" disabled={busy !== null} onClick={() => signIn("band-member")} type="button">
-          {busy === "band-member" ? "밴드회원 준비 중..." : "테스트 밴드회원으로 접속"}
         </button>
         <button className="bg-ink px-3 py-2 text-xs font-bold text-paper disabled:opacity-50" disabled={busy !== null} onClick={() => signIn("operator-primary")} type="button">
           {busy === "operator-primary" ? "운영자 계정 준비 중..." : "테스트 운영자 ID 1로 접속"}

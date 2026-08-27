@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createSupabasePublicClient, createSupabaseUserClient } from "@/lib/supabase/server";
+import { createSupabasePublicClient, createSupabaseServerClients, createSupabaseUserClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import {
   normalizeCatalogSearch,
@@ -158,11 +158,18 @@ export async function fetchPublishedProducts(input: {
     .eq("sale_type", saleType)
     .lte("publish_at", now);
   if (saleType === "auction") {
-    query = query
-      .or(
-        `and(status.eq.active,auction_feed_expires_at.gt.${now},final_bid_id.is.null),` +
-        "and(status.eq.closed,final_bid_id.not.is.null,final_bid_amount.not.is.null,sale_completed_at.is.null)",
-      );
+    const kstHour = Number(new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Seoul",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(new Date()));
+    const includeClosingWinners = kstHour === 21;
+    query = query.or(
+      `and(status.eq.active,auction_feed_expires_at.gt.${now},final_bid_id.is.null)` +
+        (includeClosingWinners
+          ? ",and(status.eq.closed,final_bid_id.not.is.null,final_bid_amount.not.is.null,sale_completed_at.is.null)"
+          : ""),
+    );
   } else {
     query = query.eq("status", "active");
   }
@@ -172,6 +179,76 @@ export async function fetchPublishedProducts(input: {
   const { data, error } = await query.range(safeOffset, safeOffset + safeLimit - 1);
   if (error) throw new Error("상품 목록을 불러오지 못했습니다.");
   return (data ?? []).map((row) => mapPublishedProduct(row as ProductRow & { stores?: { name?: string; slug?: string } | null }));
+}
+
+export async function fetchUpcomingAuctionProducts(input: {
+  limit?: number;
+  offset?: number;
+} = {}): Promise<PublishedProduct[]> {
+  const safeLimit = normalizeProductLimit(input.limit ?? 24);
+  const safeOffset = normalizeProductOffset(input.offset ?? 0);
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const minuteOfDay = Number(values.hour ?? 0) * 60 + Number(values.minute ?? 0);
+  if (minuteOfDay < 9 * 60 + 30 || minuteOfDay >= 10 * 60) return [];
+
+  const start = new Date(`${new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now)}T10:00:00+09:00`);
+  const end = new Date(start.getTime() + 60_000);
+  const { admin } = createSupabaseServerClients();
+  const { data, error } = await admin
+    .from("products")
+    .select("*, stores(name, slug)")
+    .eq("sale_type", "auction")
+    .eq("status", "pending")
+    .gte("publish_at", start.toISOString())
+    .lt("publish_at", end.toISOString())
+    .order("publish_at", { ascending: true })
+    .order("id", { ascending: true })
+    .range(safeOffset, safeOffset + safeLimit - 1);
+  if (error) throw new Error("공개 예정 상품을 불러오지 못했습니다.");
+  return (data ?? []).map((row) => mapPublishedProduct(
+    row as ProductRow & { stores?: { name?: string; slug?: string } | null },
+  ));
+}
+
+export async function fetchWonAuctionProducts(input: {
+  limit?: number;
+  offset?: number;
+} = {}): Promise<SoldFeedProduct[]> {
+  const safeLimit = normalizeProductLimit(input.limit ?? 24);
+  const safeOffset = normalizeProductOffset(input.offset ?? 0);
+  const { data, error } = await createSupabasePublicClient()
+    .from("products")
+    .select("*, stores(name, slug)")
+    .eq("sale_type", "auction")
+    .eq("status", "closed")
+    .not("final_bid_id", "is", null)
+    .not("final_bid_amount", "is", null)
+    .order("closes_at", { ascending: false })
+    .order("id", { ascending: true })
+    .range(safeOffset, safeOffset + safeLimit - 1);
+  if (error) throw new Error("낙찰 완료 상품을 불러오지 못했습니다.");
+  return (data ?? []).map((row) => {
+    const product = mapPublishedProduct(
+      row as ProductRow & { stores?: { name?: string; slug?: string } | null },
+    );
+    return {
+      ...product,
+      soldAt: row.closes_at,
+      soldPrice: row.final_bid_amount ?? row.current_price,
+    };
+  });
 }
 
 export async function fetchSoldFeedProducts(input: {

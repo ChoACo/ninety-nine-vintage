@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCcw, Save, Store, Truck } from "lucide-react";
+import { CheckCircle2, RotateCcw, Save, Sparkles, Store, Truck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { PostcodeSearchButton } from "@/components/features/account/PostcodeSearchButton";
 import { StoreImageUploader } from "@/components/common/StoreImageUploader";
@@ -54,6 +54,11 @@ type StoreData = {
   payoutAccount: { bankName: string; accountHolder: string } | null;
   announcementText: string;
   announcementEnabled: boolean;
+  planCode: "standard" | "pro";
+  requestedPlanCode: "pro" | null;
+  subscriptionStatus: "active" | "pending_approval" | "delinquent" | "cancelled";
+  monthlyFee: number;
+  subscriptionVersion: number;
 };
 type Form = {
   name: string;
@@ -497,6 +502,105 @@ function Settings({
   );
 }
 
+function ProPlanApplication({
+  store,
+  token,
+  reload,
+}: {
+  store: StoreData;
+  token: string;
+  reload: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const toast = useToastStore((state) => state.pushToast);
+  const isPro = store.planCode === "pro" && store.subscriptionStatus === "active";
+  const isPending =
+    store.requestedPlanCode === "pro" &&
+    store.subscriptionStatus === "pending_approval";
+
+  async function requestPro() {
+    if (busy || isPro || isPending) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/admin/operator/platform", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: "request_plan",
+          storeId: store.id,
+          planCode: "pro",
+        }),
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        message?: string;
+      };
+      if (!response.ok) {
+        throw new Error(
+          payload.message ?? payload.error ?? "Pro 등급을 신청하지 못했습니다.",
+        );
+      }
+      toast("success", "Pro 등급 신청을 접수했습니다. 소유자 승인 후 적용됩니다.");
+      await reload();
+    } catch (error) {
+      toast(
+        "error",
+        error instanceof Error
+          ? error.message
+          : "Pro 등급을 신청하지 못했습니다.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
+      <div className="border-b border-zinc-800 bg-gradient-to-r from-amber-500/15 to-zinc-900 p-5 md:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black text-amber-400">{store.name}</p>
+            <h2 className="mt-2 flex items-center gap-2 text-xl font-black">
+              <Sparkles size={20} /> Pro 등급 신청
+            </h2>
+          </div>
+          <span className={`rounded-full border px-3 py-2 text-[11px] font-black ${isPro ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : isPending ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : "border-zinc-700 text-zinc-400"}`}>
+            {isPro ? "Pro 이용 중" : isPending ? "승인 대기 중" : "일반 센터"}
+          </span>
+        </div>
+      </div>
+      <div className="grid gap-5 p-5 md:grid-cols-[minmax(0,1fr)_280px] md:p-6">
+        <div>
+          <p className="text-sm leading-6 text-zinc-300">
+            Pro는 월 총 50,000원이며, 엑셀 대량 등록과 확장된 상품 등록 한도를 제공합니다.
+          </p>
+          <ul className="mt-4 space-y-2 text-xs text-zinc-400">
+            <li className="flex items-center gap-2"><CheckCircle2 className="text-emerald-400" size={14}/>엑셀·이미지 폴더 대량 등록</li>
+            <li className="flex items-center gap-2"><CheckCircle2 className="text-emerald-400" size={14}/>확장된 즉시·예약 등록 및 보관 한도</li>
+            <li className="flex items-center gap-2"><CheckCircle2 className="text-emerald-400" size={14}/>판매 수수료는 일반·Pro 모두 동일하게 5%</li>
+          </ul>
+        </div>
+        <div className="rounded-xl border border-zinc-700 bg-zinc-950 p-4">
+          <p className="text-[11px] font-bold text-zinc-500">월 이용료</p>
+          <p className="mt-2 font-mono text-2xl font-black text-zinc-100">50,000원</p>
+          <p className="mt-2 text-[11px] leading-5 text-zinc-500">신청 즉시 결제되지 않으며 소유자 승인 후 적용됩니다.</p>
+          <button
+            className="mt-4 min-h-11 w-full rounded-xl bg-amber-500 px-4 text-xs font-black text-zinc-950 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={busy || isPro || isPending}
+            onClick={() => void requestPro()}
+            type="button"
+          >
+            {busy ? "신청 중…" : isPro ? "Pro 이용 중" : isPending ? "승인 대기 중" : "Pro 등급 신청"}
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function StoreSettingsWorkspace() {
   const { session } = useSupabaseSession();
   const token = session?.access_token ?? null;
@@ -504,6 +608,7 @@ export function StoreSettingsWorkspace() {
   const [error, setError] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"settings" | "pro">("settings");
   const load = useCallback(async () => {
     if (!token) {
       setLoading(false);
@@ -554,10 +659,12 @@ export function StoreSettingsWorkspace() {
         <p className="mt-2 text-sm text-zinc-400">
           고객에게 보이는 브랜딩부터 정산·배송 정책까지 한 곳에서 관리합니다.
         </p>
-        <p className="mt-2 text-xs text-zinc-500">
-          이용 플랜은 기본 3만원 또는 프리미엄 5만원이며, 다음 청구일 전 변경·해지를 요청할 수 있습니다.
-        </p>
+        <p className="mt-2 text-xs text-zinc-500">일반 센터는 월 3만원, Pro 센터는 월 5만원이며 판매 수수료는 모두 5%입니다.</p>
       </header>
+      <div aria-label="판매센터 설정 메뉴" className="flex gap-2 border-b border-zinc-800" role="tablist">
+        <button aria-selected={activeTab === "settings"} className={`min-h-11 border-b-2 px-4 text-xs font-black ${activeTab === "settings" ? "border-emerald-500 text-emerald-400" : "border-transparent text-zinc-500"}`} onClick={() => setActiveTab("settings")} role="tab" type="button">매장 설정</button>
+        <button aria-selected={activeTab === "pro"} className={`min-h-11 border-b-2 px-4 text-xs font-black ${activeTab === "pro" ? "border-amber-500 text-amber-400" : "border-transparent text-zinc-500"}`} onClick={() => setActiveTab("pro")} role="tab" type="button">Pro 등급 신청</button>
+      </div>
       {loading ? (
         <div aria-label="매장 설정 불러오는 중" className="space-y-4" role="status">
           <div className="h-40 animate-pulse rounded-2xl bg-zinc-900" />
@@ -586,13 +693,16 @@ export function StoreSettingsWorkspace() {
           연결된 운영 매장이 없습니다. 소유자에게 매장 배정을 요청해 주세요.
         </div>
       ) : null}
-      {!loading && !error ? stores.map((store) => (
+      {!loading && !error && activeTab === "settings" ? stores.map((store) => (
         <Settings
           key={store.id}
           reload={load}
           store={store}
           token={token ?? ""}
         />
+      )) : null}
+      {!loading && !error && activeTab === "pro" ? stores.map((store) => (
+        <ProPlanApplication key={store.id} reload={load} store={store} token={token ?? ""} />
       )) : null}
     </div>
   );

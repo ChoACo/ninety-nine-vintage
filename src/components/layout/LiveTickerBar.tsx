@@ -24,10 +24,10 @@ function EnabledLiveTickerBar({ surface }: { surface: "desktop" | "mobile" }) {
             <Radio size={13} strokeWidth={1.75} />
             라이브 옥션
           </span>
-          <span className={`${surface === "desktop" ? "truncate" : "line-clamp-2 max-w-40 leading-3"} text-zinc-300`}>10:00 공개 · 20:56 참여 제한 · 21:00–22:00 정산</span>
+          <span className={`${surface === "desktop" ? "truncate" : "line-clamp-2 max-w-40 leading-3"} text-zinc-300`}>10:00 공개 · 20:56 참여 제한 · 21:00–22:00 마감·동기화 점검</span>
         </div>
         <div className={`flex shrink-0 ${surface === "desktop" ? "items-center gap-4" : "flex-col items-end gap-0.5"}`}>
-          <strong className={`${surface === "desktop" ? "text-sm tracking-[0.08em]" : "text-[10px] tracking-[0.04em]"} shrink-0 font-mono tabular-nums`}>{label} {status !== "CLOSED" && timeLeft}</strong>
+          <strong className={`${surface === "desktop" ? "text-sm tracking-[0.08em]" : "text-[10px] tracking-[0.04em]"} shrink-0 font-mono tabular-nums`}>{label} {timeLeft}</strong>
           <span className="flex items-center gap-1.5 text-zinc-400">
             {status !== "CLOSED" && <span aria-hidden="true" className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-50" /><span className="relative inline-flex size-2 rounded-full bg-emerald-400" /></span>}
             {connectionLabel}

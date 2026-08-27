@@ -5,26 +5,25 @@ import test from "node:test";
 const rootUrl = new URL("../../", import.meta.url);
 const source = (path) => readFile(new URL(path, rootUrl), "utf8");
 
-test("store-scoped product feed exposes audited live auction controls", async () => {
-  const [consoleSource, controllerSource, liveRoute, productsRoute, migration] = await Promise.all([
+test("operator live auction pages are monitoring-only and reject mutation controls", async () => {
+  const [consoleSource, liveOperations, liveRoute, productsRoute, migration] = await Promise.all([
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
-    source("src/components/admin/operator/AuctionController.tsx"),
+    source("src/components/admin/operator/LiveAuctionOperations.tsx"),
     source("src/app/api/admin/operator/auctions/live/[id]/route.ts"),
     source("src/app/api/admin/operator/products/route.ts"),
-    source("supabase/migrations/20260822081357_add_admin_auction_controls_and_payment_audit.sql"),
+    source("supabase/migrations/20260826231224_harden_live_auction_policy_v2.sql"),
   ]);
 
   assert.match(productsRoute, /canCloseAuctions:\s*auth\.roleCode === "owner"/);
-  assert.match(consoleSource, /<AuctionController/);
-  assert.match(controllerSource, /즉시 마감·정산/);
-  assert.match(controllerSource, /\+10분 연장/);
-  assert.match(controllerSource, /입찰 취소/);
+  assert.doesNotMatch(consoleSource, /<AuctionController/);
+  assert.doesNotMatch(liveOperations, /<AuctionController/);
+  assert.match(liveOperations, /모니터링 전용/);
   assert.match(liveRoute, /authenticateOperatorStoreRequest\(request,\s*true\)/);
-  assert.match(liveRoute, /verifyOperatorProductScope/);
-  assert.match(liveRoute, /operator_close_live_auction/);
-  assert.match(liveRoute, /manage_member_sanction/);
-  assert.match(migration, /order by (?:bids\.)?amount desc,\s*(?:bids\.)?created_at,\s*(?:bids\.)?id/i);
-  assert.match(migration, /auction_operation_audit/i);
+  assert.match(liveRoute, /operator_live_auction_mutation_forbidden/);
+  assert.doesNotMatch(liveRoute, /operator_close_live_auction|operator_extend_live_auction|operator_cancel_auction_bid/);
+  assert.match(migration, /revoke execute on function public\.operator_extend_live_auction/i);
+  assert.match(migration, /revoke execute on function public\.operator_close_live_auction/i);
+  assert.match(migration, /revoke execute on function public\.operator_cancel_auction_bid/i);
 });
 
 test("single product registration is separate, defaults to immediate publication, supports saved scheduling, and uploads up to 15 ordered files", async () => {

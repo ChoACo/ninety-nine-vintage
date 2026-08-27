@@ -155,6 +155,7 @@ export async function GET(request: Request) {
   );
   const canMutate = stores.length > 0;
   return commerceJson({
+    serverNow: new Date().toISOString(),
     stores: stores ?? [],
     products: (products ?? []).map((product) => {
       const lock = locksByProduct.get(product.id);

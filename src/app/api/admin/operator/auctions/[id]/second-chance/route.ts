@@ -29,7 +29,10 @@ export async function POST(
   if (scopeError) return scopeError;
 
   const { data, error } = await auth.user
-    .rpc("operator_process_second_chance", { p_product_id: id })
+    .rpc(
+      "operator_process_second_chance_manual" as "operator_process_second_chance",
+      { p_product_id: id },
+    )
     .single();
   if (error) {
     return commerceJson(

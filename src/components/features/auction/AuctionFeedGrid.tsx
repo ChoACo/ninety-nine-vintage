@@ -33,8 +33,12 @@ import {
 } from "@/lib/auction/bidEvents";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LIVE_AUCTION_ENABLED } from "@/lib/featureFlags";
-import { getDailyAuctionPhase } from "@/utils/auctionBidPolicy";
+import { getDailyAuctionPhase, getKoreanAuctionTime } from "@/utils/auctionBidPolicy";
 import { getCatalogGender, type CatalogGender } from "@/utils/catalogFilters";
+import {
+  CATALOG_SESSION_CHANGED_EVENT,
+  getCatalogSessionSeed,
+} from "@/components/layout/SiteSessionActivityTracker";
 
 const CATALOG_GENDERS: readonly CatalogGender[] = [
   "all",
@@ -123,7 +127,7 @@ function getRealtimeProductId(value: unknown) {
 async function fetchCompleteProductCatalog(input: {
   saleType: ProductSaleType;
   signal: AbortSignal;
-  soldOnly: boolean;
+  view: "active" | "sold" | "upcoming" | "won";
   search?: string;
 }): Promise<ProductPayload[]> {
   let offset = 0;
@@ -140,7 +144,7 @@ async function fetchCompleteProductCatalog(input: {
       offset: String(offset),
       saleType: input.saleType,
     });
-    if (input.soldOnly) params.set("view", "sold");
+    if (input.view !== "active") params.set("view", input.view);
     if (input.search?.trim()) params.set("q", input.search.trim());
     const response = await fetch(`/api/products?${params.toString()}`, {
       cache: "no-store",
@@ -148,7 +152,7 @@ async function fetchCompleteProductCatalog(input: {
     });
     if (!response.ok) {
       throw new Error(
-        input.soldOnly
+        input.view === "sold" || input.view === "won"
           ? "판매 완료 상품을 불러오지 못했습니다."
           : "상품 목록을 불러오지 못했습니다.",
       );
@@ -235,6 +239,10 @@ function EnabledAuctionFeedGrid({
   const policyNow = useAuctionPolicyClock(saleType === "auction");
   const now = policyNow.getTime();
   const dailyAuctionPhase = now > 0 ? getDailyAuctionPhase(now) : "open";
+  const koreanClock = getKoreanAuctionTime(now);
+  const isPreparingUpcoming = saleType === "auction"
+    && koreanClock.secondsSinceMidnight >= 9 * 60 * 60 + 30 * 60
+    && koreanClock.secondsSinceMidnight < 10 * 60 * 60;
   const [products, setProducts] = useState<ProductPayload[]>(
     initialProducts ?? [],
   );
@@ -243,7 +251,7 @@ function EnabledAuctionFeedGrid({
     () => routeSearchParams.get("view") === "sold",
   );
   const [selectedDate, setSelectedDate] = useState(
-    () => routeSearchParams.get("date") ?? "all",
+    () => routeSearchParams.get("date") ?? "latest",
   );
   const [selectedBrand, setSelectedBrand] = useState(
     () => routeSearchParams.get("brand") ?? "all",
@@ -254,18 +262,22 @@ function EnabledAuctionFeedGrid({
   const [selectedStoreId, setSelectedStoreId] = useState(
     () => routeSearchParams.get("store") ?? "all",
   );
-  const feedSeed = useMemo(
-    () =>
-      `${saleType}:${initialProducts?.map((product) => product.id).join(",") ?? "catalog"}`,
-    [initialProducts, saleType],
-  );
+  const [feedSeed, setFeedSeed] = useState("initial-session");
+  const [bidEventNotice, setBidEventNotice] = useState("");
   const [page, setPage] = useState(() => {
     const requested = Number(routeSearchParams.get("page"));
     return Number.isSafeInteger(requested) && requested > 0 ? requested : 1;
   });
-  const catalogRequestKey = `${saleType}:${showSoldOnly ? "sold" : "active"}`;
+  const catalogView = showSoldOnly
+    ? saleType === "auction" ? "won" : "sold"
+    : isPreparingUpcoming
+      ? "upcoming"
+      : "active";
+  const catalogRequestKey = `${saleType}:${catalogView}:${dailyAuctionPhase}`;
   const [settledCatalogKey, setSettledCatalogKey] = useState(() =>
-    initialProducts !== undefined && !showSoldOnly ? catalogRequestKey : "",
+    initialProducts !== undefined && !showSoldOnly && !isPreparingUpcoming
+      ? catalogRequestKey
+      : "",
   );
   const loading = settledCatalogKey !== catalogRequestKey;
   const [error, setError] = useState("");
@@ -280,6 +292,19 @@ function EnabledAuctionFeedGrid({
 
   const lastRouteQuery = useRef(routeQuery);
   const productRefreshTimers = useRef(new Map<string, number>());
+  const bidNoticeTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    const applySeed = () => {
+      const seed = getCatalogSessionSeed();
+      if (seed) setFeedSeed(`${saleType}:${seed}`);
+    };
+    queueMicrotask(applySeed);
+    window.addEventListener(CATALOG_SESSION_CHANGED_EVENT, applySeed);
+    return () => {
+      window.removeEventListener(CATALOG_SESSION_CHANGED_EVENT, applySeed);
+    };
+  }, [saleType]);
 
   useEffect(() => {
     if (routeQuery === lastRouteQuery.current) return;
@@ -338,7 +363,10 @@ function EnabledAuctionFeedGrid({
   }, [saleType]);
 
   useEffect(() => {
-    if (initialProducts !== undefined && !showSoldOnly && !query.trim()) {
+    if (initialProducts !== undefined
+      && catalogView === "active"
+      && !showSoldOnly
+      && !query.trim()) {
       queueMicrotask(() => {
         setProducts(initialProducts);
         setSettledCatalogKey(catalogRequestKey);
@@ -349,7 +377,7 @@ function EnabledAuctionFeedGrid({
     fetchCompleteProductCatalog({
       saleType,
       signal: controller.signal,
-      soldOnly: showSoldOnly,
+      view: catalogView,
       search: query,
     })
       .then((nextProducts) => {
@@ -371,7 +399,11 @@ function EnabledAuctionFeedGrid({
         }
       });
     return () => controller.abort();
-  }, [catalogRequestKey, initialProducts, query, saleType, showSoldOnly]);
+  }, [catalogRequestKey, catalogView, initialProducts, query, saleType, showSoldOnly]);
+
+  useEffect(() => () => {
+    if (bidNoticeTimer.current !== null) window.clearTimeout(bidNoticeTimer.current);
+  }, []);
 
   const refreshProductById = useCallback(
     async (productId: string) => {
@@ -433,7 +465,10 @@ function EnabledAuctionFeedGrid({
   );
 
   useEffect(() => {
-    if (showSoldOnly || (saleType === "auction" && !LIVE_AUCTION_ENABLED))
+    if (showSoldOnly
+      || dailyAuctionPhase === "closed"
+      || isPreparingUpcoming
+      || (saleType === "auction" && !LIVE_AUCTION_ENABLED))
       return;
     const refreshTimers = productRefreshTimers.current;
     let client: ReturnType<typeof getSupabaseBrowserClient>;
@@ -460,10 +495,15 @@ function EnabledAuctionFeedGrid({
           }
           const snapshot = parseAuctionProductRealtimeSnapshot(payload.new);
           if (snapshot) {
-            setProducts((current) =>
-              current.map((product) =>
-                product.id === snapshot.id
-                  ? {
+            setProducts((current) => {
+              const previous = current.find((product) => product.id === snapshot.id);
+              if (previous && snapshot.currentPrice > previous.currentPrice) {
+                setBidEventNotice("새로운 입찰이 진행되었습니다. 현재 입찰가를 갱신했습니다.");
+                if (bidNoticeTimer.current !== null) window.clearTimeout(bidNoticeTimer.current);
+                bidNoticeTimer.current = window.setTimeout(() => setBidEventNotice(""), 4_000);
+              }
+              return current.map((product) =>
+                product.id === snapshot.id ? {
                       ...product,
                       antiSnipingBaseClosesAt: snapshot.antiSnipingBaseClosesAt,
                       antiSnipingExtendedAt: snapshot.antiSnipingExtendedAt,
@@ -476,10 +516,9 @@ function EnabledAuctionFeedGrid({
                       participantCount: snapshot.participantCount,
                       publishAt: snapshot.publishAt,
                       status: snapshot.status,
-                    }
-                  : product,
-              ),
-            );
+                    } : product,
+              );
+            });
           }
           scheduleProductRefresh(productId);
           if (
@@ -498,6 +537,8 @@ function EnabledAuctionFeedGrid({
     };
   }, [
     accountBidCapability,
+    dailyAuctionPhase,
+    isPreparingUpcoming,
     refreshAccountBids,
     saleType,
     scheduleProductRefresh,
@@ -532,10 +573,8 @@ function EnabledAuctionFeedGrid({
           hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
         return hash >>> 0;
       };
-      const leftScore =
-        score(left.id) / (left.storeTier === "premium" ? 1.2 : 1);
-      const rightScore =
-        score(right.id) / (right.storeTier === "premium" ? 1.2 : 1);
+      const leftScore = score(left.id);
+      const rightScore = score(right.id);
       return leftScore - rightScore;
     });
     const top: ProductPayload[] = [];
@@ -662,11 +701,13 @@ function EnabledAuctionFeedGrid({
           auctionPhase,
           timeLeft: showSoldOnly
             ? "판매 완료"
+            : isPreparingUpcoming
+              ? "오전 10시부터 입찰 진행"
             : saleType === "fixed"
               ? "재고 있음"
               : dailyAuctionPhase === "closed" &&
                   auctionPhase !== "CLOSING_SOON"
-                ? "정산 중"
+                ? "마감·동기화 점검 중"
                 : auctionPhase === "CLOSED"
                   ? "마감됨"
                   : getAuctionRemainingLabel(product.closesAt, now),
@@ -674,7 +715,7 @@ function EnabledAuctionFeedGrid({
           hashtags: product.hashtags,
         };
       }),
-    [dailyAuctionPhase, now, orderedProducts, saleType, showSoldOnly],
+    [dailyAuctionPhase, isPreparingUpcoming, now, orderedProducts, saleType, showSoldOnly],
   );
 
   const dateKeys = useMemo(
@@ -691,7 +732,9 @@ function EnabledAuctionFeedGrid({
     [cards],
   );
   const effectiveSelectedDate =
-    selectedDate === "today" ||
+    selectedDate === "latest"
+      ? dateKeys[0] ?? "all"
+      : selectedDate === "today" ||
     selectedDate === "all" ||
     dateKeys.includes(selectedDate)
       ? selectedDate
@@ -841,14 +884,14 @@ function EnabledAuctionFeedGrid({
     () =>
       Boolean(query.trim()) ||
       effectiveSelectedBrand !== "all" ||
-      effectiveSelectedDate !== "all" ||
+      selectedDate !== "latest" ||
       effectiveSelectedGender !== "all" ||
       selectedStoreId !== "all",
     [
       effectiveSelectedBrand,
-      effectiveSelectedDate,
       effectiveSelectedGender,
       query,
+      selectedDate,
       selectedStoreId,
     ],
   );
@@ -867,7 +910,7 @@ function EnabledAuctionFeedGrid({
         (params.get("gender") as CatalogGender | null) ?? "all",
       );
       setSelectedStoreId(params.get("store") ?? "all");
-      setSelectedDate(params.get("date") ?? "all");
+      setSelectedDate(params.get("date") ?? "latest");
       const requested = Number(params.get("page"));
       setPage(Number.isSafeInteger(requested) && requested > 0 ? requested : 1);
     };
@@ -884,8 +927,8 @@ function EnabledAuctionFeedGrid({
     if (effectiveSelectedBrand !== "all")
       params.set("brand", effectiveSelectedBrand);
     else params.delete("brand");
-    if (effectiveSelectedDate !== "all")
-      params.set("date", effectiveSelectedDate);
+    if (selectedDate !== "latest" && selectedDate !== "all")
+      params.set("date", selectedDate);
     else params.delete("date");
     if (effectiveSelectedGender !== "all")
       params.set("gender", effectiveSelectedGender);
@@ -913,6 +956,7 @@ function EnabledAuctionFeedGrid({
     query,
     saleType,
     selectedStoreId,
+    selectedDate,
     showSoldOnly,
   ]);
 
@@ -952,7 +996,9 @@ function EnabledAuctionFeedGrid({
               }}
               type="button"
             >
-              {showSoldOnly ? "판매 중 상품 보기" : "판매 완료 상품만 보기"}
+              {showSoldOnly
+                ? saleType === "auction" ? "진행 경매 보기" : "판매 중 상품 보기"
+                : saleType === "auction" ? "낙찰 완료 상품" : "판매 완료 상품만 보기"}
             </button>
           </div>
         </div>
@@ -962,6 +1008,46 @@ function EnabledAuctionFeedGrid({
         <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
+      )}
+      {saleType === "auction" && isPreparingUpcoming && !showSoldOnly && (
+        <div className="mb-5 border border-amber-300 bg-amber-50 px-4 py-4 text-amber-950" role="status">
+          <p className="text-sm font-black">새로운 상품들이 준비 중입니다.</p>
+          <p className="mt-1 text-xs">아래 예약 상품은 오늘 오전 10시부터 입찰할 수 있습니다.</p>
+        </div>
+      )}
+      {bidEventNotice && (
+        <div aria-live="polite" className="mb-5 border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">
+          {bidEventNotice}
+        </div>
+      )}
+      {saleType === "auction" && dateKeys.length > 0 && (
+        <nav aria-label="경매 날짜 필터" className="mb-5 flex gap-2 overflow-x-auto pb-1">
+          <button
+            aria-pressed={selectedDate === "latest"}
+            className={`min-h-10 shrink-0 border px-4 text-xs font-bold ${selectedDate === "latest" ? "border-ink bg-ink text-paper" : "border-line bg-paper"}`}
+            onClick={() => { setSelectedDate("latest"); setPage(1); }}
+            type="button"
+          >
+            최신 드롭
+          </button>
+          {dateKeys.map((dateKey) => {
+            const weekday = new Intl.DateTimeFormat("ko-KR", {
+              timeZone: "Asia/Seoul",
+              weekday: "short",
+            }).format(new Date(`${dateKey}T12:00:00+09:00`));
+            return (
+              <button
+                aria-pressed={effectiveSelectedDate === dateKey && selectedDate !== "latest"}
+                className={`min-h-10 shrink-0 border px-4 text-xs font-bold ${effectiveSelectedDate === dateKey && selectedDate !== "latest" ? "border-ink bg-ink text-paper" : "border-line bg-paper"}`}
+                key={dateKey}
+                onClick={() => { setSelectedDate(dateKey); setPage(1); }}
+                type="button"
+              >
+                {dateKey.slice(5).replace("-", ".")} ({weekday})
+              </button>
+            );
+          })}
+        </nav>
       )}
       {loading && (
         <div className={catalogGridClass}>
@@ -980,7 +1066,7 @@ function EnabledAuctionFeedGrid({
         (showSoldOnly ? (
           <div className="grid min-h-64 place-items-center border border-dashed border-line px-6 text-center">
             <div>
-              <p className="text-sm font-bold">판매 완료 상품이 없습니다.</p>
+              <p className="text-sm font-bold">{saleType === "auction" ? "낙찰 완료 상품이 없습니다." : "판매 완료 상품이 없습니다."}</p>
               <p className="mt-2 text-xs text-muted">
                 판매 중 상품 보기로 돌아갈 수 있습니다.
               </p>

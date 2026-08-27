@@ -11,6 +11,7 @@ const navigation = [
   { group: "통합 정산 & 금융", href: "/admin/owner/settlements", label: "송금·정산", description: "월·목 지급 명세와 이월", icon: "orders" },
   { group: "통합 정산 & 금융", href: "/admin/owner/platform", label: "센터 요금제", description: "수수료·서비스 정책", icon: "settings" },
   { group: "통합 정산 & 금융", href: "/admin/owner/refunds", label: "환불·긴급", description: "환불과 예외 승인", icon: "shipping" },
+  { group: "통합 정산 & 금융", href: "/admin/owner/ledger-repair", label: "운영 데이터 복구", description: "회원별 입찰·결제·보관·배송 정정", icon: "vault" },
   { group: "플랫폼 룰 & 콘텐츠", href: "/admin/owner/rules/auction", label: "경매 전역 룰", description: "일정·비상 제어실", icon: "auctions" },
   { group: "플랫폼 룰 & 콘텐츠", href: "/admin/owner/community", label: "콘텐츠·공지", description: "운영 안내와 전역 콘텐츠", icon: "inquiries" },
   { group: "보안 & 감사 로그", href: "/admin/owner/site-status", label: "시스템 상태", description: "인프라·연동·보안", icon: "settings" },

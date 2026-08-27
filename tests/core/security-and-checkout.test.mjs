@@ -45,7 +45,7 @@ const origin = "https://ninety-nine.example";
 const rootUrl = new URL("../../", import.meta.url);
 
 test("browser auth rejects URL-provided Supabase sessions", async () => {
-  const [client, sessionHook, clockHook, feed] = await Promise.all([
+  const [client, sessionHook, clockHook, feed, siteSession] = await Promise.all([
     readFile(new URL("src/lib/supabase/client.ts", rootUrl), "utf8"),
     readFile(new URL("src/hooks/useSupabaseSession.ts", rootUrl), "utf8"),
     readFile(new URL("src/hooks/useAuctionPolicyClock.ts", rootUrl), "utf8"),
@@ -53,6 +53,7 @@ test("browser auth rejects URL-provided Supabase sessions", async () => {
       new URL("src/components/features/auction/AuctionFeedGrid.tsx", rootUrl),
       "utf8",
     ),
+    readFile(new URL("src/components/layout/SiteSessionActivityTracker.tsx", rootUrl), "utf8"),
   ]);
   assert.match(client, /detectSessionInUrl:\s*false/);
   assert.doesNotMatch(client, /detectSessionInUrl:\s*true/);
@@ -72,8 +73,10 @@ test("browser auth rejects URL-provided Supabase sessions", async () => {
   assert.match(clockHook, /getSupabasePublicBrowserClient\(\)\.rpc\("get_auction_server_time"\)/);
   assert.match(clockHook, /visibilitychange/);
   assert.match(clockHook, /publishClockSnapshots\(\);[\s\S]{0,120}synchronizeAuctionServerClock\(true\)/);
-  assert.doesNotMatch(feed, /crypto\.randomUUID\(\)/);
-  assert.match(feed, /const feedSeed = useMemo/);
+  assert.match(siteSession, /crypto\.randomUUID\(\)/);
+  assert.match(siteSession, /ninety-nine:catalog-session-seed/);
+  assert.match(siteSession, /ninety-nine:catalog-last-seen-at/);
+  assert.match(feed, /const \[feedSeed, setFeedSeed\] = useState/);
 });
 
 test("the isolated browser fixture seeds both auction and fixed purchase flows", async () => {

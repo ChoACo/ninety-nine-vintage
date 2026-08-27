@@ -13,9 +13,14 @@ test("settlement batches use Monday or Thursday 09:00 KST and round payouts up t
   assert.match(migration, /on conflict\(store_id,settlement_date\) do nothing/i);
 });
 
-test("sale and shipping commission entries snapshot the store plan rate", async () => {
-  const migration = await readFile(migrationPath, "utf8");
-  assert.match(migration, /then 0\.035::numeric else 0\.05::numeric/i);
+test("sale and shipping commission entries snapshot the platform-wide five-percent rate", async () => {
+  const [migration, uniformRate] = await Promise.all([
+    readFile(migrationPath, "utf8"),
+    readFile(new URL("../../supabase/migrations/20260826210000_enforce_uniform_commission_and_owner_plan_toggle.sql", import.meta.url), "utf8"),
+  ]);
+  assert.match(uniformRate, /select 0\.05::numeric/i);
+  assert.doesNotMatch(uniformRate, /0\.035/);
+  assert.match(uniformRate, /check \(commission_rate = 0\.05\)/i);
   assert.match(migration, /planSnapshot/i);
   assert.match(migration, /store_commission_rate\(items\.origin_store_id,new\.shipped_at\)/i);
   assert.match(migration, /store_commission_rate\(allocations\.billing_store_id,new\.shipped_at\)/i);

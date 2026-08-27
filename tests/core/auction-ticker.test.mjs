@@ -33,10 +33,19 @@ test("auction ticker counts down to the KST auction close without a fixed public
   assert.deepEqual(
     getAuctionTimerState(new Date("2026-07-21T12:30:00Z")),
     {
-      label: "경매 마감",
+      label: "경매 마감 및 동기화 점검 종료까지",
       status: "CLOSED",
-      timeLeft: "00:00:00",
-      remainingSeconds: 0,
+      timeLeft: "00:30:00",
+      remainingSeconds: 1_800,
+    },
+  );
+  assert.deepEqual(
+    getAuctionTimerState(new Date("2026-07-21T13:30:00Z")),
+    {
+      label: "미판매 경매 다음 마감까지",
+      status: "RE_AUCTION",
+      timeLeft: "22:30:00",
+      remainingSeconds: 81_000,
     },
   );
 });

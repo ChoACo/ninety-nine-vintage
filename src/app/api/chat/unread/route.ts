@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     )
     .not("last_message_at", "is", null);
 
-  if (roleCode === "member" || roleCode === "band_member") {
+  if (roleCode === "member") {
     query = query
       .eq("member_id", auth.userId)
       .in("conversation_type", ["general", "product"]);

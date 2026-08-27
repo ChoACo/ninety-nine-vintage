@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Camera, Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
+import { compressAvatarImage } from "@/lib/images/avatarCompressor";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useToastStore } from "@/store/useToastStore";
 
@@ -41,13 +42,14 @@ export function ProfileAvatarUploader({
 
     setUploading(true);
     try {
+      const compressed = await compressAvatarImage(file);
       const supabase = getSupabaseBrowserClient();
       const path = `${userId}/avatar`;
       const { error: uploadError } = await supabase.storage
         .from("member-avatars")
-        .upload(path, file, {
+        .upload(path, compressed, {
           cacheControl: "3600",
-          contentType: file.type,
+          contentType: compressed.type,
           upsert: true,
         });
       if (uploadError) throw uploadError;

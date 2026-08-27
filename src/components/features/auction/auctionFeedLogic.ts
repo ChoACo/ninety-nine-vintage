@@ -199,11 +199,13 @@ export function getAuctionFeedBidAccess(input: {
   // Only an active leading/outbid position proves participation in the current
   // auction. Historical final/closed rows must never reopen the cutoff window.
   const hasParticipated = input.participationState === "leading" || input.participationState === "outbid";
-  const firstBidFinal = input.phase === "CLOSING_SOON" && !hasAnyBid;
-  const canBid = input.phase === "OPEN" || (input.phase === "CLOSING_SOON" && (hasParticipated || firstBidFinal));
+  const firstBidExtended = input.phase === "CLOSING_SOON" && !hasAnyBid;
+  const canBid = input.phase === "OPEN" || (input.phase === "CLOSING_SOON" && (hasParticipated || firstBidExtended));
   return {
     canBid,
-    firstBidFinal,
+    firstBidExtended,
+    /** @deprecated Use firstBidExtended. Kept for stale client bundles during rollout. */
+    firstBidFinal: firstBidExtended,
     hasAnyBid,
     hasParticipated,
     minimumBid: hasAnyBid ? input.currentPrice + increment : input.currentPrice,

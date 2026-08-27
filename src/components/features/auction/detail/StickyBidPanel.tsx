@@ -561,7 +561,7 @@ export function StickyBidPanel({
     phase === "CLOSED"
       ? "마감"
       : dailyAuctionPhase === "closed" && phase !== "CLOSING_SOON"
-        ? "정산 중"
+      ? "마감·동기화 점검 중"
         : getAuctionRemainingLabel(auctionSnapshot.closesAt, now);
   const remainingMs = Date.parse(auctionSnapshot.closesAt) - now;
   const isLastMinute =
@@ -574,7 +574,7 @@ export function StickyBidPanel({
   const knownBidCount = hasVisibleBidHistory
     ? activeVisibleBids.length
     : auctionSnapshot.participantCount;
-  const { canBid, firstBidFinal, hasParticipated } = getAuctionFeedBidAccess({
+  const { canBid, firstBidExtended, hasParticipated } = getAuctionFeedBidAccess({
     bidCount: knownBidCount,
     bidIncrement: item.bidIncrement,
     currentPrice: displayPrice,
@@ -588,8 +588,8 @@ export function StickyBidPanel({
       : phase === "UPCOMING"
         ? "오픈 예정"
         : phase === "CLOSING_SOON"
-          ? firstBidFinal
-            ? "첫 입찰 즉시 확정"
+          ? firstBidExtended
+            ? "첫 입찰 · 15분 연장"
             : hasParticipated
               ? "기존 참여자 입찰"
               : "기존 참여자 전용"
@@ -854,8 +854,8 @@ export function StickyBidPanel({
             </p>
             {phase === "CLOSING_SOON" && (
               <p className="mt-2 text-[11px] font-bold leading-5 text-amber-700">
-                {firstBidFinal
-                  ? "무입찰 상품의 첫 입찰은 즉시 확정됩니다."
+                {firstBidExtended
+                  ? "무입찰 상품의 첫 입찰은 마감이 15분 연장되며 경매가 계속됩니다."
                   : hasParticipated
                     ? "마감 직전에는 기존 참여자만 추가 입찰할 수 있습니다."
                     : "신규 참여가 마감되었습니다. 기존 참여자만 입찰할 수 있습니다."}

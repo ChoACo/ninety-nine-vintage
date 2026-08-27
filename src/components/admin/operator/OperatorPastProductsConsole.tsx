@@ -1,10 +1,9 @@
 "use client";
 
-import { RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { OperatorSecondChanceButton } from "@/components/admin/operator/OperatorSecondChanceButton";
-import { OperatorUnpaidRecoveryButtons } from "@/components/admin/operator/OperatorUnpaidRecoveryButtons";
 import { CatalogImage } from "@/components/ui/CatalogImage";
 import { Button } from "@/components/ui/Button";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -128,7 +127,7 @@ export function OperatorPastProductsConsole() {
         : [...current, id],
     );
 
-  const act = async (action: "relist" | "delete") => {
+  const act = async (action: "relist" | "archive" | "delete") => {
     if (!token || busy || selected.length === 0) return;
     if (
       action === "delete" &&
@@ -182,9 +181,9 @@ export function OperatorPastProductsConsole() {
             <RefreshCw size={13} /> 새로고침
           </Button>
         }
-        description="담당 숍의 모든 마감 경매에서 차순위 낙찰을 검토하고, 미낙찰 지난 상품을 재등록하거나 삭제합니다."
-        eyebrow="운영자 / 지난 경매"
-        title="마감 경매 관리"
+        description="담당 센터의 마감 경매에서 차순위를 순서대로 제안하고, 3일간 미판매된 상품을 재경매·아카이브숍 이동·삭제로 처리합니다."
+        eyebrow="운영자 / 무입찰 마감"
+        title="무입찰 마감 상품"
         variant="page"
       />
       {notice && <StatusNotice>{notice}</StatusNotice>}
@@ -193,17 +192,15 @@ export function OperatorPastProductsConsole() {
           <p className="eyebrow text-muted">마감 경매 / 차순위 낙찰</p>
           <h2 className="mt-2 text-xl font-black">차순위 낙찰 제안</h2>
           <p className="mt-2 text-xs leading-5 text-muted">
-            최근 8개 제한 없이 담당 숍의 모든 마감 경매를 표시합니다. 결제
-            기한이 지나 미결제 만료된 낙찰은 재경매 등록(다음 10:00 자동
-            편성), 즉시구매 전환, 차순위 낙찰 승계 중 하나를 클릭 한 번으로
-            처리할 수 있습니다.
+            담당 센터의 마감 경매를 모두 표시합니다. 차순위 기회는 운영자가
+            직접 실행하며, 현재 후보가 만료·거절되면 다음 입찰자에게 다시
+            12시간 기회를 줄 수 있습니다. 후보가 모두 소진되면 아래 무입찰
+            상품 처리 목록으로 분류됩니다.
           </p>
         </div>
         <div className="divide-y divide-line border-y border-line">
           {closedAuctions.map((product) => {
             const badge = winnerStateBadge(product.winnerState);
-            const showRecovery =
-              canProcessSecondChance && product.winnerState === "unpaid_expired";
             return (
             <article
               className="flex flex-wrap items-center gap-3 px-3 py-5 sm:flex-nowrap sm:gap-4 sm:px-4"
@@ -242,14 +239,6 @@ export function OperatorPastProductsConsole() {
                   </span>
                 )}
               </span>
-              {showRecovery && (
-                <OperatorUnpaidRecoveryButtons
-                  amount={product.winnerAmount ?? null}
-                  onNotice={setNotice}
-                  productId={product.id}
-                  productTitle={product.title}
-                />
-              )}
               {canProcessSecondChance ? (
                 <OperatorSecondChanceButton
                   onNotice={setNotice}
@@ -276,8 +265,10 @@ export function OperatorPastProductsConsole() {
           <p className="eyebrow text-muted">미낙찰 / 보존 기간</p>
           <h2 className="mt-2 text-xl font-black">지난 상품 정리</h2>
           <p className="mt-2 text-xs leading-5 text-muted">
-            7일이 지난 미낙찰 경매는 최대 3일 동안 재등록하거나 삭제할 수
-            있습니다.
+            입찰 없이 마감된 상품은 라이브 피드에서 최대 3일간 유지된 뒤 이
+            목록으로 이동합니다. 재등록은 다음 오전 10시 경매로, 아카이브숍
+            이동은 예약 정가 상품으로 편성됩니다. 재경매 복제본만 공개 한도에서
+            제외됩니다.
           </p>
         </div>
         <div className="flex flex-col items-start justify-between gap-3 border-y border-line py-4 text-xs sm:flex-row sm:items-center">
@@ -298,6 +289,16 @@ export function OperatorPastProductsConsole() {
               type="button"
             >
               <RotateCcw size={13} /> 선택 재등록
+            </Button>
+            <Button
+              className="flex items-center gap-2 text-xs"
+              disabled={busy || selected.length === 0}
+              size="compact"
+              variant="outline"
+              onClick={() => void act("archive")}
+              type="button"
+            >
+              <Archive size={13} /> 아카이브숍 이동
             </Button>
             <Button
               className="flex items-center gap-2 text-xs"
@@ -340,9 +341,7 @@ export function OperatorPastProductsConsole() {
                 <span className="block">
                   지난 시각 {expiryLabel(product.past_at)}
                 </span>
-                <span className="mt-1 block text-amber-700">
-                  자동 삭제 {expiryLabel(product.past_expires_at)}
-                </span>
+                <span className="mt-1 block text-amber-700">운영자 처리 대기 · 자동 삭제 없음</span>
               </span>
             </label>
           ))}

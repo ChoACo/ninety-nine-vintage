@@ -1,9 +1,11 @@
 "use client";
 
 import { FileSpreadsheet, Trash2, X } from "lucide-react";
+import Image from "next/image";
 import {
   useId,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -16,6 +18,8 @@ import { PremiumDialog } from "@/components/ui/PremiumDialog";
 import { inferBrandFromTitle } from "@/lib/catalog/brand";
 import {
   buildBatchAuctionPreview,
+  filterDirectSelectedDirectoryFiles,
+  inferBatchStorageClass,
   parseAuctionWorkbook,
   type BatchAuctionIssue,
   type BatchAuctionPreview,
@@ -50,6 +54,7 @@ interface SubmitProgress {
 
 export interface OperatorXlsxImportModalProps {
   accessToken: string;
+  activeStoreId: string | null;
   open: boolean;
   stores: readonly StoreOption[];
   onClose: () => void;
@@ -62,7 +67,8 @@ export interface OperatorXlsxImportModalProps {
 }
 
 export interface XlsxRegistrationOptions {
-  publicationMode: "now";
+  publicationMode: "now" | "scheduled";
+  publishAt: string;
   saleType: "auction" | "fixed";
 }
 
@@ -101,8 +107,47 @@ function selectedDirectoryName(files: readonly File[]) {
   return relativePath?.split("/")[0] ?? "선택한 폴더";
 }
 
+function nextDayTenKstInput() {
+  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  kstNow.setUTCDate(kstNow.getUTCDate() + 1);
+  const date = kstNow.toISOString().slice(0, 10);
+  return `${date}T10:00`;
+}
+
+function kstInputToIso(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/u.test(value)) return null;
+  const date = new Date(`${value}:00+09:00`);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function MatchedImageThumbnail({ file }: Readonly<{ file: File }>) {
+  const [src, setSrc] = useState("");
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file);
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setSrc(objectUrl);
+    });
+    return () => {
+      active = false;
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [file]);
+  return src ? (
+    <Image
+      alt={file.name}
+      className="size-12 shrink-0 border border-line object-cover"
+      height={48}
+      src={src}
+      unoptimized
+      width={48}
+    />
+  ) : null;
+}
+
 export function OperatorXlsxImportModal({
   accessToken,
+  activeStoreId,
   open,
   stores,
   onClose,
@@ -112,12 +157,16 @@ export function OperatorXlsxImportModal({
   const [directoryName, setDirectoryName] = useState("");
   const [parsedWorkbook, setParsedWorkbook] = useState<ParsedAuctionWorkbook | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [storeId, setStoreId] = useState("");
+  const [ignoredNestedImageCount, setIgnoredNestedImageCount] = useState(0);
   const [bidIncrement, setBidIncrement] = useState("1000");
   const [publicationMode, setPublicationMode] =
     useState<XlsxRegistrationOptions["publicationMode"]>("now");
   const [saleType, setSaleType] =
     useState<XlsxRegistrationOptions["saleType"]>("auction");
+  const [scheduledPublishAt, setScheduledPublishAt] = useState(
+    nextDayTenKstInput,
+  );
+  const [referenceNow, setReferenceNow] = useState(Date.now);
   const [excludedRowNumbers, setExcludedRowNumbers] = useState<Set<number>>(
     new Set(),
   );
@@ -131,18 +180,63 @@ export function OperatorXlsxImportModal({
   const [aiProgress, setAiProgress] = useState<{ completed: number; total: number } | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const parseRequestRef = useRef(0);
+  const workbookInputRef = useRef<HTMLInputElement>(null);
   const directoryInputRef = useRef<HTMLInputElement>(null);
+  const workbookId = useId();
   const directoryId = useId();
+
+  const selectedStoreId = stores.some((store) => store.id === activeStoreId)
+    ? activeStoreId ?? ""
+    : stores.length === 1
+      ? stores[0].id
+      : "";
+  const selectedStore = stores.find((store) => store.id === selectedStoreId);
+  const selectedStoreCanPublish = selectedStore?.canPublish === true;
+  const scheduledPublishAtIso = kstInputToIso(scheduledPublishAt);
+  const scheduledTimeInvalid =
+    publicationMode === "scheduled" &&
+    (!scheduledPublishAtIso || Date.parse(scheduledPublishAtIso) <= referenceNow);
 
   const preview = useMemo(() => {
     if (!parsedWorkbook) return null;
-    return buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
-      publishAt: PREVIEW_PUBLISH_AT,
+    const built = buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
+      publishAt:
+        publicationMode === "scheduled" && scheduledPublishAtIso
+          ? scheduledPublishAtIso
+          : PREVIEW_PUBLISH_AT,
       bidIncrement: Number(bidIncrement),
       excludedRowNumbers: [...excludedRowNumbers],
       saleType,
     });
-  }, [bidIncrement, excludedRowNumbers, imageFiles, parsedWorkbook, saleType]);
+    const optionIssues: BatchAuctionIssue[] = [];
+    if (!selectedStoreId) {
+      optionIssues.push({
+        code: "missing_active_store",
+        message: "현재 로그인 세션의 활성 숍을 확인할 수 없습니다.",
+        severity: "error",
+      });
+    } else if (!selectedStoreCanPublish) {
+      optionIssues.push({
+        code: "publish_permission_required",
+        message: "활성 숍의 상품 공개 권한이 필요합니다.",
+        severity: "error",
+      });
+    }
+    if (scheduledTimeInvalid) {
+      optionIssues.push({
+        code: "invalid_scheduled_publish_at",
+        message: "예약 공개 시각은 현재보다 이후의 KST 날짜·시간이어야 합니다.",
+        severity: "error",
+      });
+    }
+    if (optionIssues.length === 0) return built;
+    return {
+      ...built,
+      globalIssues: [...built.globalIssues, ...optionIssues],
+      drafts: [],
+      canSubmit: false,
+    };
+  }, [bidIncrement, excludedRowNumbers, imageFiles, parsedWorkbook, publicationMode, saleType, scheduledPublishAtIso, scheduledTimeInvalid, selectedStoreCanPublish, selectedStoreId]);
   const enhancedPreview = useMemo(() => {
     if (!preview || aiEnhancements.size === 0) return preview;
     const rows = preview.rows.map((row) => {
@@ -154,6 +248,10 @@ export function OperatorXlsxImportModal({
         title: enhancement.enhancedTitle || row.title,
         description: enhancement.refinedDescription || row.description,
         category,
+        storageClass: inferBatchStorageClass(
+          enhancement.enhancedTitle || row.title,
+          category,
+        ),
         draft: row.draft ? {
           ...row.draft,
           title: enhancement.enhancedTitle || row.draft.title,
@@ -169,10 +267,6 @@ export function OperatorXlsxImportModal({
         : [],
     };
   }, [aiEnhancements, preview]);
-  const selectedStoreId = stores.some((store) => store.id === storeId)
-    ? storeId
-    : stores[0]?.id ?? "";
-  const selectedStoreCanPublish = stores.find((store) => store.id === selectedStoreId)?.canPublish === true;
   const resetResult = useCallback(() => {
     setConfirmed(false);
     setSubmittedCount(0);
@@ -189,10 +283,11 @@ export function OperatorXlsxImportModal({
     setDirectoryName("");
     setParsedWorkbook(null);
     setImageFiles([]);
-    setStoreId(stores[0]?.id ?? "");
+    setIgnoredNestedImageCount(0);
     setBidIncrement("1000");
     setPublicationMode("now");
     setSaleType("auction");
+    setScheduledPublishAt(nextDayTenKstInput());
     setExcludedRowNumbers(new Set());
     setConfirmed(false);
     setIsParsing(false);
@@ -200,8 +295,9 @@ export function OperatorXlsxImportModal({
     setSubmittedCount(0);
     setError("");
     setProgress(null);
+    resetInput(workbookInputRef.current);
     resetInput(directoryInputRef.current);
-  }, [stores]);
+  }, []);
 
   const handleClose = useCallback(() => {
     if (isSubmitting) return;
@@ -209,31 +305,25 @@ export function OperatorXlsxImportModal({
     onClose();
   }, [isSubmitting, onClose, reset]);
 
-  const handleDirectorySelection = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleWorkbookSelection = async (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.currentTarget.files ?? []);
-    const workbookFiles = selectedFiles.filter(isWorkbookFile);
-    const selectedImages = selectedFiles.filter((file) =>
-      isSupportedProductImageMimeType(file.type),
-    );
-    const file = workbookFiles[0];
+    const file = selectedFiles[0];
     const requestId = ++parseRequestRef.current;
     setParsedWorkbook(null);
     setExcludedRowNumbers(new Set());
     setWorkbookFileName(file?.name ?? "");
-    setDirectoryName(selectedFiles.length > 0 ? selectedDirectoryName(selectedFiles) : "");
-    setImageFiles(selectedImages);
+    setDirectoryName("");
+    setImageFiles([]);
+    setIgnoredNestedImageCount(0);
+    resetInput(directoryInputRef.current);
     resetResult();
-    if (selectedFiles.length === 0) {
+    if (!file) {
       setIsParsing(false);
       return;
     }
-    if (workbookFiles.length !== 1) {
+    if (selectedFiles.length !== 1 || !isWorkbookFile(file)) {
       setIsParsing(false);
-      setError(
-        workbookFiles.length === 0
-          ? "선택한 폴더에서 .xlsx 엑셀 파일을 찾지 못했습니다."
-          : "선택한 폴더에는 등록용 .xlsx 엑셀 파일이 1개만 있어야 합니다.",
-      );
+      setError("등록용 .xlsx 엑셀 파일 1개를 선택해 주세요.");
       return;
     }
 
@@ -247,6 +337,23 @@ export function OperatorXlsxImportModal({
       }
     } finally {
       if (requestId === parseRequestRef.current) setIsParsing(false);
+    }
+  };
+
+  const handleDirectorySelection = (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.currentTarget.files ?? []);
+    const supportedImages = selectedFiles.filter((file) =>
+      isSupportedProductImageMimeType(file.type),
+    );
+    const selectedImages = filterDirectSelectedDirectoryFiles(supportedImages);
+    setDirectoryName(
+      selectedFiles.length > 0 ? selectedDirectoryName(selectedFiles) : "",
+    );
+    setImageFiles(selectedImages);
+    setIgnoredNestedImageCount(supportedImages.length - selectedImages.length);
+    resetResult();
+    if (selectedFiles.length > 0 && selectedImages.length === 0) {
+      setError("선택한 폴더의 바로 아래에서 지원하는 상품 이미지를 찾지 못했습니다.");
     }
   };
 
@@ -308,7 +415,7 @@ export function OperatorXlsxImportModal({
       return;
     }
     if (!selectedStoreId || !stores.some((store) => store.id === selectedStoreId)) {
-      setError("등록 권한이 있는 숍을 선택해 주세요.");
+      setError("현재 활성 숍의 상품 등록 권한을 확인해 주세요.");
       return;
     }
     if (!parsedWorkbook) {
@@ -316,8 +423,14 @@ export function OperatorXlsxImportModal({
       return;
     }
 
+    const finalPublishAt =
+      publicationMode === "scheduled" ? scheduledPublishAtIso : new Date().toISOString();
+    if (!finalPublishAt || scheduledTimeInvalid) {
+      setError("예약 공개 시각은 현재보다 이후의 KST 날짜·시간이어야 합니다.");
+      return;
+    }
     const finalPreview = buildBatchAuctionPreview(parsedWorkbook, imageFiles, {
-      publishAt: new Date().toISOString(),
+      publishAt: finalPublishAt,
       bidIncrement: Number(bidIncrement),
       excludedRowNumbers: [...excludedRowNumbers],
       saleType,
@@ -330,6 +443,10 @@ export function OperatorXlsxImportModal({
         category: getBatchClothingCategory(enhancement.categoryId) ?? row.category,
         title: enhancement.enhancedTitle || row.title,
         description: enhancement.refinedDescription || row.description,
+        storageClass: inferBatchStorageClass(
+          enhancement.enhancedTitle || row.title,
+          getBatchClothingCategory(enhancement.categoryId) ?? row.category,
+        ),
         draft: row.draft ? {
           ...row.draft,
           title: enhancement.enhancedTitle || row.draft.title,
@@ -362,7 +479,7 @@ export function OperatorXlsxImportModal({
       const count = await onSubmit(
         finalPreviewWithAI,
         selectedStoreId,
-        { publicationMode, saleType },
+        { publicationMode, publishAt: finalPublishAt, saleType },
         (completed, total, phase) => {
           setProgress({
             completed: Math.min(Math.max(0, completed), Math.max(1, total)),
@@ -383,6 +500,11 @@ export function OperatorXlsxImportModal({
   const rowErrorCount = enhancedPreview?.rows.filter((row) =>
     row.issues.some((issue) => issue.severity === "error"),
   ).length ?? 0;
+  const validationErrors = enhancedPreview?.rows.flatMap((row, index) =>
+    row.issues
+      .filter((issue) => issue.severity === "error")
+      .map((issue) => `${index + 1}번 상품(엑셀 ${row.rowNumber}행): ${issue.message}`),
+  ) ?? [];
   const progressValue = progressPercentage(progress);
   const completed = submittedCount > 0;
 
@@ -416,12 +538,40 @@ export function OperatorXlsxImportModal({
         </header>
 
         <form className="space-y-6 p-4 sm:p-6" onSubmit={handleSubmit}>
-          <section aria-label="일괄 등록 폴더 선택" className="border border-line bg-surface p-4">
-              <label className="text-sm font-bold" htmlFor={directoryId}>1. 엑셀·상품 이미지 폴더</label>
+          <section aria-label="엑셀 파일 선택" className="border border-line bg-surface p-4">
+              <label className="text-sm font-bold" htmlFor={workbookId}>1. 번개장터 표준 엑셀</label>
+              <input
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className="mt-3 block w-full text-xs file:mr-3 file:border file:border-ink file:bg-paper file:px-3 file:py-2 file:text-xs file:font-bold"
+                disabled={isParsing || isSubmitting || completed}
+                id={workbookId}
+                onChange={handleWorkbookSelection}
+                ref={workbookInputRef}
+                type="file"
+              />
+              <p className="mt-3 text-[11px] leading-5 text-muted">
+                1~5행은 안내로 건너뛰고 6행부터 첫 빈 행 전까지 읽습니다.
+              </p>
+              <p className="mt-2 text-[11px] leading-5 text-muted">
+                기존 고정 양식만 사용합니다. A 상품명 · B 카테고리 ID · D~H 사이즈 ·
+                W 상태 · X 설명 · Y 가격 · AG 태그 · AH 이미지명 · AI 수량을 읽으며,
+                빈티지 단품 수량은 항상 1개로 처리합니다.
+              </p>
+              {isParsing && <p className="mt-3 text-xs font-bold" role="status">엑셀 파일을 분석하는 중…</p>}
+              {workbookFileName && !isParsing && (
+                <div className="mt-3 bg-paper px-3 py-2 text-xs font-bold">
+                  <p className="truncate">{workbookFileName}</p>
+                </div>
+              )}
+          </section>
+
+          {parsedWorkbook && (
+            <section aria-label="일괄 등록 폴더 선택" className="border border-line bg-surface p-4">
+              <label className="text-sm font-bold" htmlFor={directoryId}>2. 이미지 폴더 선택</label>
               <input
                 {...directoryPickerAttributes}
                 className="mt-3 block w-full text-xs file:mr-3 file:border file:border-ink file:bg-paper file:px-3 file:py-2 file:text-xs file:font-bold"
-                disabled={isParsing || isSubmitting || completed}
+                disabled={isSubmitting || completed}
                 id={directoryId}
                 multiple
                 onChange={handleDirectorySelection}
@@ -429,44 +579,29 @@ export function OperatorXlsxImportModal({
                 type="file"
               />
               <p className="mt-3 text-[11px] leading-5 text-muted">
-                등록용 엑셀 1개와 상품 이미지를 같은 폴더에 넣고 폴더를 한 번만 선택하세요.
-                폴더 안의 엑셀과 지원 이미지가 자동으로 수집되고 AH열 이미지명으로 연결됩니다.
+                선택한 폴더 바로 아래의 지원 이미지만 AH열 파일명과 대소문자 구분 없이 1:1로 연결합니다. 하위 폴더는 읽지 않습니다.
+                {directoryName ? ` ${directoryName}에서 ${imageFiles.length.toLocaleString("ko-KR")}개를 읽었습니다.` : ""}
               </p>
-              <p className="mt-2 text-[11px] leading-5 text-muted">
-                기존 고정 양식만 사용합니다. 1~5행은 안내로 제외하고 6행부터 A열 상품명,
-                D열 여성·남성 의류, E열 여성·남성 하의, F열 스포츠·등산복 사이즈,
-                W열 상태점수, X열 원문, Y열 시작가, AH열 이미지명을 읽습니다. 행 안의
-                등록된 여성·남성 의류 카테고리 ID는 성별·대분류·세부 품목으로 자동 변환합니다.
-              </p>
-              {isParsing && <p className="mt-3 text-xs font-bold" role="status">엑셀 파일을 분석하는 중…</p>}
-              {workbookFileName && !isParsing && (
-                <div className="mt-3 bg-paper px-3 py-2 text-xs font-bold">
-                  <p className="truncate">{directoryName} / {workbookFileName}</p>
-                  <p className="mt-1 text-[11px] font-normal text-muted">
-                    이미지 {imageFiles.length.toLocaleString("ko-KR")}개 자동 수집 · {PRODUCT_IMAGE_FORMAT_LABEL}
-                  </p>
-                </div>
+              {ignoredNestedImageCount > 0 && (
+                <p className="mt-1 text-[11px] leading-5 text-muted">
+                  하위 폴더의 이미지 {ignoredNestedImageCount.toLocaleString("ko-KR")}개는 제외했습니다.
+                </p>
               )}
+              <p className="mt-1 text-[11px] leading-5 text-muted">지원 형식: {PRODUCT_IMAGE_FORMAT_LABEL}</p>
               <p className="mt-1 text-[11px] leading-5 text-amber-800">
                 {PRODUCT_IMAGE_HEIC_CONVERSION_NOTE}
               </p>
-          </section>
+            </section>
+          )}
 
           <section aria-label="일괄 등록 옵션" className="border border-line p-4">
             <h3 className="text-sm font-bold">3. 등록 옵션</h3>
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
               <label className="text-xs font-bold">
-                저장할 숍
-                <select
-                  className="mt-2 block w-full border border-line bg-paper px-3 py-3 text-xs"
-                  disabled={isSubmitting || completed}
-                  onChange={(event) => { setStoreId(event.target.value); resetResult(); }}
-                  required
-                  value={selectedStoreId}
-                >
-                  <option value="">권한이 있는 숍 선택</option>
-                  {stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
-                </select>
+                활성 숍 자동 귀속
+                <span className="mt-2 block min-h-11 border border-line bg-paper px-3 py-3 text-xs font-bold">
+                  {selectedStore?.name ?? "활성 숍을 확인할 수 없음"}
+                </span>
               </label>
               <label className="text-xs font-bold">
                 {saleType === "auction" ? "전체 입찰 단위" : "가격 단위"}
@@ -487,41 +622,65 @@ export function OperatorXlsxImportModal({
                   className="mt-2 block w-full border border-line bg-paper px-3 py-3 text-xs"
                   disabled={isSubmitting || completed}
                   onChange={(event) => {
-                    setSaleType(
-                      event.target.value as XlsxRegistrationOptions["saleType"],
-                    );
+                    const nextSaleType = event.target.value as XlsxRegistrationOptions["saleType"];
+                    setSaleType(nextSaleType);
+                    if (nextSaleType === "auction") {
+                      setScheduledPublishAt(nextDayTenKstInput());
+                    }
+                    setReferenceNow(Date.now());
                     resetResult();
                   }}
                   value={saleType}
                 >
-                  <option value="auction">실시간 경매</option>
-                  <option value="fixed">즉시 구매</option>
+                  <option value="fixed">아카이브숍 (즉시구매)</option>
+                  <option value="auction">라이브 옥션 (경매)</option>
                 </select>
               </label>
               <label className="text-xs font-bold">
-                등록 시각
+                공개 시점
                 <select
                   className="mt-2 block w-full border border-line bg-paper px-3 py-3 text-xs"
                   disabled={isSubmitting || completed}
                   onChange={(event) => {
-                    setPublicationMode(
-                      event.target
-                        .value as XlsxRegistrationOptions["publicationMode"],
-                    );
+                    const nextMode = event.target.value as XlsxRegistrationOptions["publicationMode"];
+                    setPublicationMode(nextMode);
+                    if (nextMode === "scheduled" && saleType === "auction") {
+                      setScheduledPublishAt(nextDayTenKstInput());
+                    }
+                    setReferenceNow(Date.now());
                     resetResult();
                   }}
                   value={publicationMode}
                 >
-                  <option value="now">즉시 등록</option>
+                  <option value="now">즉시 공개</option>
+                  <option value="scheduled">예약 공개</option>
                 </select>
               </label>
+              {publicationMode === "scheduled" && (
+                <label className="text-xs font-bold">
+                  예약 공개 시각 (KST)
+                  <input
+                    className="mt-2 block w-full border border-line bg-paper px-3 py-3 text-xs"
+                    disabled={isSubmitting || completed}
+                    min={new Date(referenceNow + 9 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                    onChange={(event) => {
+                      setScheduledPublishAt(event.target.value);
+                      setReferenceNow(Date.now());
+                      resetResult();
+                    }}
+                    required
+                    type="datetime-local"
+                    value={scheduledPublishAt}
+                  />
+                </label>
+              )}
             </div>
             <p className="mt-3 border border-amber-200 bg-amber-500/10 px-3 py-2 text-[11px] leading-5 text-amber-900">
               {selectedStoreCanPublish
                 ? publicationMode === "now"
                   ? "등록이 끝난 상품은 즉시 공개됩니다."
-                : "상품별 공개 시각은 상품 데이터의 공개 시각을 따릅니다."
-                : "공개 권한이 없으면 상품은 등록 대기로 저장됩니다."} 숍 선택지는 현재 계정의 서버 검증 권한 범위만 표시됩니다.
+                  : `${scheduledPublishAt.replace("T", " ")} KST에 일괄 공개됩니다.`
+                : "공개 권한이 없으면 상품은 등록 대기로 저장됩니다."} 현재 로그인 세션의 활성 숍에만 귀속되며 서버에서 다시 검증합니다.
             </p>
           </section>
 
@@ -553,6 +712,14 @@ export function OperatorXlsxImportModal({
                 </div>
               </div>
 
+              {validationErrors.length > 0 && (
+                <div className="mt-4 border border-red-300 bg-red-50 p-4 text-red-900" role="alert">
+                  <p className="text-xs font-black">등록을 막는 오류 {validationErrors.length.toLocaleString("ko-KR")}건</p>
+                  <ul className="mt-2 max-h-36 list-disc space-y-1 overflow-auto pl-5 text-[11px] leading-5">
+                    {validationErrors.map((message) => <li key={message}>{message}</li>)}
+                  </ul>
+                </div>
+              )}
 
               {enhancedPreview.globalIssues.length > 0 && (
                 <ul className="mt-3 space-y-2" role="alert">
@@ -565,15 +732,17 @@ export function OperatorXlsxImportModal({
               )}
 
               <div className="mt-4 max-h-[430px] overflow-auto border border-line">
-                <table className="w-full min-w-[900px] border-collapse text-left text-xs">
+                <table className="w-full min-w-[1180px] border-collapse text-left text-xs">
                   <thead className="sticky top-0 z-10 border-b border-line bg-surface">
                     <tr>
                       <th className="px-3 py-3">상품 순번</th>
                       <th className="px-3 py-3">상품</th>
-                      <th className="px-3 py-3">확인 브랜드</th>
-                      <th className="px-3 py-3">카테고리 ID</th>
-                      <th className="px-3 py-3">시작가</th>
-                      <th className="px-3 py-3">연결 사진</th>
+                      <th className="px-3 py-3">카테고리</th>
+                      <th className="px-3 py-3">사이즈</th>
+                      <th className="px-3 py-3">등급</th>
+                      <th className="px-3 py-3">가격</th>
+                      <th className="px-3 py-3">보관</th>
+                      <th className="px-3 py-3">필요/연결 이미지</th>
                       <th className="px-3 py-3">검증 결과</th>
                       <th className="px-3 py-3">관리</th>
                     </tr>
@@ -587,21 +756,31 @@ export function OperatorXlsxImportModal({
                           <td className="px-3 py-3 align-top font-bold">{productIndex + 1}번째</td>
                           <td className="max-w-[320px] px-3 py-3 align-top">
                             <p className="font-bold">{row.title || "상품명 없음"}</p>
+                            <p className="mt-1 text-[10px] text-muted">브랜드 {inferBrandFromTitle(row.title).brand}</p>
                             {aiApplied && <p className="mt-1 text-[10px] font-bold text-violet-700">AI 보정 적용 · 등록 전 확인 필요</p>}
                             <p className="mt-1 whitespace-pre-line leading-5 text-muted">{row.description || "설명 없음"}</p>
-                          </td>
-                          <td className="px-3 py-3 align-top font-bold">
-                            {inferBrandFromTitle(row.title).brand}
                           </td>
                           <td className="whitespace-nowrap px-3 py-3 align-top">
                             <p className="font-mono font-bold">{row.category?.id ?? "미인식"}</p>
                             <p className="mt-1 text-[10px] text-muted">{row.category?.label ?? "기타"}</p>
                           </td>
+                          <td className="whitespace-nowrap px-3 py-3 align-top font-bold">{row.size || "미입력"}</td>
+                          <td className="px-3 py-3 align-top font-black">{row.condition ?? "오류"}</td>
                           <td className="whitespace-nowrap px-3 py-3 align-top font-mono font-bold">
                             {row.startingPrice === null ? "확인 필요" : formatKRW(row.startingPrice)}
                           </td>
+                          <td className="whitespace-nowrap px-3 py-3 align-top font-bold">
+                            {row.storageClass === "large" ? "Large · 7일" : "Small · 14일"}
+                          </td>
                           <td className="px-3 py-3 align-top">
-                            {row.imageMatches.length.toLocaleString("ko-KR")}장
+                            <p className="font-bold">{row.imageNames.length.toLocaleString("ko-KR")} / {row.imageMatches.length.toLocaleString("ko-KR")}장</p>
+                            {row.imageMatches.length > 0 && (
+                              <div className="mt-2 flex max-w-[220px] gap-1 overflow-x-auto">
+                                {row.imageMatches.slice(0, 4).map((match) => (
+                                  <MatchedImageThumbnail file={match.file} key={`${match.reference}-${match.file.name}`} />
+                                ))}
+                              </div>
+                            )}
                             <p className="mt-1 max-w-[240px] break-all text-[10px] text-muted">{row.imageNames.join(", ") || "이미지명 없음"}</p>
                           </td>
                           <td className="px-3 py-3 align-top">
@@ -666,7 +845,7 @@ export function OperatorXlsxImportModal({
                 onChange={(event) => { setConfirmed(event.target.checked); setError(""); }}
                 type="checkbox"
               />
-              검증 결과, AI 보정안, 자동 추출 브랜드, 저장할 숍과 {enhancedPreview?.rows.length ?? 0}개 {saleType === "auction" ? "경매" : "즉시 구매"} 상품을 모두 확인했습니다. 이제 데이터베이스 저장을 허용합니다.
+              검증 결과, 이미지 연결, 자동 보관 규격, 활성 숍 귀속과 {enhancedPreview?.rows.length ?? 0}개 {saleType === "auction" ? "경매" : "즉시 구매"} 상품을 모두 확인했습니다. 이제 데이터베이스 저장을 허용합니다.
             </label>
           )}
 
@@ -675,7 +854,7 @@ export function OperatorXlsxImportModal({
             {!completed && (
               <Button className="inline-flex items-center gap-2" disabled={!confirmed || !enhancedPreview?.canSubmit || isParsing || isSubmitting || isEnhancing || !selectedStoreId} type="submit" variant="primary">
                 <FileSpreadsheet size={14} />
-                {isSubmitting ? "등록 중…" : `${enhancedPreview?.rows.length ?? 0}개 검증 완료 상품 저장`}
+                {isSubmitting ? "등록 중…" : `총 ${enhancedPreview?.rows.length ?? 0}개 상품 일괄 등록`}
               </Button>
             )}
           </div>

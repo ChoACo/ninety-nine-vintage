@@ -10,6 +10,11 @@
     "build": "next build --webpack",
     "dev": "next dev",
     "start": "next start",
+    "storage:configure:r2-cors": "node scripts/configure-r2-cors.mjs",
+    "storage:delete:migrated-supabase": "node scripts/delete-migrated-supabase-storage.mjs",
+    "storage:migrate:r2": "node scripts/migrate-storage-to-r2.mjs",
+    "storage:migrate:r2:dry-run": "node scripts/migrate-storage-to-r2.mjs --dry-run",
+    "storage:repair:r2-references:dry-run": "node scripts/repair-r2-url-references.mjs",
     "test": "node --test tests/core/*.test.mjs",
     "verify:browser": "node scripts/verify-local-browser-happy-path.mjs",
     "verify:central-fulfillment-db": "node scripts/verify-local-central-fulfillment-postgres.mjs",
@@ -30,6 +35,8 @@
     "deploy": "vercel --prod"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1118.0",
+    "@aws-sdk/s3-request-presigner": "3.1118.0",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
     "@supabase/supabase-js": "2.110.6",
     "@upstash/ratelimit": "^2.0.8",

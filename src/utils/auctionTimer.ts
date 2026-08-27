@@ -26,12 +26,12 @@ export function getAuctionTimerState(now = new Date()): AuctionTimerState {
   if (Number.isNaN(now.getTime())) throw new RangeError("경매 타이머 시각이 올바르지 않습니다.");
   const biddingRestrictedAt = atKstTime(now, 20, 56);
   const closesAt = atKstTime(now, 21);
+  const reopensAt = atKstTime(now, 22);
   let status: AuctionClockStatus; let target: Date; let label: string;
   if (now < biddingRestrictedAt) { status = "OPEN"; target = closesAt; label = "오늘 경매 마감까지"; }
   else if (now < closesAt) { status = "CLOSING_SOON"; target = closesAt; label = "오늘 경매 마감까지"; }
-  else { status = "CLOSED"; target = closesAt; label = "경매 마감"; }
-  const remainingSeconds = status === "CLOSED"
-    ? 0
-    : Math.max(0, Math.floor((target.getTime() - now.getTime()) / 1000));
+  else if (now < reopensAt) { status = "CLOSED"; target = reopensAt; label = "경매 마감 및 동기화 점검 종료까지"; }
+  else { status = "RE_AUCTION"; target = atKstTime(now, 21, 0, 0, true); label = "미판매 경매 다음 마감까지"; }
+  const remainingSeconds = Math.max(0, Math.floor((target.getTime() - now.getTime()) / 1000));
   return { label, status, timeLeft: formatTime(remainingSeconds), remainingSeconds };
 }

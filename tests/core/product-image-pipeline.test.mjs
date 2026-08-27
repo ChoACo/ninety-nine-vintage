@@ -140,21 +140,33 @@ test("variant encoding runs concurrently and records the 100 ms budget without a
   }
 });
 
-test("uploads overlap both variants without adding device measurements to product registration", async () => {
-  const [products, operatorConsole, uploadModal, singleRoute, bulkRoute] = await Promise.all([
+test("uploads both variants directly to R2 without adding device measurements to product registration", async () => {
+  const [products, operatorConsole, uploadModal, singleRoute, bulkRoute, r2Route] = await Promise.all([
     source("src/lib/supabase/products.ts"),
     source("src/components/admin/operator/OperatorProductsConsole.tsx"),
     source("src/components/admin/operator/OperatorXlsxImportModal.tsx"),
     source("src/app/api/admin/operator/products/route.ts"),
     source("src/app/api/admin/operator/products/bulk/route.ts"),
+    source("src/app/api/storage/r2-presigned-url/route.ts"),
   ]);
 
-  assert.match(
-    products,
-    /paths\.push\(imagePath, thumbnailPath\);[\s\S]*?Promise\.all\(\[/,
-  );
-  assert.match(products, /\.upload\(imagePath, imageFile,/);
-  assert.match(products, /\.upload\(thumbnailPath, thumbnailFile,/);
+  assert.match(products, /fetch\("\/api\/storage\/r2-presigned-url"/);
+  assert.match(products, /method: "PUT"/);
+  assert.match(products, /putR2Object\(imageTarget, imageFile\)/);
+  assert.match(products, /putR2Object\(thumbnailTarget, thumbnailFile\)/);
+  assert.match(products, /verifyR2PublicObject\(imageTarget, imageFile\)/);
+  assert.match(products, /Promise\.allSettled\(\[/);
+  assert.match(products, /paths\.slice\(offset, offset \+ 100\)/);
+  assert.match(products, /process\.env\.NEXT_PUBLIC_R2_PUBLIC_URL/);
+  assert.match(products, /url\.origin !== r2Base\.origin/);
+  assert.match(products, /path\.startsWith\("products\/"\)/);
+  assert.match(products, /provider: "supabase"/);
+  assert.match(products, /provider: "r2"/);
+  assert.match(products, /client\.storage\.from\(PRODUCT_IMAGES_BUCKET\)\.remove\(supabasePaths\)/);
+  assert.match(r2Route, /\(\?:\[0-9\]\{10,17\}-\)\?/);
+  assert.doesNotMatch(products, /\.storage[\s\S]*?\.upload\(/);
+  assert.match(r2Route, /new PutObjectCommand/);
+  assert.match(r2Route, /ContentType: contentType/);
   assert.match(products, /compressionMeasurements/);
   assert.match(products, /onCompressionMeasured\?\.\(/);
   assert.doesNotMatch(operatorConsole, /onCompressionMeasured|compressedForProduct|기기 실측/);
@@ -165,6 +177,8 @@ test("uploads overlap both variants without adding device measurements to produc
   assert.match(operatorConsole, /사진 선택/);
   assert.match(operatorConsole, /최대 15장 · 표시된 순서대로 저장/);
   assert.match(operatorConsole, /singleImages\.map\(\(image\) => image\.file\)/);
+  assert.match(operatorConsole, /preview\.rows,[\s\S]*?5,/);
+  assert.match(operatorConsole, /\{ concurrency: 1 \}/);
   assert.doesNotMatch(operatorConsole, /일괄 등록 CSV|CSV 일괄 등록 실행/);
   for (const route of [singleRoute, bulkRoute]) {
     assert.match(route, /body\??\.thumbnailUrls === undefined\s*\? imageUrls\s*:\s*images\(body\.?thumbnailUrls\)/);

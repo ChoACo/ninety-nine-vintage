@@ -108,6 +108,8 @@ export function CombinedAuctionPayment({
   const [excludedBusinessIds, setExcludedBusinessIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [transfer, setTransfer] = useState<CombinedTransfer | null>(null);
+  const [confirmationBusy, setConfirmationBusy] = useState(false);
+  const [confirmationRequestedAt, setConfirmationRequestedAt] = useState<string | null>(null);
 
   const selectedGroups = useMemo(
     () => groups.filter((group) => !excludedBusinessIds.includes(group.businessId)),
@@ -212,6 +214,7 @@ export function CombinedAuctionPayment({
         );
       }
       setTransfer(payload.transfer);
+      setConfirmationRequestedAt(null);
       setDepositorName(payload.transfer.depositorName);
       setDialog(null);
     } catch (error) {
@@ -220,6 +223,52 @@ export function CombinedAuctionPayment({
       );
     } finally {
       setBusy(false);
+    }
+  };
+
+  const requestConfirmation = async () => {
+    if (!transfer || confirmationBusy) return;
+    setConfirmationBusy(true);
+    setMessage("");
+    try {
+      const session = (await getSupabaseBrowserClient().auth.getSession()).data
+        .session;
+      if (!session?.access_token) throw new Error("로그인 후 요청할 수 있습니다.");
+      const response = await fetch("/api/payments/manual-transfer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          action: "request_confirmation",
+          idempotencyKey: crypto.randomUUID(),
+          orderIds: transfer.items.map((item) => item.orderId),
+        }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        request?: { lastRequestedAt?: unknown };
+        error?: string;
+        message?: string;
+      } | null;
+      if (!response.ok) {
+        throw new Error(
+          payload?.message ?? payload?.error ?? "입금 확인을 요청하지 못했습니다.",
+        );
+      }
+      const requestedAt = typeof payload?.request?.lastRequestedAt === "string"
+        ? payload.request.lastRequestedAt
+        : new Date().toISOString();
+      setConfirmationRequestedAt(requestedAt);
+      pushToast("success", "소유자에게 입금 확인을 요청했습니다.");
+    } catch (error) {
+      const nextMessage = error instanceof Error
+        ? error.message
+        : "입금 확인을 요청하지 못했습니다.";
+      setMessage(nextMessage);
+      pushToast("error", nextMessage);
+    } finally {
+      setConfirmationBusy(false);
     }
   };
 
@@ -506,6 +555,26 @@ export function CombinedAuctionPayment({
                 위 총액을 한 번만 입금해 주세요. 운영자가 입금을 확인하면 선택한 낙찰품이 함께 결제 완료됩니다.
               </p>
             </div>
+            <button
+              className="mt-4 h-12 w-full bg-ink px-4 text-sm font-black text-paper disabled:cursor-not-allowed disabled:opacity-45"
+              disabled={confirmationBusy || confirmationRequestedAt !== null}
+              onClick={() => void requestConfirmation()}
+              type="button"
+            >
+              {confirmationBusy
+                ? "확인 요청 보내는 중..."
+                : confirmationRequestedAt
+                  ? "입금 확인 요청 완료"
+                  : "입금했어요 · 확인 요청"}
+            </button>
+            <p className="mt-2 text-[11px] leading-5 text-muted">
+              입금자명을 입력해 결제 절차를 시작한 시점부터 소유자 원장에 표시됩니다. 이 버튼은 실제 송금 후 확인 요청을 강조하고 24시간 검토 시간을 확보하지만, 결제를 자동 완료하지는 않습니다.
+            </p>
+            {message && (
+              <p aria-live="polite" className="mt-3 text-xs font-bold text-red-700">
+                {message}
+              </p>
+            )}
             <button
               className="mt-3 w-full border border-ink px-4 py-3 text-xs font-bold"
               onClick={() => {

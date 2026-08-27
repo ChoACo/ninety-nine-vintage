@@ -47,24 +47,15 @@ test("unpaid auction recovery rpc is store-scoped, deadline-gated, and audited",
   );
 });
 
-test("recover endpoint forwards operator mode through the user-scoped rpc", async () => {
+test("legacy unpaid recovery endpoint is authenticated and retired", async () => {
   const route = await source(
     "src/app/api/admin/operator/auctions/[id]/recover/route.ts",
   );
 
   assert.match(route, /authenticateOperatorStoreRequest\(request, true\)/);
-  assert.match(
-    route,
-    /auth\.roleCode !== "owner" && auth\.roleCode !== "operator"/,
-  );
-  assert.match(route, /body\?\.mode === "reauction" \|\| body\?\.mode === "fixed"/);
-  assert.match(route, /verifyOperatorProductScope\(auth\.user, auth\.selectedStoreId, id\)/);
-  assert.match(
-    route,
-    /auth\.user[\s\S]*\.rpc\("operator_recover_unpaid_auction"/,
-  );
-  assert.match(route, /data\?\.length === 1 \? data\[0\] : null/);
-  assert.doesNotMatch(route, /auth\.admin[\s\S]*\.rpc\(/);
+  assert.match(route, /auction_recovery_route_retired/);
+  assert.match(route, /410/);
+  assert.doesNotMatch(route, /operator_recover_unpaid_auction/);
 });
 
 test("unpaid console reuses authenticated store scope and keeps failures user-facing", async () => {
@@ -85,11 +76,11 @@ test("unpaid console reuses authenticated store scope and keeps failures user-fa
   assert.doesNotMatch(layout, /Seller workspace/);
 });
 
-test("past console exposes one-click winner state actions", async () => {
-  const [pastRoute, pastConsole, recoveryButtons] = await Promise.all([
+test("past console keeps winner state visible and uses sequential second chance handling", async () => {
+  const [pastRoute, pastConsole, resolveRoute] = await Promise.all([
     source("src/app/api/admin/operator/products/past/route.ts"),
     source("src/components/admin/operator/OperatorPastProductsConsole.tsx"),
-    source("src/components/admin/operator/OperatorUnpaidRecoveryButtons.tsx"),
+    source("src/app/api/admin/operator/auctions/[id]/resolve/route.ts"),
   ]);
 
   assert.match(pastRoute, /auction_purchase_offers/);
@@ -101,17 +92,13 @@ test("past console exposes one-click winner state actions", async () => {
   assert.match(pastConsole, /winnerStateBadge/);
   assert.match(pastConsole, /미결제 만료/);
   assert.match(pastConsole, /결제 진행 중/);
-  assert.match(pastConsole, /<OperatorUnpaidRecoveryButtons/);
-  assert.match(pastConsole, /product\.winnerState === "unpaid_expired"/);
+  assert.doesNotMatch(pastConsole, /<OperatorUnpaidRecoveryButtons/);
   assert.match(pastConsole, /<OperatorSecondChanceButton/);
   assert.doesNotMatch(pastConsole, /paymentMode|portone/i);
-  assert.match(recoveryButtons, /\/recover`/);
-  assert.match(recoveryButtons, /mode: "reauction"|mode \}|"reauction"/);
-  assert.match(recoveryButtons, /재경매 등록/);
-  assert.match(recoveryButtons, /즉시구매 전환/);
-  assert.match(recoveryButtons, /<PremiumDialog/);
-  assert.match(recoveryButtons, /보안 감사 로그에 기록됩니다/);
-  assert.doesNotMatch(recoveryButtons, /window\.confirm/);
+  assert.match(resolveRoute, /body\?\.action === "relist"/);
+  assert.match(resolveRoute, /body\?\.action === "archive"/);
+  assert.match(resolveRoute, /body\?\.action === "delete"/);
+  assert.doesNotMatch(resolveRoute, /convert_fixed|reauction/);
 });
 
 test("registration form states that bid increments are per-product", async () => {

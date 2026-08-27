@@ -1,9 +1,10 @@
 import type { NewAuctionDraft } from "@/src/core/contracts/productDraft";
 import { isSupportedProductImageMimeType } from "@/src/lib/supabase/productImagePolicy";
 import {
-  findBatchClothingCategory,
+  getBatchClothingCategory,
   type BatchClothingCategory,
 } from "@/lib/import/categoryIds";
+import { DEFECT_TAGS } from "@/lib/catalog/defects";
 
 export type BatchAuctionCanonicalField =
   | "description"
@@ -83,7 +84,11 @@ export interface BatchAuctionPreviewRow {
   category: BatchClothingCategory | null;
   size: string;
   condition: BatchAuctionCondition | null;
-  /** 기존 X열 원문입니다. 공개 본문에는 넣지 않고 진단/호환용으로만 보존합니다. */
+  quantity: 1;
+  storageClass: "large" | "small";
+  defectTags: string[];
+  searchTags: string[];
+  /** 기존 X열 원문이며 공개 상품 설명으로 저장합니다. */
   sourceDescription: string;
   description: string;
   startingPrice: number | null;
@@ -93,7 +98,7 @@ export interface BatchAuctionPreviewRow {
   draft: NewAuctionDraft | null;
 }
 
-export type BatchAuctionCondition = "새상품" | "상태 좋음" | "사용감 있음";
+export type BatchAuctionCondition = "S" | "A" | "B" | "C";
 
 export interface BatchAuctionPreview {
   rows: BatchAuctionPreviewRow[];
@@ -112,13 +117,18 @@ const MAX_PRODUCT_IMAGES = 12;
 export const FIRST_PRODUCT_ROW = 6;
 const FIXED_TEMPLATE_COLUMNS = {
   title: 1,
+  categoryId: 2,
   clothingSize: 4,
   bottomSize: 5,
   sportsSize: 6,
+  extraSizeOne: 7,
+  extraSizeTwo: 8,
   conditionScore: 23,
   description: 24,
   startingPrice: 25,
+  tags: 33,
   imageNames: 34,
+  quantity: 35,
 } as const;
 
 const BOTTOM_TITLE_PATTERN =
@@ -127,17 +137,15 @@ const SPORTS_TITLE_PATTERN =
   /(스포츠|등산|아웃도어|골프|축구|야구|농구|테니스|트레이닝|유니폼|저지|져지|바람막이|윈드브레이커)/iu;
 
 interface FixedTemplateSize {
-  column: "D" | "E" | "F" | null;
+  column: "D" | "E" | "F" | "G" | "H" | null;
   size: string;
 }
 
 function fixedTemplateCategory(
   row: ParsedAuctionWorkbookRow,
 ): BatchClothingCategory | null {
-  // W열 이후에는 상태·가격·이미지 번호가 있어 숫자 ID와 우연히
-  // 충돌할 수 있으므로 분류 영역(A~V) 안에서만 카테고리 ID를 찾습니다.
-  return findBatchClothingCategory(
-    row.cells.slice(0, FIXED_TEMPLATE_COLUMNS.conditionScore - 1),
+  return getBatchClothingCategory(
+    row.cells[FIXED_TEMPLATE_COLUMNS.categoryId - 1],
   );
 }
 
@@ -162,6 +170,18 @@ function resolveFixedTemplateSize(
       column: "F" as const,
       size: normalizeBatchAuctionSize(
         row.cells[FIXED_TEMPLATE_COLUMNS.sportsSize - 1],
+      ),
+    },
+    {
+      column: "G" as const,
+      size: normalizeBatchAuctionSize(
+        row.cells[FIXED_TEMPLATE_COLUMNS.extraSizeOne - 1],
+      ),
+    },
+    {
+      column: "H" as const,
+      size: normalizeBatchAuctionSize(
+        row.cells[FIXED_TEMPLATE_COLUMNS.extraSizeTwo - 1],
       ),
     },
   ].filter((candidate) => candidate.size);
@@ -512,13 +532,20 @@ export async function parseAuctionWorkbook(
     throw new Error("기존 Excel 고정 양식(A/D·E·F/W/X/Y/AH 열, 6행 시작)을 확인하지 못했습니다.");
   }
 
-  const dataRows = selectedSheet.rows
-    .filter(
-      (row) =>
-        row.rowNumber >= FIRST_PRODUCT_ROW &&
-        row.rowNumber > selectedSheet.candidate.rowNumber,
-    )
-    .slice(0, MAX_IMPORT_ROWS + 1);
+  const rowsByNumber = new Map(
+    selectedSheet.rows.map((row) => [row.rowNumber, row]),
+  );
+  const dataRows: ParsedAuctionWorkbookRow[] = [];
+  for (
+    let rowNumber = FIRST_PRODUCT_ROW;
+    rowNumber < FIRST_PRODUCT_ROW + MAX_IMPORT_ROWS + 1;
+    rowNumber += 1
+  ) {
+    const row = rowsByNumber.get(rowNumber);
+    // 번개장터 고정 양식은 첫 완전 빈 행에서 상품 목록이 끝납니다.
+    if (!row) break;
+    dataRows.push(row);
+  }
   if (dataRows.length > MAX_IMPORT_ROWS) {
     throw new Error(`한 번에 최대 ${MAX_IMPORT_ROWS.toLocaleString("ko-KR")}개 상품을 등록할 수 있습니다.`);
   }
@@ -555,6 +582,21 @@ function fileStem(path: string): string {
 
 function fileRelativePath(file: File): string {
   return file.webkitRelativePath || file.name;
+}
+
+/** 폴더 선택 시 선택한 루트 폴더 바로 아래의 파일만 남기고 하위 폴더는 제외합니다. */
+export function filterDirectSelectedDirectoryFiles(
+  files: readonly File[],
+): File[] {
+  return files.filter((file) => {
+    const relativePath = (file.webkitRelativePath || "")
+      .normalize("NFC")
+      .replace(/\\/g, "/")
+      .replace(/^\/+|\/+$/g, "");
+    if (!relativePath) return true;
+
+    return relativePath.split("/").filter(Boolean).length <= 2;
+  });
 }
 
 function fileIdentity(file: File): string {
@@ -734,7 +776,7 @@ function splitImageNames(
 
 function parseStartingPrice(value: ParsedWorkbookCell | undefined): number | null {
   if (typeof value === "number") {
-    return Number.isInteger(value) && value > 0 && value <= 1_000_000_000
+    return Number.isInteger(value) && value >= 500 && value <= 1_000_000_000
       ? value
       : null;
   }
@@ -744,7 +786,7 @@ function parseStartingPrice(value: ParsedWorkbookCell | undefined): number | nul
     .replace(/[₩원,\s]/g, "");
   if (!/^\d+$/.test(normalized)) return null;
   const parsed = Number(normalized);
-  return Number.isSafeInteger(parsed) && parsed > 0 && parsed <= 1_000_000_000
+  return Number.isSafeInteger(parsed) && parsed >= 500 && parsed <= 1_000_000_000
     ? parsed
     : null;
 }
@@ -788,30 +830,67 @@ function parseBatchAuctionConditionScore(
     : null;
 }
 
-/** W열 상태점수를 공개용 한국어 상태로 변환합니다. 3과 5는 의도적으로 숨깁니다. */
+/** W열 상태점수를 products.condition_grade의 S/A/B/C 계약으로 변환합니다. */
 export function mapBatchAuctionConditionScore(
   value: ParsedWorkbookCell | undefined,
 ): BatchAuctionCondition | null {
   const score = parseBatchAuctionConditionScore(value);
 
-  if (score === 1) return "새상품";
-  if (score === 2) return "상태 좋음";
-  if (score === 4) return "사용감 있음";
+  if (score === 1 || score === 2) return "S";
+  if (score === 3) return "A";
+  if (score === 4) return "B";
+  if (score === 5) return "C";
   return null;
 }
 
-function buildFixedTemplateDescription(
-  title: string,
-  size: string,
-  condition: BatchAuctionCondition | null,
-): string {
-  if (!title) return "";
+const DEFECT_CODE_BY_TAG = new Map(
+  DEFECT_TAGS.flatMap((tag) => [
+    [tag.code.toLocaleLowerCase("ko-KR"), tag.code] as const,
+    [tag.label.toLocaleLowerCase("ko-KR"), tag.code] as const,
+  ]),
+);
 
-  return [
-    `Name: ${title}`,
-    `Size : ${size}`,
-    ...(condition ? [`상품상태: ${condition}`] : []),
-  ].join("\n");
+export function parseBatchAuctionTags(
+  value: ParsedWorkbookCell | undefined,
+): { defectTags: string[]; searchTags: string[] } {
+  const tags = cellAsText(value)
+    .normalize("NFKC")
+    .split(/(?=#)|[,;|\r\n]+/u)
+    .map((tag) => tag.replace(/^#+/u, "").trim())
+    .filter(Boolean);
+  const defectTags: string[] = [];
+  const searchTags: string[] = [];
+  const seenDefects = new Set<string>();
+  const seenSearch = new Set<string>();
+
+  for (const tag of tags) {
+    const defectCode = DEFECT_CODE_BY_TAG.get(tag.toLocaleLowerCase("ko-KR"));
+    if (defectCode) {
+      if (!seenDefects.has(defectCode) && defectTags.length < 20) {
+        seenDefects.add(defectCode);
+        defectTags.push(defectCode);
+      }
+      continue;
+    }
+    const normalized = tag.slice(0, 50);
+    const key = normalized.toLocaleLowerCase("ko-KR");
+    if (!seenSearch.has(key) && searchTags.length < 20) {
+      seenSearch.add(key);
+      searchTags.push(normalized);
+    }
+  }
+  return { defectTags, searchTags };
+}
+
+export function inferBatchStorageClass(
+  title: string,
+  category: BatchClothingCategory | null,
+): "large" | "small" {
+  const categoryText = `${category?.group ?? ""} ${category?.item ?? ""}`;
+  return /(패딩|코트|자켓|재킷|점퍼)/iu.test(`${categoryText} ${title}`) ||
+      /(부츠|워커|하이탑|등산화|스키화|보드화)/iu.test(title)
+    ? "large"
+    : "small";
 }
 
 function valueAt(
@@ -935,33 +1014,29 @@ export function buildBatchAuctionPreview(
     const condition = isFixedTemplate
       ? mapBatchAuctionConditionScore(valueAt(row, detected.conditionScore))
       : null;
-    const description = isFixedTemplate
-      ? buildFixedTemplateDescription(title, size, condition)
-      : fallbackDescription;
+    const description = isFixedTemplate ? descriptionCell : fallbackDescription;
     const startingPrice = parseStartingPrice(
       valueAt(row, detected.startingPrice),
     );
+    const { defectTags, searchTags } = isFixedTemplate
+      ? parseBatchAuctionTags(row.cells[FIXED_TEMPLATE_COLUMNS.tags - 1])
+      : { defectTags: [], searchTags: [] };
     const imageNames = detected.imageNames.flatMap((column) =>
       splitImageNames(valueAt(row, column), imageIndex),
     );
+    const storageClass = inferBatchStorageClass(title, category);
 
-    if (isFixedTemplate && !title) {
+    if (isFixedTemplate && (title.length < 2 || title.length > 160)) {
       issues.push({
-        code: "missing_title",
-        message: "A열 상품명이 비어 있거나 사이즈 토큰만 입력되어 있습니다.",
-        severity: "error",
-      });
-    } else if (!description) {
-      issues.push({
-        code: "missing_description",
-        message: "상품 설명 또는 상품명이 비어 있습니다.",
+        code: "invalid_title",
+        message: "A열 상품명은 2자 이상 160자 이하여야 합니다.",
         severity: "error",
       });
     }
-    if (isFixedTemplate && !size) {
+    if (!description || description.length > 10_000) {
       issues.push({
-        code: "missing_size",
-        message: "D열 의류, E열 하의, F열 스포츠·등산복 사이즈가 모두 비어 있습니다.",
+        code: "invalid_description",
+        message: "X열 상품 설명은 1자 이상 10,000자 이하여야 합니다.",
         severity: "error",
       });
     }
@@ -969,8 +1044,8 @@ export function buildBatchAuctionPreview(
       issues.push({
         code: "category_id_unrecognized",
         message:
-          "행에서 등록된 여성·남성 의류 카테고리 ID를 찾지 못해 카테고리를 기타로 저장합니다.",
-        severity: "warning",
+          "B열 카테고리 ID가 플랫폼의 등록된 카테고리와 일치하지 않습니다.",
+        severity: "error",
       });
     }
     if (isFixedTemplate && conditionScore === null) {
@@ -983,7 +1058,7 @@ export function buildBatchAuctionPreview(
     if (startingPrice === null) {
       issues.push({
         code: "invalid_starting_price",
-        message: "시작가는 1원 이상 10억원 이하의 정수여야 합니다.",
+        message: "Y열 가격은 500원 이상 10억원 이하의 원 단위 정수여야 합니다.",
         severity: "error",
       });
     }
@@ -1027,6 +1102,10 @@ export function buildBatchAuctionPreview(
       category,
       size,
       condition,
+      quantity: 1,
+      storageClass,
+      defectTags,
+      searchTags,
       sourceDescription: descriptionCell,
       description,
       startingPrice,
@@ -1080,7 +1159,9 @@ export function buildBatchAuctionPreview(
       hasErrors(row.issues) ||
       row.startingPrice === null ||
       !row.description ||
-      !row.title
+      row.title.length < 2 ||
+      !row.category ||
+      !row.condition
     ) {
       row.draft = null;
       return;

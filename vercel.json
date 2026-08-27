@@ -10,14 +10,6 @@
       "schedule": "0 3 * * *"
     },
     {
-      "path": "/api/cron/track-deliveries",
-      "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/cron/auto-settlement",
-      "schedule": "0 2 * * *"
-    },
-    {
       "path": "/api/cron/generate-settlements",
       "schedule": "0 9 * * 1,4"
     }

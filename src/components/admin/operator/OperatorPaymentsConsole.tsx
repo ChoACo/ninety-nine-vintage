@@ -290,6 +290,16 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
     })();
   }, [load]);
 
+  useEffect(() => {
+    const onOwnerPaymentUpdated = () => {
+      void load(accessToken, includeHistory, offset).catch((error) => {
+        setNotice(error instanceof Error ? error.message : "입금 대기열을 불러오지 못했습니다.");
+      });
+    };
+    window.addEventListener("owner-payment-updated", onOwnerPaymentUpdated);
+    return () => window.removeEventListener("owner-payment-updated", onOwnerPaymentUpdated);
+  }, [accessToken, includeHistory, load, offset]);
+
   const refresh = () => {
     void load(accessToken, includeHistory, offset).catch((error) => {
       setNotice(error instanceof Error ? error.message : "새로고침에 실패했습니다.");
@@ -765,7 +775,7 @@ export function OperatorPaymentsConsole({ ownerSurface = false }: { ownerSurface
                   </p>
                 </button>
                 <p className="font-mono text-sm font-black md:text-right">
-                  {formatWon(payment.remainingAmount)}
+                  {formatWon(pending ? payment.remainingAmount : payment.receivedAmount)}
                   {pending && (
                     <button
                       className="mt-1 flex items-center gap-1 text-[10px] font-bold underline md:ml-auto"

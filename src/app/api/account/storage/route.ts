@@ -286,22 +286,14 @@ export async function GET(request: Request) {
     );
   }
   const legacyWins = legacy.data as LegacyAuctionWinRow[];
-  const [roleResult, accountResult] = await Promise.all([
-    auth.admin
-      .from("account_access_roles")
-      .select("role_code")
-      .eq("user_id", auth.userId)
-      .maybeSingle(),
-    auth.admin
-      .from("member_accounts")
-      .select("last_depositor_name")
-      .eq("member_id", auth.userId)
-      .maybeSingle(),
-  ]);
-  if (roleResult.error || accountResult.error) {
+  const accountResult = await auth.admin
+    .from("member_accounts")
+    .select("last_depositor_name")
+    .eq("member_id", auth.userId)
+    .maybeSingle();
+  if (accountResult.error) {
     return inventoryUnavailable("member_context");
   }
-  const role = roleResult.data;
 
   const manualTransferIds = legacyWins.flatMap((win) =>
     win.manual_transfer_order_id ? [win.manual_transfer_order_id] : [],
@@ -446,7 +438,7 @@ export async function GET(request: Request) {
           ).toISOString();
         })(),
       })),
-    deadlineEnforcementExempt: role?.role_code === "band_member",
+    deadlineEnforcementExempt: false,
     rememberedDepositorName: accountResult.data?.last_depositor_name ?? null,
     auctionPaymentQuote: quote.data,
     centerShippingTokens,

@@ -27,7 +27,7 @@ test("owner main management provides mobile-safe toggles, ordering controls, and
   assert.match(mobileHome, /banners=\{config\.banners\}/);
 });
 
-test("seller organization exposes desktop table, mobile cards, numeric commission input, and approval badges", async () => {
+test("seller organization exposes responsive cards, plan toggles, fixed commission, and approval badges", async () => {
   const [stores, onboarding] = await Promise.all([
     source("src/components/admin/owner/OwnerStoreManagementConsole.tsx"),
     source("src/components/admin/owner/NewCenterModal.tsx"),
@@ -37,8 +37,11 @@ test("seller organization exposes desktop table, mobile cards, numeric commissio
   assert.match(stores, /승인 완료/);
   assert.match(stores, /심사 중/);
   assert.match(stores, /운영 중지/);
-  assert.match(onboarding, /key==="commissionRate"\?"decimal"/);
-  assert.match(onboarding, /pattern=\{key==="commissionRate"\?"\[0-9\]\*"/);
+  assert.match(stores, /plan_change/);
+  assert.match(stores, /Pro 센터/);
+  assert.match(stores, /일반 센터/);
+  assert.match(onboarding, /센터 등급과 관계없이 5%로 고정/);
+  assert.doesNotMatch(onboarding, /commissionRate/);
 });
 
 test("settlement desk formats won, copies accounts with feedback, and confirms completion", async () => {

@@ -57,7 +57,6 @@ const roleLabels = {
   owner: "소유자",
   operator: "운영자",
   employee: "직원",
-  band_member: "밴드 회원",
   member: "회원",
 } as const;
 
@@ -514,9 +513,7 @@ export function OwnerMembersConsole() {
           const canManageCredits =
             member.access_role !== "operator" &&
             member.access_role !== "owner";
-          const canManageEnforcement =
-            member.access_role === "band_member" ||
-            member.access_role === "member";
+          const canManageEnforcement = member.access_role === "member";
           const memberBusy = pendingMemberIds.includes(member.id);
 
           return (
@@ -570,7 +567,6 @@ export function OwnerMembersConsole() {
                     >
                       <option value="operator">운영자</option>
                       <option value="employee">직원</option>
-                      <option value="band_member">밴드 회원</option>
                       <option value="member">회원</option>
                     </select>
                     {roleDraft === "employee" && (

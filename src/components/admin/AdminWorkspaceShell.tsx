@@ -244,7 +244,7 @@ export function AdminWorkspaceShell({
 
           {utility && (
             <div
-              className={`shrink-0 border-b p-4 md:hidden ${darkMode ? "border-zinc-800" : "border-line"}`}
+              className={`shrink-0 border-b p-4 ${collapsed ? "md:hidden" : "md:block"} ${darkMode ? "border-zinc-800" : "border-line"}`}
             >
               {utility}
             </div>

@@ -46,11 +46,13 @@ test("first-login nickname setup is limited to Kakao account hubs and every late
   );
 });
 
-test("band members retain a visible deadline while combined payment keeps the exemption", async () => {
-  const [migration, route, combinedPayment] = await Promise.all([
+test("band member runtime is retired and combined payments enforce the visible deadline", async () => {
+  const [migration, policyMigration, route, combinedPayment, authTypes] = await Promise.all([
     source("supabase/migrations/20260723043642_member_center_admin_workflows.sql"),
+    source("supabase/migrations/20260826231224_harden_live_auction_policy_v2.sql"),
     source("src/app/api/payments/manual-transfer/route.ts"),
     source("src/components/features/account/CombinedAuctionPayment.tsx"),
+    source("src/lib/supabase/auth.ts"),
   ]);
 
   assert.match(migration, /display_payment_due_at\s+timestamptz/i);
@@ -63,7 +65,11 @@ test("band members retain a visible deadline while combined payment keeps the ex
     migration,
     /if v_target_role = 'member' and mod\(v_warning_count,\s*3\) = 0/i,
   );
-  assert.match(route, /role_code === "band_member"/);
+  assert.match(policyMigration, /set role_code = 'member'[\s\S]*where role_code = 'band_member'/i);
+  assert.match(policyMigration, /role_code in \('owner', 'operator', 'employee', 'member'\)/i);
+  assert.doesNotMatch(route, /band_member/);
+  assert.match(route, /deadlineEnforcementExempt:\s*false/);
+  assert.doesNotMatch(authTypes, /band_member/);
   assert.match(route, /begin_my_combined_auction_payment/);
   assert.match(combinedPayment, /paymentBlocked/);
   assert.match(combinedPayment, /deadlineEnforcementExempt/);

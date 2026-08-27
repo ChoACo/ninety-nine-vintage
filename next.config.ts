@@ -27,6 +27,7 @@ const supabaseOrigin = (() => {
 const allowedConnectOrigins = [
   "https://*.supabase.co",
   "wss://*.supabase.co",
+  "https://*.r2.cloudflarestorage.com",
   "https://kauth.kakao.com",
   "https://kapi.kakao.com",
 ];
@@ -38,7 +39,19 @@ if (
   allowedConnectOrigins.push(supabaseOrigin);
 }
 
-const r2PublicDomain = process.env.R2_PUBLIC_DOMAIN?.trim() || null;
+const r2PublicUrl = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "");
+  } catch {
+    return null;
+  }
+})();
+const r2PublicDomain =
+  r2PublicUrl?.hostname || process.env.R2_PUBLIC_DOMAIN?.trim() || null;
+const r2PublicOrigin = r2PublicUrl?.origin ?? null;
+if (r2PublicOrigin && !allowedConnectOrigins.includes(r2PublicOrigin)) {
+  allowedConnectOrigins.push(r2PublicOrigin);
+}
 
 const contentSecurityPolicy = [
   "default-src 'self'",

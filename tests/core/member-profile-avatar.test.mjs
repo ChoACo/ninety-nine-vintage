@@ -18,6 +18,8 @@ test("MY profile uses the authoritative nickname and realtime avatar state", asy
   assert.match(header, /profile\?\.display_name/);
   assert.doesNotMatch(header, /빈티지 피플/);
   assert.match(uploader, /MAX_AVATAR_BYTES = 5 \* 1024 \* 1024/);
+  assert.match(uploader, /compressAvatarImage\(file\)/);
+  assert.match(uploader, /\.upload\(path, compressed,/);
   assert.match(uploader, /image\/jpeg,image\/png,image\/webp/);
   assert.match(uploader, /`\$\{userId\}\/avatar`/);
   assert.match(uploader, /\.from\("member-avatars"\)/);

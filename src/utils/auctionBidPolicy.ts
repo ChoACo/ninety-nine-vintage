@@ -14,7 +14,7 @@ export type AuctionBidDecisionReason =
   | "empty-item-first-bid"
   | "anti-sniping-overtime"
   | "anti-sniping-participants-only"
-  | "late-first-bid-finalized"
+  | "late-first-bid-extended"
   | "new-bid-cutoff"
   | "auction-closed"
   | "item-pending"
@@ -33,7 +33,7 @@ export interface AuctionBidDecision {
   reason: AuctionBidDecisionReason;
   userHasBidHistory: boolean;
   hasAnyBidHistory: boolean;
-  /** 허용된 입찰이 저장과 동시에 최종 확정되어야 하는지 여부 */
+  /** 호환 필드. 모든 입찰은 서버 마감 처리 전까지 확정되지 않습니다. */
   finalOnAccept: boolean;
   message: string;
 }
@@ -98,7 +98,7 @@ export function getKoreanAuctionTime(
 
 /**
  * 매일 한국시간 20:56부터 신규 참여를 제한하고 21:00~22:00에는
- * 정산을 위해 모든 입찰을 멈춥니다. 22:00부터 미판매 상품 입찰을 재개합니다.
+ * 마감 및 동기화 점검을 위해 입찰을 멈춥니다. 22:00부터 미판매 상품 입찰을 재개합니다.
  */
 export function getDailyAuctionPhase(
   now: Date | string | number = new Date(),
@@ -146,8 +146,8 @@ export function isAntiSnipingOvertime(
  *
  * - 20:56 전: 누구나 입찰 가능
  * - 20:56~21:00: 입찰 원장이 있는 기존 참여자만 가능
- * - 단, 원장이 0건인 상품은 첫 입찰까지 누구나 가능하며 그 입찰이 즉시 확정·잠김
- * - 21:00~22:00: 정산 시간으로 전원 중단
+ * - 단, 원장이 0건인 상품의 첫 입찰은 15분 연장 이벤트를 만들고 계속 진행
+ * - 21:00~22:00: 경매 마감 및 동기화 점검으로 전원 중단
  * - 22:00 이후: 미판매 상품의 입찰 재개
  *
  * 실제 DB 연동 시에도 반드시 서버 트랜잭션 안에서 최신 bidHistory를 다시 읽은 뒤
@@ -184,8 +184,8 @@ export function getAuctionBidDecision({
     return {
       ...base,
       allowed: false,
-      reason: "late-first-bid-finalized",
-      message: "오후 8시 56분 이후 첫 입찰로 확정된 상품입니다.",
+      reason: "item-sold",
+      message: "서버 마감 처리가 완료된 상품입니다.",
     };
   }
 
@@ -230,7 +230,7 @@ export function getAuctionBidDecision({
       ...base,
       allowed: false,
       reason: "auction-closed",
-      message: "오후 9시 정산 중입니다. 미판매 상품은 오후 10시부터 다시 입찰할 수 있습니다.",
+      message: "오후 9시부터 10시까지는 경매 마감 및 동기화 점검 중입니다. 미판매 상품은 오후 10시부터 다시 입찰할 수 있습니다.",
     };
   }
 
@@ -257,8 +257,8 @@ export function getAuctionBidDecision({
       ...base,
       allowed: true,
       reason: "empty-item-first-bid",
-      finalOnAccept: true,
-      message: "현재 무입찰 상품입니다. 이 입찰은 즉시 확정되며 추가 입찰할 수 없습니다.",
+      finalOnAccept: false,
+      message: "첫 입찰이 접수되면 마감 시각이 15분 연장되고 경매가 계속 진행됩니다.",
     };
   }
 

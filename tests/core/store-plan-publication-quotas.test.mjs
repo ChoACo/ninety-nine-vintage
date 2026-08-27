@@ -40,7 +40,7 @@ test("premium automation is owner-linked and limited to 300 items per rolling we
   assert.match(ownerRoute, /configure_owner_store_automation/);
   assert.match(ownerPanel, /프리미엄 승인/);
   assert.match(ownerPanel, /자동화 연결/);
-  assert.match(operatorPanel, /기본 3만원/);
-  assert.match(operatorPanel, /프리미엄 5만원/);
-  assert.match(operatorPanel, /다음 청구일 전 변경·해지/);
+  assert.match(operatorPanel, /일반 센터는 월 3만원/);
+  assert.match(operatorPanel, /Pro 센터는 월 5만원/);
+  assert.match(operatorPanel, /판매 수수료는 모두 5%/);
 });

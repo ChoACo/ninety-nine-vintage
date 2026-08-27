@@ -129,6 +129,16 @@ test("assigned operators do not require an expiring store-selection session", as
   assert.doesNotMatch(permissionHelper, /require_active_operator_store_scope/i);
 });
 
+test("owner store selector is visible in the expanded desktop operator workspace", async () => {
+  const [layout, shell] = await Promise.all([
+    source("src/app/(admin)/admin/operator/layout.tsx"),
+    source("src/components/admin/AdminWorkspaceShell.tsx"),
+  ]);
+  assert.match(layout, /utility=\{<OperatorStoreScopeSelector \/>\}/);
+  assert.match(shell, /\$\{collapsed \? "md:hidden" : "md:block"\}/);
+  assert.doesNotMatch(shell, /className=\{`shrink-0 border-b p-4 md:hidden/);
+});
+
 test("every operator API except scope selection requires the active selected store", async () => {
   const apiRoot = fileURLToPath(new URL("src/app/api/admin/operator/", rootUrl));
   const entries = await readdir(apiRoot, { recursive: true, withFileTypes: true });

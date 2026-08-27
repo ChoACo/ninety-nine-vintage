@@ -41,6 +41,10 @@ next-env.d.ts
 /dist/
 /outputs/
 /work/
+/migration-r2-backup.json
+/.codex-backups/
+/migration-r2-source-deletion.json
+/migration-r2-reference-repair.json
 
 .env*
 

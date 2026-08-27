@@ -80,7 +80,7 @@ export function AuctionInactiveTeaser({
 
   const scheduleMessage =
     dailyPhase === "closed"
-      ? "오후 9시 정산 시간입니다. 미판매 상품은 오후 10시부터 다시 입찰할 수 있습니다."
+      ? "오후 9시부터 10시까지 경매 마감 및 동기화 점검 중입니다. 미판매 상품은 오후 10시부터 다시 입찰할 수 있습니다."
       : "현재 진행 중인 경매가 없습니다. 다음 경매는 매일 오전 10시에 시작됩니다.";
   const teaserGridClass =
     surface === "desktop"

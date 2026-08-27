@@ -62,7 +62,8 @@ test("store malls split into main, new, auction, buy, and info pages", async () 
   assert.match(storeDates, /dates\.map/);
   assert.doesNotMatch(storeDates, /getRecentCatalogDates/);
   assert.doesNotMatch(storeSplit, /grid-cols-5/);
-  assert.match(feed, /storeTier === "premium" \? 1\.2 : 1/);
+  assert.doesNotMatch(feed, /storeTier === "premium" \? 1\.2 : 1/);
+  assert.match(feed, /const leftScore = score\(left\.id\)/);
   assert.match(feed, /top\.length < 8 && count >= 2/);
   assert.match(feed, /센터 · \{source\.storeName\}/);
 });

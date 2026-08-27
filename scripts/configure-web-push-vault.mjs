@@ -43,16 +43,40 @@ const values = [
     name: "web_push_dispatch_url",
     secret: "https://www.ninety-nine-vintage.store/api/push/dispatch",
     description: "Production Web Push dispatch endpoint",
+  }, {
+    name: "storage_policy_probe_url",
+    secret: "https://www.ninety-nine-vintage.store/api/cron/storage-policy",
+    description: "Production storage policy probe endpoint",
+  }, {
+    name: "delivery_tracking_cron_url",
+    secret: "https://www.ninety-nine-vintage.store/api/cron/track-deliveries",
+    description: "Production delivery tracking endpoint",
+  }, {
+    name: "auto_settlement_cron_url",
+    secret: "https://www.ninety-nine-vintage.store/api/cron/auto-settlement",
+    description: "Production inventory auto-settlement endpoint",
   }] : []),
 ];
 
 const serialized = JSON.stringify(values).replaceAll("'", "''");
+const ensureDispatcherSecret = activateDispatch ? `
+  if not exists (
+    select 1 from vault.secrets where name = 'web_push_dispatch_secret'
+  ) then
+    perform vault.create_secret(
+      encode(extensions.gen_random_bytes(48), 'hex'),
+      'web_push_dispatch_secret',
+      'Cron dispatcher bearer secret'
+    );
+  end if;
+` : "";
 const sql = `
 do $vault$
 declare
   v_item record;
   v_id uuid;
 begin
+${ensureDispatcherSecret}
   for v_item in
     select *
     from jsonb_to_recordset('${serialized}'::jsonb)

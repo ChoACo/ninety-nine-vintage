@@ -32,12 +32,16 @@ test("public catalog visibility keeps auctions addressable through their final c
     "utf8",
   );
   const migration = await readFile(
-    new URL("supabase/migrations/20260830122932_align_public_auction_expiry_and_sold_archive.sql", rootUrl),
+    new URL("supabase/migrations/20260830131607_restore_seven_day_no_bid_auction_lifecycle.sql", rootUrl),
     "utf8",
   );
 
   assert.match(visibility, /auction_feed_expires_at\.gt/);
   assert.match(visibility, /closes_at\.gt/);
-  assert.match(migration, /auction_close_at\([\s\S]*new\.publish_at \+ interval '3 days'/);
+  assert.match(migration, /auction_close_at\([\s\S]*new\.publish_at \+ interval '7 days'/);
   assert.match(migration, /status in \('pending', 'active'\)/);
+  assert.match(migration, /p_at >= public\.auction_close_at\([\s\S]*interval '7 days'/);
+  assert.match(migration, /products\.past_action = 'pending'/);
+  assert.match(migration, /not exists \([\s\S]*public\.auction_bids/);
+  assert.doesNotMatch(migration, /interval '3 days'/);
 });

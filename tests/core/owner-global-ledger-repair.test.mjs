@@ -97,7 +97,7 @@ test("owner center exposes the unified member ledger repair console", async () =
 
 test("owner ledger can force a canonical shipment request and delivery completion through trusted service bridges", async () => {
   const [migration, route, consoleSource] = await Promise.all([
-    source("supabase/migrations/20260830101849_owner_force_shipping_progression.sql"),
+    source("supabase/migrations/20260830102217_owner_force_shipping_progression.sql"),
     source("src/app/api/admin/owner/ledger-repair/route.ts"),
     source("src/components/admin/owner/OwnerLedgerRepairConsole.tsx"),
   ]);

@@ -78,7 +78,7 @@ test("unpaid console reuses authenticated store scope and keeps failures user-fa
 
 test("only the Owner can force an expired winner through payment and choose settlement inclusion", async () => {
   const [migration, route, consoleSource] = await Promise.all([
-    source("supabase/migrations/20260830100952_owner_unpaid_force_payment.sql"),
+    source("supabase/migrations/20260830101502_owner_unpaid_force_payment.sql"),
     source("src/app/api/admin/operator/auctions/unpaid/route.ts"),
     source("src/components/admin/operator/OperatorUnpaidAuctionsConsole.tsx"),
   ]);

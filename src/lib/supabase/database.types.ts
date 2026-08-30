@@ -8796,6 +8796,7 @@ current_price: number
           measurements: Json
           participant_count: number
           product_id: string
+          sale_type: string
           size_label: string
           sold_at: string
           status: string

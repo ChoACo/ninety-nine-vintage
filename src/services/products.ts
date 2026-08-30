@@ -9,6 +9,7 @@ import {
 } from "@/lib/catalog/query";
 import { formatProductDisplayNumber } from "@/lib/productDisplayNumber";
 import { isSoldFeedVisible } from "@/lib/catalog/soldVisibility";
+import { buildAuctionCatalogVisibilityFilter } from "@/lib/catalog/publicProductVisibility";
 import {
   normalizeConditionGrade,
   type ConditionGrade,
@@ -164,12 +165,7 @@ export async function fetchPublishedProducts(input: {
       hourCycle: "h23",
     }).format(new Date()));
     const includeClosingWinners = kstHour === 21;
-    query = query.or(
-      `and(status.eq.active,auction_feed_expires_at.gt.${now},final_bid_id.is.null)` +
-        (includeClosingWinners
-          ? ",and(status.eq.closed,final_bid_id.not.is.null,final_bid_amount.not.is.null,sale_completed_at.is.null)"
-          : ""),
-    );
+    query = query.or(buildAuctionCatalogVisibilityFilter(now, { includeClosingWinners }));
   } else {
     query = query.eq("status", "active");
   }

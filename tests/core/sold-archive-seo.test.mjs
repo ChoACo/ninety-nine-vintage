@@ -104,6 +104,19 @@ test("sold feed RPC supports both sale types without exposing buyer identity", a
   assert.match(route, /searchParams\.get\("view"\) === "sold"/);
 });
 
+test("sold archive accepts canonical fixed sales and Owner-recovered auction settlements", async () => {
+  const [migration, soldService] = await Promise.all([
+    source("supabase/migrations/20260830122932_align_public_auction_expiry_and_sold_archive.sql"),
+    source("src/services/sold.ts"),
+  ]);
+  assert.match(migration, /returns table \([\s\S]*sale_type text/);
+  assert.match(migration, /offers\.status = 'settled'/);
+  assert.match(migration, /orders\.status = 'confirmed'/);
+  assert.match(migration, /inventory\.ownership_status = 'active'/);
+  assert.match(migration, /products\.sale_type = 'fixed'/);
+  assert.match(soldService, /product\.sale_type !== "auction" \|\| isSoldFeedVisible/);
+});
+
 test("auction settlement copy and optional measurement rendering match policy", async () => {
   const [panel, bidRoutePanel, report] = await Promise.all([
     source("src/components/features/auction/detail/StickyBidPanel.tsx"),

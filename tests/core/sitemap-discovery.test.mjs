@@ -13,9 +13,8 @@ test("sitemap exposes canonical public catalog routes and isolates data-source f
 
   assert.match(sitemap, /fetchAllPublishedProducts\(\)/);
   assert.match(sitemap, /fetchActiveStores\(\)/);
-  assert.match(sitemap, /\.eq\("status", "active"\)/);
   assert.match(sitemap, /\.lte\("publish_at", now\)/);
-  assert.match(sitemap, /auction_feed_expires_at\.gt/);
+  assert.match(sitemap, /buildPublicCatalogVisibilityFilter\(now\)/);
   assert.match(sitemap, /product\.sale_type === "fixed" \? "shop" : "auction"/);
   assert.match(sitemap, /\/centers\/\$\{encodeURIComponent\(store\.slug\)\}/);
   assert.match(sitemap, /Promise\.allSettled/);
@@ -23,4 +22,20 @@ test("sitemap exposes canonical public catalog routes and isolates data-source f
   assert.match(sitemap, /\.slice\(0, MAX_SITEMAP_ENTRIES\)/);
   assert.doesNotMatch(sitemap, /SITE_URL\}\/m\//);
   assert.doesNotMatch(sitemap, /SITE_URL\}\/admin\//);
+});
+
+test("public catalog visibility keeps auctions addressable through their final close", async () => {
+  const visibility = await readFile(
+    new URL("src/lib/catalog/publicProductVisibility.ts", rootUrl),
+    "utf8",
+  );
+  const migration = await readFile(
+    new URL("supabase/migrations/20260830122932_align_public_auction_expiry_and_sold_archive.sql", rootUrl),
+    "utf8",
+  );
+
+  assert.match(visibility, /auction_feed_expires_at\.gt/);
+  assert.match(visibility, /closes_at\.gt/);
+  assert.match(migration, /auction_close_at\([\s\S]*new\.publish_at \+ interval '3 days'/);
+  assert.match(migration, /status in \('pending', 'active'\)/);
 });

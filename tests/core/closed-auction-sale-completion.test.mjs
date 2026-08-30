@@ -5,9 +5,10 @@ import test from "node:test";
 const source = (path) => readFile(new URL(`../../${path}`, import.meta.url), "utf8");
 
 test("closed winners remain public until inventory marks the sale complete", async () => {
-  const [migration, products, feedCard] = await Promise.all([
+  const [migration, products, visibility, feedCard] = await Promise.all([
     source("supabase/migrations/20260724082849_align_closed_sale_inventory_and_tracking.sql"),
     source("src/services/products.ts"),
+    source("src/lib/catalog/publicProductVisibility.ts"),
     source("src/components/features/auction/AuctionFeedCard.tsx"),
   ]);
 
@@ -22,9 +23,10 @@ test("closed winners remain public until inventory marks the sale complete", asy
     /get_public_sold_feed_products[\s\S]*products\.sale_completed_at is not null/,
   );
   assert.match(
-    products,
-    /and\(status\.eq\.closed,final_bid_id\.not\.is\.null,final_bid_amount\.not\.is\.null,sale_completed_at\.is\.null\)/,
+    visibility,
+    /status\.eq\.closed,final_bid_id\.not\.is\.null,final_bid_amount\.not\.is\.null,sale_completed_at\.is\.null/,
   );
+  assert.match(products, /buildAuctionCatalogVisibilityFilter/);
   assert.match(feedCard, /phase === "CLOSED" \? "마감됨" : "실시간 입찰"/);
 });
 

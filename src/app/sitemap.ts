@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { buildPublicCatalogVisibilityFilter } from "@/lib/catalog/publicProductVisibility";
 import { createSupabasePublicClient } from "@/lib/supabase/server";
 import { fetchSoldArchivePage, fetchSoldBrands } from "@/services/sold";
 import { fetchActiveStores } from "@/services/stores";
@@ -26,11 +27,8 @@ async function fetchAllPublishedProducts(): Promise<PublishedProductSitemapRow[]
     const { data, error } = await verifier
       .from("products")
       .select("id, sale_type, updated_at")
-      .eq("status", "active")
       .lte("publish_at", now)
-      .or(
-        `sale_type.eq.fixed,and(sale_type.eq.auction,auction_feed_expires_at.gt.${now},final_bid_id.is.null)`,
-      )
+      .or(buildPublicCatalogVisibilityFilter(now))
       .order("updated_at", { ascending: false })
       .order("id", { ascending: true })
       .range(offset, offset + pageSize - 1);

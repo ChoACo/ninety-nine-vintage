@@ -27,7 +27,9 @@ export async function fetchSoldArchivePage(input: { before?: string; beforeId?: 
     p_brand_slug: input.brandSlug,
   });
   if (error) throw new Error("판매 완료 아카이브를 불러오지 못했습니다.");
-  const rows = (data ?? []).filter((product) => isSoldFeedVisible(product.sold_at)).map(mapImages);
+  const rows = (data ?? [])
+    .filter((product) => product.sale_type !== "auction" || isSoldFeedVisible(product.sold_at))
+    .map(mapImages);
   return { products: rows.slice(0, limit), hasNext: rows.length > limit };
 }
 

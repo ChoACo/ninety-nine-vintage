@@ -20,6 +20,10 @@ import {
   type ProductImageCompressionMeasurement,
   type ProductImageCompressionReporter,
 } from "../images/productImageCompression";
+import {
+  buildAuctionCatalogVisibilityFilter,
+  buildPublicProductDetailVisibilityFilter,
+} from "../catalog/publicProductVisibility";
 
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -866,10 +870,7 @@ export async function fetchPublishedProductsPage({
     .select(PRODUCT_COLUMNS, { count: "exact" })
     .eq("sale_type", "auction")
     .lte("publish_at", nowIso)
-    .or(
-      `and(status.eq.active,auction_feed_expires_at.gt.${nowIso},final_bid_id.is.null),` +
-      "and(status.eq.closed,final_bid_id.not.is.null,final_bid_amount.not.is.null,sale_completed_at.is.null)",
-    )
+    .or(buildAuctionCatalogVisibilityFilter(nowIso, { includeClosingWinners: true }))
     .order("publish_at", { ascending: false })
     .order("id", { ascending: false })
     .range(rangeStart, rangeEnd);
@@ -916,11 +917,7 @@ export async function fetchPublishedProductById(
     .select(PRODUCT_COLUMNS)
     .eq("id", normalizedId)
     .lte("publish_at", now.toISOString())
-    .or(
-      "and(status.eq.active,sale_type.eq.fixed)," +
-      `and(status.eq.active,sale_type.eq.auction,auction_feed_expires_at.gt.${now.toISOString()},final_bid_id.is.null),` +
-      "and(status.eq.closed,sale_type.eq.auction,final_bid_id.not.is.null,final_bid_amount.not.is.null,sale_completed_at.is.null)",
-    )
+    .or(buildPublicProductDetailVisibilityFilter(now.toISOString()))
     .maybeSingle();
 
   if (error) {

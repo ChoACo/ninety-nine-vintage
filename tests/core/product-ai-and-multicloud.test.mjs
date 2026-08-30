@@ -207,5 +207,6 @@ test("root metadata fixes the shared preview to the site brand image", async () 
   assert.match(layout, /url:\s*"\/ninety-nine-vintage-banner\.png"/);
   assert.match(layout, /twitter:\s*\{/);
   assert.match(layout, /card:\s*"summary_large_image"/);
+  assert.match(layout, /"naver-site-verification":\s*"[a-f0-9]+"/);
   assert.doesNotMatch(layout, /banner_url|mall_image/);
 });

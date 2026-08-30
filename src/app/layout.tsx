@@ -39,6 +39,11 @@ const themeInitializationScript = `
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.ninety-nine-vintage.store"),
+  verification: {
+    other: {
+      "naver-site-verification": "ed2ecda797d1c2ae79b88751dcaba53cf006bcdb",
+    },
+  },
   title: "NINETY-NINE VINTAGE",
   description: "시간을 다시 입는 선택, 빈티지 라이브 옥션 & 14일 무료 보관 플랫폼",
   openGraph: {

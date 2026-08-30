@@ -15,6 +15,8 @@ test("sitemap exposes canonical public catalog routes and isolates data-source f
   assert.match(sitemap, /fetchActiveStores\(\)/);
   assert.match(sitemap, /\.lte\("publish_at", now\)/);
   assert.match(sitemap, /buildPublicCatalogVisibilityFilter\(now\)/);
+  assert.match(sitemap, /visibleSoldBrandSlugs/);
+  assert.match(sitemap, /visibleSoldBrands\.map/);
   assert.match(sitemap, /product\.sale_type === "fixed" \? "shop" : "auction"/);
   assert.match(sitemap, /\/centers\/\$\{encodeURIComponent\(store\.slug\)\}/);
   assert.match(sitemap, /Promise\.allSettled/);

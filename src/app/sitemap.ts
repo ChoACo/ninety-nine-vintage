@@ -83,6 +83,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const stores = storesResult.status === "fulfilled" ? storesResult.value : [];
   const soldProducts = soldResult.status === "fulfilled" ? soldResult.value : [];
   const brands = brandsResult.status === "fulfilled" ? brandsResult.value : [];
+  const visibleSoldBrandSlugs = new Set(
+    soldProducts.map((product) => product.brand_slug),
+  );
+  const visibleSoldBrands = brands.filter((brand) =>
+    visibleSoldBrandSlugs.has(brand.brand_slug),
+  );
 
   const dynamicEntries: MetadataRoute.Sitemap = [
     ...publishedProducts.map((product) => ({
@@ -96,7 +102,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily" as const,
       priority: 0.7,
     })),
-    ...brands.map((brand) => ({
+    ...visibleSoldBrands.map((brand) => ({
       url: `${SITE_URL}/sold/brand/${encodeURIComponent(brand.brand_slug)}`,
       changeFrequency: "weekly" as const,
       priority: 0.7,

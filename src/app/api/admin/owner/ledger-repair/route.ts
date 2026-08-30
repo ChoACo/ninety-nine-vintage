@@ -17,6 +17,8 @@ const ACTIONS = new Set([
   "update_storage_duration",
   "cancel_shipment",
   "correct_shipment_tracking",
+  "force_request_shipment",
+  "force_complete_delivery",
   "restore_audit_event",
 ]);
 const FORCE_ACTIONS = new Set([
@@ -26,6 +28,10 @@ const FORCE_ACTIONS = new Set([
   "cancel_legacy_payment",
   "cancel_inventory_item",
   "cancel_shipment",
+]);
+const FORCE_PROGRESSION_ACTIONS = new Set([
+  "force_request_shipment",
+  "force_complete_delivery",
 ]);
 
 interface RpcClient {
@@ -129,7 +135,7 @@ export async function GET(request: Request) {
       return ownerAccessJsonResponse({ members });
     }
 
-    const [profileResult, accountResult, bidsResult, cancelledBidsResult, auctionPaymentsResult, legacyPaymentsResult, ordersResult, inventoryResult, shipmentsResult, auditsResult] = await Promise.all([
+    const [profileResult, accountResult, bidsResult, cancelledBidsResult, auctionPaymentsResult, legacyPaymentsResult, ordersResult, inventoryResult, shipmentsResult, auditsResult, addressesResult] = await Promise.all([
       access.admin.from("profiles").select("id,display_name,created_at,deleted_at").eq("id", memberId).maybeSingle(),
       access.admin.from("member_accounts").select("member_id,phone,account_status,shipping_credit_count,last_depositor_name").eq("member_id", memberId).maybeSingle(),
       access.admin.from("auction_bids").select("id,product_id,amount,is_final,created_at,bidder_display_name").eq("bidder_id", memberId).order("created_at", { ascending: false }).limit(300),
@@ -140,6 +146,7 @@ export async function GET(request: Request) {
       access.admin.from("customer_inventory_items").select("id,product_id,source_kind,paid_amount,paid_at,ownership_status,storage_duration_days,storage_started_at,storage_expires_at,version,created_at,updated_at").eq("member_id", memberId).order("paid_at", { ascending: false }).limit(300),
       access.admin.from("inventory_shipments").select("id,status,settlement_method,courier,tracking_number,delivery_status,delivery_status_text,packed_at,shipped_at,delivered_at,cancelled_at,cancellation_reason,version,created_at,updated_at").eq("member_id", memberId).order("created_at", { ascending: false }).limit(200),
       access.admin.from("owner_ledger_repair_events").select("id,action,entity_type,entity_id,product_id,reason,occurred_at,result").eq("member_id", memberId).order("occurred_at", { ascending: false }).limit(100),
+      access.admin.from("shipping_addresses").select("id,label,recipient_name,phone,postal_code,address,is_default").eq("member_id", memberId).order("is_default", { ascending: false }).order("created_at", { ascending: false }).limit(20),
     ]);
     const baseResults = [
       { query: "profiles", error: profileResult.error },
@@ -152,6 +159,7 @@ export async function GET(request: Request) {
       { query: "customer_inventory_items", error: inventoryResult.error },
       { query: "inventory_shipments", error: shipmentsResult.error },
       { query: "owner_ledger_repair_events", error: auditsResult.error },
+      { query: "shipping_addresses", error: addressesResult.error },
     ];
     if (baseResults.some((result) => result.error)) {
       logLedgerReadFailure("base", baseResults);
@@ -260,6 +268,15 @@ export async function GET(request: Request) {
       }),
       inventory: inventory.map((item) => ({ ...item, product: productById.get(item.product_id) ?? null, fulfillment: fulfillmentByItem.get(item.id) ?? null, activeShipmentId: shipmentItems.find((line) => line.inventory_item_id === item.id && !["cancelled", "excluded", "shipped"].includes(String(line.line_status)))?.shipment_id ?? null })),
       shipments: shipments.map((shipment) => ({ ...shipment, items: shipmentLinesByShipment.get(String(shipment.id)) ?? [] })),
+      addresses: rows(addressesResult.data).map((address) => ({
+        id: address.id,
+        label: address.label,
+        recipientName: address.recipient_name,
+        phone: address.phone,
+        postalCode: address.postal_code,
+        address: address.address,
+        isDefault: address.is_default,
+      })),
       audits: (() => {
         const audits = rows(auditsResult.data);
         const restoredIds = new Set(audits
@@ -287,18 +304,63 @@ export async function POST(request: Request) {
   try {
     const access = await authenticateOwnerAccessRequest(request);
     const body = await readSmallJsonBody(request, 12_288);
-    const allowedKeys = new Set(["action", "entityId", "expectedVersion", "payload", "reason", "idempotencyKey", "confirmation", "expectedReceivedAmount", "expectedLedgerEntryCount"]);
+    const allowedKeys = new Set(["action", "entityId", "memberId", "expectedVersion", "payload", "reason", "idempotencyKey", "confirmation", "expectedReceivedAmount", "expectedLedgerEntryCount"]);
     if (Object.keys(body).some((key) => !allowedKeys.has(key))) {
       return ownerAccessJsonResponse({ error: "invalid_ledger_repair" }, 422);
     }
     const action = typeof body.action === "string" ? body.action : "";
     const reason = typeof body.reason === "string" ? body.reason.trim() : "";
-    const requiredConfirmation = FORCE_ACTIONS.has(action) ? "강제철회" : "원장복구";
+    const requiredConfirmation = FORCE_ACTIONS.has(action)
+      ? "강제철회"
+      : FORCE_PROGRESSION_ACTIONS.has(action)
+        ? "강제진행"
+        : "원장복구";
     if (!ACTIONS.has(action) || !isUuid(body.entityId) || !isUuid(body.idempotencyKey) || body.confirmation !== requiredConfirmation || reason.length < 3 || reason.length > 500) {
       return ownerAccessJsonResponse({ error: "invalid_ledger_repair", message: "복구 작업, 사유, 확인 문구를 확인해 주세요." }, 422);
     }
     const userRpc = access.userClient as unknown as RpcClient;
     const adminRpc = access.admin as unknown as RpcClient;
+    const payload = body.payload && typeof body.payload === "object" && !Array.isArray(body.payload)
+      ? body.payload as Record<string, unknown>
+      : {};
+    if (action === "force_request_shipment") {
+      const inventoryItemIds = Array.isArray(payload.inventoryItemIds)
+        ? payload.inventoryItemIds.filter(isUuid)
+        : [];
+      if (
+        !isUuid(body.memberId)
+        || !isUuid(payload.addressId)
+        || inventoryItemIds.length < 1
+        || inventoryItemIds.length > 100
+        || inventoryItemIds.length !== (Array.isArray(payload.inventoryItemIds) ? payload.inventoryItemIds.length : 0)
+      ) {
+        return ownerAccessJsonResponse({ error: "invalid_force_shipment_request" }, 422);
+      }
+      const { data, error } = await adminRpc.rpc("owner_force_request_inventory_shipment_service", {
+        p_actor_owner_id: access.userId,
+        p_member_id: body.memberId,
+        p_inventory_item_ids: inventoryItemIds,
+        p_address_id: payload.addressId,
+        p_reason: reason,
+        p_idempotency_key: body.idempotencyKey,
+      });
+      if (error) return repairFailure(error);
+      return ownerAccessJsonResponse({ result: data });
+    }
+    if (action === "force_complete_delivery") {
+      if (!Number.isSafeInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
+        return ownerAccessJsonResponse({ error: "invalid_force_delivery" }, 422);
+      }
+      const { data, error } = await adminRpc.rpc("owner_force_complete_inventory_delivery_service", {
+        p_actor_owner_id: access.userId,
+        p_shipment_id: body.entityId,
+        p_expected_version: body.expectedVersion,
+        p_reason: reason,
+        p_idempotency_key: body.idempotencyKey,
+      });
+      if (error) return repairFailure(error);
+      return ownerAccessJsonResponse({ result: data });
+    }
     if (action === "restore_audit_event") {
       const { data, error } = await adminRpc.rpc("owner_restore_ledger_repair_event_service", {
         p_actor_owner_id: access.userId,
@@ -324,7 +386,6 @@ export async function POST(request: Request) {
       if (error) return repairFailure(error);
       return ownerAccessJsonResponse({ result: data });
     }
-    const payload = body.payload && typeof body.payload === "object" && !Array.isArray(body.payload) ? body.payload : {};
     const { data, error } = await userRpc.rpc("owner_repair_global_ledger", {
       p_action: action,
       p_entity_id: body.entityId,

@@ -76,6 +76,27 @@ test("unpaid console reuses authenticated store scope and keeps failures user-fa
   assert.doesNotMatch(layout, /Seller workspace/);
 });
 
+test("only the Owner can force an expired winner through payment and choose settlement inclusion", async () => {
+  const [migration, route, consoleSource] = await Promise.all([
+    source("supabase/migrations/20260830100952_owner_unpaid_force_payment.sql"),
+    source("src/app/api/admin/operator/auctions/unpaid/route.ts"),
+    source("src/components/admin/operator/OperatorUnpaidAuctionsConsole.tsx"),
+  ]);
+
+  assert.match(migration, /owner_force_confirm_unpaid_auction_offer/i);
+  assert.match(migration, /not public\.is_owner\(\)/i);
+  assert.match(migration, /orders\.status in \('awaiting_manual_transfer', 'cancelled_unpaid'\)/i);
+  assert.match(migration, /offers\.status = 'settled'/i);
+  assert.match(migration, /owner_force_confirm_auction_payment_request/i);
+  assert.match(migration, /owner_operational_ledger_purge_archives/i);
+  assert.match(route, /auth\.roleCode !== "owner"/);
+  assert.match(route, /owner_force_confirm_unpaid_auction_offer/);
+  assert.match(route, /p_include_in_settlement: body\.includeInSettlement/);
+  assert.match(consoleSource, /isOwner &&/);
+  assert.match(consoleSource, /즉시 결제완료 처리/);
+  assert.match(consoleSource, /정산 미포함/);
+});
+
 test("past console keeps winner state visible and uses sequential second chance handling", async () => {
   const [pastRoute, pastConsole, resolveRoute] = await Promise.all([
     source("src/app/api/admin/operator/products/past/route.ts"),

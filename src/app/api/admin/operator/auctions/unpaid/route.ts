@@ -28,6 +28,20 @@ interface ProductRow {
   stores?: { name: string } | null;
 }
 
+interface RpcError {
+  code?: string;
+  message: string;
+}
+
+interface RpcClient {
+  rpc(
+    fn: string,
+    args: Record<string, unknown>,
+  ): Promise<{ data: unknown; error: RpcError | null }>;
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function normalizeOfferStatus(status: string): string {
   if (status === "payment_due") return "결제 대기";
   if (status === "offered") return "차순위 제안 대기";
@@ -80,7 +94,7 @@ export async function GET(request: Request) {
     }, 503);
   const productRows = (products ?? []) as unknown as ProductRow[];
   if (productRows.length === 0) {
-    return commerceJson({ products: [], stores: stores ?? [] });
+    return commerceJson({ isOwner: auth.roleCode === "owner", products: [], stores: stores ?? [] });
   }
 
   const { data: offerRows, error: offerError } = await auth.user
@@ -136,6 +150,11 @@ export async function GET(request: Request) {
       winnerName: winner?.bidder_display_name_snapshot ?? null,
       winnerAmount: winner?.offered_amount ?? null,
       paymentDueAt: original?.payment_due_at ?? null,
+      ownerForceOfferId: original?.offer_id ?? null,
+      canOwnerForcePayment: auth.roleCode === "owner"
+        && Boolean(original)
+        && !hasSettled
+        && ["payment_due", "accepted", "expired_unpaid"].includes(original?.status ?? ""),
       canResolve,
       canSecondChance: Boolean(original) && !hasSettled,
       blockedReason,
@@ -153,5 +172,69 @@ export async function GET(request: Request) {
     };
   });
 
-  return commerceJson({ products: productsPayload, stores: stores ?? [] });
+  return commerceJson({ isOwner: auth.roleCode === "owner", products: productsPayload, stores: stores ?? [] });
+}
+
+export async function POST(request: Request) {
+  const auth = await authenticateOperatorStoreRequest(request);
+  if (!auth.ok) return auth.response;
+  if (auth.roleCode !== "owner") {
+    return commerceJson({ error: "owner_force_payment_forbidden" }, 403);
+  }
+
+  const body = await request.json().catch(() => null) as {
+    action?: unknown;
+    offerId?: unknown;
+    depositorName?: unknown;
+    includeInSettlement?: unknown;
+    reason?: unknown;
+    idempotencyKey?: unknown;
+  } | null;
+  const depositorName = typeof body?.depositorName === "string"
+    ? body.depositorName.trim()
+    : "";
+  const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
+  if (
+    body?.action !== "force_confirm_payment"
+    || typeof body.offerId !== "string"
+    || !UUID_PATTERN.test(body.offerId)
+    || typeof body.idempotencyKey !== "string"
+    || !UUID_PATTERN.test(body.idempotencyKey)
+    || typeof body.includeInSettlement !== "boolean"
+    || depositorName.length < 1
+    || depositorName.length > 80
+    || reason.length < 3
+    || reason.length > 500
+  ) {
+    return commerceJson({ error: "invalid_owner_force_payment" }, 422);
+  }
+
+  const { data, error } = await (auth.user as unknown as RpcClient).rpc(
+    "owner_force_confirm_unpaid_auction_offer",
+    {
+      p_offer_id: body.offerId,
+      p_depositor_name: depositorName,
+      p_include_in_settlement: body.includeInSettlement,
+      p_reason: reason,
+      p_idempotency_key: body.idempotencyKey,
+    },
+  );
+  if (error) {
+    const status = error.code === "42501"
+      ? 403
+      : error.code === "23505" || error.code === "PT409"
+        ? 409
+        : ["22023", "55000", "P0002"].includes(error.code ?? "")
+          ? 422
+          : 503;
+    return commerceJson(
+      {
+        error: "owner_force_payment_failed",
+        message: error.message || "강제 결제완료를 처리하지 못했습니다.",
+      },
+      status,
+    );
+  }
+
+  return commerceJson({ result: data });
 }

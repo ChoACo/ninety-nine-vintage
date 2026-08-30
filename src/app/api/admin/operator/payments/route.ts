@@ -398,7 +398,7 @@ export async function GET(request: Request) {
 
   const historyCutoff = Date.parse(data.serverTime) - 7 * 24 * 60 * 60 * 1_000;
   const visiblePayments = data.payments.filter((payment) => {
-    if (payment.status === "cancelled" || payment.status === "cancelled_unpaid") {
+    if (["cancelled", "cancelled_unpaid", "owner_reversed"].includes(payment.status)) {
       return false;
     }
     if (!page.includeHistory) return payment.remainingAmount > 0;

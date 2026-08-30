@@ -46,7 +46,7 @@ test("owner can restore a force rollback from the append-only audit snapshot", a
 test("owner ledger API authenticates exact owner and requires explicit repair confirmation", async () => {
   const route = await source("src/app/api/admin/owner/ledger-repair/route.ts");
   assert.match(route, /authenticateOwnerAccessRequest\(request\)/);
-  assert.match(route, /requiredConfirmation = FORCE_ACTIONS\.has\(action\) \? "강제철회" : "원장복구"/);
+  assert.match(route, /FORCE_PROGRESSION_ACTIONS\.has\(action\)/);
   assert.match(route, /readSmallJsonBody\(request, 12_288\)/);
   assert.match(route, /adminRpc\.rpc\("owner_force_ledger_rollback_service"/);
   assert.match(route, /adminRpc\.rpc\("owner_restore_ledger_repair_event_service"/);
@@ -89,10 +89,33 @@ test("owner center exposes the unified member ledger repair console", async () =
   assert.doesNotMatch(consoleSource, /<h2[^>]*>결제·미결제<\/h2>/);
   assert.doesNotMatch(consoleSource, /<h2[^>]*>보관 상품<\/h2>/);
   assert.doesNotMatch(consoleSource, /<h2[^>]*>배송 신청·발송<\/h2>/);
-  assert.match(consoleSource, /FORCE_ACTIONS\.has\(target\.action\) \? "강제철회" : "원장복구"/);
+  assert.match(consoleSource, /confirmationForAction\(target\.action\)/);
   assert.match(consoleSource, /감사 기록의 변경 전 스냅샷으로 플랫폼 원장을 복구/);
   assert.match(consoleSource, /실제 입금 반환 확인 필요/);
   assert.match(consoleSource, /실물 배송 회수 확인 필요/);
+});
+
+test("owner ledger can force a canonical shipment request and delivery completion through trusted service bridges", async () => {
+  const [migration, route, consoleSource] = await Promise.all([
+    source("supabase/migrations/20260830101849_owner_force_shipping_progression.sql"),
+    source("src/app/api/admin/owner/ledger-repair/route.ts"),
+    source("src/components/admin/owner/OwnerLedgerRepairConsole.tsx"),
+  ]);
+
+  assert.match(migration, /owner_force_request_inventory_shipment_service/i);
+  assert.match(migration, /owner_force_complete_inventory_delivery_service/i);
+  assert.match(migration, /auth\.role\(\) <> 'service_role'/i);
+  assert.match(migration, /role_code = 'owner'[\s\S]*grade_level = 0/i);
+  assert.match(migration, /public\.request_inventory_shipment\(/i);
+  assert.match(migration, /'waiver'/i);
+  assert.match(migration, /public\.record_inventory_delivery_tracking\(/i);
+  assert.match(migration, /owner_ledger_repair_events/i);
+  assert.match(route, /owner_force_request_inventory_shipment_service/);
+  assert.match(route, /owner_force_complete_inventory_delivery_service/);
+  assert.match(route, /FORCE_PROGRESSION_ACTIONS/);
+  assert.match(consoleSource, /배송신청 강제 진행/);
+  assert.match(consoleSource, /배송완료 강제 처리/);
+  assert.match(consoleSource, /강제진행/);
 });
 
 test("owner ledger server can read fulfillment tables without granting browser access", async () => {

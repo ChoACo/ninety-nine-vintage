@@ -60,7 +60,7 @@ test("operator payments expose seven-day history, amount adjustment, and reversi
   ]);
 
   assert.match(queueRoute, /7 \* 24 \* 60 \* 60 \* 1_000/);
-  assert.match(queueRoute, /payment\.status === "cancelled" \|\| payment\.status === "cancelled_unpaid"/);
+  assert.match(queueRoute, /\["cancelled", "cancelled_unpaid", "owner_reversed"\]\.includes\(payment\.status\)/);
   assert.match(queueRoute, /reversibleLedgerId/);
   assert.match(confirmRoute, /fields\.every\(\(field\) => Object\.hasOwn\(value, field\)\)/);
   assert.doesNotMatch(confirmRoute, /Object\.keys\(value\)\.length !== fields\.length/);

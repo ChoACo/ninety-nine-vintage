@@ -106,6 +106,16 @@ interface ShipmentRow {
   items: Array<{ inventory_item_id: string; product_id: string; line_status: string; product: ProductSummary | null }>;
 }
 
+interface ShippingAddressRow {
+  id: string;
+  label: string;
+  recipientName: string;
+  phone: string;
+  postalCode: string;
+  address: string;
+  isDefault: boolean;
+}
+
 interface AuditRow {
   id: string;
   action: string;
@@ -127,6 +137,7 @@ interface LedgerPayload {
   commerceOrders?: CommerceOrder[];
   inventory?: InventoryRow[];
   shipments?: ShipmentRow[];
+  addresses?: ShippingAddressRow[];
   audits?: AuditRow[];
   error?: string;
   message?: string;
@@ -155,6 +166,8 @@ type RepairAction =
   | "update_storage_duration"
   | "cancel_shipment"
   | "correct_shipment_tracking"
+  | "force_request_shipment"
+  | "force_complete_delivery"
   | "restore_audit_event";
 
 interface RepairTarget {
@@ -179,6 +192,8 @@ const ACTION_LABELS: Record<RepairAction, string> = {
   update_storage_duration: "보관 기간 수정",
   cancel_shipment: "배송 신청 취소",
   correct_shipment_tracking: "운송장 정정",
+  force_request_shipment: "배송 신청 강제 진행",
+  force_complete_delivery: "배송완료 강제 처리",
   restore_audit_event: "감사 기록에서 복구",
 };
 
@@ -190,6 +205,17 @@ const FORCE_ACTIONS = new Set<RepairAction>([
   "cancel_inventory_item",
   "cancel_shipment",
 ]);
+
+const FORCE_PROGRESSION_ACTIONS = new Set<RepairAction>([
+  "force_request_shipment",
+  "force_complete_delivery",
+]);
+
+function confirmationForAction(action: RepairAction) {
+  if (FORCE_ACTIONS.has(action)) return "강제철회";
+  if (FORCE_PROGRESSION_ACTIONS.has(action)) return "강제진행";
+  return "원장복구";
+}
 
 function formatWon(value: number) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
@@ -313,6 +339,7 @@ export function OwnerLedgerRepairConsole() {
   const [courier, setCourier] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
   const [storageDuration, setStorageDuration] = useState("14");
+  const [selectedAddressId, setSelectedAddressId] = useState("");
   const [busy, setBusy] = useState(false);
   const requestKeys = useRef(new Map<string, string>());
 
@@ -367,12 +394,13 @@ export function OwnerLedgerRepairConsole() {
     setCourier("");
     setTrackingNumber("");
     setStorageDuration(String(next.payload?.storageDurationDays ?? 14));
+    setSelectedAddressId(String(next.payload?.addressId ?? ledger?.addresses?.[0]?.id ?? ""));
     setNotice("");
   };
 
   const submitRepair = async () => {
     if (!token || !target || !selectedMemberId || busy) return;
-    const requiredConfirmation = FORCE_ACTIONS.has(target.action) ? "강제철회" : "원장복구";
+    const requiredConfirmation = confirmationForAction(target.action);
     if (reason.trim().length < 3 || confirmation !== requiredConfirmation) {
       setNotice(`사유를 3자 이상 입력하고 확인 문구 ‘${requiredConfirmation}’를 정확히 입력해 주세요.`);
       return;
@@ -389,6 +417,10 @@ export function OwnerLedgerRepairConsole() {
       payload.trackingNumber = trackingNumber.trim();
     }
     if (target.action === "update_storage_duration") payload.storageDurationDays = Number(storageDuration);
+    if (target.action === "force_request_shipment") {
+      if (!selectedAddressId) return setNotice("회원 배송지를 선택해 주세요.");
+      payload.addressId = selectedAddressId;
+    }
     const requestScope = `${target.action}:${target.entityId}:${target.expectedVersion}:${JSON.stringify(payload)}`;
     const idempotencyKey = requestKeys.current.get(requestScope) ?? crypto.randomUUID();
     requestKeys.current.set(requestScope, idempotencyKey);
@@ -401,6 +433,7 @@ export function OwnerLedgerRepairConsole() {
         body: JSON.stringify({
           action: target.action,
           entityId: target.entityId,
+          memberId: selectedMemberId,
           expectedVersion: target.expectedVersion,
           expectedReceivedAmount: target.expectedReceivedAmount,
           expectedLedgerEntryCount: target.expectedLedgerEntryCount,
@@ -485,7 +518,9 @@ export function OwnerLedgerRepairConsole() {
               <div className="mt-4 flex flex-wrap justify-end gap-2">
                 {group.auctionPayments.filter((item) => item.status === "awaiting_manual_transfer").map((payment) => <button className="min-h-10 border border-zinc-700 px-3 text-xs font-bold" key={`due:${payment.id}`} onClick={() => openRepair({action:"update_auction_due_at",entityId:payment.id,expectedVersion:payment.version,title:payment.product?.title ?? payment.order_name,description:"회원의 낙찰 결제 마감 시각을 수정합니다."})} type="button"><Clock3 className="mr-1 inline" size={13}/>결제 마감 수정</button>)}
                 {group.inventory.filter((item) => item.storage_started_at && item.ownership_status === "active").map((item) => <button className="min-h-10 border border-zinc-700 px-3 text-xs font-bold" key={`storage:${item.id}`} onClick={() => openRepair({action:"update_storage_duration",entityId:item.id,expectedVersion:item.version,payload:{storageDurationDays:item.storage_duration_days},title:item.product?.title ?? "보관 상품",description:"보관 시작일을 기준으로 7일 또는 14일 만료일을 다시 계산합니다."})} type="button"><PackageCheck className="mr-1 inline" size={13}/>보관 기간 수정</button>)}
+                {group.inventory.filter((item) => item.ownership_status === "active" && !item.activeShipmentId && item.fulfillment && !item.fulfillment.is_blocked && ["entitled", "preparing", "in_transit_to_center", "center_received", "center_stored"].includes(item.fulfillment.current_stage)).map((item) => <button className="min-h-10 border border-amber-500/60 px-3 text-xs font-black text-amber-300" key={`force-ship:${item.id}`} onClick={() => openRepair({action:"force_request_shipment",entityId:item.id,expectedVersion:item.version,payload:{inventoryItemIds:[item.id]},title:item.product?.title ?? "보관 상품",description:"회원의 저장된 배송지로 배송 신청을 생성합니다. 운영 복구 조치로 배송비는 1회 면제되며 모든 변경이 감사 기록에 남습니다."})} type="button"><Truck className="mr-1 inline" size={13}/>배송신청 강제 진행</button>)}
                 {group.shipments.filter((item) => item.status === "shipped").map((shipment) => <button className="min-h-10 border border-zinc-700 px-3 text-xs font-bold" key={`tracking:${shipment.id}`} onClick={() => openRepair({action:"correct_shipment_tracking",entityId:shipment.id,expectedVersion:shipment.version,title:"운송장 정정",description:"발송 완료 배송의 택배사와 운송장 번호를 수정하고 감사 이벤트를 남깁니다."})} type="button"><Truck className="mr-1 inline" size={13}/>운송장 정정</button>)}
+                {group.shipments.filter((item) => item.status === "shipped" && item.delivery_status !== "delivered").map((shipment) => <button className="min-h-10 border border-emerald-500/60 px-3 text-xs font-black text-emerald-300" key={`force-delivered:${shipment.id}`} onClick={() => openRepair({action:"force_complete_delivery",entityId:shipment.id,expectedVersion:shipment.version,title:"배송완료 강제 처리",description:"택배사 외부 조회와 별개로 현재 시각을 배송완료로 기록합니다. 구매확정·정산 대기 시계가 시작되며 감사 기록에 남습니다."})} type="button"><PackageCheck className="mr-1 inline" size={13}/>배송완료 강제 처리</button>)}
                 {forceTarget ? <button className="min-h-10 border border-rose-500/50 px-3 text-xs font-black text-rose-300" onClick={() => openRepair(forceTarget)} type="button"><XCircle className="mr-1 inline" size={13}/>연결 거래 전체 강제 철회</button> : <span className="inline-flex min-h-10 items-center border border-emerald-500/30 px-3 text-xs font-black text-emerald-300">철회 완료</span>}
               </div>
             </article>;
@@ -504,10 +539,11 @@ export function OwnerLedgerRepairConsole() {
           {target.action === "update_auction_due_at" && <label className="mt-5 block text-xs font-bold">새 결제 마감 시각<input className="mt-2 min-h-11 w-full border border-zinc-700 bg-zinc-900 px-3" min={new Date().toISOString().slice(0,16)} onChange={(event) => setDueAt(event.target.value)} type="datetime-local" value={dueAt}/></label>}
           {target.action === "correct_shipment_tracking" && <div className="mt-5 grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold">택배사<input className="mt-2 min-h-11 w-full border border-zinc-700 bg-zinc-900 px-3" maxLength={80} onChange={(event) => setCourier(event.target.value)} value={courier}/></label><label className="text-xs font-bold">운송장 번호<input className="mt-2 min-h-11 w-full border border-zinc-700 bg-zinc-900 px-3" maxLength={120} onChange={(event) => setTrackingNumber(event.target.value)} value={trackingNumber}/></label></div>}
           {target.action === "update_storage_duration" && <label className="mt-5 block text-xs font-bold">새 보관 기간<select className="mt-2 min-h-11 w-full border border-zinc-700 bg-zinc-900 px-3" onChange={(event) => setStorageDuration(event.target.value)} value={storageDuration}><option value="7">7일</option><option value="14">14일</option></select></label>}
+          {target.action === "force_request_shipment" && <label className="mt-5 block text-xs font-bold">회원 배송지<select className="mt-2 min-h-11 w-full border border-zinc-700 bg-zinc-900 px-3" onChange={(event) => setSelectedAddressId(event.target.value)} value={selectedAddressId}><option value="">배송지를 선택해 주세요</option>{(ledger?.addresses ?? []).map((address) => <option key={address.id} value={address.id}>{address.isDefault ? "[기본] " : ""}{address.label} · {address.recipientName} · {address.address}</option>)}</select>{(ledger?.addresses?.length ?? 0) === 0 && <span className="mt-2 block text-amber-300">회원이 저장한 배송지가 없어 먼저 회원 계정에서 배송지를 등록해야 합니다.</span>}</label>}
           <label className="mt-5 block text-xs font-bold">조치 사유<textarea className="mt-2 min-h-24 w-full resize-y border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm" maxLength={500} onChange={(event) => setReason(event.target.value)} placeholder="예: 운영 초반 중복 상품을 같은 상품으로 오인해 잘못 입찰한 건" value={reason}/></label>
-          <label className="mt-4 block text-xs font-bold">확인 문구<input autoComplete="off" className="mt-2 min-h-11 w-full border border-rose-500/50 bg-zinc-900 px-3" onChange={(event) => setConfirmation(event.target.value)} placeholder={FORCE_ACTIONS.has(target.action) ? "강제철회" : "원장복구"} value={confirmation}/></label>
+          <label className="mt-4 block text-xs font-bold">확인 문구<input autoComplete="off" className="mt-2 min-h-11 w-full border border-rose-500/50 bg-zinc-900 px-3" onChange={(event) => setConfirmation(event.target.value)} placeholder={confirmationForAction(target.action)} value={confirmation}/></label>
           {notice && <p aria-live="polite" className="mt-4 border border-zinc-700 bg-zinc-900 p-3 text-xs">{notice}</p>}
-          <div className="mt-6 flex flex-col-reverse gap-2 border-t border-zinc-800 pt-5 sm:flex-row sm:justify-end"><button className="min-h-11 border border-zinc-700 px-5 text-xs font-bold" disabled={busy} onClick={() => setTarget(null)} type="button">닫기</button><button className="min-h-11 bg-rose-600 px-5 text-xs font-black text-white disabled:opacity-40" disabled={busy || reason.trim().length < 3 || confirmation !== (FORCE_ACTIONS.has(target.action) ? "강제철회" : "원장복구")} onClick={() => void submitRepair()} type="button">{busy ? "처리 중…" : FORCE_ACTIONS.has(target.action) ? "감사 기록 후 강제 철회" : "감사 기록 후 복구"}</button></div>
+          <div className="mt-6 flex flex-col-reverse gap-2 border-t border-zinc-800 pt-5 sm:flex-row sm:justify-end"><button className="min-h-11 border border-zinc-700 px-5 text-xs font-bold" disabled={busy} onClick={() => setTarget(null)} type="button">닫기</button><button className="min-h-11 bg-rose-600 px-5 text-xs font-black text-white disabled:opacity-40" disabled={busy || reason.trim().length < 3 || confirmation !== confirmationForAction(target.action) || (target.action === "force_request_shipment" && !selectedAddressId)} onClick={() => void submitRepair()} type="button">{busy ? "처리 중…" : FORCE_ACTIONS.has(target.action) ? "감사 기록 후 강제 철회" : FORCE_PROGRESSION_ACTIONS.has(target.action) ? "감사 기록 후 강제 진행" : "감사 기록 후 복구"}</button></div>
         </div>}
       </PremiumDialog>
     </div>

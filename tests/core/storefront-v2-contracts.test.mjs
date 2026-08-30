@@ -113,7 +113,7 @@ test("product, login, and bid navigation support intercepted modals and direct f
   assert.match(detailView, /min-w-0[\s\S]*sm:col-span-6/);
   assert.match(stickyBidPanel, /sm:sticky sm:col-span-6/);
   assert.match(stickyBidPanel, /compact \? "sm:top-6" : "sm:top-20 md:top-24"/);
-  assert.match(directProduct, /<AuctionDetailView id=\{id\} \/>/);
+  assert.match(directProduct, /<AuctionDetailView id=\{id\} product=\{product\} \/>/);
   assert.match(interceptedLogin, /<ModalShell label="로그인"><LoginPrompt dismissToPrevious returnTo=\{safeReturnTo\(query\.next\)\} \/><\/ModalShell>/);
   assert.match(directLogin, /<LoginPrompt returnTo=\{safeReturnTo\(query\.next\)\} \/>/);
   for (const login of [interceptedLogin, directLogin]) {

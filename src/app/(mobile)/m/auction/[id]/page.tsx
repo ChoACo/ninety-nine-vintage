@@ -1,26 +1,41 @@
 import type { Metadata } from "next";
+import { notFound, permanentRedirect } from "next/navigation";
 import { AuctionDetailView } from "@/components/features/auction/detail/AuctionDetailView";
-import { getCatalogImageUrl } from "@/lib/images";
-import { fetchPublishedProduct } from "@/services/products";
+import { buildProductMetadata, type ProductSeoInput } from "@/lib/seo/productSeo";
+import { loadPublishedProductForSeo } from "@/lib/seo/productLoaders.server";
+import type { PublishedProduct } from "@/services/products";
 
 export const dynamic = "force-dynamic";
 
+function seoInput(product: PublishedProduct): ProductSeoInput {
+  return {
+    id: product.id,
+    title: product.title,
+    description: product.description,
+    brand: product.brand,
+    category: product.category,
+    canonicalPath: `/auction/${product.id}`,
+    imageUrls: product.imageUrls,
+    price: product.currentPrice,
+    availability: product.status === "closed" ? "SoldOut" : "InStock",
+    saleKind: "auction",
+    conditionGrade: product.conditionGrade,
+    sizeLabel: product.sizeLabel,
+    priceValidUntil: product.closesAt,
+    storeName: product.storeName,
+  };
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const product = await fetchPublishedProduct(id).catch(() => null);
-  if (!product) return {};
-  const title = `${product.title} | ${product.brand}`;
-  const priceLabel = product.saleType === "fixed" ? "판매 정가" : "현재 입찰가";
-  const price = product.saleType === "fixed" ? product.fixedPrice ?? product.currentPrice : product.currentPrice;
-  const priceText = `${priceLabel} ${price.toLocaleString("ko-KR")}원`;
-  const description = product.description ? `${priceText} · ${product.description}`.slice(0, 200) : priceText;
-  const url = `/auction/${id}`;
-  const imageUrl = product.imageUrls[0] ? getCatalogImageUrl(product.imageUrls[0], 800) : undefined;
-  const images = imageUrl ? [{ url: imageUrl, alt: product.title }] : undefined;
-  return { title, description, alternates: { canonical: url }, openGraph: { title, description, url, type: "website", images } };
+  const product = await loadPublishedProductForSeo(id).catch(() => null);
+  return product?.saleType === "auction" ? buildProductMetadata(seoInput(product)) : {};
 }
 
 export default async function MobileAuctionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <AuctionDetailView id={id} surface="mobile" />;
+  const product = await loadPublishedProductForSeo(id).catch(() => null);
+  if (!product) notFound();
+  if (product.saleType === "fixed") permanentRedirect(`/m/shop/${id}`);
+  return <AuctionDetailView id={id} product={product} surface="mobile" />;
 }

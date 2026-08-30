@@ -50,12 +50,13 @@ test("sold RPCs expose only archive-safe fields with cursor and brand filtering"
 });
 
 test("sold routes own their canonical, structured data and safe 404 boundary", async () => {
-  const [shopLayout, soldPage, brandPage, mobileBrandPage, detailPage, sitemap, robots] = await Promise.all([
+  const [shopLayout, soldPage, brandPage, mobileBrandPage, detailPage, productSeo, sitemap, robots] = await Promise.all([
     source("src/app/(shop)/layout.tsx"),
     source("src/app/(shop)/sold/page.tsx"),
     source("src/app/(shop)/sold/brand/[slug]/page.tsx"),
     source("src/app/(mobile)/m/sold/brand/[slug]/page.tsx"),
     source("src/app/(shop)/sold/[id]/page.tsx"),
+    source("src/lib/seo/productSeo.ts"),
     source("src/app/sitemap.ts"),
     source("src/app/robots.ts"),
   ]);
@@ -67,9 +68,10 @@ test("sold routes own their canonical, structured data and safe 404 boundary", a
   assert.match(mobileBrandPage, /fetchSoldBrands\(\)/);
   assert.match(mobileBrandPage, /brand\.brand_slug === slug\)\) notFound\(\)/);
   assert.match(detailPage, /UUID_PATTERN\.test\(id\).*notFound\(\)/s);
-  assert.match(detailPage, /"@type":\s*"Product"/);
-  assert.match(detailPage, /https:\/\/schema\.org\/SoldOut/);
-  assert.match(detailPage, /priceCurrency:\s*"KRW"/);
+  assert.match(detailPage, /buildProductJsonLd\(seoInput\(product\)\)/);
+  assert.match(productSeo, /"@type":\s*"Product"/);
+  assert.match(productSeo, /`https:\/\/schema\.org\/\$\{input\.availability\}`/);
+  assert.match(productSeo, /priceCurrency:\s*"KRW"/);
   assert.match(sitemap, /sold\/brand/);
   assert.match(robots, /sitemap\.xml/);
 });

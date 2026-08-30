@@ -1,4 +1,6 @@
 import { authenticateOperatorStoreRequest, commerceJson, verifyOperatorProductScope } from "@/lib/commerce/server";
+import { after } from "next/server";
+import { notifyIndexNow, productPublicUrl } from "@/lib/seo/indexNow.server";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await authenticateOperatorStoreRequest(request, true);
@@ -24,5 +26,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return commerceJson({ error: "product_not_published", result: data }, 409);
   }
 
+  const productResult = await auth.admin
+    .from("products")
+    .select("sale_type")
+    .eq("id", id)
+    .maybeSingle();
+  if (productResult.data) {
+    const saleType = productResult.data.sale_type;
+    after(() => notifyIndexNow([productPublicUrl(id, saleType)]));
+  }
   return commerceJson({ result: data });
 }

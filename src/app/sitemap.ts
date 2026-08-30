@@ -14,6 +14,7 @@ interface PublishedProductSitemapRow {
   id: string;
   sale_type: string;
   updated_at: string;
+  image_urls: string[];
 }
 
 async function fetchAllPublishedProducts(): Promise<PublishedProductSitemapRow[]> {
@@ -26,7 +27,7 @@ async function fetchAllPublishedProducts(): Promise<PublishedProductSitemapRow[]
     const pageSize = Math.min(DATABASE_PAGE_SIZE, remaining);
     const { data, error } = await verifier
       .from("products")
-      .select("id, sale_type, updated_at")
+      .select("id, sale_type, updated_at, image_urls")
       .lte("publish_at", now)
       .or(buildPublicCatalogVisibilityFilter(now))
       .order("updated_at", { ascending: false })
@@ -96,6 +97,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(product.updated_at),
       changeFrequency: "daily" as const,
       priority: product.sale_type === "fixed" ? 0.8 : 0.9,
+      images: product.image_urls.slice(0, 15),
     })),
     ...stores.map((store) => ({
       url: `${SITE_URL}/centers/${encodeURIComponent(store.slug)}`,
@@ -112,6 +114,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(product.sold_at),
       changeFrequency: "never" as const,
       priority: 0.6,
+      images: product.image_urls.slice(0, 15),
     })),
   ];
 

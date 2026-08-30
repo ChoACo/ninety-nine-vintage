@@ -5,6 +5,8 @@ import { isConditionGrade } from "@/lib/catalog/conditions";
 import { normalizeDefectTags } from "@/lib/catalog/defects";
 import { normalizeMeasurements } from "@/lib/catalog/measurements";
 import { getBatchClothingCategory } from "@/lib/import/categoryIds";
+import { after } from "next/server";
+import { notifyIndexNow, productPublicUrl } from "@/lib/seo/indexNow.server";
 
 type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -184,7 +186,11 @@ export async function POST(request: Request) {
   const { data, error } = await auth.user
     .from("products")
     .insert(rows as ProductInsert[])
-    .select("id, title, sale_type, status, store_id");
+    .select("id, title, sale_type, status, store_id, publish_at");
   if (error) return commerceJson({ error: error.message || "상품 일괄등록에 실패했습니다." }, 409);
+  const dueUrls = (data ?? [])
+    .filter((product) => Date.parse(product.publish_at) <= Date.now() + 60_000)
+    .map((product) => productPublicUrl(product.id, product.sale_type));
+  if (dueUrls.length > 0) after(() => notifyIndexNow(dueUrls));
   return commerceJson({ products: data ?? [], count: data?.length ?? 0 }, 201);
 }

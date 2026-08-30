@@ -11,6 +11,8 @@ import {
   getAvailablePublishSlots,
   parseBrandAndSizeFromTitle,
 } from "@/lib/utils/productParser";
+import { after } from "next/server";
+import { notifyIndexNow, productPublicUrl } from "@/lib/seo/indexNow.server";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -377,5 +379,8 @@ export async function POST(request: Request) {
       { error: error.message || "상품을 등록하지 못했습니다." },
       409,
     );
+  if (Date.parse(publishAt) <= Date.now() + 60_000) {
+    after(() => notifyIndexNow([productPublicUrl(product.id, product.sale_type)]));
+  }
   return commerceJson({ product }, 201);
 }

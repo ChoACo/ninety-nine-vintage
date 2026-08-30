@@ -8,6 +8,8 @@ import { isConditionGrade } from "@/lib/catalog/conditions";
 import { normalizeDefectTags } from "@/lib/catalog/defects";
 import { normalizeMeasurements } from "@/lib/catalog/measurements";
 import { parseBrandAndSizeFromTitle } from "@/lib/utils/productParser";
+import { after } from "next/server";
+import { notifyIndexNow, productPublicUrl } from "@/lib/seo/indexNow.server";
 
 const MAX_PRODUCT_PRICE = 1_000_000_000;
 const MAX_BID_INCREMENT = 100_000_000;
@@ -325,6 +327,9 @@ export async function PATCH(
       mutationErrorStatus(error),
     );
   if (!updated) return commerceJson({ error: "stale_product" }, 409);
+  if (product.status === "active") {
+    after(() => notifyIndexNow([productPublicUrl(id, product.sale_type)]));
+  }
   return commerceJson({ product: updated });
 }
 
@@ -348,6 +353,16 @@ export async function DELETE(
   const expectedUpdatedAt = validTimestampVersion(body?.expectedUpdatedAt);
   if (!expectedUpdatedAt)
     return commerceJson({ error: "expected_updated_at_required" }, 400);
+
+  const { data: deletionTarget, error: deletionLookupError } = await auth.user
+    .from("products")
+    .select("sale_type")
+    .eq("id", id)
+    .maybeSingle();
+  if (deletionLookupError) {
+    return commerceJson({ error: "product_unavailable" }, 503);
+  }
+  if (!deletionTarget) return commerceJson({ error: "product_not_found" }, 404);
 
   const { data: deletedImageUrls, error } = await auth.user.rpc(
     "delete_managed_product",
@@ -382,5 +397,6 @@ export async function DELETE(
     }
   }
 
+  after(() => notifyIndexNow([productPublicUrl(id, deletionTarget.sale_type)]));
   return commerceJson({ deleted: true, imageCleanupPending });
 }

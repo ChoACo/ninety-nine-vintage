@@ -63,7 +63,7 @@ function EnabledAuctionCard({ basePath = "", detailRoute, item }: AuctionCardPro
       if (!session?.access_token) {
         rememberFixedPurchaseIntent(item.id, "cart");
         router.push(
-          `${basePath}/account/login?next=${encodeURIComponent(`${basePath}/auction/${item.id}?purchaseIntent=cart`)}`,
+          `${basePath}/account/login?next=${encodeURIComponent(`${basePath}/shop/${item.id}?purchaseIntent=cart`)}`,
         );
         return;
       }
@@ -113,7 +113,7 @@ function EnabledAuctionCard({ basePath = "", detailRoute, item }: AuctionCardPro
           <div className="absolute right-2 top-2 flex flex-col items-end gap-2">
             <button aria-label={liked ? `${item.name} 찜 해제` : `${item.name} 찜하기`} className={`grid size-9 place-items-center rounded-xl bg-paper/90 shadow-sm backdrop-blur-md transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ink active:scale-95 ${liked ? "text-red-700" : "text-ink"}`} disabled={wishlistBusy} onClick={(event) => { event.preventDefault(); void updateWishlist(); }} type="button"><Heart className={liked ? "scale-110" : "scale-100"} fill={liked ? "currentColor" : "none"} size={16} strokeWidth={1.75} /></button>
             <button aria-label={`${item.name} 상품 문의`} className="flex h-8 items-center gap-1 rounded-xl bg-paper/90 px-2.5 text-[10px] font-bold text-ink shadow-sm backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ink active:scale-95" onClick={(event) => { event.preventDefault(); setInquiryOpen(true); }} type="button"><MessageCircle size={13} strokeWidth={1.75} /> 문의</button>
-            <ShareProductButton ariaLabel={`${item.name} 공유`} className="grid size-9 place-items-center rounded-xl bg-paper/90 text-ink shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" priceText={`${isFixed ? "판매 정가" : "현재 입찰가"} ${price.toLocaleString("ko-KR")}원`} title={`${item.enhancedTitle || item.name} | ${item.brand}`} url={`/auction/${item.id}`} />
+            <ShareProductButton ariaLabel={`${item.name} 공유`} className="grid size-9 place-items-center rounded-xl bg-paper/90 text-ink shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" priceText={`${isFixed ? "판매 정가" : "현재 입찰가"} ${price.toLocaleString("ko-KR")}원`} title={`${item.enhancedTitle || item.name} | ${item.brand}`} url={`/${resolvedDetailRoute}/${item.id}`} />
           </div>
           {sold && <div className="absolute inset-0 grid place-items-center bg-black/60 text-center text-white"><span className="border border-white/70 px-5 py-3"><strong className="block text-sm tracking-[.16em]">SOLD OUT</strong><span className="mt-1 block text-[10px]">판매완료</span></span></div>}
           {quickSpecs.length > 0 && (
@@ -134,7 +134,7 @@ function EnabledAuctionCard({ basePath = "", detailRoute, item }: AuctionCardPro
           <p className="text-[10px] text-muted">{isFixed ? "즉시 구매" : `입찰 ${item.bidCount}건`}</p>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2">
-          {isFixed ? <><button className="flex h-9 items-center justify-center gap-1 rounded-xl border border-line text-[10px] font-bold shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-ink hover:shadow-lg active:scale-95 disabled:opacity-50" disabled={cartBusy} onClick={(event) => { event.preventDefault(); void addFixedToCart(); }} type="button"><ShoppingBag size={13} /> {cartBusy ? "저장 중" : "장바구니"}</button><Link className="flex h-9 items-center justify-center rounded-xl bg-ink text-[10px] font-bold text-paper shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" href={`${basePath}/auction/${item.id}`} prefetch={false}>즉시 구매</Link></> : <Link className="col-span-2 flex h-9 items-center justify-center gap-1 rounded-xl bg-ink text-[10px] font-bold text-paper shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" href={`${basePath}/auction/${item.id}/bid`} prefetch={false}><Gavel size={13} /> 입찰하기</Link>}
+          {isFixed ? <><button className="flex h-9 items-center justify-center gap-1 rounded-xl border border-line text-[10px] font-bold shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-ink hover:shadow-lg active:scale-95 disabled:opacity-50" disabled={cartBusy} onClick={(event) => { event.preventDefault(); void addFixedToCart(); }} type="button"><ShoppingBag size={13} /> {cartBusy ? "저장 중" : "장바구니"}</button><Link className="flex h-9 items-center justify-center rounded-xl bg-ink text-[10px] font-bold text-paper shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" href={`${basePath}/shop/${item.id}`} prefetch={false}>즉시 구매</Link></> : <Link className="col-span-2 flex h-9 items-center justify-center gap-1 rounded-xl bg-ink text-[10px] font-bold text-paper shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95" href={`${basePath}/auction/${item.id}/bid`} prefetch={false}><Gavel size={13} /> 입찰하기</Link>}
         </div>
         {actionMessage && <p aria-live="polite" className="mt-2 text-[10px] font-bold text-emerald-700">{actionMessage}</p>}
       </div>

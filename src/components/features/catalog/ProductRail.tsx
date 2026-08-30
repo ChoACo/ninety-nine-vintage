@@ -92,12 +92,12 @@ export function ProductRail({
           {products.map((product) => (
             <Link
               className="flex min-w-0 items-center gap-3 border-b border-line py-3 transition-colors hover:bg-surface"
-              href={`${basePath}/auction/${product.id}`}
+              href={`${basePath}/${product.saleType === "fixed" ? "shop" : "auction"}/${product.id}`}
               key={product.id}
               prefetch={false}
             >
               <CatalogImage
-                alt=""
+                alt={`${product.brand} ${product.title}`}
                 className="size-14 shrink-0 object-cover"
                 loading="lazy"
                 maxDimension={320}

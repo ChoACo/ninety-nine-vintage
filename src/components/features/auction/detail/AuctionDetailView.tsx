@@ -2,16 +2,22 @@ import { notFound } from "next/navigation";
 import { ConditionReport } from "@/components/features/auction/detail/ConditionReport";
 import { ItemGallery } from "@/components/features/auction/detail/ItemGallery";
 import { StickyBidPanel } from "@/components/features/auction/detail/StickyBidPanel";
-import { fetchPublishedProduct } from "@/services/products";
 import type { BidHistoryEntry, ItemDetail } from "@/types/detail";
 import {
   normalizeConditionGrade,
   type ConditionGrade,
 } from "@/lib/catalog/conditions";
 import { normalizeMeasurements } from "@/lib/catalog/measurements";
+import {
+  buildBrandSearchLabel,
+  buildProductJsonLd,
+  serializeJsonLd,
+} from "@/lib/seo/productSeo";
+import { loadPublishedProductForSeo } from "@/lib/seo/productLoaders.server";
+import type { PublishedProduct } from "@/services/products";
 
 function mapPublishedProductToDetail(
-  product: Awaited<ReturnType<typeof fetchPublishedProduct>>,
+  product: PublishedProduct,
 ): ItemDetail | null {
   if (!product) return null;
   const records = Array.isArray(product.bidHistory) ? product.bidHistory : [];
@@ -65,7 +71,7 @@ function mapPublishedProductToDetail(
     id: product.id,
     auctionId: product.id,
     name: product.title,
-    brand: product.brand,
+    brand: buildBrandSearchLabel(product.brand),
     category: product.category,
     description: product.description,
     imageUrl: product.imageUrls[0] ?? product.thumbnailUrls[0] ?? "",
@@ -104,10 +110,12 @@ function mapPublishedProductToDetail(
 
 export async function AuctionDetailView({
   id,
+  product: suppliedProduct,
   compact = false,
   surface = "desktop",
 }: {
   id: string;
+  product?: PublishedProduct;
   compact?: boolean;
   surface?: "desktop" | "mobile";
 }) {
@@ -117,14 +125,38 @@ export async function AuctionDetailView({
     )
   )
     notFound();
-  const item = mapPublishedProductToDetail(await fetchPublishedProduct(id));
+  const product = suppliedProduct ?? await loadPublishedProductForSeo(id);
+  if (!product) notFound();
+  const item = mapPublishedProductToDetail(product);
   if (!item) notFound();
+  const canonicalPath = `/${product.saleType === "fixed" ? "shop" : "auction"}/${id}` as const;
+  const price = product.saleType === "fixed"
+    ? (product.fixedPrice ?? product.currentPrice)
+    : product.currentPrice;
+  const jsonLd = buildProductJsonLd({
+    id: product.id,
+    title: product.title,
+    description: product.description,
+    brand: product.brand,
+    category: product.category,
+    canonicalPath,
+    imageUrls: product.imageUrls,
+    price,
+    availability: product.status === "closed" ? "SoldOut" : "InStock",
+    saleKind: product.saleType === "fixed" ? "fixed" : "auction",
+    conditionGrade: product.conditionGrade,
+    sizeLabel: product.sizeLabel,
+    priceValidUntil: product.saleType === "auction" ? product.closesAt : null,
+    storeName: product.storeName,
+  });
   return (
-    <div
+    <>
+      <script dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} type="application/ld+json" />
+      <div
       className="mx-auto grid w-full max-w-[1400px] grid-cols-1 items-start gap-6 p-0 sm:grid-cols-12 sm:gap-8 sm:p-6 lg:grid-cols-[minmax(0,58fr)_minmax(340px,42fr)] lg:gap-10"
       data-detail-layout={compact ? "intercepted" : "page"}
       data-detail-surface={surface}
-    >
+      >
       <div
         className="no-scrollbar min-w-0 overscroll-contain sm:col-span-6 md:col-span-7 lg:col-auto lg:h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pr-2"
         data-detail-gallery-scroll
@@ -139,6 +171,7 @@ export async function AuctionDetailView({
         key={item.id}
         surface={surface}
       />
-    </div>
+      </div>
+    </>
   );
 }

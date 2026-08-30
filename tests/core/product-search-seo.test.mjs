@@ -34,6 +34,7 @@ test("product metadata supports Korean and English brand discovery and Product o
   assert.match(seo, /\["NIKE", "나이키"\]/);
   assert.match(seo, /\["STUSSY", "스투시"\]/);
   assert.match(seo, /buildProductSearchName/);
+  assert.match(seo, /title:\s*\{ absolute: title \}/);
   assert.match(seo, /"@type":\s*"Product"/);
   assert.match(seo, /"@type":\s*"Offer"/);
   assert.match(seo, /priceCurrency:\s*"KRW"/);

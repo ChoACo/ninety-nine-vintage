@@ -112,7 +112,7 @@ export function buildProductMetadata(input: ProductSeoInput): Metadata {
     alt: buildProductSearchName(input.title, input.brand),
   }));
   return {
-    title,
+    title: { absolute: title },
     description,
     alternates: {
       canonical: input.canonicalPath,
